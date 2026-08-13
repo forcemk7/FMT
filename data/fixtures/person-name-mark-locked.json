@@ -1,0 +1,29 @@
+{
+  "layout": "person-name-mark-v1-locked",
+  "status": "locked",
+  "summary": "Gap UIDs (no \\u0000\\u0002+uid inline names) resolve via person stub MARK 01006c07 before uid||uid: firstNameId@+25, secondNameId@+30. Mid-file name tables collide on the same id space — take hits[0] for first-name ids and hits[1] (else hits[0]) for surname ids within NAME_TABLE_LO..HI (100–160MB).",
+  "mark": "01006c07",
+  "firstNameIdOffset": 25,
+  "secondNameIdOffset": 30,
+  "nameTableBand": { "lo": 104857600, "hi": 167772160 },
+  "expected": {
+    "2002217460": {
+      "name": "Landri Risse",
+      "jobId": 317202,
+      "unit": "II",
+      "note": "Mentoring/Loans must not show uid:2002217460"
+    },
+    "2002215969": {
+      "name": "Lion Görrissen",
+      "jobId": 315711,
+      "unit": "FT"
+    },
+    "2002251850": {
+      "name": "Miguel Pérez",
+      "jobId": 351592,
+      "unit": "II"
+    }
+  },
+  "scripts": ["scripts/extract-first-team-fast.py"],
+  "tests": ["tests/test_roster_name_resolution_t008.py"]
+}

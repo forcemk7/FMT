@@ -1,0 +1,56 @@
+{
+  "layout": "subunit-squad-lists-v1-wip",
+  "status": "partial-lock",
+  "note": "Reserves/U19 job lists are NOT discovered by First Team 7f02 sentinel parser. II affiliate clubId+squad join is LOCKED; U19 name→list join is LOCKED — see u19-squad-namelist-locked.json.",
+  "firstTeamContrast": {
+    "sentinel": "7f 02 00 00 00 ff ff ff ff <count:u16> <jobs>",
+    "schalkeFtTid": 193616
+  },
+  "subunitListHeader": {
+    "bytes": "ff ff ff ff <u32> <u32> ff ff ff ff 00 ff ff ff ff <count:u16> <jobs:u32×n>",
+    "countRange": [12, 50],
+    "oftenPrecededBy": "64 ff 24 … team object (II) or U19 club-name table rows"
+  },
+  "u19": {
+    "status": "LOCKED — see data/fixtures/u19-squad-namelist-locked.json",
+    "name": "Schalke 04 U19",
+    "nameAbs": 60415927,
+    "liveListAbs": 60415988,
+    "liveListCount": 26,
+    "join": "parent short → lp32 name (exact or fuzzy) → header+joblist within ~150 bytes",
+    "calibration": "James Solo job 439758 was on a neighbouring U19 list @60415763 (may be prior club row in the same table); not on the post-name Schalke list — player may have moved"
+  },
+  "reservesII": {
+    "calibrationPlayer": "Ermin Maric",
+    "jobId": 237871,
+    "listAbs": 57023793,
+    "jobsAbs": 57023795,
+    "listCount": 23,
+    "alsoContainsJob": 306095,
+    "nameColocation": "Schalke 04 II string not within ±300 of this list; German II is often an affiliate club",
+    "headerMatch": "same ffffffff 00 ffffffff count motif as U19",
+    "affiliateClubIdDiscovery": "LOCKED — see data/fixtures/ii-clubid-discovery-locked.json",
+    "affiliateClubId": {
+      "fromParentShort": "Schalke 04",
+      "expectedClubId": 13217,
+      "recipe": "lp32 + '{short} II' → after_name+23 u32le (skip nested II lp; reject sentinels)"
+    },
+    "affiliateSquadJoin": "LOCKED — see data/fixtures/ii-squad-join-locked.json",
+    "affiliateJoin": {
+      "fromParentShort": "Schalke 04",
+      "expectedClubId": 13217,
+      "expectedTeamId": 6912,
+      "expectedListCountAbs": 57023793,
+      "recipe": "same catalog row → pre-name motif → teamId+dup → mid-file body → subunit header (64 ff 24 optional)",
+      "erminJobIndex": 3
+    }
+  },
+  "extractImplication": [
+    "Extend squad discovery with subunit header motif (do not overload FT 7f02 path)",
+    "II affiliate: parent short → clubId+teamId (ii-clubid + ii-squad-join locks) → job UIDs — WIRED as extract.reserves",
+    "U19: parent short → mid-file name→list (u19-squad-namelist lock) → job UIDs — WIRED as extract.u19",
+    "Reuse existing job→person→attributes/CA·PA pipeline once jobs are known",
+    "Re-calibrate anchor players per save; job IDs move with transfers"
+  ],
+  "saveBinUsed": "fmt-probe-wmr70v8a.bin"
+}

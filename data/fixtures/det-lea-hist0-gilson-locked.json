@@ -1,0 +1,41 @@
+{
+  "layout": "det-lea-hist0-gilson-v1",
+  "description": "T014 negative + poison lock for recent-signing (hist=0) Det/Lea",
+  "saveBinUsed": "tmp/live-0112-decomp.bin",
+  "player": {
+    "name": "Domenico Gilson",
+    "uid": 2002200653,
+    "doubles": [124409164, 251577995],
+    "personDouble": 251577995,
+    "personalityPackAbs": 251577590,
+    "personalityPack": [14, 15, 15, 18, 16, 16, 13, 5],
+    "fmGroundTruth": {
+      "determination": 14,
+      "leadership": 16,
+      "personality": "Light-Hearted",
+      "mediaHandling": "Evasive, Reserved"
+    }
+  },
+  "findings": {
+    "caHistoryPoints": 0,
+    "lookbackAttrCards": [
+      {
+        "gap": 11107,
+        "determination": 20,
+        "leadership": 3,
+        "technicalWiped": true,
+        "note": "Foreign decoy; live_status=rejected"
+      }
+    ],
+    "gilsonOwnedAttrishDet14Lea16Within5MB": 0,
+    "lateFileDetLea80NearUidOrIid": 0,
+    "classicStaffOrderPackWithDet": 0,
+    "note": "Det/Lea for hist>0 players come only from CA tip strips (*5 mental). No alternate locked locus for hist=0 on this save."
+  },
+  "productRule": {
+    "when": "live_status=rejected and attributeHistory empty",
+    "mustNot": "apply decoded lookback mental as live Det/Lea",
+    "must": "attributes.mental.determination/leadership = null; keep HA pack general"
+  },
+  "notLocked": "Positive file offset / encoding where Gilson current Det=14 Lea=16 live without a CA tip strip"
+}

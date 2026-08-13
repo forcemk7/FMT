@@ -1,0 +1,78 @@
+{
+  "layout": "ii-clubid-discovery-v1-locked",
+  "status": "locked",
+  "saveBinUsed": "fmt-probe-wmr70v8a.bin",
+  "discovery": {
+    "input": "managed parent short name only (e.g. Schalke 04); parent clubId ~920 is context, not required for the catalog read",
+    "steps": [
+      "Build II catalog name: f'{parentShort} II'",
+      "Find early (<~30MB) catalog row: u32le length prefix + exact UTF-8 name bytes",
+      "If bytes immediately after the name are another lp32 string ending in ' II', skip that nested name (long/short pair residue)",
+      "Require after-name marker: byte0=status (often 01/02), bytes1..10 = 00 00 ff ff ff ff 00 00 01 00",
+      "Read affiliate clubId = u32le at after_name + 23",
+      "Reject sentinels {0,1,255,256,65535,65536,0xffffffff} and values outside 100..50000"
+    ],
+    "afterNameLayout": {
+      "rel": {
+        "0": "status:u8 (01 or 02 typical)",
+        "1-2": "00 00",
+        "3-6": "ff ff ff ff",
+        "7-10": "00 00 01 00",
+        "11-22": "padding / optional small fields (may be non-zero)",
+        "23-26": "clubId:u32le"
+      },
+      "schalkeExampleHex": "01 00 00 ff ff ff ff 00 00 01 00 00 00 00 00 00 00 00 00 00 00 00 00 a1 33 00 00"
+    },
+    "falsePositives": {
+      "alignPlus24": "WRONG — old spike assumed 01 00 00 00 (4-byte status); real layout is 3-byte lead-in so clubId is at +23, not +24",
+      "nestedNamePlus23": "Reading +23 before skipping nested lp32 can yield garbage (e.g. Borussia Dortmund II → 329 from 'II'+status bytes; VfB Stuttgart II → 65536). Always require marker / skip nested II names.",
+      "sentinels": [65535, 65536, 256, 255, 1, 0]
+    }
+  },
+  "expected": {
+    "Schalke 04": {
+      "iiName": "Schalke 04 II",
+      "catalogNameAbs": 10126288,
+      "clubId": 13217,
+      "clubIdHex": "0x33a1",
+      "note": "expected verification output only — do not hardcode as discovery input"
+    }
+  },
+  "crossClubProbe": {
+    "Kaiserslautern": 3847,
+    "Hansa Rostock": 2220,
+    "Karlsruhe": 479,
+    "Borussia Dortmund": 31640,
+    "Werder Bremen": 4790,
+    "Hoffenheim": 9634,
+    "VfB Stuttgart": 7026,
+    "note": "Prior BVB=329 was nested-name false positive; marker+skip yields 31640. VfB requires nested skip ('Stuttgart II' residue) → 7026."
+  },
+  "validation": {
+    "erminMaric": {
+      "uid": 2002138129,
+      "jobId": 237871,
+      "iiJobListCountAbs": 57023793,
+      "iiJobListJobsAbs": 57023795,
+      "iiJobListCount": 23,
+      "jobIndex": 3,
+      "headerMotif": "ff×4 | u32 | u32 | ff×4 | 00 | ff×4 | <count:u16> | <jobs:u32×n>",
+      "clubIdNearList": "weak — clubId 13217 first appears ~+0.68MB after list (not a tight join key)"
+    },
+    "clubRefPatterns": {
+      "010302+clubId": "0 hits for Schalke II on this probe (FT/favoured motif; not required for II catalog lock)",
+      "64ff00+clubId": "present (e.g. @57753619) — possible club-object marker worth chasing for squad join"
+    }
+  },
+  "nextStepSketch": {
+    "clubIdToIiSquad": "LOCKED — see data/fixtures/ii-squad-join-locked.json (catalog teamId+dup → mid-file team body → subunit jobs; 64 ff 00 + clubId is a dead end)",
+    "u19": {
+      "status": "LOCKED — see data/fixtures/u19-squad-namelist-locked.json",
+      "note": "II early-catalog +23 clubId recipe does NOT apply; U19 is mid-file name→list colocation"
+    }
+  },
+  "scripts": [
+    "scripts/spike-squad-ii-clubid-lock.py",
+    "scripts/spike-squad-ii-joblist-lock.py"
+  ]
+}

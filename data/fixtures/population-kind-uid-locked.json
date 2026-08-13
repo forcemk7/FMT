@@ -1,0 +1,28 @@
+{
+  "layout": "population-kind-uid-v1",
+  "status": "locked-heuristic",
+  "summary": "REAL vs NEWGEN for regen_only personalities is classified by UniqueID magnitude on this FM26 continue-career DB. Not a binary person flag — floor sits in the observed gap between known REAL and NEWGEN UIDs.",
+  "recipe": {
+    "kind": "NEWGEN if uid >= NEWGEN_UID_FLOOR else REAL",
+    "NEWGEN_UID_FLOOR": 2002000000,
+    "UNKNOWN": "uid missing or <= 0"
+  },
+  "evidence": {
+    "savePlayersFixture": "data/fixtures/save-players.json",
+    "REAL": [
+      { "name": "Dennis Seimen", "uid": 2000175080 }
+    ],
+    "NEWGEN": [
+      { "name": "Patrick Bandeira", "uid": 2002234366 },
+      { "name": "Robert Müller", "uid": 2002266341 },
+      { "name": "Martin Přibyl", "uid": 2002266332 },
+      { "name": "Felix Heynke", "uid": 2002439142 }
+    ],
+    "observedGap": "known REAL ≤ ~2000188173; NEWGENs ≥ ~2002083070"
+  },
+  "wiring": [
+    "scripts/extract-first-team-fast.py → person_population_kind → player.kind",
+    "web/main.ts mapApiSquadPlayers + createSquadPersonalityCard isRegen: kind === NEWGEN"
+  ],
+  "scripts": ["scripts/spike-population-kind-lock.py"]
+}

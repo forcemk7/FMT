@@ -1,0 +1,104 @@
+{
+  "status": "wip",
+  "label": "Schalke 04 FT — Dynamics after demotions (screenshots 2026-08-11 ~11:55)",
+  "notes": [
+    "Second screenshot set after manual hierarchy changes in-game.",
+    "Pair with dynamics-ground-truth-baseline-wip.json for save diff.",
+    "Counts still sum to 26 if squad unchanged: hierarchy 3+14+1+4, social TBD."
+  ],
+  "extractAnchors": {
+    "clubId": 920,
+    "teamId": 193616,
+    "listAbs": 56254242,
+    "countHeader": 33
+  },
+  "summary": {
+    "captaincy": { "captain": "Josef Tusjak", "viceCaptain": "Paco Suárez" },
+    "hierarchyCounts": {
+      "teamLeader": 3,
+      "highlyInfluential": 14,
+      "influential": 1,
+      "other": 4
+    },
+    "socialGroupCounts": {
+      "core": 13,
+      "secondaryA": 11,
+      "other": 1
+    },
+    "captainsScreen": {
+      "standIns": ["Dieudonné Koné", "Jannis Mandelkow", "Robert Müller", "Yoan Robert"],
+      "leadershipSamples": [
+        { "name": "Josef Tusjak", "hierarchy": "teamLeader", "leadership": 18, "teamwork": 12 },
+        { "name": "Paco Suárez", "hierarchy": "teamLeader", "leadership": 14, "teamwork": 13 },
+        { "name": "Dieudonné Koné", "hierarchy": "highlyInfluential", "leadership": 16, "teamwork": 9 },
+        { "name": "Jannis Mandelkow", "hierarchy": "highlyInfluential", "leadership": 12, "teamwork": 11 },
+        { "name": "Robert Müller", "hierarchy": "influential", "leadership": 17, "teamwork": 12 },
+        { "name": "Yoan Robert", "hierarchy": "highlyInfluential", "leadership": 17, "teamwork": 12 },
+        { "name": "Marko Radović", "hierarchy": "other", "leadership": 16, "teamwork": 14 },
+        { "name": "Florin Gabor", "hierarchy": "other", "leadership": 15, "teamwork": 15 }
+      ]
+    }
+  },
+  "changesFromBaseline": [
+    {
+      "type": "hierarchyCount",
+      "field": "other",
+      "before": 8,
+      "after": 4,
+      "note": "Four players left the Others tier"
+    },
+    {
+      "type": "playerLeftTier",
+      "tier": "other",
+      "names": ["Jan Lundqvist", "Ivaylo Erinin", "Samuel Lawal", "Adrian Itu"],
+      "note": "No longer listed under Other Players — promoted, moved squad, or loaned?"
+    },
+    {
+      "type": "socialGroup",
+      "name": "Marco Tassinari",
+      "before": "core",
+      "after": "secondaryA"
+    },
+    {
+      "type": "socialGroup",
+      "name": "Rodrigo Cadavid",
+      "before": "core",
+      "after": "secondaryA"
+    },
+    {
+      "type": "socialGroup",
+      "name": "Adrian Itu",
+      "before": "other",
+      "after": "unknown",
+      "note": "No longer in social Others (only Gabor remains)"
+    }
+  ],
+  "players": [
+    { "name": "Paco Suárez", "hierarchy": "teamLeader", "socialGroup": "core", "captaincy": "viceCaptain" },
+    { "name": "Josef Tusjak", "hierarchy": "teamLeader", "socialGroup": "secondaryA", "captaincy": "captain" },
+    { "name": "Elias Hoßmang", "hierarchy": "teamLeader", "socialGroup": "core" },
+    { "name": "Dennis Seimen", "hierarchy": "highlyInfluential", "socialGroup": "core" },
+    { "name": "Dieudonné Koné", "hierarchy": "highlyInfluential", "socialGroup": "secondaryA" },
+    { "name": "Jannis Mandelkow", "hierarchy": "highlyInfluential", "socialGroup": "core" },
+    { "name": "Pietro Miraglia", "hierarchy": "highlyInfluential", "socialGroup": "core" },
+    { "name": "Alejandro Núñez", "hierarchy": "highlyInfluential", "socialGroup": "core" },
+    { "name": "Franco Viera", "hierarchy": "highlyInfluential", "socialGroup": "secondaryA" },
+    { "name": "Patrick Bandeira", "hierarchy": "highlyInfluential", "socialGroup": "core" },
+    { "name": "Marco Tassinari", "hierarchy": "highlyInfluential", "socialGroup": "secondaryA" },
+    { "name": "Rodrigo Cadavid", "hierarchy": "highlyInfluential", "socialGroup": "secondaryA" },
+    { "name": "Santiago Contreras", "hierarchy": "highlyInfluential", "socialGroup": "core" },
+    { "name": "Edis Hasanovic", "hierarchy": "highlyInfluential", "socialGroup": "core" },
+    { "name": "Nathan Jones", "hierarchy": "highlyInfluential", "socialGroup": "secondaryA" },
+    { "name": "Sam Kizza", "hierarchy": "highlyInfluential", "socialGroup": "core" },
+    { "name": "Yoan Robert", "hierarchy": "highlyInfluential", "socialGroup": "secondaryA" },
+    { "name": "Robert Müller", "hierarchy": "influential", "socialGroup": "core" },
+    { "name": "Jordan Dobler", "hierarchy": "other", "socialGroup": "secondaryA" },
+    { "name": "Marko Radović", "hierarchy": "other", "socialGroup": "secondaryA" },
+    { "name": "Ilan Kramarić", "hierarchy": "other", "socialGroup": "secondaryA" },
+    { "name": "Florin Gabor", "hierarchy": "other", "socialGroup": "other" },
+    { "name": "Jan Lundqvist", "hierarchy": "unknown", "note": "was other; not in Others list post-change" },
+    { "name": "Ivaylo Erinin", "hierarchy": "unknown", "note": "was other; not in Others list post-change" },
+    { "name": "Samuel Lawal", "hierarchy": "unknown", "note": "was other; not in Others list post-change" },
+    { "name": "Adrian Itu", "hierarchy": "unknown", "note": "was other; not in Others or social Others post-change" }
+  ]
+}

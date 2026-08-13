@@ -1,0 +1,62 @@
+{
+  "layout": "u19-squad-namelist-v1-locked",
+  "status": "locked",
+  "saveBinUsed": "fmt-fm-25bcacv_.bin",
+  "summary": "U19 youth squads are discovered by parent short → lp32 name → colocated subunit job-list. The live list sits BEFORE the name label (list → long/short names); after-name lists are often decoys/neighbours. This is NOT the II affiliate clubId/team-body join.",
+  "discovery": {
+    "input": "managed parent short name only (e.g. Schalke 04)",
+    "steps": [
+      "Prefer exact mid-file (~40–120MB) catalog row: u32le length prefix + UTF-8 f'{parentShort} U19'",
+      "From the start of the name, within −220 bytes, take the last subunit header motif: ff×4 | 00 | ff×4 | count:u16∈[3,50] | jobs:u32×n (list precedes name)",
+      "Require a majority of jobs in 50000..2000000",
+      "Fallback only: list within +150 bytes after the name (often neighbour/decoy)",
+      "If exact miss: fuzzy-match other lp32 names ending ' U19' in the same band (exact core, endswith, token cover, or stem≥6 chars / ≥70% of shorter)",
+      "Prefer higher match score, then shorter label (short form over long form)"
+    ],
+    "subunitHeader": "ff×4 | u32 | u32 | ff×4 | 00 | ff×4 | count:u16 | jobs:u32×n  (parser anchors on trailing ff×4|00|ff×4 before count)",
+    "contrastWithII": "II uses early catalog + clubId@+23 + pre-name teamId/dup → mid-file team body. U19 names sit beside their live list; do not require II after-name marker or team-body join."
+  },
+  "falsePositives": {
+    "iiClubIdRecipe": "Early catalog f'{S} U19' with after_name+23 does not appear — U19 is mid-file name-colocated only",
+    "afterNameDecoy": "After-name list on Schalke short row was a wrong 27-man squad (Alparslan/Fayet/…). Live squad (Kraft/Solo/Eschweiler/Breite) is the BEFORE-name list (n=25, Δ≈−165). Prior lock used after-name and was incorrect.",
+    "longVsShortPair": "Rows often store long then short labels (FC Schalke 04 U19 → Schalke 04 U19) sharing one preceding list; exact short match or shorter fuzzy label is preferred"
+  },
+  "expected": {
+    "Schalke 04": {
+      "u19Name": "Schalke 04 U19",
+      "method": "exact",
+      "listSide": "before",
+      "listCount": 25,
+      "deltaNameToMotif": -165,
+      "mustIncludeNames": [
+        "Carsten Kraft",
+        "James Solo",
+        "Luca Eschweiler",
+        "Jan Breite"
+      ],
+      "mustExcludeNames": [
+        "Alparslan Yiğit",
+        "André Fayet",
+        "Clemens Prus",
+        "Tammo Nieweler"
+      ],
+      "note": "verification outputs only — offsets move per save; do not hardcode as discovery inputs"
+    }
+  },
+  "crossClubProbe": {
+    "Schalke 04": {"u19Name": "Schalke 04 U19", "method": "exact", "listSide": "before", "listCount": 25},
+    "Kaiserslautern": {"u19Name": "Kaiserslautern U19", "method": "exact", "listSide": "before", "listCount": 27},
+    "Hansa Rostock": {"u19Name": "Hansa Rostock U19", "method": "exact", "listSide": "before", "listCount": 30},
+    "Karlsruhe": {"u19Name": "Karlsruher SC U19", "method": "fuzzy", "listSide": "before", "listCount": 23},
+    "Borussia Dortmund": {"u19Name": "Borussia Dortmund U19", "method": "exact", "listSide": "before", "listCount": 21},
+    "Werder Bremen": {"u19Name": "SV Werder Bremen U19", "method": "fuzzy", "listSide": "before", "listCount": 23},
+    "Hoffenheim": {"u19Name": "Hoffenheim U19", "method": "exact", "listSide": "before", "listCount": 32},
+    "VfB Stuttgart": {"u19Name": "VfB Stuttgart U19", "method": "exact", "listSide": "before", "listCount": 27},
+    "note": "8/8 parent shorts resolve name→BEFORE-list on fmt-fm-25bcacv_.bin (2026-08-11 Schalke career decompress)"
+  },
+  "scripts": [
+    "scripts/spike-squad-u19-namelist-lock.py",
+    "scripts/spike-u19-list-side.py",
+    "scripts/u19_squad_discovery.py"
+  ]
+}

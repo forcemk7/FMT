@@ -1,0 +1,96 @@
+{
+  "note": "Narrow HA calibration set (user-confirmed). Important Matches left open 1-20.",
+  "players": [
+    {
+      "name": "Sam Kizza",
+      "uid": 2002185604,
+      "personality": "Model Citizen",
+      "determination": 16,
+      "leadership": 15,
+      "bands": {
+        "professionalism": [15, 20],
+        "pressure": [15, 20],
+        "ambition": [12, 20],
+        "temperament": [15, 15],
+        "loyalty": [15, 20],
+        "sportsmanship": [15, 20],
+        "controversy": [1, 14],
+        "importantMatches": [1, 20]
+      },
+      "locks": { "temperament": 15 }
+    },
+    {
+      "name": "Paco Suárez",
+      "uid": 2000136577,
+      "personality": "Model Professional",
+      "determination": 19,
+      "leadership": 14,
+      "bands": {
+        "professionalism": [20, 20],
+        "pressure": [1, 14],
+        "ambition": [1, 20],
+        "temperament": [10, 20],
+        "loyalty": [1, 10],
+        "sportsmanship": [1, 20],
+        "controversy": [6, 14],
+        "importantMatches": [1, 20]
+      },
+      "locks": { "professionalism": 20 }
+    },
+    {
+      "name": "Marco Tassinari",
+      "uid": 2002083070,
+      "personality": "Perfectionist",
+      "determination": null,
+      "leadership": null,
+      "bands": {
+        "professionalism": [14, 20],
+        "pressure": [1, 20],
+        "ambition": [14, 20],
+        "temperament": [3, 6],
+        "loyalty": [1, 20],
+        "sportsmanship": [1, 7],
+        "controversy": [15, 20],
+        "importantMatches": [1, 20]
+      },
+      "locks": {},
+      "notes": "Det unknown; Perfectionist implies Det 14-20 when picking CA card"
+    },
+    {
+      "name": "Dennis Seimen",
+      "uid": 2000175080,
+      "personality": "Professional",
+      "determination": 18,
+      "leadership": 16,
+      "bands": {
+        "professionalism": [18, 19],
+        "pressure": [15, 20],
+        "ambition": [1, 20],
+        "temperament": [10, 14],
+        "loyalty": [1, 20],
+        "sportsmanship": [1, 20],
+        "controversy": [1, 5],
+        "importantMatches": [1, 20]
+      },
+      "locks": {}
+    },
+    {
+      "name": "Yoan Robert",
+      "uid": 2002089146,
+      "personality": "Resilient",
+      "determination": 15,
+      "leadership": 17,
+      "bands": {
+        "professionalism": [1, 17],
+        "pressure": [17, 19],
+        "ambition": [1, 20],
+        "temperament": [15, 20],
+        "loyalty": [11, 20],
+        "sportsmanship": [5, 20],
+        "controversy": [1, 14],
+        "importantMatches": [1, 20]
+      },
+      "locks": {}
+    }
+  ]
+}

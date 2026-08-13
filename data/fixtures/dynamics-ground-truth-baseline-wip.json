@@ -1,0 +1,244 @@
+{
+  "status": "wip",
+  "label": "Schalke 04 FT — Dynamics baseline (screenshots 2026-08-11, pre-demotion)",
+  "notes": [
+    "Ground truth from in-game Dynamics tab screenshots before hierarchy demotions.",
+    "Map to extract via uid/name; lock binary layout after save diff.",
+    "Counts must sum to 26: hierarchy 3+14+1+8, social 13+11+2."
+  ],
+  "extractAnchors": {
+    "clubId": 920,
+    "teamId": 193616,
+    "listAbs": 56254242,
+    "countHeader": 33
+  },
+  "summary": {
+    "captaincy": {
+      "captain": "Josef Tusjak",
+      "viceCaptain": "Paco Suárez"
+    },
+    "hierarchyCounts": {
+      "teamLeader": 3,
+      "highlyInfluential": 14,
+      "influential": 1,
+      "other": 8
+    },
+    "socialGroupCounts": {
+      "core": 13,
+      "secondaryA": 11,
+      "other": 2
+    }
+  },
+  "players": [
+    {
+      "name": "Paco Suárez",
+      "hierarchy": "teamLeader",
+      "socialGroup": "core",
+      "captaincy": "viceCaptain",
+      "personality": "Model Professional",
+      "uid": 2000136577,
+      "jobId": 106935
+    },
+    {
+      "name": "Josef Tusjak",
+      "hierarchy": "teamLeader",
+      "socialGroup": "secondaryA",
+      "captaincy": "captain",
+      "personality": "Fairly Professional",
+      "uid": 2002200827,
+      "jobId": 300569
+    },
+    {
+      "name": "Elias Hoßmang",
+      "hierarchy": "teamLeader",
+      "socialGroup": "core",
+      "personality": "Fairly Professional",
+      "uid": 2002154423,
+      "jobId": 254165
+    },
+    {
+      "name": "Dennis Seimen",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "core",
+      "personality": "Professional",
+      "uid": 2000175080,
+      "jobId": 113517
+    },
+    {
+      "name": "Dieudonné Koné",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "secondaryA",
+      "personality": "Resolute",
+      "uid": 2002166919,
+      "jobId": 266661
+    },
+    {
+      "name": "Jannis Mandelkow",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "core",
+      "personality": "Resolute",
+      "uid": 2002090082,
+      "jobId": 189824
+    },
+    {
+      "name": "Pietro Miraglia",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "core",
+      "personality": "Spirited",
+      "uid": 2002201952,
+      "jobId": 301694
+    },
+    {
+      "name": "Alejandro Núñez",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "core",
+      "personality": "Resolute",
+      "uid": 2002202241,
+      "jobId": 301983
+    },
+    {
+      "name": "Franco Viera",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "secondaryA",
+      "personality": "Resolute",
+      "uid": 2002141787,
+      "jobId": 241529
+    },
+    {
+      "name": "Patrick Bandeira",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "core",
+      "personality": "Spirited",
+      "uid": 2002234366,
+      "jobId": 334108
+    },
+    {
+      "name": "Marco Tassinari",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "core",
+      "personality": "Perfectionist",
+      "uid": 2002083070,
+      "jobId": 182812
+    },
+    {
+      "name": "Rodrigo Cadavid",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "core",
+      "personality": "Ambitious",
+      "uid": 2002171319,
+      "jobId": 271061
+    },
+    {
+      "name": "Santiago Contreras",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "core",
+      "personality": "Model Citizen",
+      "uid": 2002220356,
+      "jobId": 320098
+    },
+    {
+      "name": "Edis Hasanovic",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "core",
+      "personality": "Resolute",
+      "uid": 2002216605,
+      "jobId": 316347
+    },
+    {
+      "name": "Nathan Jones",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "secondaryA",
+      "personality": "Resolute",
+      "uid": 2002264900,
+      "jobId": 364642
+    },
+    {
+      "name": "Sam Kizza",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "core",
+      "personality": "Model Citizen",
+      "uid": 2002185604,
+      "jobId": 285346
+    },
+    {
+      "name": "Yoan Robert",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "secondaryA",
+      "personality": "Resilient",
+      "uid": 2002089146,
+      "jobId": 188888
+    },
+    {
+      "name": "Robert Müller",
+      "hierarchy": "influential",
+      "socialGroup": "core",
+      "personality": "Professional",
+      "uid": 2002266341,
+      "jobId": 366083
+    },
+    {
+      "name": "Jan Lundqvist",
+      "hierarchy": "other",
+      "socialGroup": "secondaryA",
+      "personality": "Spirited",
+      "uid": 2002307555,
+      "jobId": 413297
+    },
+    {
+      "name": "Jordan Dobler",
+      "hierarchy": "other",
+      "socialGroup": "secondaryA",
+      "personality": "Fairly Professional",
+      "uid": 2002282661,
+      "jobId": 382403
+    },
+    {
+      "name": "Marko Radović",
+      "hierarchy": "other",
+      "socialGroup": "secondaryA",
+      "personality": "Resolute",
+      "uid": 2002417447,
+      "jobId": 534057
+    },
+    {
+      "name": "Ivaylo Erinin",
+      "hierarchy": "other",
+      "socialGroup": "secondaryA",
+      "personality": "Spirited",
+      "uid": 2002351241,
+      "jobId": 465321
+    },
+    {
+      "name": "Ilan Kramarić",
+      "hierarchy": "other",
+      "socialGroup": "secondaryA",
+      "personality": "Professional",
+      "uid": 2002354919,
+      "jobId": 469373
+    },
+    {
+      "name": "Samuel Lawal",
+      "hierarchy": "other",
+      "socialGroup": "secondaryA",
+      "personality": "Fairly Professional",
+      "uid": 2002331939,
+      "jobId": 439147
+    },
+    {
+      "name": "Adrian Itu",
+      "hierarchy": "other",
+      "socialGroup": "other",
+      "personality": "Resilient",
+      "uid": 2002400248,
+      "jobId": 516374
+    },
+    {
+      "name": "Florin Gabor",
+      "hierarchy": "other",
+      "socialGroup": "other",
+      "personality": "Driven",
+      "uid": 2002400283,
+      "jobId": 516409
+    }
+  ]
+}

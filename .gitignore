@@ -1,0 +1,15 @@
+node_modules/
+dist/
+web/dist/
+tmp/
+*.tsbuildinfo
+.DS_Store
+data/history.json
+data/history.json.bak
+# Local career saves for import / reverse-engineering (large binaries)
+data/saves/
+*.fm
+
+__pycache__/
+*.pyc
+.cursor/

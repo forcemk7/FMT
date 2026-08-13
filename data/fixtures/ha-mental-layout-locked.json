@@ -1,0 +1,69 @@
+{
+  "note": "Locked mental-trait layout from Genie Scout values vs .fm (FM24 Schalke career). Each player's 8-byte pack is UNIQUE in the decompressed save.",
+  "source": "Genie Scout + save fingerprint",
+  "save": "data/saves/FC Schalke 04 - Bastian König - FM24Career.fm",
+  "mentalLayout": {
+    "encoding": "u8_raw_1_to_20",
+    "contiguous": true,
+    "order": [
+      "adaptability",
+      "ambition",
+      "loyalty",
+      "pressure",
+      "professionalism",
+      "sportsmanship",
+      "temperament",
+      "controversy"
+    ],
+    "note": "Not Genie UI list order (Genie puts Controversy earlier). Determination/Leadership/match-HAs are NOT in this 8-byte pack. Important Matches does not append as classic8. Pick packAbs BEFORE person double when multiple signature hits exist (decoy packs often sit after the double — e.g. Tassinari Amb=4 ghost @ +701 vs Genie @ −652)."
+  },
+  "matchHidden": {
+    "status": "not_locked",
+    "note": "Consistency/Dirtiness/Important Matches/Injury Proneness/Versatility not found as contiguous Genie order near this pack."
+  },
+  "players": [
+    {
+      "uid": 2002185604,
+      "name": "Sam Kizza",
+      "packAbs": 243644112,
+      "relToPersonDouble": -579,
+      "bytes": [13, 17, 15, 15, 15, 16, 15, 7]
+    },
+    {
+      "uid": 2002346977,
+      "name": "Nikola Stamenkovic",
+      "packAbs": 337379485,
+      "relToPersonDouble": -324,
+      "bytes": [9, 12, 13, 15, 18, 13, 15, 8]
+    },
+    {
+      "uid": 2002307555,
+      "name": "Jan Lundqvist",
+      "packAbs": 302016391,
+      "relToPersonDouble": -411,
+      "bytes": [10, 13, 8, 16, 15, 5, 15, 5]
+    },
+    {
+      "uid": 2002388466,
+      "name": "Carlos Varela",
+      "packAbs": 367190486,
+      "relToPersonDouble": 3088,
+      "bytes": [12, 16, 16, 15, 17, 16, 15, 6],
+      "note": "Person-like double score weaker; pack still globally unique"
+    },
+    {
+      "uid": 2002248133,
+      "name": "Ferney Tello",
+      "packAbs": 269188384,
+      "relToPersonDouble": -237,
+      "bytes": [14, 13, 19, 17, 16, 16, 15, 2]
+    },
+    {
+      "uid": 2002452623,
+      "name": "Thomas Guttau",
+      "packAbs": 408610940,
+      "relToPersonDouble": -269,
+      "bytes": [5, 13, 10, 19, 15, 17, 15, 9]
+    }
+  ]
+}

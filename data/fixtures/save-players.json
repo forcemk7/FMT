@@ -1,0 +1,187 @@
+﻿[
+  {
+    "kind": "REAL",
+    "uid": 2000175080,
+    "name": "Dennis Seimen",
+    "club": "Schalke 04",
+    "age": 33,
+    "nation": "Germany",
+    "nation2": "Romania",
+    "pos": "GK",
+    "det": 18,
+    "lea": 16,
+    "dob": "2005-12-01",
+    "height_cm": 193,
+    "foot": "Left",
+    "attributes": {
+      "goalkeeping": {
+        "aerialReach": 17,
+        "commandOfArea": 13,
+        "communication": 13,
+        "eccentricity": 12,
+        "firstTouch": 11,
+        "handling": 11,
+        "kicking": 11,
+        "oneOnOnes": 17,
+        "passing": 13,
+        "punchingTendency": 7,
+        "reflexes": 14,
+        "rushingOutTendency": 16,
+        "throwing": 14
+      },
+      "mental": {
+        "aggression": 15,
+        "anticipation": 14,
+        "bravery": 12,
+        "composure": 13,
+        "concentration": 15,
+        "decisions": 12,
+        "determination": 18,
+        "flair": 8,
+        "leadership": 16,
+        "offTheBall": 1,
+        "positioning": 14,
+        "teamwork": 10,
+        "vision": 15,
+        "workRate": 12
+      },
+      "physical": {
+        "acceleration": 9,
+        "agility": 13,
+        "balance": 13,
+        "jumpingReach": 17,
+        "naturalFitness": 14,
+        "pace": 9,
+        "stamina": 11,
+        "strength": 12
+      },
+      "technical": {
+        "freeKickTaking": 3,
+        "penaltyTaking": 11,
+        "technique": 11
+      }
+    }
+  },
+  {
+    "kind": "NEWGEN",
+    "uid": 2002234366,
+    "name": "Patrick Bandeira",
+    "club": "Schalke 04",
+    "age": 24,
+    "nation": "Portugal",
+    "nation2": null,
+    "pos": "D (L)",
+    "det": 16,
+    "lea": 14,
+    "dob": "2015-01-18",
+    "height_cm": 192,
+    "foot": "Left",
+    "attributes": {
+      "technical": {
+        "crossing": 8,
+        "dribbling": 15,
+        "finishing": 7,
+        "firstTouch": 12,
+        "heading": 16,
+        "longShots": 10,
+        "marking": 17,
+        "passing": 13,
+        "tackling": 14,
+        "technique": 15
+      },
+      "setPieces": {
+        "corners": 8,
+        "freeKickTaking": 11,
+        "longThrows": 12,
+        "penaltyTaking": 5
+      },
+      "mental": {
+        "aggression": 9,
+        "anticipation": 17,
+        "bravery": 13,
+        "composure": 13,
+        "concentration": 18,
+        "decisions": 16,
+        "determination": 16,
+        "flair": 13,
+        "leadership": 14,
+        "offTheBall": 11,
+        "positioning": 17,
+        "teamwork": 12,
+        "vision": 15,
+        "workRate": 15
+      },
+      "physical": {
+        "acceleration": 16,
+        "agility": 17,
+        "balance": 18,
+        "jumpingReach": 17,
+        "naturalFitness": 16,
+        "pace": 17,
+        "stamina": 16,
+        "strength": 17
+      }
+    }
+  },
+  {
+    "kind": "NEWGEN",
+    "uid": 2002266341,
+    "name": "Robert Müller",
+    "club": "Schalke 04",
+    "age": 20,
+    "nation": "Germany",
+    "nation2": null,
+    "pos": "AM (C)",
+    "det": 16,
+    "lea": 17,
+    "dob": "2019-06-15",
+    "height_cm": 189,
+    "foot": "Right",
+    "attributes": {
+      "technical": {
+        "crossing": 9,
+        "dribbling": 12,
+        "finishing": 9,
+        "firstTouch": 15,
+        "heading": 12,
+        "longShots": 12,
+        "marking": 12,
+        "passing": 13,
+        "tackling": 12,
+        "technique": 15
+      },
+      "setPieces": {
+        "corners": 11,
+        "freeKickTaking": 10,
+        "longThrows": 5,
+        "penaltyTaking": 7
+      },
+      "mental": {
+        "aggression": 9,
+        "anticipation": 15,
+        "bravery": 11,
+        "composure": 16,
+        "concentration": 12,
+        "decisions": 18,
+        "determination": 16,
+        "flair": 12,
+        "leadership": 17,
+        "offTheBall": 15,
+        "positioning": 12,
+        "teamwork": 12,
+        "vision": 16,
+        "workRate": 13
+      },
+      "physical": {
+        "acceleration": 16,
+        "agility": 14,
+        "balance": 18,
+        "jumpingReach": 16,
+        "naturalFitness": 9,
+        "pace": 15,
+        "stamina": 16,
+        "strength": 11
+      }
+    }
+  }
+]

@@ -1,0 +1,78 @@
+{
+  "layout": "ii-squad-join-v1-locked",
+  "status": "locked",
+  "saveBinUsed": "fmt-probe-wmr70v8a.bin",
+  "dependsOn": "data/fixtures/ii-clubid-discovery-locked.json",
+  "summary": "Same early II catalog row that yields affiliate clubId also embeds teamId+dup; mid-file team body (often under 64 ff 24) owns the subunit job-list. Do not chase 64 ff 00 + clubId — that object is ~0.7MB after the list and is not the join key.",
+  "discovery": {
+    "input": "managed parent short name only (e.g. Schalke 04)",
+    "steps": [
+      "Discover II clubId via ii-clubid-discovery-v1 (lp32 + f'{S} II' → after_name+23)",
+      "On the same short-name catalog hit, search backward ≤256 bytes for pre-name motif: 00 91 00 00 00 | ff×4 | 91 00 00 00 | 91 00 00 00",
+      "Immediately before that motif read: <teamId:u32le> <dup:u32le> <dup:u32le> (the two dups must be equal and >1000)",
+      "In mid-file (~40–100MB) find team body: <teamId> | 00×10 | <u32> | <dup>×2 | 0a …",
+      "Optional: body may be preceded by 64 ff 24 (common) — NOT required (Kaiserslautern / Karlsruhe omit it)",
+      "From the dup pair, within +96 bytes, parse subunit header: ff×4 | 00 | ff×4 | <count:u16∈[3,50]> | <jobs:u32×n>",
+      "Require a majority of jobs in 50000..2000000"
+    ],
+    "preNameMotifHex": "00 91 00 00 00 ff ff ff ff 91 00 00 00 91 00 00 00",
+    "teamBodyLayout": {
+      "relFromTeamId": {
+        "0-3": "teamId:u32le",
+        "4-13": "00 × 10",
+        "14-17": "midField:u32le (varies; often 0x1cXX)",
+        "18-25": "dup:u32le × 2 (must match catalog dup)",
+        "26": "0a (next byte varies; Schalke 00, Werder 10)"
+      },
+      "optionalPrefix": "64 ff 24 immediately before teamId when present"
+    },
+    "subunitHeader": "ff×4 | u32 | u32 | ff×4 | 00 | ff×4 | count:u16 | jobs:u32×n  (parser anchors on the trailing ff×4|00|ff×4 before count)"
+  },
+  "falsePositives": {
+    "64ff00+clubId": "Club-table object (e.g. Schalke II @57753619) — spatial gap ~+0.73MB from list; no reliable pointer to subunit jobs",
+    "tid-only 64ff24 scan": "Misses packed rows without 64 ff 24 prefix (K'lautern, Karlsruhe on this probe)",
+    "count floor 12": "Too strict — Werder Bremen II list n=5 on this probe; use [3,50] + jobish majority",
+    "post-dup require 0a00": "Too strict — only first byte is stably 0a"
+  },
+  "expected": {
+    "Schalke 04": {
+      "iiName": "Schalke 04 II",
+      "clubId": 13217,
+      "teamId": 6912,
+      "dup": 3608761,
+      "catalogTeamIdAbs": 10126225,
+      "listCountAbs": 57023793,
+      "listJobsAbs": 57023795,
+      "listCount": 23,
+      "has64ff24Prefix": true,
+      "erminJobId": 237871,
+      "erminJobIndex": 3,
+      "note": "verification outputs only — do not hardcode as discovery inputs"
+    }
+  },
+  "crossClubProbe": {
+    "Schalke 04": {"clubId": 13217, "teamId": 6912, "listCount": 23, "has64ff24": true},
+    "Kaiserslautern": {"clubId": 3847, "teamId": 6902, "listCount": 34, "has64ff24": false},
+    "Hansa Rostock": {"clubId": 2220, "teamId": 6909, "listCount": 34, "has64ff24": true},
+    "Karlsruhe": {"clubId": 479, "teamId": 6914, "listCount": 23, "has64ff24": false},
+    "Borussia Dortmund": {"clubId": 31640, "teamId": 2590, "listCount": 41, "has64ff24": true},
+    "Werder Bremen": {"clubId": 4790, "teamId": 2288, "listCount": 5, "has64ff24": true},
+    "Hoffenheim": {"clubId": 9634, "teamId": 6034, "listCount": 31, "has64ff24": true},
+    "VfB Stuttgart": {"clubId": 7026, "teamId": 2595, "listCount": 40, "has64ff24": true},
+    "note": "8/8 parent shorts resolve clubId+teamId+job-list on fmt-probe-wmr70v8a.bin"
+  },
+  "u19": {
+    "status": "LOCKED — see data/fixtures/u19-squad-namelist-locked.json",
+    "note": "Separate recipe: mid-file name→list colocation (~150 bytes), not II clubId/team-body join."
+  },
+  "extractWiringNextStep": [
+    "In squad discovery: after resolving managed parent short, call II catalog clubId+teamId join (this fixture) to obtain job UIDs",
+    "Do not overload FT 7f02 / manager teamId 193616 path for II",
+    "Feed discovered jobs into existing job→person→attributes/CA·PA pipeline",
+    "Re-calibrate anchor players per save (job IDs move with transfers); treat Ermin 237871 as probe-only verification"
+  ],
+  "scripts": [
+    "scripts/spike-squad-ii-joblist-lock.py",
+    "scripts/spike-squad-ii-clubid-lock.py"
+  ]
+}

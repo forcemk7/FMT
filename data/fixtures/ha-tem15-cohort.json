@@ -1,0 +1,42 @@
+{
+  "note": "User-confirmed Tem 15-15 cohort (Model Citizen / Unflappable-class). Use for shared-offset HA pattern hunt.",
+  "temperament_lock": 15,
+  "players": [
+    {
+      "uid": 2002185604,
+      "name": "Sam Kizza",
+      "club": "Schalke 04",
+      "clubUniqueId": 920
+    },
+    {
+      "uid": 2002346977,
+      "name": "Nikola Stamenkovic",
+      "club": "Schalke 04 II",
+      "clubUniqueId": 3609393
+    },
+    {
+      "uid": 2002307555,
+      "name": "Jan Lundqvist",
+      "club": "Schalke 04 II",
+      "clubUniqueId": 3609393
+    },
+    {
+      "uid": 2002388466,
+      "name": "Carlos Varela",
+      "club": "Schalke 04 II",
+      "clubUniqueId": 3609393
+    },
+    {
+      "uid": 2002248133,
+      "name": "Ferney Tello",
+      "club": "Schalke 04 II",
+      "clubUniqueId": 3609393
+    },
+    {
+      "uid": 2002452623,
+      "name": "Thomas Guttau",
+      "club": "Schalke 04 U19",
+      "clubUniqueId": 920
+    }
+  ]
+}

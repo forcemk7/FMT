@@ -1,0 +1,40 @@
+Make sure to read the cases at the bottom,Professionalism,Determination,Ambition,Loyalty,Sportsmanship,Pressure,Temperament,Leadership,Controversy,Cases
+"Outspoken, Unflappable",,,,,,15-20,15-20,,15-20,
+"Outspoken, Short-Tempered, Confrontational",,,,,1-7,,1-2,,15-20,
+"Outspoken, Short-Tempered ",,,,,8-20,,1-2,,15-20,
+"Ouspoken, Volatile, Confrontational",,,,,1-7,,3-6,,15-20,
+"Outspoken, Volatile",,,,,8-20,,3-6,,15-20,
+"Ouspoken, Confrontational",,,,,1-7,,7,,15-20,
+Outspoken,,,,,,,7-20,,15-20,3.4
+"Evasive, Unflappable",15-20,,,,,15-20,15,,1-14,
+"Evasive, Short-Tempered, Confrontational",15-20,,,,1-7,15-20,1-2,,1-14,
+"Evasive, Short-Tempered ",15-20,,,,8-20,15-20,1-2,,1-14,
+"Evasive, Volatile, Confrontational",15-20,,,,1-7,15-20,3-6,,1-14,
+"Evasive, Volatile ",15-20,,,,8-20,15-20,3-6,,1-14,
+"Evasive, Confrontational",15-20,,,,1-7,15-20,7,,1-14,
+"Evasive, Reserved",15-20,,,,,15-20,7-14,,1-5,3
+Evasive,15-20,,,,,15-20,7-14,,6-14,3
+Unflappable,,,,11-20,,15-20,15-20,,1-14,6
+"Short-Tempered, Confrontational",13-20,,,11-20,1-7,,1-2,,1-14,1
+Short-Tempered ,,,,11-20,8-20,,1-2,,1-14,1.6
+"Volatile, Confrontational",13-20,,,11-20,1-7,,3-6,,1-14,1
+Volatile ,,,,11-20,8-20,,3-6,,1-14,1.6
+Confrontational,13-20,,,11-20,1-7,,7,,1-14,1
+Reserved,15-20,,,11-20,,1-14,7-20,,1-5,1.3
+Level Headed,,,,11-20,,,7-20,,1-14,"1,3,4,5,6"
+"Media Friendly, Unflappable",,,,,,15-20,15-20,,1-14,2
+"Media Friendly, Short-Tempered, Confrontational",,,,,1-7,,1-2,,1-14,1.2
+"Media Friendly, Short Tempered",,,,,8-20,,1-2,,1-14,1.2
+"Media Friendly, Volatile, Confrontational",,,,,1-7,,3-6,,1-14,1.2
+"Media Friendly, Volatile ",,,,,8-20,,3-6,,1-14,1.2
+"Media Friendly, Confrontational",,,,,1-7,,7,,1-14,1.2
+"Media Friendly, Reserved",15-20,,,1-10,,1-14,7-20,,1-5,3
+Media Friendly,,,,,,,7-20,,1-14,"1,2,3,4,5"
+,,,,,,,,,,
+Cases: MHS that have this case must follow its rules,,,,,,,,,,
+Case 1: Prof 1-14 and/or Press 1-14,,,,,,,,,,
+Case 2: Loy 1-10 and/or (Both Prof 1-12 and Sports 1-11),,,,,,,,,,
+Case 3: Temp 8-20 and/or Sports 8-20,,,,,,,,,,
+Case 4: Temp 1-14 and/or Press 1-14,,,,,,,,,,
+Case 5: Cont 6-14 and/or Prof 1-14,,,,,,,,,,
+Case 6: Prof 13-20 and/or Sports 12-20,,,,,,,,,,

@@ -1,0 +1,58 @@
+{
+  "layout": "ft-club-squad-join-v1-locked",
+  "status": "locked",
+  "saveBinUsed": "tmp/live-0112-decomp.bin",
+  "summary": "Managed club identity (clubId/short) must select First Team via club-object PRE_NAME → mid-file team body → persist-tid 7f02 job-list. Manager-hit ranking alone can prefer a foreign squad list while clubName stays Schalke.",
+  "employmentRule": {
+    "definition": "Employed by managed club = jobId sits on that club's unit squad list (FT club-object→7f02; II affiliate join; U19 namelist). Mentoring pool = FT employees ∩ ¬loanedOut.",
+    "t009": "When club short is known, join miss yields empty FT (method ft-club-squad-join-miss) — never pick_tid fallback. Foreign/decoy persistTid jobs must not enter players[] or Mentoring."
+  },
+  "discovery": {
+    "input": "managed parent short name from discover_managed_club (e.g. Schalke 04)",
+    "steps": [
+      "Find lp32 parent short in catalog (≤20MB); require PRE_NAME motif immediately before the name (skips human-identity short without PRE_NAME)",
+      "Before PRE_NAME read <teamId:u32le> <dup:u32le>×2 (dups equal, not sentinel; teamId in 100..50000)",
+      "In mid-file (~40–100MB) find team body: <teamId> | 00×10 | <u32> | <dup>×2 | 0a … (same body layout as II)",
+      "Within +128 bytes of body teamId find <persistTid:u32le> | 7f 02 00 00 00 ff×4 | <count:u16∈[15,45]> | <jobs:u32×n>",
+      "Use persistTid + jobs as First Team (do not let pick_tid manager ranking override when this join hits; refuse pick_tid entirely when identity known)"
+    ],
+    "preNameMotifHex": "00 91 00 00 00 ff ff ff ff 91 00 00 00 91 00 00 00",
+    "listSentinelHex": "7f 02 00 00 00 ff ff ff ff"
+  },
+  "falsePositives": {
+    "pick_tid manager_hits only": "Identity OK + wrong ranked squad — foreign FT cards under Schalke clubName",
+    "reuse II teamId threshold dup>1000": "Schalke FT club-object dup is 919; allow dup≥100",
+    "II subunit ff|00|ff header": "FT list is 7f02 persist-tid path, not subunit header"
+  },
+  "expected": {
+    "Schalke 04": {
+      "clubId": 920,
+      "bodyTeamId": 580,
+      "dup": 919,
+      "persistTid": 193616,
+      "listAbs": 56324023,
+      "listCount": 33,
+      "decoyPersistTid": 15658,
+      "mustExcludeDecoyJobIds": [184940, 186575, 189933, 225741, 250232],
+      "spotCheckJobIds": {
+        "Dennis Seimen": 113517,
+        "Patrick Bandeira": 334108,
+        "Paco Suárez": 106935,
+        "Sam Kizza": 285346,
+        "Nathan Jones": 364642
+      },
+      "spotCheckNames": [
+        "Dennis Seimen",
+        "Patrick Bandeira",
+        "Paco Suárez",
+        "Sam Kizza",
+        "Nathan Jones"
+      ],
+      "note": "verification outputs — do not hardcode as discovery inputs"
+    }
+  },
+  "scripts": [
+    "scripts/ft_squad_discovery.py",
+    "scripts/extract-first-team-fast.py"
+  ]
+}

@@ -1,0 +1,175 @@
+{
+  "note": "Definite attributes from Genie Scout. Fill one player at a time; used to fingerprint-search .fm / live RAM. Genie splits match hidden attrs vs mental traits.",
+  "source": "Genie Scout",
+  "matchHiddenAttributes": [
+    "consistency",
+    "dirtiness",
+    "importantMatches",
+    "injuryProneness",
+    "versatility"
+  ],
+  "mentalTraits": [
+    "adaptability",
+    "ambition",
+    "controversy",
+    "loyalty",
+    "pressure",
+    "professionalism",
+    "sportsmanship",
+    "temperament"
+  ],
+  "players": [
+    {
+      "uid": 2002185604,
+      "name": "Sam Kizza",
+      "club": "Schalke 04",
+      "clubUniqueId": 920,
+      "personality": "Model Citizen",
+      "determination": 16,
+      "leadership": 15,
+      "status": "complete",
+      "matchHidden": {
+        "consistency": 18,
+        "dirtiness": 10,
+        "importantMatches": 16,
+        "injuryProneness": 11,
+        "versatility": 18
+      },
+      "mental": {
+        "adaptability": 13,
+        "ambition": 17,
+        "controversy": 7,
+        "loyalty": 15,
+        "pressure": 15,
+        "professionalism": 15,
+        "sportsmanship": 16,
+        "temperament": 15
+      }
+    },
+    {
+      "uid": 2002346977,
+      "name": "Nikola Stamenkovic",
+      "club": "Schalke 04 II",
+      "clubUniqueId": 3609393,
+      "personality": null,
+      "status": "complete",
+      "matchHidden": {
+        "consistency": 12,
+        "dirtiness": 6,
+        "importantMatches": 14,
+        "injuryProneness": 4,
+        "versatility": 13
+      },
+      "mental": {
+        "adaptability": 9,
+        "ambition": 12,
+        "controversy": 8,
+        "loyalty": 13,
+        "pressure": 15,
+        "professionalism": 18,
+        "sportsmanship": 13,
+        "temperament": 15
+      }
+    },
+    {
+      "uid": 2002307555,
+      "name": "Jan Lundqvist",
+      "club": "Schalke 04 II",
+      "clubUniqueId": 3609393,
+      "personality": null,
+      "status": "complete",
+      "matchHidden": {
+        "consistency": 10,
+        "dirtiness": 14,
+        "importantMatches": 17,
+        "injuryProneness": 14,
+        "versatility": 9
+      },
+      "mental": {
+        "adaptability": 10,
+        "ambition": 13,
+        "controversy": 5,
+        "loyalty": 8,
+        "pressure": 16,
+        "professionalism": 15,
+        "sportsmanship": 5,
+        "temperament": 15
+      }
+    },
+    {
+      "uid": 2002388466,
+      "name": "Carlos Varela",
+      "club": "Schalke 04 II",
+      "clubUniqueId": 3609393,
+      "personality": null,
+      "status": "complete",
+      "matchHidden": {
+        "consistency": 8,
+        "dirtiness": 8,
+        "importantMatches": 17,
+        "injuryProneness": 8,
+        "versatility": 9
+      },
+      "mental": {
+        "adaptability": 12,
+        "ambition": 16,
+        "controversy": 6,
+        "loyalty": 16,
+        "pressure": 15,
+        "professionalism": 17,
+        "sportsmanship": 16,
+        "temperament": 15
+      }
+    },
+    {
+      "uid": 2002248133,
+      "name": "Ferney Tello",
+      "club": "Schalke 04 II",
+      "clubUniqueId": 3609393,
+      "personality": null,
+      "status": "complete",
+      "matchHidden": {
+        "consistency": 16,
+        "dirtiness": 10,
+        "importantMatches": 18,
+        "injuryProneness": 5,
+        "versatility": 12
+      },
+      "mental": {
+        "adaptability": 14,
+        "ambition": 13,
+        "controversy": 2,
+        "loyalty": 19,
+        "pressure": 17,
+        "professionalism": 16,
+        "sportsmanship": 16,
+        "temperament": 15
+      }
+    },
+    {
+      "uid": 2002452623,
+      "name": "Thomas Guttau",
+      "club": "Schalke 04 U19",
+      "clubUniqueId": 920,
+      "personality": null,
+      "status": "complete",
+      "matchHidden": {
+        "consistency": 9,
+        "dirtiness": 10,
+        "importantMatches": 15,
+        "injuryProneness": 10,
+        "versatility": 16
+      },
+      "mental": {
+        "adaptability": 5,
+        "ambition": 13,
+        "controversy": 9,
+        "loyalty": 10,
+        "pressure": 19,
+        "professionalism": 15,
+        "sportsmanship": 17,
+        "temperament": 15
+      }
+    }
+  ]
+}

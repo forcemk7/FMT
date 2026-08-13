@@ -1,0 +1,60 @@
+{
+  "layout": "player-capa-core-v1",
+  "description": "Current/Potential Ability near person double-UID records",
+  "core": {
+    "bytes": "<ptr:u32le> <ptr:u32le> 02 <x:u16> <y:u16> <z:u16> <CA:u16> <PA:u16>",
+    "constraints": [
+      "both ptr fields identical",
+      "ptr high byte == 0x77 (FM object-id band observed on locked samples)",
+      "tag byte == 0x02",
+      "CA and PA in 1..200"
+    ],
+    "headersObserved": [
+      "08 02 40 30 04 00 00 00 <id:u32> <core…>  (Kizza, Bandeira / internal-id band)",
+      "50 00 01 00 00 00 <id:u32> <core…>  (Assan / person-index band)"
+    ],
+    "idField": "u32 immediately before twin ptr; equals known INTERNAL-1 or personIndex-1 depending on header"
+  },
+  "join": {
+    "anchor": "person double-UID (early file region, < ~800MB)",
+    "lookback": 48000,
+    "rule": "nearest matching core before the double (largest abs offset still < dab)",
+    "note": "Multiple cores appear in lookback (neighbouring people); nearest-hi77 disambiguates"
+  },
+  "groundTruth": [
+    {
+      "name": "Assan Ouédraogo",
+      "uid": 2000188173,
+      "ca": 186,
+      "pa": 190,
+      "dab": 159849949,
+      "gap": 2308,
+      "id": 115400
+    },
+    {
+      "name": "Sam Kizza",
+      "uid": 2002185604,
+      "ca": 165,
+      "pa": 165,
+      "dab": 246129926,
+      "gap": 10436,
+      "id": 285345
+    },
+    {
+      "name": "Patrick Bandeira",
+      "uid": 2002234366,
+      "ca": 184,
+      "pa": 184,
+      "dab": 267691269,
+      "gap": 17777,
+      "id": 334107,
+      "internalRef": "0x5191c (id == internal - 1)"
+    }
+  ],
+  "discoveredOnSameRule": [
+    { "name": "Robert Müller", "uid": 2002266341, "ca": 163, "pa": 167 },
+    { "name": "Dennis Seimen", "uid": 2000175080, "ca": 135, "pa": 142 }
+  ],
+  "saveBinUsed": "fmt-probe-wmr70v8a.bin (~22.11.2039 career decompress)",
+  "notThis": "Repo 'CA' attribute-history cards (69-byte strips) are unrelated to ability scores"
+}
