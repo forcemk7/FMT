@@ -170,12 +170,20 @@ const GK_GOALKEEPING_COLUMN: EvolutionAttrId[] = [
   "goalkeeping.throwing",
 ];
 
-/** FM Goalkeeping - Technical column. */
+/** FM GK right-column Technical extras (not a fourth column). */
 const GK_TECHNICAL_COLUMN: EvolutionAttrId[] = [
   "technical.freeKickTaking",
   "technical.penaltyTaking",
   "technical.technique",
 ];
+
+function personalityExtraCategory(): EvolutionCategory {
+  return {
+    id: "general",
+    label: "Personality (extra)",
+    ids: HA_PACK_KEYS.map((k) => `general.${k}` as EvolutionAttrId),
+  };
+}
 
 const LABEL: Record<string, string> = {
   corners: "Corners",
@@ -331,48 +339,87 @@ export function defaultEvolutionAttrIds(
   ];
 }
 
-/** FM-style category columns for chart attribute pills (outfield vs GK). */
-export function evolutionCategories(player: RosterPlayer): EvolutionCategory[] {
-  const mental = MENTAL_KEYS.map((k) => `mental.${k}` as EvolutionAttrId);
-  const physical = PHYSICAL_KEYS.map((k) => `physical.${k}` as EvolutionAttrId);
+export type EvolutionFmLayout = {
+  /** In-game three columns; a column may stack sections (Set Pieces, GK Technical). */
+  columns: EvolutionCategory[][];
+  /** Pack HA — not on the FM attributes screen. */
+  extra: EvolutionCategory;
+};
 
-  if (evolutionPlayerIsGk(player)) {
-    return [
-      {
-        id: "goalkeeping",
-        label: "Goalkeeping",
-        ids: [...GK_GOALKEEPING_COLUMN],
-      },
-      {
-        id: "goalkeepingTechnical",
-        label: "Goalkeeping - Technical",
-        ids: [...GK_TECHNICAL_COLUMN],
-      },
-      { id: "mental", label: "Mental", ids: mental },
-      { id: "physical", label: "Physical", ids: physical },
-    ];
-  }
-
+function outfieldTechnicalIds(): EvolutionAttrId[] {
   const technical = OUTFIELD_TECHNICAL_KEYS.map(
     (k) => `technical.${k}` as EvolutionAttrId,
   );
-  const setPieces = SET_PIECE_KEYS.map(
-    (k) => `technical.${k}` as EvolutionAttrId,
-  );
-
-  // Keep any remaining technical keys (future-proof) under Technical.
   for (const k of TECHNICAL_KEYS) {
     if (SET_PIECE_KEY_SET.has(k)) continue;
     if ((OUTFIELD_TECHNICAL_KEYS as readonly string[]).includes(k)) continue;
     technical.push(`technical.${k}`);
   }
+  return technical;
+}
 
-  return [
-    { id: "technical", label: "Technical", ids: technical },
-    { id: "setPieces", label: "Set Pieces", ids: setPieces },
-    { id: "mental", label: "Mental", ids: mental },
-    { id: "physical", label: "Physical", ids: physical },
-  ];
+/** In-game three-column attribute grid; Personality sits below as extra. */
+export function evolutionFmLayout(player: RosterPlayer): EvolutionFmLayout {
+  const mental: EvolutionCategory = {
+    id: "mental",
+    label: "Mental",
+    ids: MENTAL_KEYS.map((k) => `mental.${k}` as EvolutionAttrId),
+  };
+  const physical: EvolutionCategory = {
+    id: "physical",
+    label: "Physical",
+    ids: PHYSICAL_KEYS.map((k) => `physical.${k}` as EvolutionAttrId),
+  };
+  const extra = personalityExtraCategory();
+
+  if (evolutionPlayerIsGk(player)) {
+    return {
+      columns: [
+        [
+          {
+            id: "goalkeeping",
+            label: "Goalkeeping",
+            ids: [...GK_GOALKEEPING_COLUMN],
+          },
+        ],
+        [mental],
+        [
+          physical,
+          {
+            id: "goalkeepingTechnical",
+            label: "Technical",
+            ids: [...GK_TECHNICAL_COLUMN],
+          },
+        ],
+      ],
+      extra,
+    };
+  }
+
+  return {
+    columns: [
+      [
+        {
+          id: "technical",
+          label: "Technical",
+          ids: outfieldTechnicalIds(),
+        },
+        {
+          id: "setPieces",
+          label: "Set Pieces",
+          ids: SET_PIECE_KEYS.map((k) => `technical.${k}` as EvolutionAttrId),
+        },
+      ],
+      [mental],
+      [physical],
+    ],
+    extra,
+  };
+}
+
+/** Flat CA sections (no Personality). Prefer `evolutionFmLayout` for UI. */
+export function evolutionCategories(player: RosterPlayer): EvolutionCategory[] {
+  return evolutionFmLayout(player).columns.flat();
 }
 
 export function buildEvolutionSeries(
@@ -400,15 +447,12 @@ export function colorForActiveEvolutionAttr(
   return COLORS[i % COLORS.length]!;
 }
 
-/** CA categories plus a Personality (hidden HA) column at the end. */
+/** CA sections plus Personality extra (not a fifth FM column). */
 export function evolutionCategoriesWithPersonality(
   player: RosterPlayer,
 ): EvolutionCategory[] {
-  const packIds = HA_PACK_KEYS.map((k) => `general.${k}` as EvolutionAttrId);
-  return [
-    ...evolutionCategories(player),
-    { id: "general", label: "Personality", ids: packIds },
-  ];
+  const layout = evolutionFmLayout(player);
+  return [...layout.columns.flat(), layout.extra];
 }
 
 export function allSelectableEvolutionIds(

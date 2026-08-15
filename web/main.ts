@@ -198,7 +198,7 @@ import {
   colorForActiveEvolutionAttr,
   defaultEvolutionAttrIds,
   defaultHaEvolutionAttrIds,
-  evolutionCategoriesWithPersonality,
+  evolutionFmLayout,
   isHaProgressAttrId,
   splitEvolutionChartSelection,
   filterAttributeHistory,
@@ -213,6 +213,7 @@ import {
   renderEvolutionChartSvg,
   type AttrDeltaWindow,
   type EvolutionAttrId,
+  type EvolutionCategory,
   type EvolutionHoverPoint,
 } from "./attribute-evolution.ts";
 import {
@@ -422,7 +423,7 @@ let pendingSquadUnitView: SquadUnitView | null = null;
 let squadEvolutionUid: number | null = null;
 let squadEvolutionAttrs: EvolutionAttrId[] = [];
 /** Overrides role-default / custom pill selection when active. */
-let squadEvolutionAttrOverride: "default" | "all" | "none" = "default";
+let squadEvolutionAttrOverride: "default" | "all" | "none" = "none";
 /** Chip deltas: last two points vs first finite vs latest. */
 let squadEvolutionDeltaWindow: AttrDeltaWindow = "recent";
 let squadEvolutionHover: EvolutionHoverPoint | null = null;
@@ -916,10 +917,10 @@ function selectSquadEvolutionPlayer(uid: number) {
   )) {
     opt.setAttribute('aria-selected', String(opt.dataset.uid === String(uid)));
   }
-  squadEvolutionAttrOverride = 'default';
+  squadEvolutionAttrOverride = 'none';
   squadEvolutionDeltaWindow = 'recent';
   squadEvolutionHover = null;
-  squadEvolutionAttrs = roleDefaultEvolutionAttrs(player);
+  squadEvolutionAttrs = [];
   squadEvolutionTogglesEl.dataset.sig = '';
   renderSquadEvolution();
 }
@@ -927,7 +928,7 @@ function selectSquadEvolutionPlayer(uid: number) {
 function clearSquadEvolution() {
   squadEvolutionUid = null;
   squadEvolutionAttrs = [];
-  squadEvolutionAttrOverride = 'default';
+  squadEvolutionAttrOverride = 'none';
   squadEvolutionDeltaWindow = 'recent';
   squadEvolutionHover = null;
   squadEvolutionChartEl.replaceChildren();
@@ -973,6 +974,32 @@ function applyToggleDeltaMeta(
   deltaEl.classList.toggle('is-down', delta != null && delta < 0);
 }
 
+function appendEvolutionCategory(
+  parent: HTMLElement,
+  player: RosterPlayer,
+  category: EvolutionCategory,
+) {
+  const ids = category.ids.filter((id) => {
+    const history = historyForAttrId(player, id);
+    return (
+      history.some((p) => historyPointValue(p, id) != null) ||
+      liveAttrValue(player, id) != null
+    );
+  });
+  if (ids.length === 0) return;
+  const cat = document.createElement('div');
+  cat.className = 'squad-evo-cat';
+  cat.dataset.category = category.id;
+  const title = document.createElement('h3');
+  title.className = 'squad-evo-cat-title';
+  title.textContent = category.label;
+  const list = document.createElement('div');
+  list.className = 'squad-evo-cat-list';
+  for (const id of ids) appendAttrToggle(list, player, id);
+  cat.append(title, list);
+  parent.append(cat);
+}
+
 function appendAttrToggle(
   list: HTMLElement,
   player: RosterPlayer,
@@ -1014,8 +1041,10 @@ function appendAttrToggle(
         squadEvolutionAttrs = [...current, id];
       }
     } else if (squadEvolutionAttrs.includes(id)) {
-      if (squadEvolutionAttrs.length <= 1) return;
       squadEvolutionAttrs = squadEvolutionAttrs.filter((x) => x !== id);
+      if (squadEvolutionAttrs.length === 0) {
+        squadEvolutionAttrOverride = 'none';
+      }
     } else {
       squadEvolutionAttrs = [...squadEvolutionAttrs, id];
     }
@@ -1110,30 +1139,28 @@ function renderSquadEvolution() {
     player.attributeHistory?.at(-1)?.kind ??
     player._extract?.kind ??
     'outfield';
-  const sig = `${player.uid}:${layoutKind}:unified`;
+  const sig = `${player.uid}:${layoutKind}:fm3`;
   if (squadEvolutionTogglesEl.dataset.sig !== sig) {
     squadEvolutionTogglesEl.dataset.sig = sig;
     squadEvolutionTogglesEl.replaceChildren();
-    for (const category of evolutionCategoriesWithPersonality(player)) {
-      const ids = category.ids.filter((id) => {
-        const history = historyForAttrId(player, id);
-        return (
-          history.some((p) => historyPointValue(p, id) != null) ||
-          liveAttrValue(player, id) != null
-        );
-      });
-      if (ids.length === 0) continue;
+    const layout = evolutionFmLayout(player);
+    const fm = document.createElement('div');
+    fm.className = 'squad-evo-fm';
+    for (const sections of layout.columns) {
       const col = document.createElement('div');
-      col.className = 'squad-evo-cat';
-      col.dataset.category = category.id;
-      const title = document.createElement('h3');
-      title.className = 'squad-evo-cat-title';
-      title.textContent = category.label;
-      const list = document.createElement('div');
-      list.className = 'squad-evo-cat-list';
-      for (const id of ids) appendAttrToggle(list, player, id);
-      col.append(title, list);
-      squadEvolutionTogglesEl.append(col);
+      col.className = 'squad-evo-col';
+      for (const category of sections) {
+        appendEvolutionCategory(col, player, category);
+      }
+      if (col.childElementCount > 0) fm.append(col);
+    }
+    if (fm.childElementCount > 0) squadEvolutionTogglesEl.append(fm);
+    const extraWrap = document.createElement('div');
+    extraWrap.className = 'squad-evo-extra';
+    extraWrap.dataset.category = 'personality-extra';
+    appendEvolutionCategory(extraWrap, player, layout.extra);
+    if (extraWrap.childElementCount > 0) {
+      squadEvolutionTogglesEl.append(extraWrap);
     }
   }
   syncAttrToggleAppearance(player, activeAttrs);
@@ -1195,6 +1222,9 @@ squadEvoVisibilitySelectEl.addEventListener("change", () => {
   squadEvolutionAttrOverride = evoVisibilityOverrideFromSelect(
     squadEvoVisibilitySelectEl.value,
   );
+  if (squadEvolutionAttrOverride === 'default') {
+    squadEvolutionAttrs = roleDefaultEvolutionAttrs(player);
+  }
   squadEvolutionHover = null;
   renderSquadEvolution();
 });

@@ -32,7 +32,7 @@ Last updated: 2026-08-15 (HQ: Squad + Loans + Mentoring + Progress)
 
 **T070 done** — Header Buy me a coffee → `https://buymeacoffee.com/mrramirez` (new tab, optional thank-you). Table stays free.
 
-**Next:** Board empty. T074 cancelled (Loans stays).
+**Next:** T077 live www (needs host).
 
 | Area | State | Need-to-have? |
 |------|--------|---------------|
@@ -77,12 +77,13 @@ Last updated: 2026-08-15 (HQ: Squad + Loans + Mentoring + Progress)
 | Extract this club only (not world) | **T076 done** | **Yes** |
 | Personalities label → Squad | **T073 done** | Yes |
 | Ranker / checker / compare chrome | **T075 done** | Yes |
+| Progress default chip + FM columns | **T078 done** | Yes |
 
 ## Board
 
 | ID | Title | Status | Owner |
 |----|-------|--------|-------|
-| — | *(empty)* | | |
+| T077 | Live www URL — upload save, extract, four tabs | ready | |
 
 ## Behavior
 
@@ -106,10 +107,11 @@ Last updated: 2026-08-15 (HQ: Squad + Loans + Mentoring + Progress)
 
 ## Blockers
 
-- None.
+- T077: host with ≥2GB RAM (Fly / Railway / VPS). Not Vercel.
 
 ## Recently done
 
+- **T078** — Progress starts with no attribute selected (empty chart until a click). Chip grid matches FM: outfield Technical+Set Pieces | Mental | Physical; GK Goalkeeping | Mental | Physical+Technical. Pack Personality sits below as extra. `-` still restores HA chips. No GK/outfield 1–10 ratings.
 - **T070** — Header Buy me a coffee opens `https://buymeacoffee.com/mrramirez` in a new tab. Copy: optional thank-you. HA table, filters, mentoring capture stay free. No Stripe.
 - **T075** — Navigator is Squad | Loans | Mentoring | Progress. Ranker / Best Personalities / checker hashes land on Squad. Loans + HAS table unchanged.
 - **T076** — Extract walks this club’s FT/II/U19 only (skip all-club 7f02 + foreign staff-link ranking; stadiums never walked). König `data/saves` copy: 372s → 316s; same 34/30/30 UIDs, U19 before-name, FT CA strip. Live `games/*.fm` still refused. Restart `npm run dev`.

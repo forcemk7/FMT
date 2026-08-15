@@ -3,6 +3,8 @@ import type { AttributeHistoryPoint } from "../shared/save/types.ts";
 import {
   attrValueAndDelta,
   defaultHaEvolutionAttrIds,
+  evolutionCategories,
+  evolutionFmLayout,
   evoChipValueTone,
   evoVisibilityOverrideFromSelect,
   evoVisibilitySelectValue,
@@ -12,6 +14,7 @@ import {
   type EvolutionAttrId,
 } from "../web/attribute-evolution.ts";
 import { haSnapshotsToHistoryPoints } from "../web/ha-history-store.ts";
+import type { RosterPlayer } from "../web/roster-data.ts";
 
 const ID = "general.professionalism" as const;
 
@@ -400,5 +403,55 @@ describe("Det/Lea Progress CA strip", () => {
       "general.sportsmanship",
       "general.controversy",
     ]);
+  });
+});
+
+describe("Progress FM attribute layout", () => {
+  it("outfield is Technical+Set Pieces | Mental | Physical; Personality extra below", () => {
+    const player = {
+      uid: 1,
+      name: "Outfield",
+      attributeHistory: [{ index: 0, kind: "outfield" as const }],
+      _extract: { kind: "outfield" as const },
+    } as RosterPlayer;
+    const layout = evolutionFmLayout(player);
+    expect(layout.columns.map((col) => col.map((s) => s.id))).toEqual([
+      ["technical", "setPieces"],
+      ["mental"],
+      ["physical"],
+    ]);
+    expect(layout.columns[0]![1]!.ids).toContain("technical.corners");
+    expect(layout.columns[0]![0]!.ids).not.toContain("technical.corners");
+    expect(layout.extra.id).toBe("general");
+    expect(layout.extra.label).toMatch(/extra/i);
+    expect(layout.extra.ids).toContain("general.controversy");
+    expect(evolutionCategories(player).map((c) => c.id)).toEqual([
+      "technical",
+      "setPieces",
+      "mental",
+      "physical",
+    ]);
+  });
+
+  it("GK is Goalkeeping | Mental | Physical+Technical; Personality extra below", () => {
+    const player = {
+      uid: 2,
+      name: "Keeper",
+      attributeHistory: [{ index: 0, kind: "gk" as const }],
+      _extract: { kind: "gk" as const },
+    } as RosterPlayer;
+    const layout = evolutionFmLayout(player);
+    expect(layout.columns.map((col) => col.map((s) => s.id))).toEqual([
+      ["goalkeeping"],
+      ["mental"],
+      ["physical", "goalkeepingTechnical"],
+    ]);
+    expect(layout.columns[2]![1]!.label).toBe("Technical");
+    expect(layout.columns[2]![1]!.ids).toEqual([
+      "technical.freeKickTaking",
+      "technical.penaltyTaking",
+      "technical.technique",
+    ]);
+    expect(layout.extra.ids).toContain("general.ambition");
   });
 });
