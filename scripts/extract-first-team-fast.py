@@ -2170,24 +2170,6 @@ def person_population_kind(uid: int) -> str:
     return "NEWGEN" if uid >= NEWGEN_UID_FLOOR else "REAL"
 
 
-def tip_only_attribute_history(players: list[dict]) -> list[dict]:
-    """Keep only the live tip CA strip — full history is huge and FT already
-    carries evolution charts. Subunit payloads otherwise blow NDJSON /
-    localStorage and soft-sync silently keeps stale slim rows."""
-    for p in players:
-        hist = p.get("attributeHistory")
-        if not isinstance(hist, list) or len(hist) <= 1:
-            continue
-        tip = dict(hist[-1])
-        tip["index"] = 0
-        p["attributeHistory"] = [tip]
-        meta = p.get("_extract")
-        if isinstance(meta, dict):
-            meta["historyPoints"] = 1
-            meta["historyCompacted"] = True
-    return players
-
-
 def enrich_capa_on_players(mm: mmap.mmap, players: list[dict]) -> int:
     """Attach ca/pa onto player dicts. Returns count resolved."""
     resolved = 0
@@ -2685,7 +2667,6 @@ def main() -> int:
                             parent_club=int(club_id),
                         )
                     ii_capa = enrich_capa_on_players(mm, ii_players)
-                    tip_only_attribute_history(ii_players)
                     ii_general = sum(
                         1
                         for p in ii_players
@@ -2771,7 +2752,6 @@ def main() -> int:
                             parent_club=int(club_id),
                         )
                     u19_capa = enrich_capa_on_players(mm, u19_players)
-                    tip_only_attribute_history(u19_players)
                     u19_general = sum(
                         1
                         for p in u19_players

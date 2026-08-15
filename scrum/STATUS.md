@@ -78,6 +78,7 @@ Last updated: 2026-08-15 (HQ: Squad + Loans + Mentoring + Progress)
 | Personalities label → Squad | **T073 done** | Yes |
 | Ranker / checker / compare chrome | **T075 done** | Yes |
 | Progress default chip + FM columns | **T078 done** | Yes |
+| II/U19 Progress CA strip | **T079 done** | **Yes** |
 
 ## Board
 
@@ -95,7 +96,7 @@ Last updated: 2026-08-15 (HQ: Squad + Loans + Mentoring + Progress)
 - Progress plot: HA pack has no in-save strip (extract snapshots). Det/Lea use the attributes-card CA strip (T066). Pack chips stay on `fmt.ha-history.v1`.
 - Career `.fm`: copy selected live save into `data/saves`, then extract. Never extract the live file.
 - **T065:** selected live `.fm` copies into `data/saves` even when dest was missing; `(v02)` and other careers stay out. 97/99 after a live save is a new extract.
-- **T068:** poll copies live→dest when dest is stale. U19 uses the before-name list (window 400). Quota compact keeps FT CA strips. König dest blob today is still **2040-01-13**. Restart `npm run dev`; wait for extract.
+- **T068:** poll copies live→dest when dest is stale. U19 uses the before-name list (window 400). Quota compact trims CA strips (24/8); II/U19 keep history unless last-resort overflow. König dest blob today is still **2040-01-13**. Restart `npm run dev`; wait for extract.
 - Faces: copy roster portraits into `data/faces`, then serve the copies.
 - Logos: copy crests into `data/logos`, then serve the copies. SI graphics only for a missing file.
 
@@ -111,6 +112,7 @@ Last updated: 2026-08-15 (HQ: Squad + Loans + Mentoring + Progress)
 
 ## Recently done
 
+- **T079** — II/U19 Progress keeps the in-save CA strip (not one tip). Pack HA still uses extract snapshots. Quota may trim to 24/8; tip-only II/U19 only if that still overflows. Restart `npm run dev` and re-extract.
 - **T078** — Progress starts with no attribute selected (empty chart until a click). Chip grid matches FM: outfield Technical+Set Pieces | Mental | Physical; GK Goalkeeping | Mental | Physical+Technical. Pack Personality sits below as extra. `-` still restores HA chips. No GK/outfield 1–10 ratings.
 - **T070** — Header Buy me a coffee opens `https://buymeacoffee.com/mrramirez` in a new tab. Copy: optional thank-you. HA table, filters, mentoring capture stay free. No Stripe.
 - **T075** — Navigator is Squad | Loans | Mentoring | Progress. Ranker / Best Personalities / checker hashes land on Squad. Loans + HAS table unchanged.

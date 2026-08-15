@@ -98,7 +98,7 @@ function isQuotaExceededError(err: unknown): boolean {
   );
 }
 
-/** Keep only the live tip CA strip — full history dominates localStorage. */
+/** Keep only the live tip CA strip — last-resort quota shrink for II/U19. */
 export function tipOnlyAttributeHistory(
   player: RosterPlayer,
 ): RosterPlayer {
@@ -106,6 +106,106 @@ export function tipOnlyAttributeHistory(
   if (!Array.isArray(hist) || hist.length <= 1) return player;
   const tip = { ...hist[hist.length - 1]!, index: 0 };
   return { ...player, attributeHistory: [tip] };
+}
+
+function trimPlayersAttributeHistory(
+  players: RosterPlayer[],
+  keep: number,
+): RosterPlayer[] {
+  return players.map((p) => {
+    const hist = p.attributeHistory;
+    if (!Array.isArray(hist) || hist.length <= keep) return p;
+    const sliced = hist.slice(-keep).map((pt, i) => ({ ...pt, index: i }));
+    return { ...p, attributeHistory: sliced };
+  });
+}
+
+/** Trim FT + II + U19 CA strips. Never collapses to a single tip. */
+function trimSquadsAttributeHistory(
+  entry: StoredRoster,
+  keep: number,
+): StoredRoster {
+  return {
+    ...entry,
+    players: trimPlayersAttributeHistory(entry.players, keep),
+    ...(entry.reserves
+      ? {
+          reserves: {
+            ...entry.reserves,
+            players: trimPlayersAttributeHistory(entry.reserves.players, keep),
+          },
+        }
+      : {}),
+    ...(entry.u19
+      ? {
+          u19: {
+            ...entry.u19,
+            players: trimPlayersAttributeHistory(entry.u19.players, keep),
+          },
+        }
+      : {}),
+  };
+}
+
+/** II/U19 only — FT CA strip (Det/Lea Progress) must survive last-resort quota. */
+function compactSubunitsForStorage(entry: StoredRoster): StoredRoster {
+  return {
+    ...entry,
+    ...(entry.reserves
+      ? {
+          reserves: {
+            ...entry.reserves,
+            players: entry.reserves.players.map(tipOnlyAttributeHistory),
+          },
+        }
+      : {}),
+    ...(entry.u19
+      ? {
+          u19: {
+            ...entry.u19,
+            players: entry.u19.players.map(tipOnlyAttributeHistory),
+          },
+        }
+      : {}),
+  };
+}
+
+const HISTORY_TRIMS = [24, 8] as const;
+
+function dropInactiveSaves(store: RosterStore): RosterStore {
+  const active = store.activeSaveName;
+  if (!active || !store.saves[active]) return store;
+  if (Object.keys(store.saves).length <= 1) return store;
+  return { activeSaveName: active, saves: { [active]: store.saves[active]! } };
+}
+
+function mapSaves(
+  store: RosterStore,
+  mapEntry: (entry: StoredRoster) => StoredRoster,
+): RosterStore {
+  const saves: Record<string, StoredRoster> = {};
+  for (const [name, entry] of Object.entries(store.saves)) {
+    saves[name] = mapEntry(entry);
+  }
+  return { ...store, saves };
+}
+
+function* quotaCompactCandidates(store: RosterStore): Generator<RosterStore> {
+  let current = store;
+  for (const keep of HISTORY_TRIMS) {
+    current = mapSaves(current, (entry) =>
+      trimSquadsAttributeHistory(entry, keep),
+    );
+    yield current;
+
+    const dropped = dropInactiveSaves(current);
+    if (dropped !== current) {
+      yield dropped;
+      current = dropped;
+    }
+  }
+
+  yield mapSaves(current, compactSubunitsForStorage);
 }
 
 function normalizeSquadPlayers(raw: unknown[] | undefined): RosterPlayer[] {
@@ -161,72 +261,6 @@ function migrateStore(parsed: RosterStore): RosterStore {
     activeSaveName: active && saves[active] ? active : (Object.keys(saves)[0] ?? null),
     saves,
   };
-}
-
-/** II/U19 only — FT CA strip (Det/Lea Progress) must survive quota compact. */
-function compactSubunitsForStorage(entry: StoredRoster): StoredRoster {
-  return {
-    ...entry,
-    ...(entry.reserves
-      ? {
-          reserves: {
-            ...entry.reserves,
-            players: entry.reserves.players.map(tipOnlyAttributeHistory),
-          },
-        }
-      : {}),
-    ...(entry.u19
-      ? {
-          u19: {
-            ...entry.u19,
-            players: entry.u19.players.map(tipOnlyAttributeHistory),
-          },
-        }
-      : {}),
-  };
-}
-
-const FT_HISTORY_TRIMS = [24, 8] as const;
-
-function trimFtAttributeHistory(
-  entry: StoredRoster,
-  keep: number,
-): StoredRoster {
-  return {
-    ...entry,
-    players: entry.players.map((p) => {
-      const hist = p.attributeHistory;
-      if (!Array.isArray(hist) || hist.length <= keep) return p;
-      const sliced = hist.slice(-keep).map((pt, i) => ({ ...pt, index: i }));
-      return { ...p, attributeHistory: sliced };
-    }),
-  };
-}
-
-function dropInactiveSaves(store: RosterStore): RosterStore {
-  const active = store.activeSaveName;
-  if (!active || !store.saves[active]) return store;
-  if (Object.keys(store.saves).length <= 1) return store;
-  return { activeSaveName: active, saves: { [active]: store.saves[active]! } };
-}
-
-function* quotaCompactCandidates(store: RosterStore): Generator<RosterStore> {
-  const subunits: Record<string, StoredRoster> = {};
-  for (const [name, entry] of Object.entries(store.saves)) {
-    subunits[name] = compactSubunitsForStorage(entry);
-  }
-  yield { ...store, saves: subunits };
-
-  const dropped = dropInactiveSaves({ ...store, saves: subunits });
-  if (dropped !== store) yield dropped;
-
-  for (const keep of FT_HISTORY_TRIMS) {
-    const trimmed: Record<string, StoredRoster> = {};
-    for (const [name, entry] of Object.entries(dropped.saves)) {
-      trimmed[name] = trimFtAttributeHistory(entry, keep);
-    }
-    yield { ...dropped, saves: trimmed };
-  }
 }
 
 export function loadRosterStore(): RosterStore {

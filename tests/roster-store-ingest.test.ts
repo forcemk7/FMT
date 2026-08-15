@@ -184,7 +184,7 @@ describe("shouldRefreshRosterFromDisk (T010)", () => {
   });
 });
 
-describe("saveRosterStore quota (T068)", () => {
+describe("saveRosterStore quota (T068 / T079)", () => {
   function ftPlayerWithStrip(points: number): RosterPlayer {
     return {
       ...player(1, "Jan Lundqvist"),
@@ -195,17 +195,53 @@ describe("saveRosterStore quota (T068)", () => {
     } as RosterPlayer;
   }
 
-  function iiPlayerWithStrip(): RosterPlayer {
+  function iiPlayerWithStrip(points = 8): RosterPlayer {
     return {
       ...player(2, "II Kid"),
-      attributeHistory: Array.from({ length: 8 }, (_, i) => ({
+      attributeHistory: Array.from({ length: points }, (_, i) => ({
         index: i,
         mental: { determination: 10 },
       })),
     } as RosterPlayer;
   }
 
-  it("quota compact keeps FT CA strip; II/U19 go tip-only", () => {
+  function storeWithStrips(): RosterStore {
+    const entry: StoredRoster = {
+      saveName: "Schalke.fm",
+      clubId: 920,
+      extractedAt: "2026-08-15T00:00:00.000Z",
+      gameDate: "2040-01-13",
+      players: [ftPlayerWithStrip(12)],
+      reserves: {
+        iiName: "II",
+        players: [iiPlayerWithStrip()],
+      },
+      u19: {
+        u19Name: "Schalke 04 U19",
+        players: [iiPlayerWithStrip()],
+      },
+      diskPath: null,
+      diskMtimeMs: null,
+    };
+    return {
+      activeSaveName: "Schalke.fm",
+      saves: { "Schalke.fm": entry },
+    };
+  }
+
+  it("upsert keeps II/U19 CA strips (not tip-only)", () => {
+    saveRosterStore(storeWithStrips());
+    const reloaded = loadRosterStore();
+    expect(
+      reloaded.saves["Schalke.fm"]!.reserves?.players[0]?.attributeHistory?.length,
+    ).toBe(8);
+    expect(reloaded.saves["Schalke.fm"]!.u19?.players[0]?.attributeHistory?.length).toBe(
+      8,
+    );
+    expect(reloaded.saves["Schalke.fm"]!.players[0]?.attributeHistory?.length).toBe(12);
+  });
+
+  it("quota compact trims; II/U19 stay more than one point when 8 fit", () => {
     let writes = 0;
     Object.defineProperty(globalThis, "localStorage", {
       configurable: true,
@@ -227,36 +263,51 @@ describe("saveRosterStore quota (T068)", () => {
       },
     });
 
-    const entry: StoredRoster = {
-      saveName: "Schalke.fm",
-      clubId: 920,
-      extractedAt: "2026-08-15T00:00:00.000Z",
-      gameDate: "2040-01-13",
-      players: [ftPlayerWithStrip(12)],
-      reserves: {
-        iiName: "II",
-        players: [iiPlayerWithStrip()],
-      },
-      u19: {
-        u19Name: "Schalke 04 U19",
-        players: [iiPlayerWithStrip()],
-      },
-      diskPath: null,
-      diskMtimeMs: null,
-    };
-    saveRosterStore({
-      activeSaveName: "Schalke.fm",
-      saves: { "Schalke.fm": entry },
-    });
+    saveRosterStore(storeWithStrips());
     const reloaded = loadRosterStore();
     const ft = reloaded.saves["Schalke.fm"]!.players[0]!;
     expect(ft.attributeHistory?.length).toBe(12);
     expect(ft.attributeHistory?.at(-1)?.mental?.determination).toBe(17);
     expect(
       reloaded.saves["Schalke.fm"]!.reserves?.players[0]?.attributeHistory?.length,
+    ).toBe(8);
+    expect(reloaded.saves["Schalke.fm"]!.u19?.players[0]?.attributeHistory?.length).toBe(
+      8,
+    );
+  });
+
+  it("quota last resort tip-onlys II/U19 if trim still overflows", () => {
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: {
+        getItem: (key: string) => memory.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+          const parsed = JSON.parse(String(value)) as RosterStore;
+          const iiLen =
+            parsed.saves["Schalke.fm"]?.reserves?.players[0]?.attributeHistory
+              ?.length ?? 0;
+          if (iiLen > 1) {
+            const err = new Error("quota") as Error & { name: string };
+            err.name = "QuotaExceededError";
+            throw err;
+          }
+          memory.set(key, String(value));
+        },
+        removeItem: (key: string) => {
+          memory.delete(key);
+        },
+        clear: () => memory.clear(),
+      },
+    });
+
+    saveRosterStore(storeWithStrips());
+    const reloaded = loadRosterStore();
+    expect(
+      reloaded.saves["Schalke.fm"]!.reserves?.players[0]?.attributeHistory?.length,
     ).toBe(1);
     expect(reloaded.saves["Schalke.fm"]!.u19?.players[0]?.attributeHistory?.length).toBe(
       1,
     );
+    expect(reloaded.saves["Schalke.fm"]!.players[0]?.attributeHistory?.length).toBe(8);
   });
 });

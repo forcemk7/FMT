@@ -184,7 +184,6 @@ import {
   loadRosterStore,
   setActiveRoster,
   shouldRefreshRosterFromDisk,
-  tipOnlyAttributeHistory,
   upsertRoster,
   type RosterStore,
   type StoredFavouredClub,
@@ -8635,11 +8634,7 @@ function persistExtractResult(
           teamId: body.reserves.teamId ?? null,
           countHeader: body.reserves.countHeader,
           capaResolved: body.reserves.capaResolved,
-          // Tip-only history — full CA strips for II/U19 blow localStorage and
-          // used to leave soft-sync on stale slim rows (names, no personality).
-          players: mapApiSquadPlayers(body.reserves.players).map(
-            tipOnlyAttributeHistory,
-          ),
+          players: mapApiSquadPlayers(body.reserves.players),
         }
       : body.reserves === null
         ? null
@@ -8650,9 +8645,7 @@ function persistExtractResult(
           u19Name: body.u19.u19Name,
           countHeader: body.u19.countHeader,
           capaResolved: body.u19.capaResolved,
-          players: mapApiSquadPlayers(body.u19.players).map(
-            tipOnlyAttributeHistory,
-          ),
+          players: mapApiSquadPlayers(body.u19.players),
         }
       : body.u19 === null
         ? null
