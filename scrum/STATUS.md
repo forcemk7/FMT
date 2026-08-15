@@ -6,7 +6,7 @@ Last updated: 2026-08-15 (HQ: Squad + Loans + Mentoring + Progress)
 
 **Loop:** Squad (HA) → Loans (honesty / youth out) → Progress (CA + HA) → Mentoring (in FM).
 
-**SHIP.** Four tabs: Squad, Loans, Mentoring, Progress. Cloud-capable extract. BMC tip.
+**SHIP.** Four tabs: Squad, Loans, Mentoring, Progress. Cloud-capable extract. BMC tip on the header.
 
 **T038 done** — II Lars Gabrielsen Det/Lea is the same T014 tip class (not a new locus). Remaining hist=0 stay `—`.
 
@@ -30,7 +30,9 @@ Last updated: 2026-08-15 (HQ: Squad + Loans + Mentoring + Progress)
 
 **SHIP.** Lookup is the product (Itu → Robert + Miraglia → Group 3). Git: one commit per ticket. Money: Buy Me a Coffee, not a paywall.
 
-**Next:** T070 BMC (needs URL). T074 cancelled (Loans stays).
+**T070 done** — Header Buy me a coffee → `https://buymeacoffee.com/mrramirez` (new tab, optional thank-you). Table stays free.
+
+**Next:** Board empty. T074 cancelled (Loans stays).
 
 | Area | State | Need-to-have? |
 |------|--------|---------------|
@@ -70,7 +72,7 @@ Last updated: 2026-08-15 (HQ: Squad + Loans + Mentoring + Progress)
 | Progress CA + HA points | **keep** (loop) | **Yes** |
 | Loans tab | **keep** (honesty + youth out) | **Yes** |
 | Suggest | cancelled | No — hidden (T071) |
-| Buy Me a Coffee | **T070 ready** | Tip only |
+| Buy Me a Coffee | **T070 done** | Tip only |
 | One extract Python (no 5×2GB on start) | **T072 done** | **Yes** |
 | Extract this club only (not world) | **T076 done** | **Yes** |
 | Personalities label → Squad | **T073 done** | Yes |
@@ -80,7 +82,7 @@ Last updated: 2026-08-15 (HQ: Squad + Loans + Mentoring + Progress)
 
 | ID | Title | Status | Owner |
 |----|-------|--------|-------|
-| T070 | Buy Me a Coffee tip on the UI | ready | |
+| — | *(empty)* | | |
 
 ## Behavior
 
@@ -104,10 +106,11 @@ Last updated: 2026-08-15 (HQ: Squad + Loans + Mentoring + Progress)
 
 ## Blockers
 
-- T070: live Buy Me a Coffee URL (paste here).
+- None.
 
 ## Recently done
 
+- **T070** — Header Buy me a coffee opens `https://buymeacoffee.com/mrramirez` in a new tab. Copy: optional thank-you. HA table, filters, mentoring capture stay free. No Stripe.
 - **T075** — Navigator is Squad | Loans | Mentoring | Progress. Ranker / Best Personalities / checker hashes land on Squad. Loans + HAS table unchanged.
 - **T076** — Extract walks this club’s FT/II/U19 only (skip all-club 7f02 + foreign staff-link ranking; stadiums never walked). König `data/saves` copy: 372s → 316s; same 34/30/30 UIDs, U19 before-name, FT CA strip. Live `games/*.fm` still refused. Restart `npm run dev`.
 - **T071** — Mentoring board and Add-group picker have no Suggest button. Groups + Add group / HA Group checks unchanged. Suggest engine left in place.

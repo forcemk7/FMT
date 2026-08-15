@@ -1000,6 +1000,30 @@ main {
   background: transparent;
 }
 
+.bmc-tip {
+  margin-left: auto;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.05rem;
+  text-decoration: none;
+  color: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 600;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.bmc-tip:hover {
+  text-decoration: underline;
+}
+
+.bmc-tip-note {
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
 .shell[data-history-open] .workspace:has(.tool-view:not([hidden])),
 .shell[data-drawer="off"] .workspace:has(.tool-view:not([hidden])) {
   overflow: hidden;
@@ -4073,6 +4097,14 @@ button.regen-chip-toggle:focus-visible {
   .tool-nav-btn {
     padding: 0.3rem 0.5rem;
     font-size: 0.78rem;
+  }
+
+  .bmc-tip {
+    font-size: 0.72rem;
+  }
+
+  .bmc-tip-note {
+    font-size: 0.6rem;
   }
 
   .shell[data-drawer="off"] .workspace {
