@@ -30,7 +30,7 @@ Last updated: 2026-08-15 (HQ: Squad + Loans + Mentoring + Progress)
 
 **SHIP.** Lookup is the product (Itu → Robert + Miraglia → Group 3). Git: one commit per ticket. Money: Buy Me a Coffee, not a paywall.
 
-**Next:** T071 hide Suggest, T075 strip other chrome, T076 club-only extract, T070 BMC (needs URL). T074 cancelled (Loans stays).
+**Next:** T075 strip other chrome, T076 club-only extract, T070 BMC (needs URL). T074 cancelled (Loans stays).
 
 | Area | State | Need-to-have? |
 |------|--------|---------------|
@@ -69,7 +69,7 @@ Last updated: 2026-08-15 (HQ: Squad + Loans + Mentoring + Progress)
 | CA/PA on Squad table | unfunded | Optional |
 | Progress CA + HA points | **keep** (loop) | **Yes** |
 | Loans tab | **keep** (honesty + youth out) | **Yes** |
-| Suggest | cancelled | No — T071 hides the button |
+| Suggest | cancelled | No — hidden (T071) |
 | Buy Me a Coffee | **T070 ready** | Tip only |
 | One extract Python (no 5×2GB on start) | **T072 done** | **Yes** |
 | Extract this club only (not world) | **T076 ready** | **Yes** |
@@ -79,7 +79,6 @@ Last updated: 2026-08-15 (HQ: Squad + Loans + Mentoring + Progress)
 
 | ID | Title | Status | Owner |
 |----|-------|--------|-------|
-| T071 | Hide cancelled Suggest on Mentoring | ready | |
 | T075 | Strip chrome that is not the four tabs | ready | |
 | T076 | Extract this club’s players — not the whole save | ready | |
 | T070 | Buy Me a Coffee tip on the UI | ready | |
@@ -110,6 +109,7 @@ Last updated: 2026-08-15 (HQ: Squad + Loans + Mentoring + Progress)
 
 ## Recently done
 
+- **T071** — Mentoring board and Add-group picker have no Suggest button. Groups + Add group / HA Group checks unchanged. Suggest engine left in place.
 - **T073** — Navigator tab Personalities → Squad. Click/filter/Group unchanged. Ranker chrome left for T075.
 - **T069** — Working tree committed as ship baseline `f57e928a57dea364715b5e630cc810dd56c28aae`. Later tickets compound from here. No push.
 - **T074 cancelled** — Loans tab stays (honesty + youth out on loan).

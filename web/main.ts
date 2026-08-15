@@ -1627,7 +1627,7 @@ const mentoringCardsEl = document.querySelector<HTMLElement>("#mentoring-cards")
 const mentoringAddBtn = document.querySelector<HTMLButtonElement>("#mentoring-add-btn")!;
 const mentoringBoardSuggestBtn = document.querySelector<HTMLButtonElement>(
   "#mentoring-suggest-btn",
-)!;
+);
 const mentoringPickerDialogEl = document.querySelector<HTMLDialogElement>(
   "#mentoring-picker-dialog",
 )!;
@@ -1640,7 +1640,7 @@ const mentoringPickerBodyEl = document.querySelector<HTMLTableSectionElement>(
 )!;
 const mentoringPickerSuggestBtn = document.querySelector<HTMLButtonElement>(
   "#mentoring-picker-suggest",
-)!;
+);
 const mentoringPickerClearBtn = document.querySelector<HTMLButtonElement>(
   "#mentoring-picker-clear",
 )!;
@@ -10410,12 +10410,16 @@ function syncMentoringSuggestButton(
 }
 
 function updateMentoringSuggestButton() {
-  syncMentoringSuggestButton(mentoringPickerSuggestBtn, {
-    requireCreateSlot: false,
-  });
-  syncMentoringSuggestButton(mentoringBoardSuggestBtn, {
-    requireCreateSlot: true,
-  });
+  if (mentoringPickerSuggestBtn) {
+    syncMentoringSuggestButton(mentoringPickerSuggestBtn, {
+      requireCreateSlot: false,
+    });
+  }
+  if (mentoringBoardSuggestBtn) {
+    syncMentoringSuggestButton(mentoringBoardSuggestBtn, {
+      requireCreateSlot: true,
+    });
+  }
 }
 
 function openMentoringPicker(options?: { groupId?: string | null }) {
@@ -11491,9 +11495,11 @@ function renderMentoringPage() {
     mentoringEmptyEl.hidden = false;
     mentoringEmptyEl.textContent = "Load a Career Save";
     mentoringAddBtn.disabled = true;
-    mentoringBoardSuggestBtn.disabled = true;
-    mentoringBoardSuggestBtn.textContent = "Suggest";
-    mentoringBoardSuggestBtn.title = "Load a Career Save";
+    if (mentoringBoardSuggestBtn) {
+      mentoringBoardSuggestBtn.disabled = true;
+      mentoringBoardSuggestBtn.textContent = "Suggest";
+      mentoringBoardSuggestBtn.title = "Load a Career Save";
+    }
     setMentoringStatusNotice("Load a Career Save");
     mentoringRenderFingerprint = "";
     return;
@@ -11555,7 +11561,7 @@ function renderMentoringPage() {
 }
 
 mentoringAddBtn.addEventListener("click", () => openMentoringPicker({ groupId: null }));
-mentoringBoardSuggestBtn.addEventListener("click", () => {
+mentoringBoardSuggestBtn?.addEventListener("click", () => {
   suggestMentoringGroupFromBoard();
 });
 mentoringMenteesEl.addEventListener("click", (event) => {
@@ -11578,7 +11584,7 @@ mentoringPickerBodyEl.addEventListener("click", (event) => {
   event.preventDefault();
   toggleMentoringPickerPlayer(id);
 });
-mentoringPickerSuggestBtn.addEventListener("click", () => {
+mentoringPickerSuggestBtn?.addEventListener("click", () => {
   suggestMentoringPickerSelection();
 });
 mentoringPickerClearBtn.addEventListener("click", () => {

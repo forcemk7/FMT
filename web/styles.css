@@ -5334,16 +5334,6 @@ button.mentoring-mentee.is-free:focus-visible .mentoring-seat-face-wrap {
   background: color-mix(in srgb, var(--good) 30%, var(--panel));
 }
 
-.mentoring-board-suggest {
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
-  background: color-mix(in srgb, var(--accent) 22%, var(--panel));
-}
-
-.mentoring-board-suggest:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
-  background: color-mix(in srgb, var(--accent) 30%, var(--panel));
-}
-
 .mentoring-add-btn:disabled {
   opacity: 0.42;
   cursor: not-allowed;
