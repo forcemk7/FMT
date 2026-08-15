@@ -11,7 +11,7 @@ describe("rosterHashForView", () => {
     );
   });
 
-  it("keeps Personalities / Loans / Mentoring hashes", () => {
+  it("keeps Squad / Loans / Mentoring hashes", () => {
     expect(rosterHashForView("firstTeam", "personalities")).toBe("#roster");
     expect(rosterHashForView("loans", "personalities")).toBe("#roster/loans");
     expect(rosterHashForView("mentoring", "attributes")).toBe(
@@ -44,7 +44,7 @@ describe("parseRosterHash", () => {
     });
   });
 
-  it("keeps Loans and Mentoring; legacy unit hashes land on Personalities", () => {
+  it("keeps Loans and Mentoring; legacy unit hashes land on Squad", () => {
     expect(parseRosterHash("roster")).toEqual({
       squadView: "firstTeam",
       unitView: "personalities",

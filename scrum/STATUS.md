@@ -30,7 +30,7 @@ Last updated: 2026-08-15 (HQ: Squad + Loans + Mentoring + Progress)
 
 **SHIP.** Lookup is the product (Itu → Robert + Miraglia → Group 3). Git: one commit per ticket. Money: Buy Me a Coffee, not a paywall.
 
-**Next:** T073 Squad rename, T071 hide Suggest, T075 strip other chrome, T076 club-only extract, T070 BMC (needs URL). T074 cancelled (Loans stays).
+**Next:** T071 hide Suggest, T075 strip other chrome, T076 club-only extract, T070 BMC (needs URL). T074 cancelled (Loans stays).
 
 | Area | State | Need-to-have? |
 |------|--------|---------------|
@@ -73,13 +73,12 @@ Last updated: 2026-08-15 (HQ: Squad + Loans + Mentoring + Progress)
 | Buy Me a Coffee | **T070 ready** | Tip only |
 | One extract Python (no 5×2GB on start) | **T072 done** | **Yes** |
 | Extract this club only (not world) | **T076 ready** | **Yes** |
-| Personalities label → Squad | **T073 ready** | Yes |
+| Personalities label → Squad | **T073 done** | Yes |
 
 ## Board
 
 | ID | Title | Status | Owner |
 |----|-------|--------|-------|
-| T073 | Rename Personalities tab to Squad | ready | |
 | T071 | Hide cancelled Suggest on Mentoring | ready | |
 | T075 | Strip chrome that is not the four tabs | ready | |
 | T076 | Extract this club’s players — not the whole save | ready | |
@@ -111,7 +110,8 @@ Last updated: 2026-08-15 (HQ: Squad + Loans + Mentoring + Progress)
 
 ## Recently done
 
-- **T069** — Working tree committed as ship baseline (SHA pending this commit). Later tickets compound from here. No push.
+- **T073** — Navigator tab Personalities → Squad. Click/filter/Group unchanged. Ranker chrome left for T075.
+- **T069** — Working tree committed as ship baseline `f57e928a57dea364715b5e630cc810dd56c28aae`. Later tickets compound from here. No push.
 - **T074 cancelled** — Loans tab stays (honesty + youth out on loan).
 - **T072** — One extract Python at a time. Reload/poll no longer stacks 5×2GB decompresses. Vite start kills leftover extract pid. Restart `npm run dev`. Kill stray `python.exe` once if RAM is still high. One extract still ~2GB while it runs.
 - **T068** — Poll copies the selected live save into `data/saves` even when dest already exists (dest was 56 min stale). U19 is the before-name Schalke list (Δ≈−189), not the after-name decoy. Quota compact no longer wipes FT Det/CA strips. Restart `npm run dev` and let extract finish. König blob today is still 2040-01-13.

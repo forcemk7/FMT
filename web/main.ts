@@ -413,7 +413,7 @@ let saveEventSource: EventSource | null = null;
 let rosterFileDialogOpen = false;
 let rosterSavesMenuOpen = false;
 /** 5×5 matrix: one page holds up to 25 ranked players. */
-/** Top Squad tabs: Personalities | Progress | Loans | Mentoring. */
+/** Top Squad tabs: Squad | Progress | Loans | Mentoring. */
 let squadViewMode: SquadViewMode = "firstTeam";
 let squadUnitView: SquadUnitView = "personalities";
 /** Deep-link / reload restore for Squad tabs (`#roster/mentoring`). */
@@ -645,7 +645,7 @@ function setSquadUnitView(view: SquadUnitView) {
 }
 
 function setSquadViewMode(mode: SquadViewMode) {
-  // Collapse FT/II/U19 into one Personalities list (T035). Progress is club-wide too.
+  // Collapse FT/II/U19 into one Squad list (T035). Progress is club-wide too.
   if (
     (squadUnitView === "personalities" || squadUnitView === "attributes") &&
     (mode === "reserves" || mode === "under19s")
@@ -661,10 +661,10 @@ function setSquadViewMode(mode: SquadViewMode) {
 
   syncActiveSquadPlayers();
 
-  // Navigator: Personalities | Progress | Loans | Mentoring (unit tabs collapsed).
+  // Navigator: Squad | Progress | Loans | Mentoring (unit tabs collapsed).
   squadViewReservesEl.hidden = true;
   squadViewUnder19sEl.hidden = true;
-  squadViewFirstTeamEl.textContent = "Personalities";
+  squadViewFirstTeamEl.textContent = "Squad";
   squadViewFirstTeamEl.classList.toggle("is-active", isPersonalities);
   squadViewProgressEl.classList.toggle("is-active", isAttrs);
   squadViewReservesEl.classList.remove("is-active");
@@ -8089,7 +8089,7 @@ function renderRoster() {
   const clubName = hasSave ? (rosterMeta.clubName ?? "").trim() : "";
   const isEmptyRoster = clubPlayerCount() === 0;
 
-  // Empty club has no tab chrome — reset to Personalities so Mentoring / Progress
+  // Empty club has no tab chrome — reset to Squad so Mentoring / Progress
   // markup cannot linger in the empty container.
   if (
     isEmptyRoster &&
