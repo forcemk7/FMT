@@ -9,8 +9,8 @@ Layout insight (FM24 career):
     → resolve employment with mmap.rfind (search from the end).
 
 Pipeline:
-  1) Full stream-decompress to temp (squad discovery only while streaming)
-  2) mmap: rfind employment, find names/doubles, pick attr-dense doubles
+  1) Full stream-decompress to temp (no world squad/staff/stadium walk)
+  2) mmap: this club FT/II/U19 only; rfind employment, names, attr doubles
   3) stderr PROGRESS JSON lines; stdout final JSON
 """
 
@@ -1623,6 +1623,34 @@ def scan_manager_hits(
     return hits
 
 
+def walk_world_squads_if_needed(
+    mm,
+    *,
+    club_short: str | None,
+    squads: dict[int, tuple[int, int, list[int]]],
+    manager_hits: dict[int, int],
+) -> tuple[dict[int, tuple[int, int, list[int]]], dict[int, int], str]:
+    """All-club 7f02 + staff-link ranking only when club identity is unknown."""
+    if club_short:
+        return squads, manager_hits, "skipped_identity_known"
+    if not squads:
+        squads = discover_squads(mm)
+    if not squads:
+        return squads, manager_hits, "empty"
+    ft_like = [
+        tid
+        for tid, (_abs, _count, jobs) in squads.items()
+        if 15 <= len(jobs) <= 40
+    ] or list(squads.keys())
+    spans = [(0, min(len(mm), 400 * 1024 * 1024))]
+    if len(mm) > EMPLOYMENT_TAIL:
+        spans.append((len(mm) - EMPLOYMENT_TAIL, len(mm)))
+    scanned = scan_manager_hits(mm, ft_like, windows=spans)
+    for tid, n in scanned.items():
+        manager_hits[tid] = max(manager_hits.get(tid, 0), n)
+    return squads, manager_hits, "fallback_no_identity"
+
+
 def collect_doubles(buf, uid: int, limit: int = 12) -> list[int]:
     """Only scan the head of the file — doubles for squad players live early."""
     pat = struct.pack("<II", uid, uid)
@@ -2391,31 +2419,6 @@ def main() -> int:
             saveBytes=save_size,
             layout=container["inferredLayout"],
         )
-        with save.open("rb") as f:
-            mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
-            try:
-                squads = discover_squads(mm)
-                ft_like = [
-                    tid
-                    for tid, (_a, _c, jobs) in squads.items()
-                    if 15 <= len(jobs) <= 40
-                ] or list(squads.keys())
-                spans = [(0, min(len(mm), 400 * 1024 * 1024))]
-                if len(mm) > EMPLOYMENT_TAIL:
-                    spans.append((len(mm) - EMPLOYMENT_TAIL, len(mm)))
-                scanned = scan_manager_hits(mm, ft_like, windows=spans)
-                for tid, n in scanned.items():
-                    manager_hits[tid] = max(manager_hits.get(tid, 0), n)
-            finally:
-                mm.close()
-        if not squads:
-            return fail(
-                t0,
-                "No squad job-lists found in pre-decompressed bin.",
-                code=1,
-                decompressedBytes=out_bytes,
-                **container,
-            )
     else:
         container = probe_container(save)
         progress(
@@ -2443,8 +2446,6 @@ def main() -> int:
         tmp = Path(tmp_name)
         delete_tmp = True
 
-        abs_base = 0
-        carry = b""
         last_progress_out = 0
 
         with save.open("rb") as f, tmp.open("wb") as out:
@@ -2467,46 +2468,7 @@ def main() -> int:
                     if not block:
                         break
                     out.write(block)
-                    data = carry + block
-                    chunk_start = abs_base - len(carry)
                     out_bytes += len(block)
-
-                    start = 0
-                    while True:
-                        j = data.find(LIST_SENTINEL_LOOSE, start)
-                        if j < 0:
-                            break
-                        for tid, jobs_off, count, jobs, _layout in parse_squad_candidates(
-                            data, j
-                        ):
-                            abs_list = chunk_start + jobs_off
-                            prev = squads.get(tid)
-                            score = len(jobs)
-                            prev_score = len(prev[2]) if prev else -1
-                            prefer = score > prev_score
-                            if prev and 18 <= score <= 40 and not (
-                                18 <= prev_score <= 40
-                            ):
-                                prefer = True
-                            if prefer:
-                                squads[tid] = (abs_list, count, jobs)
-                        start = j + 1
-
-                    if squads and out_bytes < 200 * 1024 * 1024:
-                        for tid in squads:
-                            pat = b"\x0b\x02" + struct.pack("<I", tid) + b"\x02"
-                            j = data.find(pat)
-                            while j >= 0 and j + 11 <= len(data):
-                                uid = struct.unpack_from("<I", data, j + 7)[0]
-                                if UID_LO <= uid <= UID_HI:
-                                    window = data[max(0, j - 48) : j]
-                                    manager_hits[tid] += (
-                                        3 if STAFF_MARK in window else 1
-                                    )
-                                j = data.find(pat, j + 1)
-
-                    abs_base += len(block)
-                    carry = data[-OVERLAP:]
 
                     step = (
                         4 * 1024 * 1024
@@ -2525,7 +2487,6 @@ def main() -> int:
                             message="Decompressing save",
                             pct=min(70, int(70 * out_bytes / max(1, estimate_out))),
                             outBytes=out_bytes,
-                            squads=len(squads),
                             etaMs=eta,
                         )
             finally:
@@ -2540,7 +2501,6 @@ def main() -> int:
             message="Resolving First Team",
             pct=72,
             outBytes=out_bytes,
-            squads=len(squads),
         )
 
         if out_bytes == 0:
@@ -2551,52 +2511,6 @@ def main() -> int:
                 code=1,
                 **container,
             )
-
-        if not squads:
-            progress(
-                t0,
-                phase="resolve",
-                message="No streamed squads — calibrating full decompress…",
-                pct=71,
-                outBytes=out_bytes,
-            )
-            calib: dict | None = None
-            with tmp.open("rb") as f:
-                mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
-                try:
-                    squads = discover_squads(mm)
-                    if not squads:
-                        calib = calibrate_squad_layout(mm)
-                finally:
-                    mm.close()
-            if not squads:
-                tmp.unlink(missing_ok=True)
-                return fail(
-                    t0,
-                    "No squad job-lists found after decompress. "
-                    "Native FM26 needs calibration — paste the diagnostics below (no save names needed).",
-                    code=1,
-                    decompressedBytes=out_bytes,
-                    calibration=calib or {},
-                    **container,
-                )
-
-        ft_like = [
-            tid
-            for tid, (_abs, _count, jobs) in squads.items()
-            if 15 <= len(jobs) <= 40
-        ] or list(squads.keys())
-        with tmp.open("rb") as f:
-            mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
-            try:
-                spans = [(0, min(len(mm), 400 * 1024 * 1024))]
-                if len(mm) > EMPLOYMENT_TAIL:
-                    spans.append((len(mm) - EMPLOYMENT_TAIL, len(mm)))
-                scanned = scan_manager_hits(mm, ft_like, windows=spans)
-                for tid, n in scanned.items():
-                    manager_hits[tid] = max(manager_hits.get(tid, 0), n)
-            finally:
-                mm.close()
 
     players: list[dict] = []
     reserves: dict | None = None
@@ -2613,6 +2527,8 @@ def main() -> int:
     ft_discovery_method = "max_manager_staff_link_among_squad_lists"
     ft_hit: dict | None = None
     ft_list: dict | None = None
+    abort_world: dict | None = None
+    world_lists = "skipped_identity_known"
     with tmp.open("rb") as f:
         mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
         try:
@@ -2634,13 +2550,32 @@ def main() -> int:
                     pct=73,
                 )
 
+            squads, manager_hits, world_lists = walk_world_squads_if_needed(
+                mm,
+                club_short=club_short,
+                squads=squads,
+                manager_hits=manager_hits,
+            )
+            if world_lists == "empty":
+                abort_world = {
+                    "calibration": None if is_bin else calibrate_squad_layout(mm)
+                }
+            elif world_lists == "skipped_identity_known":
+                progress(
+                    t0,
+                    phase="resolve",
+                    message="Skipping world squad/staff lists — this club only",
+                    pct=73,
+                )
+
             # Employment rule (T006/T009): a managed-club employee is a jobId on
             # the club's unit squad list — FT via club-object → 7f02 join; II via
             # affiliate join; U19 via namelist. Never admit pick_tid foreign lists
             # when identity is known (non-employees poison Mentoring).
-            ft_hit = resolve_ft_squad(mm, club_short) if club_short else None
+            if world_lists != "empty":
+                ft_hit = resolve_ft_squad(mm, club_short) if club_short else None
             fallback_jobs: list[int] | None = None
-            if not club_short and squads:
+            if abort_world is None and not club_short and squads:
                 best_tid = pick_tid(squads, manager_hits)
                 list_abs, count, fallback_jobs = squads[best_tid]
             selected = select_managed_ft_jobs(
@@ -2875,6 +2810,30 @@ def main() -> int:
         finally:
             mm.close()
 
+    if abort_world is not None:
+        if delete_tmp:
+            try:
+                tmp.unlink(missing_ok=True)
+            except OSError:
+                pass
+        if is_bin:
+            return fail(
+                t0,
+                "No squad job-lists found in pre-decompressed bin.",
+                code=1,
+                decompressedBytes=out_bytes,
+                **container,
+            )
+        return fail(
+            t0,
+            "No squad job-lists found after decompress. "
+            "Native FM26 needs calibration — paste the diagnostics below (no save names needed).",
+            code=1,
+            decompressedBytes=out_bytes,
+            calibration=abort_world.get("calibration") or {},
+            **container,
+        )
+
     if delete_tmp:
         try:
             tmp.unlink(missing_ok=True)
@@ -2929,6 +2888,16 @@ def main() -> int:
             },
             "rankedTids": ranked[:8],
             "method": ft_discovery_method,
+            "worldLists": world_lists,
+            "skippedWorldLists": (
+                [
+                    "all-club 7f02 squad lists",
+                    "manager/staff links for foreign teamIds",
+                    "stadiums (never walked)",
+                ]
+                if world_lists == "skipped_identity_known"
+                else []
+            ),
             "employmentRule": (
                 "jobId on managed-club unit squad list "
                 "(FT: club-object→7f02; II: affiliate; U19: namelist); "
