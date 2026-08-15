@@ -18,6 +18,12 @@ import {
 } from "../shared/save/types.ts";
 import type { RosterPlayer } from "./roster-data.ts";
 import { HA_PACK_KEYS, type HaPackKey } from "./ha-history-store.ts";
+import {
+  attributeTone,
+  CHECKER_TABLE_ATTRIBUTES,
+  TRACKED_ATTRIBUTES,
+  type TrackedAttribute,
+} from "../src/index.ts";
 
 /** Catmull–Rom → cubic Bézier path through plotted points. */
 function smoothLinePath(pts: Array<{ x: number; y: number }>): string {
@@ -263,6 +269,41 @@ export function historyPointValue(
   return typeof raw === "number" && Number.isFinite(raw) ? raw : null;
 }
 
+/** Pack HA uses extract snapshots. Det/Lea stay on the CA strip (same as Strength). */
+export function isHaProgressAttrId(id: EvolutionAttrId): boolean {
+  return id.startsWith("general.");
+}
+
+export function haTableEvolutionAttrId(
+  key: (typeof CHECKER_TABLE_ATTRIBUTES)[number],
+): EvolutionAttrId {
+  if (key === "determination") return "mental.determination";
+  if (key === "leadership") return "mental.leadership";
+  return `general.${key}`;
+}
+
+/** Default Progress chips = pack keys with snapshot points (not Det/Lea). */
+export function defaultHaEvolutionAttrIds(
+  history: AttributeHistoryPoint[],
+): EvolutionAttrId[] {
+  return CHECKER_TABLE_ATTRIBUTES.map(haTableEvolutionAttrId).filter(
+    (id) =>
+      isHaProgressAttrId(id) &&
+      history.some((p) => historyPointValue(p, id) != null),
+  );
+}
+
+/** CA attrs vs HA snapshot attrs. Any CA selection keeps the chart on the tip strip. */
+export function splitEvolutionChartSelection(selected: EvolutionAttrId[]): {
+  caIds: EvolutionAttrId[];
+  haIds: EvolutionAttrId[];
+} {
+  return {
+    caIds: selected.filter((id) => !isHaProgressAttrId(id)),
+    haIds: selected.filter(isHaProgressAttrId),
+  };
+}
+
 export function defaultEvolutionAttrIds(
   player: RosterPlayer,
 ): EvolutionAttrId[] {
@@ -376,25 +417,44 @@ export function allSelectableEvolutionIds(
   return evolutionCategoriesWithPersonality(player).flatMap((c) => c.ids);
 }
 
-/** Latest value + change vs prior history point (0 / missing → null delta). */
+export type AttrDeltaWindow = "recent" | "allTime";
+
+function finiteHistoryValues(
+  history: AttributeHistoryPoint[],
+  id: EvolutionAttrId,
+): number[] {
+  const out: number[] = [];
+  for (const point of history) {
+    const v = historyPointValue(point, id);
+    if (v != null) out.push(v);
+  }
+  return out;
+}
+
+/**
+ * Latest value + change vs a history window (0 / missing → null delta).
+ * `recent` = last two finite points. `allTime` = first finite vs latest
+ * (progress 0, or 1 if 0 is empty).
+ */
 export function attrValueAndDelta(
   history: AttributeHistoryPoint[],
   id: EvolutionAttrId,
   liveFallback: number | null = null,
+  window: AttrDeltaWindow = "recent",
 ): { value: number | null; delta: number | null } {
-  let last: number | null = null;
-  let prev: number | null = null;
-  for (let i = history.length - 1; i >= 0; i--) {
-    const v = historyPointValue(history[i]!, id);
-    if (v == null) continue;
-    if (last == null) last = v;
-    else {
-      prev = v;
-      break;
-    }
-  }
+  const finite = finiteHistoryValues(history, id);
+  let last: number | null =
+    finite.length > 0 ? finite[finite.length - 1]! : null;
   if (last == null) last = liveFallback;
   if (last == null) return { value: null, delta: null };
+
+  let prev: number | null = null;
+  if (window === "allTime") {
+    if (finite.length >= 2) prev = finite[0]!;
+  } else if (finite.length >= 2) {
+    prev = finite[finite.length - 2]!;
+  }
+
   if (prev == null) return { value: last, delta: null };
   const delta = last - prev;
   return { value: last, delta: delta === 0 ? null : delta };
@@ -403,6 +463,39 @@ export function attrValueAndDelta(
 export function formatAttrDelta(delta: number | null): string {
   if (delta == null || delta === 0) return "";
   return delta > 0 ? `+${delta}` : String(delta);
+}
+
+const TRACKED_ATTR_SET = new Set<string>(TRACKED_ATTRIBUTES);
+
+/** HA-table `good` / `bad` on chip values. CON inverted; other 1–20 use the same floors. */
+export function evoChipValueTone(
+  id: EvolutionAttrId,
+  value: number | null,
+): "good" | "bad" | "" {
+  if (value == null || !Number.isFinite(value)) return "";
+  const key = id.slice(id.indexOf(".") + 1);
+  if (TRACKED_ATTR_SET.has(key)) {
+    const tone = attributeTone(key as TrackedAttribute, value);
+    return tone === "neutral" ? "" : tone;
+  }
+  if (value > 14) return "good";
+  if (value > 0 && value < 6) return "bad";
+  return "";
+}
+
+/** Visibility `<select>`: `-` = role-default / mixed. */
+export function evoVisibilitySelectValue(
+  override: "default" | "all" | "none",
+): "default" | "all" | "none" {
+  return override;
+}
+
+export function evoVisibilityOverrideFromSelect(
+  value: string,
+): "default" | "all" | "none" {
+  if (value === "none") return "none";
+  if (value === "all") return "all";
+  return "default";
 }
 
 export type EvolutionHoverPoint = {
@@ -762,7 +855,7 @@ export function hitTestEvolutionPoint(
   return best;
 }
 
-/** Extracted HA pack attrs (FMT snapshots). Det/Lea stay on Attributes until pack history is solid. */
+/** Extracted HA pack attrs (FMT snapshots). Det/Lea stay on the CA mental column. */
 export function personalityEvolutionCategories(): EvolutionCategory[] {
   const packIds = HA_PACK_KEYS.map((k) => `general.${k}` as EvolutionAttrId);
   const stubGeneral: EvolutionAttrId[] = [

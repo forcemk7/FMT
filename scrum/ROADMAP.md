@@ -1,66 +1,105 @@
-# Roadmap
+# Roadmap — what we ship
 
-Poverty rule: only the next loop-breaking phase is funded. Later phases are notes, not commitments.
+Tickets and done/ready live in [STATUS.md](./STATUS.md). This file is the **funded product**. Law: [SCOPE.md](./SCOPE.md).
 
-## Phase 0 — Loop exists (shipped — stop expanding)
+## The product
 
-- [x] HAS ranker / checker / compare
-- [x] Career Save → FT / II / U19 + HAS (discovery can still miss units on some saves — do not fund until loans are honest)
-- [x] Mentoring (attr-only influence proxy)
-- [x] Attributes evolution (CA + HA history)
-- [x] Mercenary / regen-only personality match (NEWGEN) — user-verified
+A **lightweight Genie Scout for hidden attributes**: this club’s **HA + CA** from a Career Save, without installing GS and without loading every player, staff, and stadium.
 
-## Phase 1 — Mentoring must be creatable, then Dynamics
+Tight **mentoring loop**, also usable to plan **youth development** (who is growing, who is out on loan, who can sit in a group).
 
-### 1a — Squad / loan / name honesty (**shipped**)
+Must run **in the cloud** (upload save → extract → four tabs). Local `npm run dev` is the same extract contract.
 
-T004–T009. Closed against user-provided GT — **generalization unproven**.
+```
+Upload / copy Career Save
+  → extract this club only (see Savefile)
+  → Squad (HA table, at-club)
+  → Loans (honesty + who is out)
+  → Progress (CA growth + HA movement)
+  → Mentoring (reminder)
+  → you create the group in FM
+```
 
-### 1a.5 — Career Save ingest (**shipped**)
+Tab order: **Squad | Loans | Mentoring | Progress**
 
-T010 — upload / disk sync commits fresh extract.
+Money: **Buy Me a Coffee**. Optional tip. Nothing is gated.
 
-### 1a.6 — Blind extract trust + U19 loan ghosts
+## Funded features
 
-| Ticket | Focus | Status |
-|--------|--------|--------|
-| T011 | Incomplete extract cannot look done | **shipped** |
-| T012 | U19 at-club excludes outgoing loans; Loans U19 | **shipped** |
+### 1. Squad
 
-### 1a.7 — Personality combo honesty (**shipped**)
+Club-wide HA table for **FT + II + U19 at-club** (loaned-out players are not here).
 
-| Ticket | Focus | Status |
-|--------|--------|--------|
-| T013 | Do not label Born Leader without known Det/Lea=20 | **shipped** |
+- Columns: name, unit, age, personality, media, Det / Pro / Pre / Amb / Tem / Lea / Loy / Spo / Con (HAS optional)
+- Click a player → filters from their numbers (kid: find mentors; senior: find mentees)
+- Edit / loosen floors; missing = `—`
+- Group checks: three names become a mentoring unit
 
-### 1a.8 — Det/Lea extract for recent signings (**funded**)
+**Label:** **Squad** (not Personalities, not Players).
 
-Gilson-class: HA pack present, **no CA history** (recent signing). Det/Lea must not depend on Progress Report tip.
+### 2. Loans
 
-| Ticket | Focus | Status |
-|--------|--------|--------|
-| **T014** | Lock + extract Det/Lea without CA history; no decoy poison | **ready #1** |
+Outgoing loans for this club, by unit. **Honesty feature:** a short list is easier to check against FM than 99 at-club names. Also: youth out on loan are part of development planning. Same extract tags as Squad (no second detector).
 
-### 1b — Dynamics lock (**paused** until T014)
+### 3. Mentoring
 
-1. Ground truth fixtures
-2. Binary layout lock → `dynamics-layout-locked.json`
-3. Wire `dynamics{}` in extract
-4. Mentoring seating consumes Dynamics
+Reminder list of units you will create in FM. Add from Squad, list, remove. **No Suggest.** At-club only (not players who are on Loans).
 
-## Explicitly unfunded (refuse / defer)
+### 4. Progress
 
-- Sync status pill cosmetics
-- Loan crest polish
-- “Fix every Millwood-class motif” as open-ended RE
-- Upload / decompress / extract **speed rewrite** — T010 already commits fresh extracts; slowness is not the error source (T011: loan unclassified)
-- More GT-chasing tickets without a blind failure surface
+Per-player history after extract on a new in-game date.
 
-## Later (unfunded until Phase 1 closes)
+- **CA points** — who is growing; high growth ⇒ likely high PA ⇒ worth mentoring if personality is poor
+- **HA points** — pack + Det/Lea movement; mentoring influence
 
-- Dynamics labels no longer manual
-- Fixture regression polish — only if usage shows breakage
+One extract ⇒ values, empty deltas. Two different game dates ⇒ deltas.
 
-## Discard pile
+### 5. Cloud
 
-Quarantined forever unless the loop itself dies without them: see SCOPE.md "Not need-to-have".
+Same four tabs behind a public URL. User uploads a `.fm`. Server runs the extract below, returns roster JSON, **deletes the binary**. No desktop install. Faces from SI graphics are **local-only**; cloud ships without a face pack.
+
+### 6. Savefile (extract contract)
+
+The save is a **read-only input**. Speed comes from doing less, not a faster full dump.
+
+**Do**
+
+| Step | Why |
+|------|-----|
+| Take **one** Career `.fm` (upload, or copy from SI `games/` into `data/saves`) | Working copy only |
+| Read-only open / mmap that copy | Never lock FM autosave |
+| Find **this club’s** FT / II / U19 lists | Squad + Loans |
+| Pull per player: uid, name, unit, age, pack HA, Det/Lea, CA, in-game today, loan flag | Tabs 1–4 |
+| Put **loaned-out** on Loans only; Squad is at-club | Honesty + mentoring pool |
+| Stream or partial decompress only as far as those lists need | Expedient |
+| When JSON is written: **delete** temp `.fm` / decompress blobs (cloud: always; local: keep the `data/saves` copy the user chose) | Cloud must not store saves |
+
+**Do not**
+
+| Action | Why |
+|--------|-----|
+| Extract or mmap live `Documents/Sports Interactive/…/games/*.fm` | Locks autosave |
+| Write, patch, or round-trip the `.fm` | Not an editor |
+| Keep the uploaded `.fm` in cloud storage | Privacy + cost |
+| Walk staff, stadiums, world players, tactics, media, graphics | GS’s 15-minute load |
+| Full-file decompress “to be safe” after this club is already in hand | Waste |
+| Run several full decompresses of the same save at once | T072: one Python, no 5×2GB |
+| Require SI `graphics/` for the cloud path | No download, no local FM install |
+
+### 7. Ship shape
+
+- GitHub `forcemk7/FMT`
+- Local: clone + `npm run dev` (same extract rules)
+- Cloud: upload → extract → discard `.fm`
+- Buy Me a Coffee (tip, not Stripe)
+- One git commit per ticket (AGENTS.md)
+
+## Not funded
+
+Suggest, HAS ranker/checker/compare as app chrome, editor / write-to-save, FMT→in-game sync, Talent tab, CA/PA columns on Squad, exe, FM27 extract, storing career saves in the cloud.
+
+## Later (notes, not a promise)
+
+- Extract entirely in the browser (no server Python)
+- Read mentoring groups back from the save
+- CA/PA as Squad columns if Progress is not enough

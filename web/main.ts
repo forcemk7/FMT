@@ -25,7 +25,22 @@ import {
   defaultMentoringUnitRoles,
   evaluateMentoringUnit,
   findInfluenceSafeMentoringGroups,
+  isMentoringZeroInfluenceGroup,
+  mentoringGroupMemberKey,
+  mentoringInfluenceEdgeKey,
+  mentoringMenteeCoverage,
+  mentoringMenteeFaceState,
+  mentoringKnownAbility,
+  mentoringCaPaFaceDigits,
+  mentoringReplacementForLow,
+  mentoringRolesHaveLabeledDownwardNone,
+  planMentoringMatrixCellMarks,
+  mentoringChevronCount,
+  planMentoringSeatPeerMarks,
+  planMentoringPairTraitMarks,
+  resolveMentoringInfluenceLevel,
   MENTORING_DISPLAY_ORDER,
+  MENTORING_YOUNG_AGE,
   HA_QUALITY_WEIGHTS,
   HA_VISIBLE_QUALITY_WEIGHTS,
   HIDDEN_QUALITY_GOOD_FLOOR,
@@ -48,10 +63,15 @@ import {
   type TrackedAttribute,
   type MediaHandlingDefinition,
   type MentoringCandidate,
+  type MentoringDisplayBand,
   type MentoringHierarchyLabel,
   type MentoringInfluenceLevel,
   type MentoringInfluenceSafeGroup,
   type MentoringInfluenceSeat,
+  type MentoringMatrixCellMarks,
+  type MentoringMenteeCoverageRow,
+  type MentoringPairSideMarks,
+  type MentoringSeatPeerMark,
   type MentoringSubject,
   type MentoringUnitEvaluation,
   type MentoringUnitMember,
@@ -86,6 +106,54 @@ import {
 } from "./roster-data.ts";
 import { loansByUnit } from "./loans-roster.ts";
 import {
+  isSquadUnitMode,
+  parseRosterHash,
+  rosterHashForView,
+  type SquadUnitView,
+  type SquadViewMode,
+} from "./squad-route.ts";
+import {
+  SQUAD_HA_COL_META,
+  SQUAD_HA_FILTER_KEYS,
+  SQUAD_HA_GROUP_HEADER,
+  SQUAD_HA_GROUP_HEADER_TIP,
+  SQUAD_HA_MENTORING_UNIT_SIZE,
+  SQUAD_HA_UNIT_ORDER,
+  SQUAD_HA_YOUNG_AGE,
+  cycleSquadHaSort,
+  formatSquadHaCell,
+  isSquadHaEllipsisKey,
+  isSquadHaNumericFilterKey,
+  isSquadHaTextFilterKey,
+  mentoringGroupNumberByUid,
+  mergeClubWideAtClubPlayers,
+  newSquadHaManualFilter,
+  nudgeSquadHaFilterBy,
+  nudgeSquadHaFiltersBy,
+  sortSquadHaRows,
+  squadHaAddMentoringUnitGate,
+  squadHaAttrsFromSignals,
+  squadHaCheckCompletesUnit,
+  squadHaClickPreset,
+  squadHaEllipsisCellText,
+  squadHaEllipsisCellTitle,
+  squadHaFilterKeyLabel,
+  squadHaTextOverflows,
+  squadHaNumericFilterBounds,
+  squadHaNumericFilterValueOptions,
+  squadHaRowVisible,
+  squadHaTableHeaderLabel,
+  toggleSquadHaSelection,
+  toggleSquadHaUnitCheck,
+  type SquadHaFilter,
+  type SquadHaFilterJoin,
+  type SquadHaFilterKey,
+  type SquadHaFilterOp,
+  type SquadHaRow,
+  type SquadHaSortKey,
+  type SquadHaUnit,
+} from "./squad-ha-table.ts";
+import {
   extractTrustHoles,
   formatExtractTrustStatus,
   isMentoringCompleteEnough,
@@ -94,6 +162,22 @@ import {
   rosterResolvedName,
   summarizeExtractTrust,
 } from "./extract-trust.ts";
+import {
+  MENTORING_STACK_STORAGE_KEY,
+  buildMentoringPruneRosterIds,
+  canPersistMentoringGroupsToStore,
+  decideMentoringPrune,
+  isMentoringRosterTrustworthyForPrune,
+  loadMentoringStackFromStorage as loadMentoringStackSnapshot,
+  mentoringEdgesForMembers,
+  normalizeMentoringInfluenceEdges,
+  type MentoringCaptaincyLabel,
+  type MentoringDynamicsLabel,
+  type MentoringDynamicsSnapshot,
+  type MentoringGroupRecord,
+  type MentoringSocialGroupLabel,
+  type MentoringStackPersist,
+} from "./mentoring-stack.ts";
 import {
   deleteRoster,
   listRosterSaveNames,
@@ -113,14 +197,21 @@ import {
   buildEvolutionSeries,
   colorForActiveEvolutionAttr,
   defaultEvolutionAttrIds,
+  defaultHaEvolutionAttrIds,
   evolutionCategoriesWithPersonality,
+  isHaProgressAttrId,
+  splitEvolutionChartSelection,
   filterAttributeHistory,
+  evoChipValueTone,
+  evoVisibilityOverrideFromSelect,
+  evoVisibilitySelectValue,
   formatAttrDelta,
   hitTestEvolutionPoint,
   historyPointValue,
   labelForEvolutionAttr,
   liveAttrValue,
   renderEvolutionChartSvg,
+  type AttrDeltaWindow,
   type EvolutionAttrId,
   type EvolutionHoverPoint,
 } from "./attribute-evolution.ts";
@@ -171,6 +262,15 @@ const rosterSaveControllerEl = document.querySelector<HTMLElement>(
 const rosterClubLineEl = document.querySelector<HTMLElement>("#roster-club-line")!;
 const rosterTablePanelEl = document.querySelector<HTMLElement>(".roster-table-panel")!;
 const rosterBodyEl = document.querySelector<HTMLElement>("#roster-body")!;
+const squadFilterWrapEl = document.querySelector<HTMLElement>("#squad-filter-wrap")!;
+const squadFilterRowsEl = document.querySelector<HTMLElement>("#squad-filter-rows")!;
+const squadFilterAddEl = document.querySelector<HTMLButtonElement>("#squad-filter-add")!;
+const squadFilterClearEl = document.querySelector<HTMLButtonElement>("#squad-filter-clear")!;
+const squadFilterLoosenEl = document.querySelector<HTMLButtonElement>("#squad-filter-loosen")!;
+const squadFilterTightenEl = document.querySelector<HTMLButtonElement>("#squad-filter-tighten")!;
+const squadFilterToggleEl = document.querySelector<HTMLButtonElement>("#squad-filter-toggle")!;
+const squadFilterPopoverEl = document.querySelector<HTMLElement>("#squad-filter-popover")!;
+const squadFilterCountEl = document.querySelector<HTMLElement>("#squad-filter-count")!;
 const rosterStatusEl = document.querySelector<HTMLElement>("#roster-status")!;
 const rosterUploadEl = document.querySelector<HTMLInputElement>("#roster-upload")!;
 const rosterUploadBtnEl = document.querySelector<HTMLButtonElement>("#roster-upload-btn")!;
@@ -187,6 +287,9 @@ const squadMentoringPaneEl = document.querySelector<HTMLElement>(
 )!;
 const squadViewFirstTeamEl = document.querySelector<HTMLButtonElement>(
   "#squad-view-first-team",
+)!;
+const squadViewProgressEl = document.querySelector<HTMLButtonElement>(
+  "#squad-view-progress",
 )!;
 const squadViewReservesEl = document.querySelector<HTMLButtonElement>(
   "#squad-view-reserves",
@@ -237,11 +340,11 @@ const squadEvolutionTogglesEl = document.querySelector<HTMLElement>(
 const squadEvoVisibilityToolsEl = document.querySelector<HTMLElement>(
   "#squad-evo-visibility-tools",
 )!;
-const squadEvoShowAllEl = document.querySelector<HTMLButtonElement>(
-  "#squad-evo-show-all",
+const squadEvoVisibilitySelectEl = document.querySelector<HTMLSelectElement>(
+  "#squad-evo-visibility-select",
 )!;
-const squadEvoHideAllEl = document.querySelector<HTMLButtonElement>(
-  "#squad-evo-hide-all",
+const squadEvoWindowSelectEl = document.querySelector<HTMLSelectElement>(
+  "#squad-evo-window-select",
 )!;
 const rosterSavesBtnEl = document.querySelector<HTMLButtonElement>("#roster-saves-btn")!;
 const rosterSavesMenuEl = document.querySelector<HTMLElement>("#roster-saves-menu")!;
@@ -310,33 +413,7 @@ let saveEventSource: EventSource | null = null;
 let rosterFileDialogOpen = false;
 let rosterSavesMenuOpen = false;
 /** 5×5 matrix: one page holds up to 25 ranked players. */
-/** Top Squad tabs: three identical squad pages + Loans + club-wide Mentoring. */
-type SquadViewMode =
-  | "firstTeam"
-  | "reserves"
-  | "under19s"
-  | "loans"
-  | "mentoring";
-const SQUAD_VIEW_MODES: readonly SquadViewMode[] = [
-  "firstTeam",
-  "reserves",
-  "under19s",
-  "loans",
-  "mentoring",
-];
-/** Per-unit detail: personalities grid vs attribute evolution. */
-type SquadUnitView = "personalities" | "attributes";
-function isSquadViewMode(value: string | null | undefined): value is SquadViewMode {
-  return (
-    value != null &&
-    (SQUAD_VIEW_MODES as readonly string[]).includes(value)
-  );
-}
-function isSquadUnitMode(
-  mode: SquadViewMode,
-): mode is "firstTeam" | "reserves" | "under19s" {
-  return mode === "firstTeam" || mode === "reserves" || mode === "under19s";
-}
+/** Top Squad tabs: Personalities | Progress | Loans | Mentoring. */
 let squadViewMode: SquadViewMode = "firstTeam";
 let squadUnitView: SquadUnitView = "personalities";
 /** Deep-link / reload restore for Squad tabs (`#roster/mentoring`). */
@@ -346,43 +423,9 @@ let squadEvolutionUid: number | null = null;
 let squadEvolutionAttrs: EvolutionAttrId[] = [];
 /** Overrides role-default / custom pill selection when active. */
 let squadEvolutionAttrOverride: "default" | "all" | "none" = "default";
+/** Chip deltas: last two points vs first finite vs latest. */
+let squadEvolutionDeltaWindow: AttrDeltaWindow = "recent";
 let squadEvolutionHover: EvolutionHoverPoint | null = null;
-
-type MentoringGroupRecord = {
-  id: string;
-  memberIds: string[];
-  roles: Record<string, MentoringInfluenceSeat>;
-  /**
-   * Directed mentoring-triangle influence from FM (A→B).
-   * Key: `${fromId}>${toId}` → none | light | average | significant.
-   */
-  influenceEdges?: Record<string, MentoringInfluenceLevel>;
-};
-
-/** User-tagged Dynamics labels from FM (compatible — not inferred). */
-type MentoringCaptaincyLabel = "captain" | "viceCaptain" | "none";
-type MentoringSocialGroupLabel =
-  | "core"
-  | "secondaryA"
-  | "secondaryB"
-  | "secondaryC"
-  | "other";
-
-type MentoringDynamicsSnapshot = {
-  age?: number;
-  determination?: number;
-  leadership?: number;
-  haScore?: number;
-  personality?: string;
-};
-
-type MentoringDynamicsLabel = {
-  captaincy: MentoringCaptaincyLabel | null;
-  hierarchy: MentoringHierarchyLabel | null;
-  socialGroup: MentoringSocialGroupLabel | null;
-  labeledAt?: string;
-  snapshot?: MentoringDynamicsSnapshot;
-};
 
 /** Per-peer influence draft while editing a group member. */
 type MentoringPeerInfluenceDraft = {
@@ -410,6 +453,8 @@ type MentoringCache = {
   groups: MentoringGroupRecord[];
   /** Player Dynamics labels keyed by player id (uid string). */
   dynamicsByPlayerId: Record<string, MentoringDynamicsLabel>;
+  /** Dissolved / labeled-none triples — do not re-suggest on this save. */
+  rejectedGroupKeys: string[];
   /** Built once per session key — avoid rematching combos on every render. */
   candidates: MentoringCandidate[] | null;
   suggestions: MentoringCachedSuggestion[];
@@ -423,6 +468,7 @@ let mentoringCache: MentoringCache = {
   sessionKey: "",
   groups: [],
   dynamicsByPlayerId: {},
+  rejectedGroupKeys: [],
   candidates: null,
   suggestions: [],
   suggestionCursor: 0,
@@ -430,9 +476,7 @@ let mentoringCache: MentoringCache = {
   generation: 0,
 };
 /** Bump when group-edge scoring changes so suggestion caches refresh (not group storage). */
-const MENTORING_LOGIC_REV = 11;
-const MENTORING_STACK_STORAGE_KEY = "fmt-mentoring-stack-v2";
-const MENTORING_STACK_STORAGE_KEY_LEGACY = "fmt-mentoring-stack-v1";
+const MENTORING_LOGIC_REV = 15;
 /** Skip DOM rebuild when groups/dynamics unchanged (avoids face skeleton flicker). */
 let mentoringRenderFingerprint = "";
 
@@ -451,6 +495,8 @@ let mentoringDetailGroupId: string | null = null;
 let mentoringDynamicsPlayerId: string | null = null;
 let mentoringDynamicsGroupId: string | null = null;
 let mentoringDynamicsDraft: MentoringDynamicsDraft | null = null;
+/** Set after a dead-group dissolve when Suggest has no replacement trio. */
+let mentoringReplacementNotice: string | null = null;
 
 type ScoutPlayerRow = {
   uid: number;
@@ -486,17 +532,19 @@ function syncActiveSquadPlayers(): void {
 }
 
 /**
- * Mentoring pool = managed-club employees at club only.
- * Employment proof is extract FT list membership (club-object→7f02 join);
- * loaned-out employees stay on FT `players[]` but never seat here (T007/T009).
+ * Mentoring pool = managed-club employees at club (FT + Reserves + U19).
+ * Loaned-out never seat. Dedupe by uid (first list wins: FT → II → U19).
  */
-function firstTeamMentoringPlayers(): RosterPlayer[] {
+function clubAtClubMentoringPlayers(): RosterPlayer[] {
   const byUid = new Map<number, RosterPlayer>();
-  for (const p of firstTeamPlayers) {
+  for (const p of [
+    ...firstTeamPlayers,
+    ...reservesPlayers,
+    ...under19sPlayers,
+  ]) {
     if (p.uid == null || !Number.isFinite(p.uid)) continue;
-    // Loaned-out players stay on the squad list but are unavailable in-game.
     if (p.loan?.status === "loanedOut") continue;
-    byUid.set(p.uid, p);
+    if (!byUid.has(p.uid)) byUid.set(p.uid, p);
   }
   return [...byUid.values()];
 }
@@ -554,17 +602,13 @@ function findRosterPlayer(uid: number): RosterPlayer | undefined {
   );
 }
 
-function rosterHashForView(
-  mode: SquadViewMode = squadViewMode,
-  unitView: SquadUnitView = squadUnitView,
-): string {
-  if (mode === "mentoring") return "#roster/mentoring";
-  if (mode === "loans") return "#roster/loans";
-  const unit =
-    mode === "firstTeam" ? "first-team" : mode === "under19s" ? "under19s" : mode;
-  if (mode === "firstTeam" && unitView === "personalities") return "#roster";
-  if (unitView === "attributes") return `#roster/${unit}/attributes`;
-  return `#roster/${unit}`;
+/** Same pool as the club-wide HA table (named, at-club, uid-deduped). */
+function clubWideEvolutionPlayers(): RosterPlayer[] {
+  return mergeClubWideAtClubPlayers({
+    firstTeam: firstTeamPlayers,
+    reserves: reservesPlayers,
+    under19s: under19sPlayers,
+  }).map((entry) => entry.player);
 }
 
 function syncRosterViewHash(
@@ -596,13 +640,18 @@ function syncRosterViewHash(
 
 function setSquadUnitView(view: SquadUnitView) {
   squadUnitView = view;
-  if (!isSquadUnitMode(squadViewMode)) {
-    squadViewMode = "firstTeam";
-  }
-  setSquadViewMode(squadViewMode);
+  squadViewMode = "firstTeam";
+  setSquadViewMode("firstTeam");
 }
 
 function setSquadViewMode(mode: SquadViewMode) {
+  // Collapse FT/II/U19 into one Personalities list (T035). Progress is club-wide too.
+  if (
+    (squadUnitView === "personalities" || squadUnitView === "attributes") &&
+    (mode === "reserves" || mode === "under19s")
+  ) {
+    mode = "firstTeam";
+  }
   squadViewMode = mode;
   const isUnit = isSquadUnitMode(mode);
   const isMentoring = mode === "mentoring";
@@ -612,14 +661,20 @@ function setSquadViewMode(mode: SquadViewMode) {
 
   syncActiveSquadPlayers();
 
-  squadViewFirstTeamEl.classList.toggle("is-active", mode === "firstTeam");
-  squadViewReservesEl.classList.toggle("is-active", mode === "reserves");
-  squadViewUnder19sEl.classList.toggle("is-active", mode === "under19s");
+  // Navigator: Personalities | Progress | Loans | Mentoring (unit tabs collapsed).
+  squadViewReservesEl.hidden = true;
+  squadViewUnder19sEl.hidden = true;
+  squadViewFirstTeamEl.textContent = "Personalities";
+  squadViewFirstTeamEl.classList.toggle("is-active", isPersonalities);
+  squadViewProgressEl.classList.toggle("is-active", isAttrs);
+  squadViewReservesEl.classList.remove("is-active");
+  squadViewUnder19sEl.classList.remove("is-active");
   squadViewLoansEl.classList.toggle("is-active", isLoans);
   squadViewMentoringEl.classList.toggle("is-active", isMentoring);
-  squadViewFirstTeamEl.setAttribute("aria-selected", String(mode === "firstTeam"));
-  squadViewReservesEl.setAttribute("aria-selected", String(mode === "reserves"));
-  squadViewUnder19sEl.setAttribute("aria-selected", String(mode === "under19s"));
+  squadViewFirstTeamEl.setAttribute("aria-selected", String(isPersonalities));
+  squadViewProgressEl.setAttribute("aria-selected", String(isAttrs));
+  squadViewReservesEl.setAttribute("aria-selected", "false");
+  squadViewUnder19sEl.setAttribute("aria-selected", "false");
   squadViewLoansEl.setAttribute("aria-selected", String(isLoans));
   squadViewMentoringEl.setAttribute("aria-selected", String(isMentoring));
 
@@ -640,22 +695,23 @@ function setSquadViewMode(mode: SquadViewMode) {
   if (isAttrs) panel?.classList.add("is-attributes");
   if (isMentoring) panel?.classList.add("is-mentoring");
   if (isLoans) panel?.classList.add("is-loans");
-  if (mode === "reserves") panel?.classList.add("is-reserves");
-  if (mode === "under19s") panel?.classList.add("is-under19s");
-  if (mode === "firstTeam") panel?.classList.add("is-first-team");
+  if (isPersonalities) panel?.classList.add("is-first-team");
+  else if (mode === "reserves") panel?.classList.add("is-reserves");
+  else if (mode === "under19s") panel?.classList.add("is-under19s");
+  else if (mode === "firstTeam") panel?.classList.add("is-first-team");
 
   syncRosterViewHash(mode, squadUnitView);
 
   if (isAttrs) {
     squadEvolutionHover = null;
+    const pool = clubWideEvolutionPlayers();
     populateSquadEvolutionPlayers();
     if (
       squadEvolutionUid == null ||
-      !rosterPlayers.some((p) => p.uid === squadEvolutionUid)
+      !pool.some((p) => p.uid === squadEvolutionUid)
     ) {
       const first =
-        rosterPlayers.find((p) => (p.attributeHistory?.length ?? 0) > 0) ??
-        rosterPlayers[0];
+        pool.find((p) => (p.attributeHistory?.length ?? 0) > 0) ?? pool[0];
       if (first) selectSquadEvolutionPlayer(first.uid);
       else {
         clearSquadEvolution();
@@ -724,7 +780,7 @@ function setSquadEvolutionPlayerTrigger(player: RosterPlayer | null) {
 function populateSquadEvolutionPlayers() {
   const previous = squadEvolutionUid;
   squadEvolutionPlayerListEl.replaceChildren();
-  const sorted = [...rosterPlayers].sort((a, b) =>
+  const sorted = [...clubWideEvolutionPlayers()].sort((a, b) =>
     (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" }),
   );
   for (const player of sorted) {
@@ -802,12 +858,13 @@ function personalityHistoryFor(player: RosterPlayer) {
 }
 
 function historyForAttrId(player: RosterPlayer, id: EvolutionAttrId) {
-  return id.startsWith('general.')
-    ? personalityHistoryFor(player)
-    : evolutionHistoryFor(player);
+  if (!isHaProgressAttrId(id)) return evolutionHistoryFor(player);
+  return personalityHistoryFor(player);
 }
 
 function roleDefaultEvolutionAttrs(player: RosterPlayer): EvolutionAttrId[] {
+  const haDefaults = defaultHaEvolutionAttrIds(personalityHistoryFor(player));
+  if (haDefaults.length > 0) return haDefaults;
   const history = evolutionHistoryFor(player);
   const defaults = defaultEvolutionAttrIds(player).filter((id) =>
     history.some((p) => historyPointValue(p, id) != null),
@@ -836,18 +893,17 @@ function effectiveEvolutionAttrs(player: RosterPlayer): EvolutionAttrId[] {
   return squadEvolutionAttrs;
 }
 
-/** Chart uses CA history when any CA attr is selected; otherwise personality HA. */
+/** Chart uses CA when any CA attr (incl. Det/Lea) is selected; pack-only uses HA snapshots. */
 function chartHistoryAndAttrs(player: RosterPlayer): {
   history: ReturnType<typeof evolutionHistoryFor>;
   attrs: EvolutionAttrId[];
 } {
   const selected = effectiveEvolutionAttrs(player);
-  const caSelected = selected.filter((id) => !id.startsWith('general.'));
-  const persSelected = selected.filter((id) => id.startsWith('general.'));
-  if (caSelected.length > 0) {
-    return { history: evolutionHistoryFor(player), attrs: caSelected };
+  const { caIds, haIds } = splitEvolutionChartSelection(selected);
+  if (caIds.length > 0) {
+    return { history: evolutionHistoryFor(player), attrs: caIds };
   }
-  return { history: personalityHistoryFor(player), attrs: persSelected };
+  return { history: personalityHistoryFor(player), attrs: haIds };
 }
 
 function selectSquadEvolutionPlayer(uid: number) {
@@ -861,6 +917,7 @@ function selectSquadEvolutionPlayer(uid: number) {
     opt.setAttribute('aria-selected', String(opt.dataset.uid === String(uid)));
   }
   squadEvolutionAttrOverride = 'default';
+  squadEvolutionDeltaWindow = 'recent';
   squadEvolutionHover = null;
   squadEvolutionAttrs = roleDefaultEvolutionAttrs(player);
   squadEvolutionTogglesEl.dataset.sig = '';
@@ -871,6 +928,7 @@ function clearSquadEvolution() {
   squadEvolutionUid = null;
   squadEvolutionAttrs = [];
   squadEvolutionAttrOverride = 'default';
+  squadEvolutionDeltaWindow = 'recent';
   squadEvolutionHover = null;
   squadEvolutionChartEl.replaceChildren();
   squadEvolutionTogglesEl.replaceChildren();
@@ -879,9 +937,40 @@ function clearSquadEvolution() {
   squadEvolutionPlayerListEl.replaceChildren();
   setSquadEvolutionPlayerTrigger(null);
   closeSquadEvolutionPlayerList();
-  squadEvoShowAllEl.setAttribute('aria-pressed', 'false');
-  squadEvoHideAllEl.setAttribute('aria-pressed', 'false');
+  syncEvoPills();
   squadEvoVisibilityToolsEl.hidden = false;
+}
+
+function syncEvoPills() {
+  squadEvoVisibilitySelectEl.value = evoVisibilitySelectValue(
+    squadEvolutionAttrOverride,
+  );
+  squadEvoWindowSelectEl.value = squadEvolutionDeltaWindow;
+}
+
+function applyToggleValueTone(
+  valEl: HTMLElement,
+  id: EvolutionAttrId,
+  value: number | null,
+) {
+  valEl.classList.remove("good", "bad");
+  const tone = evoChipValueTone(id, value);
+  if (tone) valEl.classList.add(tone);
+}
+
+function applyToggleDeltaMeta(
+  meta: HTMLElement,
+  delta: number | null,
+) {
+  let deltaEl = meta.querySelector<HTMLElement>('.squad-evo-toggle-delta');
+  if (!deltaEl) {
+    deltaEl = document.createElement('span');
+    deltaEl.className = 'squad-evo-toggle-delta';
+    meta.prepend(deltaEl);
+  }
+  deltaEl.textContent = formatAttrDelta(delta);
+  deltaEl.classList.toggle('is-up', delta != null && delta > 0);
+  deltaEl.classList.toggle('is-down', delta != null && delta < 0);
 }
 
 function appendAttrToggle(
@@ -894,6 +983,7 @@ function appendAttrToggle(
     history,
     id,
     liveAttrValue(player, id),
+    squadEvolutionDeltaWindow,
   );
   const btn = document.createElement('button');
   btn.type = 'button';
@@ -910,13 +1000,9 @@ function appendAttrToggle(
   const valEl = document.createElement('span');
   valEl.className = 'squad-evo-toggle-val';
   valEl.textContent = value != null ? String(value) : '—';
-  const deltaEl = document.createElement('span');
-  deltaEl.className = 'squad-evo-toggle-delta';
-  const deltaText = formatAttrDelta(delta);
-  deltaEl.textContent = deltaText;
-  if (delta != null && delta > 0) deltaEl.classList.add('is-up');
-  if (delta != null && delta < 0) deltaEl.classList.add('is-down');
-  meta.append(valEl, deltaEl);
+  applyToggleValueTone(valEl, id, value);
+  meta.append(valEl);
+  applyToggleDeltaMeta(meta, delta);
   btn.append(swatch, text, meta);
   btn.addEventListener('click', () => {
     const current = effectiveEvolutionAttrs(player);
@@ -967,16 +1053,15 @@ function syncAttrToggleAppearance(
       history,
       id,
       liveAttrValue(player, id),
+      squadEvolutionDeltaWindow,
     );
     const valEl = btn.querySelector<HTMLElement>('.squad-evo-toggle-val');
-    const deltaEl = btn.querySelector<HTMLElement>('.squad-evo-toggle-delta');
-    if (valEl) valEl.textContent = value != null ? String(value) : '—';
-    if (deltaEl) {
-      const deltaText = formatAttrDelta(delta);
-      deltaEl.textContent = deltaText;
-      deltaEl.classList.toggle('is-up', delta != null && delta > 0);
-      deltaEl.classList.toggle('is-down', delta != null && delta < 0);
+    const meta = btn.querySelector<HTMLElement>('.squad-evo-toggle-meta');
+    if (valEl) {
+      valEl.textContent = value != null ? String(value) : '—';
+      applyToggleValueTone(valEl, id, value);
     }
+    if (meta) applyToggleDeltaMeta(meta, delta);
   }
 }
 
@@ -986,6 +1071,7 @@ function renderSquadEvolution() {
     squadEvolutionSubEl.textContent = '';
     squadEvolutionChartEl.replaceChildren();
     squadEvolutionChartEl.title = 'Select a player';
+    syncEvoPills();
     return;
   }
   const player = findRosterPlayer(squadEvolutionUid);
@@ -995,6 +1081,7 @@ function renderSquadEvolution() {
   }
 
   squadEvoVisibilityToolsEl.hidden = false;
+  syncEvoPills();
   const caHistory = evolutionHistoryFor(player);
   const { history: chartHistory, attrs: chartAttrs } =
     chartHistoryAndAttrs(player);
@@ -1002,7 +1089,7 @@ function renderSquadEvolution() {
 
   squadEvolutionSubEl.textContent = '';
   squadEvolutionChartEl.title =
-    caHistory.length === 0 && chartAttrs.every((id) => !id.startsWith('general.'))
+    caHistory.length === 0 && chartAttrs.every((id) => !isHaProgressAttrId(id))
       ? 'No CA history in this save extract — re-upload the Career Save'
       : '';
 
@@ -1017,15 +1104,6 @@ function renderSquadEvolution() {
       hover: squadEvolutionHover,
       dates: chartHistory.map((p) => p.date),
     }),
-  );
-
-  squadEvoShowAllEl.setAttribute(
-    'aria-pressed',
-    String(squadEvolutionAttrOverride === 'all'),
-  );
-  squadEvoHideAllEl.setAttribute(
-    'aria-pressed',
-    String(squadEvolutionAttrOverride === 'none'),
   );
 
   const layoutKind =
@@ -1065,6 +1143,9 @@ squadViewFirstTeamEl.addEventListener("click", () => {
   squadUnitView = "personalities";
   setSquadViewMode("firstTeam");
 });
+squadViewProgressEl.addEventListener("click", () => {
+  setSquadUnitView("attributes");
+});
 squadViewReservesEl.addEventListener("click", () => {
   squadUnitView = "personalities";
   setSquadViewMode("reserves");
@@ -1101,31 +1182,26 @@ document.addEventListener("keydown", (event) => {
   squadEvolutionPlayerTriggerEl.focus();
 });
 
-squadEvoShowAllEl.addEventListener("click", () => {
-  if (squadEvolutionUid == null) return;
-  const player = findRosterPlayer(squadEvolutionUid);
-  if (!player) return;
-  if (squadEvolutionAttrOverride === "all") {
-    squadEvolutionAttrOverride = "default";
-    squadEvolutionAttrs = roleDefaultEvolutionAttrs(player);
-  } else {
-    squadEvolutionAttrOverride = "all";
+squadEvoVisibilitySelectEl.addEventListener("change", () => {
+  if (squadEvolutionUid == null) {
+    syncEvoPills();
+    return;
   }
+  const player = findRosterPlayer(squadEvolutionUid);
+  if (!player) {
+    syncEvoPills();
+    return;
+  }
+  squadEvolutionAttrOverride = evoVisibilityOverrideFromSelect(
+    squadEvoVisibilitySelectEl.value,
+  );
   squadEvolutionHover = null;
   renderSquadEvolution();
 });
 
-squadEvoHideAllEl.addEventListener("click", () => {
-  if (squadEvolutionUid == null) return;
-  const player = findRosterPlayer(squadEvolutionUid);
-  if (!player) return;
-  if (squadEvolutionAttrOverride === "none") {
-    squadEvolutionAttrOverride = "default";
-    squadEvolutionAttrs = roleDefaultEvolutionAttrs(player);
-  } else {
-    squadEvolutionAttrOverride = "none";
-  }
-  squadEvolutionHover = null;
+squadEvoWindowSelectEl.addEventListener("change", () => {
+  squadEvolutionDeltaWindow =
+    squadEvoWindowSelectEl.value === "allTime" ? "allTime" : "recent";
   renderSquadEvolution();
 });
 
@@ -1200,6 +1276,7 @@ function applyActiveRosterFromStore(options?: {
     squadEvolutionHover = null;
   } else {
     clearSquadEvolution();
+    resetSquadHaPreset();
   }
   if (!entry) {
     const names = listRosterSaveNames(rosterStore);
@@ -1311,7 +1388,7 @@ function readHashToolRaw(): string {
   return window.location.hash.replace(/^#/, "");
 }
 
-/** Parse `#roster/mentoring` / `#roster/reserves/attributes` into tool + squad tab. */
+/** Parse `#roster/mentoring` / `#roster/progress` into tool + squad tab. */
 function readHashRoute(): {
   tool: AppTool | null;
   squadView: SquadViewMode | null;
@@ -1321,33 +1398,12 @@ function readHashRoute(): {
   if (!raw) return { tool: null, squadView: null, unitView: null };
   const parts = raw.split("/");
   const head = parts[0];
-  const tab = parts[1];
-  const detail = parts[2];
   if (head === "roster" || head === "squad") {
-    const mapped =
-      tab == null || tab === "" || tab === "personalities" || tab === "first-team"
-        ? "firstTeam"
-        : tab === "u19" || tab === "under-19s" || tab === "under19"
-          ? "under19s"
-          : tab === "reserve" || tab === "ii"
-            ? "reserves"
-            : tab === "attributes"
-              ? "firstTeam"
-              : tab === "penalties" || tab === "scouting" || tab === "scout"
-                ? "firstTeam"
-                : tab;
-    const unitView: SquadUnitView | null =
-      detail === "attributes" || tab === "attributes"
-        ? "attributes"
-        : detail === "personalities" || mapped === "mentoring"
-          ? mapped === "mentoring"
-            ? null
-            : "personalities"
-          : null;
+    const parsed = parseRosterHash(raw);
     return {
       tool: "roster",
-      squadView: isSquadViewMode(mapped) ? mapped : null,
-      unitView,
+      squadView: parsed.squadView,
+      unitView: parsed.unitView,
     };
   }
   if (head === "scout" || head === "scouting") {
@@ -1404,8 +1460,9 @@ function persistActiveTool(tool: AppTool) {
     // ignore private-mode / quota failures
   }
   const view = pendingSquadViewMode ?? squadViewMode;
+  const unitView = pendingSquadUnitView ?? squadUnitView;
   const nextHash =
-    tool === "roster" ? rosterHashForView(view) : `#${tool}`;
+    tool === "roster" ? rosterHashForView(view, unitView) : `#${tool}`;
   if (window.location.hash !== nextHash) {
     window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${nextHash}`);
   }
@@ -1528,6 +1585,18 @@ let rankerFilters: RankerFilter[] = [];
 let rankerFilterJoins: RankerFilterJoin[] = [];
 let rankerFilterSeq = 0;
 
+let squadHaFilters: SquadHaFilter[] = [];
+let squadHaFilterJoins: SquadHaFilterJoin[] = [];
+let squadHaFilterSeq = 0;
+let squadHaSelectedUids: number[] = [];
+/** Mentoring unit checkboxes — separate from ≥ filter selection. */
+let squadHaUnitCheckUids: number[] = [];
+/** Tooltip after a rejected 3rd check (max groups / ineligible). */
+let squadHaLastCheckReject: { uid: number; reason: string } | null = null;
+let squadHaSortKey: SquadHaSortKey = "has";
+let squadHaSortAsc = false;
+let lastSquadHaRows: SquadHaRow[] = [];
+
 const rankerFilterRowsEl = document.querySelector<HTMLElement>("#ranker-filter-rows")!;
 const rankerFilterAddEl = document.querySelector<HTMLButtonElement>("#ranker-filter-add")!;
 const rankerFilterToggleEl = document.querySelector<HTMLButtonElement>("#ranker-filter-toggle")!;
@@ -1552,9 +1621,13 @@ const haScoreEl = document.querySelector<HTMLElement>("#ha-score")!;
 const haRankEl = document.querySelector<HTMLElement>("#ha-rank")!;
 const haScoreValueEl = document.querySelector<HTMLElement>("#ha-score-value")!;
 const mentoringStatusEl = document.querySelector<HTMLElement>("#mentoring-status")!;
+const mentoringMenteesEl = document.querySelector<HTMLElement>("#mentoring-mentees")!;
 const mentoringEmptyEl = document.querySelector<HTMLElement>("#mentoring-empty")!;
 const mentoringCardsEl = document.querySelector<HTMLElement>("#mentoring-cards")!;
 const mentoringAddBtn = document.querySelector<HTMLButtonElement>("#mentoring-add-btn")!;
+const mentoringBoardSuggestBtn = document.querySelector<HTMLButtonElement>(
+  "#mentoring-suggest-btn",
+)!;
 const mentoringPickerDialogEl = document.querySelector<HTMLDialogElement>(
   "#mentoring-picker-dialog",
 )!;
@@ -1796,6 +1869,31 @@ function positionMetricTip(host: HTMLElement, tip: HTMLElement) {
   const viewW = window.innerWidth;
   const viewH = window.innerHeight;
 
+  // HA ellipsis cells: sit just above so the cursor on the row does not cover the tip.
+  if (tip.classList.contains("is-above")) {
+    const tight = 2;
+    let left = hostRect.left;
+    if (left + tipW > viewW - margin) {
+      left = hostRect.right - tipW;
+    }
+    if (left < margin) left = margin;
+    if (left + tipW > viewW - margin) {
+      left = Math.max(margin, viewW - tipW - margin);
+    }
+
+    let top = hostRect.top - tipH - tight;
+    if (top < margin) {
+      top = hostRect.bottom + tight;
+    }
+    if (top + tipH > viewH - margin) {
+      top = Math.max(margin, viewH - tipH - margin);
+    }
+
+    tip.style.left = `${Math.round(left)}px`;
+    tip.style.top = `${Math.round(top)}px`;
+    return;
+  }
+
   // Mentoring attr matrix: park beside the seat so the board stays scannable.
   if (tip.classList.contains("is-mentoring-matrix")) {
     const spaceRight = viewW - hostRect.right - margin;
@@ -1843,19 +1941,24 @@ function positionMetricTip(host: HTMLElement, tip: HTMLElement) {
   tip.style.top = `${Math.round(top)}px`;
 }
 
-function showMetricTip(host: HTMLElement, text: string) {
+function showMetricTip(
+  host: HTMLElement,
+  text: string,
+  place: "below" | "above" = "below",
+) {
   const tip = ensureMetricTip();
-  tip.classList.remove("is-roster-attrs");
+  tip.classList.remove("is-roster-attrs", "is-above");
   tip.replaceChildren();
   tip.textContent = text;
   tip.classList.toggle("is-multiline", text.includes("\n"));
+  tip.classList.toggle("is-above", place === "above");
   tip.hidden = false;
   positionMetricTip(host, tip);
 }
 
 function showMetricTipNode(host: HTMLElement, content: HTMLElement) {
   const tip = ensureMetricTip();
-  tip.classList.remove("is-multiline");
+  tip.classList.remove("is-multiline", "is-above");
   tip.classList.add("is-roster-attrs");
   tip.replaceChildren(content);
   tip.hidden = false;
@@ -1866,7 +1969,12 @@ function hideMetricTip() {
   clearMentoringMatrixTipHide();
   if (!metricTipEl) return;
   metricTipEl.hidden = true;
-  metricTipEl.classList.remove("is-multiline", "is-roster-attrs", "is-mentoring-matrix");
+  metricTipEl.classList.remove(
+    "is-multiline",
+    "is-roster-attrs",
+    "is-mentoring-matrix",
+    "is-above",
+  );
   metricTipEl.replaceChildren();
   delete metricTipEl.dataset.pinned;
 }
@@ -1924,7 +2032,7 @@ document.addEventListener(
     if (
       target instanceof Element &&
       (target.closest(".ranker-ha-tip") ||
-        target.closest(".mentoring-seat-card.has-attrs-tip") ||
+        target.closest(".mentoring-seat-ha-tip") ||
         target.closest(".metric-tip.is-mentoring-matrix"))
     ) {
       return;
@@ -4189,8 +4297,12 @@ document.addEventListener("click", () => {
 });
 
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && rankerFilterPopoverEl && !rankerFilterPopoverEl.hidden) {
+  if (event.key !== "Escape") return;
+  if (rankerFilterPopoverEl && !rankerFilterPopoverEl.hidden) {
     setRankerFilterPopoverOpen(false);
+  }
+  if (squadFilterPopoverEl && !squadFilterPopoverEl.hidden) {
+    setSquadHaFilterPopoverOpen(false);
   }
 });
 
@@ -7164,17 +7276,6 @@ function createSquadPersonalityCard(
     `${resolvedName ?? "Name missing"}, open attribute history`,
   );
   const openAttrs = () => {
-    // From Loans (or other non-unit tabs), land on the unit that owns the player
-    // so the attributes picker still lists them.
-    if (!isSquadUnitMode(squadViewMode)) {
-      if (reservesPlayers.some((p) => p.uid === player.uid)) {
-        squadViewMode = "reserves";
-      } else if (under19sPlayers.some((p) => p.uid === player.uid)) {
-        squadViewMode = "under19s";
-      } else {
-        squadViewMode = "firstTeam";
-      }
-    }
     selectSquadEvolutionPlayer(player.uid);
     setSquadUnitView("attributes");
   };
@@ -7188,6 +7289,798 @@ function createSquadPersonalityCard(
   return wrap;
 }
 
+function nextSquadHaFilterId(): string {
+  squadHaFilterSeq += 1;
+  return `sf-${squadHaFilterSeq}`;
+}
+
+function resetSquadHaPreset() {
+  squadHaFilters = [];
+  squadHaFilterJoins = [];
+  squadHaSelectedUids = [];
+  squadHaUnitCheckUids = [];
+  squadHaLastCheckReject = null;
+  squadHaSortKey = "has";
+  squadHaSortAsc = false;
+}
+
+function clearSquadHaFiltersOnly() {
+  squadHaFilters = [];
+  squadHaFilterJoins = [];
+  squadHaSelectedUids = [];
+}
+
+function setSquadHaFilterPopoverOpen(open: boolean) {
+  if (!squadFilterPopoverEl || !squadFilterToggleEl) return;
+  squadFilterPopoverEl.hidden = !open;
+  squadFilterToggleEl.setAttribute("aria-expanded", String(open));
+}
+
+function syncSquadHaFilterCount() {
+  const n = squadHaFilters.length;
+  if (!squadFilterCountEl) return;
+  if (n === 0) {
+    squadFilterCountEl.hidden = true;
+    squadFilterCountEl.textContent = "";
+    squadFilterToggleEl?.removeAttribute("data-active");
+    return;
+  }
+  squadFilterCountEl.hidden = false;
+  squadFilterCountEl.textContent = String(n);
+  squadFilterToggleEl?.setAttribute("data-active", "true");
+}
+
+function defaultSquadHaFilterValue(key: SquadHaFilterKey): number | string {
+  if (key === "personality") return catalog.personalities[0]?.id ?? "";
+  if (key === "mediaHandling") {
+    const media = catalog.mediaHandling[0];
+    return media ? formatMediaHandlingLabel(media.styles) : "";
+  }
+  if (key === "name") {
+    const names = lastSquadHaRows
+      .map((row) => row.name)
+      .filter((name) => Boolean(name));
+    return names[0] ?? "";
+  }
+  if (key === "unit") return "FT";
+  if (key === "age") return SQUAD_HA_YOUNG_AGE;
+  return key === "has" ? 12 : 10;
+}
+
+function newSquadHaFilter(): SquadHaFilter {
+  return newSquadHaManualFilter(nextSquadHaFilterId());
+}
+
+function squadHaColumnClass(key: SquadHaFilterKey): string {
+  if (key === "name") return "ranker-col-name";
+  if (key === "unit") return "ranker-col-unit";
+  if (key === "age") return "ranker-col-age";
+  if (key === "personality") return "ranker-col-personality";
+  if (key === "mediaHandling") return "ranker-col-label";
+  if (key === "has") return "ranker-col-ha";
+  return "ranker-col-mid";
+}
+
+function squadHaColumnTip(key: SquadHaFilterKey): string {
+  if (key === "name") return "Player name";
+  if (key === "unit") return "First Team, Reserves (II), or Under 19s";
+  if (key === "age") return "Age at this save’s game date";
+  if (key === "personality" || key === "mediaHandling") {
+    return "Label of this save’s personality vector";
+  }
+  if (key === "has") return "Hidden Attribute Score from extract";
+  return SQUAD_HA_COL_META[key]?.title ?? key;
+}
+
+function applySquadHaPresetFromSelection() {
+  const selectedIds = new Set(squadHaSelectedUids.map(Number));
+  const selected = lastSquadHaRows.filter((row) =>
+    selectedIds.has(Number(row.uid)),
+  );
+  if (selected.length === 0) {
+    squadHaFilters = [];
+    squadHaFilterJoins = [];
+    return;
+  }
+  const built = squadHaClickPreset(selected, nextSquadHaFilterId);
+  squadHaFilters = built.filters;
+  squadHaFilterJoins = built.joins;
+}
+
+function buildSquadHaRow(
+  player: RosterPlayer,
+  score: number | null,
+  unit: SquadHaUnit,
+): SquadHaRow | null {
+  const trust = playerExtractTrust(player);
+  const resolvedName = rosterResolvedName(player);
+  if (!resolvedName) return null;
+  const pa = rosterPersonalitySignals(player);
+  const age = rosterPlayerAge(player, rosterMeta.gameDate);
+  const combo =
+    trust.attrsEnough && pa
+      ? matchPersonalityComboFromAttrs(pa, {
+          isRegen: player.kind === "NEWGEN",
+          ...(age != null ? { age } : {}),
+        })
+      : null;
+  const has =
+    trust.attrsEnough && score != null && Number.isFinite(score) ? score : null;
+  return {
+    uid: player.uid,
+    name: resolvedName,
+    unit,
+    age,
+    personality: combo?.personality ?? null,
+    mediaHandling: combo?.mediaHandling ?? null,
+    attrs: squadHaAttrsFromSignals(pa),
+    has,
+  };
+}
+
+function renderSquadHaFilters() {
+  if (!squadFilterRowsEl) return;
+  squadFilterRowsEl.replaceChildren();
+  syncSquadHaFilterCount();
+
+  const keyOptions = SQUAD_HA_FILTER_KEYS.map((key) => ({
+    value: key,
+    label: squadHaFilterKeyLabel(key),
+  }));
+  const personalityOptions = [...catalog.personalities]
+    .map((p) => p.id)
+    .sort((a, b) => a.localeCompare(b))
+    .map((id) => ({ value: id, label: id }));
+  const mediaOptions = catalog.mediaHandling
+    .map((media) => formatMediaHandlingLabel(media.styles))
+    .sort((a, b) => a.localeCompare(b))
+    .map((label) => ({ value: label, label }));
+  const nameOptions = [
+    ...new Set(
+      lastSquadHaRows.map((row) => row.name).filter((name) => Boolean(name)),
+    ),
+  ]
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))
+    .map((name) => ({ value: name, label: name }));
+  const unitOptions = SQUAD_HA_UNIT_ORDER.map((unit) => ({
+    value: unit,
+    label: unit,
+  }));
+  if (squadHaFilters.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "ranker-filter-empty";
+    empty.textContent = "No filters yet.";
+    squadFilterRowsEl.append(empty);
+    return;
+  }
+
+  squadHaFilters.forEach((filter, index) => {
+    if (index > 0) {
+      const joinWrap = document.createElement("div");
+      joinWrap.className = "ranker-filter-join";
+      const joinBtn = document.createElement("button");
+      joinBtn.type = "button";
+      joinBtn.className = "ranker-filter-join-btn";
+      const join = squadHaFilterJoins[index - 1] ?? "and";
+      joinBtn.textContent = join.toUpperCase();
+      joinBtn.setAttribute(
+        "aria-label",
+        `Join filters with ${join.toUpperCase()}. Click to toggle AND/OR.`,
+      );
+      joinBtn.addEventListener("click", () => {
+        squadHaFilterJoins[index - 1] = join === "and" ? "or" : "and";
+        renderSquadHaFilters();
+        renderSquadHaTable();
+      });
+      joinWrap.append(joinBtn);
+      squadFilterRowsEl.append(joinWrap);
+    }
+
+    const textKey = isSquadHaTextFilterKey(filter.key);
+    const row = document.createElement("div");
+    row.className = "ranker-filter-row";
+    row.dataset.filterId = filter.id;
+    if (textKey) row.dataset.filterKind = "text";
+
+    const keySel = document.createElement("select");
+    keySel.className = "ranker-filter-key";
+    keySel.setAttribute("aria-label", "Filter field");
+    fillSelect(keySel, keyOptions, filter.key);
+
+    const opSel = document.createElement("select");
+    opSel.className = "ranker-filter-op";
+    opSel.setAttribute("aria-label", "Filter comparison");
+    const opOptions = (
+      textKey ? RANKER_FILTER_TEXT_OPS : RANKER_FILTER_NUMERIC_OPS
+    ).map((op) => ({ value: op.value, label: op.label }));
+    const opValue =
+      textKey && (filter.op === "gte" || filter.op === "lte") ? "eq" : filter.op;
+    if (opValue !== filter.op) filter.op = opValue;
+    fillSelect(opSel, opOptions, filter.op);
+
+    const valSel = document.createElement("select");
+    valSel.className = "ranker-filter-value";
+    valSel.setAttribute("aria-label", "Filter value");
+    const valueOptions =
+      filter.key === "personality"
+        ? personalityOptions
+        : filter.key === "mediaHandling"
+          ? mediaOptions
+          : filter.key === "name"
+            ? nameOptions
+            : filter.key === "unit"
+              ? unitOptions
+              : isSquadHaNumericFilterKey(filter.key)
+                ? squadHaNumericFilterValueOptions(filter.key)
+                : [];
+    const selectedValue = String(filter.value);
+    if (!valueOptions.some((opt) => opt.value === selectedValue)) {
+      if (filter.key === "name" && selectedValue) {
+        valueOptions.unshift({ value: selectedValue, label: selectedValue });
+      } else if (valueOptions[0]) {
+        filter.value = textKey
+          ? valueOptions[0].value
+          : Number(valueOptions[0].value);
+      }
+    }
+
+    const removeBtn = document.createElement("button");
+    removeBtn.type = "button";
+    removeBtn.className = "ranker-filter-remove";
+    removeBtn.setAttribute(
+      "aria-label",
+      `Remove ${squadHaFilterKeyLabel(filter.key)} filter`,
+    );
+    removeBtn.textContent = "×";
+
+    keySel.addEventListener("change", () => {
+      const nextKey = keySel.value as SquadHaFilterKey;
+      const wasText = isSquadHaTextFilterKey(filter.key);
+      const nextText = isSquadHaTextFilterKey(nextKey);
+      filter.key = nextKey;
+      if (wasText !== nextText) {
+        filter.op = nextText ? "eq" : "gte";
+      } else if (nextText && (filter.op === "gte" || filter.op === "lte")) {
+        filter.op = "eq";
+      }
+      filter.value = defaultSquadHaFilterValue(nextKey);
+      renderSquadHaFilters();
+      renderSquadHaTable();
+    });
+    opSel.addEventListener("change", () => {
+      filter.op = opSel.value as SquadHaFilterOp;
+      renderSquadHaTable();
+    });
+
+    fillSelect(valSel, valueOptions, String(filter.value));
+    valSel.addEventListener("change", () => {
+      filter.value = textKey ? valSel.value : Number(valSel.value);
+      renderSquadHaTable();
+    });
+    const valueField = valSel;
+
+    let valueControl: HTMLElement = valueField;
+    if (!textKey && isSquadHaNumericFilterKey(filter.key)) {
+      const numericKey = filter.key;
+      const fieldLabel = squadHaFilterKeyLabel(numericKey);
+      const stepper = document.createElement("div");
+      stepper.className = "squad-filter-stepper";
+      const minusBtn = document.createElement("button");
+      minusBtn.type = "button";
+      minusBtn.className = "squad-filter-step";
+      minusBtn.textContent = "−";
+      minusBtn.setAttribute("aria-label", `Decrease ${fieldLabel}`);
+      const plusBtn = document.createElement("button");
+      plusBtn.type = "button";
+      plusBtn.className = "squad-filter-step";
+      plusBtn.textContent = "+";
+      plusBtn.setAttribute("aria-label", `Increase ${fieldLabel}`);
+      const syncStepEnabled = () => {
+        const current =
+          typeof filter.value === "number"
+            ? filter.value
+            : Number(filter.value);
+        const { min, max } = squadHaNumericFilterBounds(numericKey);
+        minusBtn.disabled = !Number.isFinite(current) || current <= min;
+        plusBtn.disabled = !Number.isFinite(current) || current >= max;
+      };
+      const applyDelta = (delta: number) => {
+        const next = nudgeSquadHaFilterBy(filter, delta);
+        filter.value = next.value;
+        valueField.value = String(next.value);
+        syncStepEnabled();
+        renderSquadHaTable();
+      };
+      minusBtn.addEventListener("click", () => applyDelta(-1));
+      plusBtn.addEventListener("click", () => applyDelta(1));
+      valueField.addEventListener("change", syncStepEnabled);
+      syncStepEnabled();
+      stepper.append(valueField, minusBtn, plusBtn);
+      valueControl = stepper;
+    }
+    removeBtn.addEventListener("click", () => {
+      const at = squadHaFilters.findIndex((f) => f.id === filter.id);
+      if (at < 0) return;
+      squadHaFilters.splice(at, 1);
+      if (at === 0) squadHaFilterJoins.shift();
+      else squadHaFilterJoins.splice(at - 1, 1);
+      if (squadHaFilters.length === 0) {
+        squadHaSelectedUids = [];
+      }
+      renderSquadHaFilters();
+      renderSquadHaTable();
+    });
+
+    row.append(keySel, opSel, valueControl, removeBtn);
+    squadFilterRowsEl.append(row);
+  });
+}
+
+function wireSquadHaSortHeader(
+  th: HTMLElement,
+  key: SquadHaSortKey,
+  label: string,
+  tip: string,
+) {
+  th.tabIndex = 0;
+  th.role = "button";
+  th.classList.add("ranker-th-sort");
+  th.dataset.tip = tip;
+  const sorted = squadHaSortKey === key;
+  th.classList.toggle("is-sorted", sorted && key !== "has");
+  th.setAttribute(
+    "aria-sort",
+    sorted ? (squadHaSortAsc ? "ascending" : "descending") : "none",
+  );
+  th.setAttribute(
+    "aria-label",
+    `${label}: ${tip}. Click to cycle sort.`,
+  );
+  th.addEventListener("mouseenter", () => showMetricTip(th, tip));
+  th.addEventListener("mouseleave", hideMetricTip);
+  th.addEventListener("focus", () => showMetricTip(th, tip));
+  th.addEventListener("blur", hideMetricTip);
+  const activate = (event: Event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    hideMetricTip();
+    const next = cycleSquadHaSort(squadHaSortKey, squadHaSortAsc, key);
+    squadHaSortKey = next.key;
+    squadHaSortAsc = next.asc;
+    renderSquadHaTable();
+  };
+  th.addEventListener("click", activate);
+  th.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      activate(event);
+    }
+  });
+}
+
+function onSquadHaRowActivate(uid: number) {
+  squadHaSelectedUids = toggleSquadHaSelection(squadHaSelectedUids, uid);
+  applySquadHaPresetFromSelection();
+  renderSquadHaFilters();
+  renderSquadHaTable();
+  if (squadHaSelectedUids.length > 0) {
+    setSquadHaFilterPopoverOpen(true);
+  }
+}
+
+function squadHaMentoringEligibleUids(): Set<number> {
+  const candidates = ensureMentoringCacheForRoster();
+  return new Set(
+    candidates
+      .map((row) => Number(row.id))
+      .filter((uid) => Number.isFinite(uid)),
+  );
+}
+
+function squadHaAddMentoringUnitState(): ReturnType<
+  typeof squadHaAddMentoringUnitGate
+> {
+  const candidates = ensureMentoringCacheForRoster();
+  const assigned = mentoringAssignedPlayerIds();
+  const assignedUids = new Set(
+    [...assigned].map(Number).filter((uid) => Number.isFinite(uid)),
+  );
+  const maxGroups = mentoringMaxGroups(candidates);
+  return squadHaAddMentoringUnitGate({
+    checkedUids: squadHaUnitCheckUids,
+    assignedUids,
+    eligibleUids: squadHaMentoringEligibleUids(),
+    canCreateSlot: canCreateMentoringGroup(candidates),
+    maxGroupsReached: mentoringCache.groups.length >= maxGroups,
+  });
+}
+
+function onSquadHaUnitCheckToggle(uid: number) {
+  const assigned = mentoringAssignedPlayerIds();
+  if (assigned.has(String(uid))) return;
+  const eligible = squadHaMentoringEligibleUids();
+  if (!eligible.has(Number(uid))) return;
+  const previous = squadHaUnitCheckUids;
+  const next = toggleSquadHaUnitCheck(previous, uid);
+  squadHaUnitCheckUids = next;
+  if (squadHaCheckCompletesUnit(previous, next)) {
+    const gate = squadHaAddMentoringUnitState();
+    if (gate.ok) {
+      squadHaLastCheckReject = null;
+      addMentoringUnitFromSquadHaTable();
+      return;
+    }
+    squadHaUnitCheckUids = previous;
+    squadHaLastCheckReject = { uid: Number(uid), reason: gate.reason };
+  } else {
+    squadHaLastCheckReject = null;
+  }
+  renderSquadHaTable();
+}
+
+function removeSquadHaPlayerFromMentoringGroup(uid: number) {
+  const id = String(uid);
+  const group = mentoringCache.groups.find((row) =>
+    row.memberIds.some((memberId) => memberId === id),
+  );
+  if (!group) return;
+  // Groups must stay size 3 — same as Mentoring picker clearing a seat.
+  deleteMentoringGroup(group.id);
+  squadHaUnitCheckUids = squadHaUnitCheckUids.filter(
+    (checked) => Number(checked) !== Number(uid),
+  );
+  renderSquadHaTable();
+  if (squadViewMode === "mentoring") renderMentoringPage();
+}
+
+function addMentoringUnitFromSquadHaTable() {
+  const gate = squadHaAddMentoringUnitState();
+  if (!gate.ok) return;
+  const candidates = ensureMentoringCacheForRoster();
+  const byId = new Map(candidates.map((c) => [String(c.id), c]));
+  const players = squadHaUnitCheckUids
+    .map((uid) => byId.get(String(uid)))
+    .filter((row): row is MentoringCandidate => row !== undefined);
+  if (players.length !== SQUAD_HA_MENTORING_UNIT_SIZE) return;
+
+  const assigned = mentoringAssignedPlayerIds();
+  if (players.some((player) => assigned.has(String(player.id)))) return;
+  if (!canCreateMentoringGroup(candidates)) return;
+
+  const defaults = defaultMentoringUnitRoles(players, {
+    hierarchyById: mentoringHierarchyByIdMap(),
+  });
+  const roles: Record<string, MentoringInfluenceSeat> = {};
+  for (const seat of defaults) roles[String(seat.player.id)] = seat.role;
+
+  upsertMentoringGroup({
+    id: newMentoringGroupId(),
+    memberIds: players.map((player) => String(player.id)),
+    roles,
+  });
+  squadHaUnitCheckUids = [];
+  squadHaLastCheckReject = null;
+  renderSquadHaTable();
+  if (squadViewMode === "mentoring") renderMentoringPage();
+}
+
+function fillSquadHaEllipsisCell(
+  td: HTMLTableCellElement,
+  value: string | null,
+) {
+  const full = squadHaEllipsisCellTitle(value);
+  if (!full) {
+    td.textContent = "—";
+    td.classList.add("is-empty");
+    return;
+  }
+  const label = document.createElement("span");
+  label.className = "squad-ha-ellipsis";
+  label.textContent = full;
+  td.append(label);
+  td.addEventListener("mouseenter", () => {
+    if (!squadHaTextOverflows(label) && !squadHaTextOverflows(td)) return;
+    showMetricTip(td, full, "above");
+  });
+  td.addEventListener("mouseleave", hideMetricTip);
+}
+
+function renderSquadHaTable() {
+  hideMetricTip();
+  const scrollTop = rosterBodyEl.scrollTop;
+  rosterBodyEl.classList.remove("is-boot-skeleton");
+  rosterBodyEl.removeAttribute("aria-busy");
+  rosterBodyEl.replaceChildren();
+
+  const visible = sortSquadHaRows(
+    lastSquadHaRows.filter((row) =>
+      squadHaRowVisible(
+        row,
+        squadHaFilters,
+        squadHaFilterJoins,
+        squadHaSelectedUids,
+      ),
+    ),
+    squadHaSortKey,
+    squadHaSortAsc,
+  );
+
+  const mentoringCandidates = ensureMentoringCacheForRoster();
+  const groupByUid = mentoringGroupNumberByUid(mentoringCache.groups);
+  const eligibleUids = squadHaMentoringEligibleUids();
+  const nextChecks = squadHaUnitCheckUids.filter(
+    (uid) => eligibleUids.has(Number(uid)) && !groupByUid.has(Number(uid)),
+  );
+  if (nextChecks.length !== squadHaUnitCheckUids.length) {
+    squadHaUnitCheckUids = nextChecks;
+  }
+  const checkedSet = new Set(squadHaUnitCheckUids.map(Number));
+  const assignedUids = new Set(groupByUid.keys());
+  const maxGroups = mentoringMaxGroups(mentoringCandidates);
+  const maxGroupsReached = mentoringCache.groups.length >= maxGroups;
+  const canCreateSlot = canCreateMentoringGroup(mentoringCandidates);
+
+  const table = document.createElement("table");
+  table.className = "ranker-list-table fmt-table";
+  table.setAttribute("aria-label", "Club personality HA");
+
+  const colgroup = document.createElement("colgroup");
+  const appendCol = (className: string) => {
+    const col = document.createElement("col");
+    col.className = className;
+    colgroup.append(col);
+  };
+  appendCol("ranker-col-unit-check");
+  for (const key of SQUAD_HA_FILTER_KEYS) {
+    appendCol(squadHaColumnClass(key));
+  }
+  table.append(colgroup);
+
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
+
+  const checkTh = document.createElement("th");
+  checkTh.scope = "col";
+  checkTh.className = "ranker-col-unit-check ranker-th-tip";
+  checkTh.textContent = SQUAD_HA_GROUP_HEADER;
+  checkTh.title = SQUAD_HA_GROUP_HEADER_TIP;
+  checkTh.tabIndex = 0;
+  checkTh.setAttribute("aria-label", SQUAD_HA_GROUP_HEADER_TIP);
+  checkTh.addEventListener("mouseenter", () =>
+    showMetricTip(checkTh, SQUAD_HA_GROUP_HEADER_TIP),
+  );
+  checkTh.addEventListener("mouseleave", hideMetricTip);
+  checkTh.addEventListener("focus", () =>
+    showMetricTip(checkTh, SQUAD_HA_GROUP_HEADER_TIP),
+  );
+  checkTh.addEventListener("blur", hideMetricTip);
+  headRow.append(checkTh);
+
+  for (const key of SQUAD_HA_FILTER_KEYS) {
+    const th = document.createElement("th");
+    th.scope = "col";
+    const label = squadHaTableHeaderLabel(key);
+    th.textContent = label;
+    th.className = squadHaColumnClass(key);
+    wireSquadHaSortHeader(th, key, label, squadHaColumnTip(key));
+    headRow.append(th);
+  }
+  thead.append(headRow);
+  table.append(thead);
+
+  const body = document.createElement("tbody");
+  const colCount = 1 + SQUAD_HA_FILTER_KEYS.length;
+  if (visible.length === 0) {
+    const emptyRow = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = colCount;
+    td.textContent =
+      squadHaFilters.length > 0
+        ? "No players match the current filters."
+        : "No at-club players in First Team, Reserves, or Under 19s.";
+    emptyRow.append(td);
+    body.append(emptyRow);
+  }
+
+  for (const row of visible) {
+    const tr = document.createElement("tr");
+    tr.dataset.uid = String(row.uid);
+    tr.dataset.unit = row.unit;
+    tr.tabIndex = 0;
+    const selected = squadHaSelectedUids.some(
+      (id) => Number(id) === Number(row.uid),
+    );
+    tr.classList.toggle("is-squad-selected", selected);
+    tr.setAttribute("aria-selected", String(selected));
+    tr.setAttribute(
+      "aria-label",
+      selected
+        ? `${row.name || "Unnamed"} (${row.unit}), selected. Click to unselect.`
+        : `${row.name || "Unnamed"} (${row.unit}). Click to set not-worse-than filters.`,
+    );
+
+    const checkTd = document.createElement("td");
+    checkTd.className = "ranker-col-unit-check";
+    const groupNumber = groupByUid.get(Number(row.uid));
+    if (groupNumber != null) {
+      const removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "squad-ha-group-num";
+      removeBtn.textContent = String(groupNumber);
+      removeBtn.title = `Remove from Mentoring Group ${groupNumber}`;
+      removeBtn.setAttribute(
+        "aria-label",
+        `Remove ${row.name || "player"} from Mentoring Group ${groupNumber}`,
+      );
+      removeBtn.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        removeSquadHaPlayerFromMentoringGroup(row.uid);
+      });
+      checkTd.append(removeBtn);
+    } else if (eligibleUids.has(Number(row.uid))) {
+      const check = document.createElement("input");
+      check.type = "checkbox";
+      check.className = "squad-ha-unit-check";
+      const isChecked = checkedSet.has(Number(row.uid));
+      check.checked = isChecked;
+      check.disabled =
+        !isChecked &&
+        squadHaUnitCheckUids.length >= SQUAD_HA_MENTORING_UNIT_SIZE;
+      const previewUids = isChecked
+        ? squadHaUnitCheckUids
+        : toggleSquadHaUnitCheck(squadHaUnitCheckUids, row.uid);
+      const wouldComplete = squadHaCheckCompletesUnit(
+        squadHaUnitCheckUids,
+        previewUids,
+      );
+      const previewGate = wouldComplete
+        ? squadHaAddMentoringUnitGate({
+            checkedUids: previewUids,
+            assignedUids,
+            eligibleUids,
+            canCreateSlot,
+            maxGroupsReached,
+          })
+        : null;
+      check.title =
+        squadHaLastCheckReject?.uid === Number(row.uid)
+          ? squadHaLastCheckReject.reason
+          : previewGate && !previewGate.ok
+            ? previewGate.reason
+            : check.disabled
+              ? `Max ${SQUAD_HA_MENTORING_UNIT_SIZE} players`
+              : "Include in mentoring unit";
+      check.setAttribute(
+        "aria-label",
+        `Add ${row.name || "player"} to mentoring unit`,
+      );
+      check.addEventListener("click", (event) => {
+        event.stopPropagation();
+      });
+      check.addEventListener("change", (event) => {
+        event.stopPropagation();
+        onSquadHaUnitCheckToggle(row.uid);
+      });
+      checkTd.append(check);
+    }
+    tr.append(checkTd);
+
+    for (const key of SQUAD_HA_FILTER_KEYS) {
+      const td = document.createElement("td");
+      td.className = squadHaColumnClass(key);
+      if (isSquadHaEllipsisKey(key)) {
+        fillSquadHaEllipsisCell(td, squadHaEllipsisCellText(row, key));
+      } else if (key === "unit") {
+        td.textContent = row.unit;
+        td.title =
+          row.unit === "FT"
+            ? "First Team"
+            : row.unit === "II"
+              ? "Reserves"
+              : "Under 19s";
+      } else if (key === "age") {
+        const text = formatSquadHaCell(row.age);
+        td.textContent = text;
+        if (text === "—") td.classList.add("is-empty");
+        if (squadHaSortKey === key) td.classList.add("is-sorted-col");
+      } else if (key === "has") {
+        if (row.has == null || !Number.isFinite(row.has)) {
+          td.textContent = "—";
+          td.classList.add("is-empty");
+        } else {
+          const tone = hiddenQualityTone(
+            row.has,
+            catalogEliteHasFloor,
+            catalogPoorHasCeiling,
+          );
+          td.append(createHaBadge(row.has, tone));
+        }
+      } else {
+        const value = row.attrs[key];
+        const text = formatSquadHaCell(value);
+        td.textContent = text;
+        if (text === "—") {
+          td.classList.add("is-empty");
+        } else if (value != null) {
+          const tone = attributeTone(key, value);
+          if (tone !== "neutral") td.classList.add(tone);
+        }
+        if (squadHaSortKey === key) td.classList.add("is-sorted-col");
+      }
+      tr.append(td);
+    }
+
+    const activate = (event: Event) => {
+      const target = event.target as HTMLElement | null;
+      if (
+        target?.closest(
+          ".squad-ha-unit-check, .squad-ha-group-num, .ranker-col-unit-check",
+        )
+      ) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      onSquadHaRowActivate(row.uid);
+    };
+    tr.addEventListener("click", activate);
+    tr.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") activate(event);
+    });
+    body.append(tr);
+  }
+
+  table.append(body);
+  rosterBodyEl.append(table);
+  rosterBodyEl.scrollTop = scrollTop;
+}
+
+rosterBodyEl.addEventListener("scroll", hideMetricTip, { passive: true });
+
+squadFilterToggleEl?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  const open = squadFilterPopoverEl?.hidden ?? true;
+  renderSquadHaFilters();
+  setSquadHaFilterPopoverOpen(open);
+});
+
+squadFilterAddEl?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  if (squadHaFilters.length > 0) {
+    squadHaFilterJoins.push("and");
+  }
+  squadHaFilters.push(newSquadHaFilter());
+  renderSquadHaFilters();
+  renderSquadHaTable();
+  setSquadHaFilterPopoverOpen(true);
+});
+
+squadFilterClearEl?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  clearSquadHaFiltersOnly();
+  renderSquadHaFilters();
+  renderSquadHaTable();
+});
+
+squadFilterLoosenEl?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  squadHaFilters = nudgeSquadHaFiltersBy(squadHaFilters, -1);
+  renderSquadHaFilters();
+  renderSquadHaTable();
+});
+
+squadFilterTightenEl?.addEventListener("click", (event) => {
+  event.stopPropagation();
+  squadHaFilters = nudgeSquadHaFiltersBy(squadHaFilters, 1);
+  renderSquadHaFilters();
+  renderSquadHaTable();
+});
+
+squadFilterPopoverEl?.addEventListener("click", (event) => {
+  event.stopPropagation();
+});
+
 function renderRoster() {
   rosterBodyEl.replaceChildren();
   syncRosterSavesMenu();
@@ -7196,9 +8089,12 @@ function renderRoster() {
   const clubName = hasSave ? (rosterMeta.clubName ?? "").trim() : "";
   const isEmptyRoster = clubPlayerCount() === 0;
 
-  // Empty club has no tab chrome — reset to First Team so Mentoring pane
+  // Empty club has no tab chrome — reset to Personalities so Mentoring / Progress
   // markup cannot linger in the empty container.
-  if (isEmptyRoster && squadViewMode !== "firstTeam") {
+  if (
+    isEmptyRoster &&
+    (squadViewMode !== "firstTeam" || squadUnitView !== "personalities")
+  ) {
     squadUnitView = "personalities";
     setSquadViewMode("firstTeam");
     return;
@@ -7245,7 +8141,7 @@ function renderRoster() {
 
   const saveCount = listRosterSaveNames(rosterStore).length;
   const emptyUploadTip =
-    "Load a Career Save to rank First Team, Reserves, and Under 19s by personality HAS.";
+    "Load a Career Save to see First Team, Reserves, and Under 19s personality HA in one list.";
   const loadLabel = rosterAmendTarget
     ? "Overwrite selected save"
     : isEmptyRoster
@@ -7257,8 +8153,6 @@ function renderRoster() {
   rosterSavesBtnEl.title = savesLabel;
   rosterSavesBtnEl.setAttribute("aria-label", savesLabel);
 
-  const unitPlayers = rosterPlayers;
-
   rosterStatusEl.classList.toggle("is-error", Boolean(rosterMeta.error));
   // Don't clobber live settle/extract progress while a refresh is in flight,
   // or a just-finished Updated flash from showRosterUpdatedStatus.
@@ -7266,18 +8160,35 @@ function renderRoster() {
     applyRosterTrustStatus();
   }
 
-  type RankedSquadPlayer = {
-    player: RosterPlayer;
-    score: number | null;
-  };
-  const ranked: RankedSquadPlayer[] = rankPlayersForPersonalityGrid(unitPlayers);
-  const atClub = ranked.filter(
-    (entry) => entry.player.loan?.status !== "loanedOut",
+  const merged = mergeClubWideAtClubPlayers({
+    firstTeam: firstTeamPlayers,
+    reserves: reservesPlayers,
+    under19s: under19sPlayers,
+  });
+  const ranked = rankPlayersForPersonalityGrid(merged.map((entry) => entry.player));
+  const unitByUid = new Map(
+    merged.map((entry) => [Number(entry.player.uid), entry.unit] as const),
   );
-
-  for (const entry of atClub) {
-    rosterBodyEl.append(createSquadPersonalityCard(entry.player, entry.score));
-  }
+  lastSquadHaRows = ranked.flatMap((entry) => {
+    const row = buildSquadHaRow(
+      entry.player,
+      entry.score,
+      unitByUid.get(Number(entry.player.uid)) ?? "FT",
+    );
+    return row ? [row] : [];
+  });
+  const liveUids = new Set(lastSquadHaRows.map((row) => Number(row.uid)));
+  squadHaSelectedUids = squadHaSelectedUids.filter((uid) =>
+    liveUids.has(Number(uid)),
+  );
+  const showFilters =
+    !isEmptyRoster &&
+    isSquadUnitMode(squadViewMode) &&
+    squadUnitView === "personalities";
+  squadFilterWrapEl.hidden = !showFilters;
+  if (!showFilters) setSquadHaFilterPopoverOpen(false);
+  renderSquadHaFilters();
+  renderSquadHaTable();
 }
 
 function rankPlayersForPersonalityGrid(
@@ -7406,6 +8317,21 @@ async function fetchSaveDiskStat(saveName: string): Promise<SaveDiskStat | null>
   try {
     const res = await fetch(
       `/api/roster/save-stat?save=${encodeURIComponent(saveName)}`,
+    );
+    if (!res.ok) return null;
+    return (await res.json()) as SaveDiskStat;
+  } catch {
+    return null;
+  }
+}
+
+/** Copy the selected live SI games/*.fm into data/saves when dest is missing. */
+async function pullLiveSaveToRepo(saveName: string): Promise<SaveDiskStat | null> {
+  if (!useRosterApi) return null;
+  try {
+    const res = await fetch(
+      `/api/roster/pull-live?save=${encodeURIComponent(saveName)}`,
+      { method: "POST" },
     );
     if (!res.ok) return null;
     return (await res.json()) as SaveDiskStat;
@@ -7716,6 +8642,8 @@ function persistExtractResult(
       null,
     diskMtimeMs:
       diskBinding?.mtimeMs ?? prev?.diskMtimeMs ?? null,
+    diskSize:
+      diskBinding?.size ?? prev?.diskSize ?? null,
     ...(favouredClub !== undefined ? { favouredClub } : {}),
     ...(reserves !== undefined ? { reserves } : {}),
     ...(u19 !== undefined ? { u19 } : {}),
@@ -7933,7 +8861,7 @@ async function refreshSaveFromDisk(
         }
         void maybeRefreshActiveSaveFromDisk({
           reason: "Save changed on disk",
-          waitForSettle: true,
+          waitForSettle: false,
           background: true,
         });
       }, 0);
@@ -7943,7 +8871,7 @@ async function refreshSaveFromDisk(
 
 async function maybeRefreshActiveSaveFromDisk(options?: {
   reason?: string;
-  /** When false, skip client settle (server already waited). Default true. */
+  /** When false, skip client settle (server already waited). Default false. */
   waitForSettle?: boolean;
   /** Default true — daily/auto saves should not lock the UI. */
   background?: boolean;
@@ -7957,10 +8885,15 @@ async function maybeRefreshActiveSaveFromDisk(options?: {
   const entry = rosterStore.saves[active];
   if (!entry) return;
 
-  const stat = await fetchSaveDiskStat(active);
-  if (!stat) return;
+  // Dest existing is not "caught up". Live may be newer; pull no-ops when dest
+  // already covers the live snapshot (T068). Never extract live games/*.fm.
+  let stat = await pullLiveSaveToRepo(active);
+  if (!stat) {
+    stat = await fetchSaveDiskStat(active);
+    if (!stat) return;
+  }
 
-  const waitForSettle = options?.waitForSettle !== false;
+  const waitForSettle = options?.waitForSettle === true;
   const background = options?.background !== false;
 
   // Path bind only — never stamp diskMtimeMs ahead of a successful extract.
@@ -7969,7 +8902,16 @@ async function maybeRefreshActiveSaveFromDisk(options?: {
   }
 
   const latest = rosterStore.saves[active] ?? entry;
-  if (!shouldRefreshRosterFromDisk(latest, stat.mtimeMs)) return;
+  if (!shouldRefreshRosterFromDisk(latest, stat.mtimeMs, stat.size)) {
+    if (
+      !rosterRefreshInFlight &&
+      rosterStatusEl.textContent === "Syncing"
+    ) {
+      setRosterSyncing(false);
+      applyRosterTrustStatus();
+    }
+    return;
+  }
 
   await refreshSaveFromDisk(active, {
     replaceName: background ? null : active,
@@ -7994,7 +8936,10 @@ function startSaveAutoSync(): void {
   })();
 
   try {
-    saveEventSource = new EventSource("/api/roster/events");
+    const eventsUrl = rosterStore.activeSaveName
+      ? `/api/roster/events?save=${encodeURIComponent(rosterStore.activeSaveName)}`
+      : "/api/roster/events";
+    saveEventSource = new EventSource(eventsUrl);
     saveEventSource.onmessage = (ev) => {
       let data: { type?: string; saveName?: string };
       try {
@@ -8018,7 +8963,10 @@ function startSaveAutoSync(): void {
 
   if (savePollTimer) clearInterval(savePollTimer);
   savePollTimer = setInterval(() => {
-    void maybeRefreshActiveSaveFromDisk({ background: true });
+    void maybeRefreshActiveSaveFromDisk({
+      background: true,
+      waitForSettle: false,
+    });
   }, 8000);
 }
 
@@ -8244,6 +9192,9 @@ function candidateFromRosterPlayer(
     bands[trait] = { min: value, max: value, midpoint: value };
   }
 
+  const knownCa = mentoringKnownAbility(player.ca);
+  const knownPa = mentoringKnownAbility(player.pa);
+
   return {
     id: String(player.uid),
     name: resolvedName,
@@ -8278,6 +9229,8 @@ function candidateFromRosterPlayer(
         ? { isRegen: false }
         : {}),
     ...(Object.keys(bands).length ? { bands } : {}),
+    ...(knownCa !== undefined ? { ca: knownCa } : {}),
+    ...(knownPa !== undefined ? { pa: knownPa } : {}),
   };
 }
 
@@ -8335,25 +9288,22 @@ function createMentoringPlayerHeader(
   return wrap;
 }
 
-type MentoringDeltaMark =
-  | { kind: "plus"; values: number[]; labels: string[] }
-  | { kind: "arrow"; dir: "up" | "down"; good: boolean };
+function mentoringInfluenceBandClass(band: MentoringDisplayBand): string {
+  return `is-influence-${band}`;
+}
 
-/** Signed “mentor better than mentee” amount (controversy inverted). */
-function mentoringMentorEdge(
-  trait: (typeof MENTORING_DISPLAY_ORDER)[number],
-  mentorValue: number,
-  menteeValue: number,
-): number {
-  return trait === "controversy"
-    ? menteeValue - mentorValue
-    : mentorValue - menteeValue;
+function mentoringArrowTitle(
+  dir: "up" | "down",
+  band: MentoringDisplayBand,
+): string {
+  const move = dir === "up" ? "will go up" : "will go down";
+  return `${band} — ${move}`;
 }
 
 function createMentoringComparePair(
   value: number | undefined,
   trait: (typeof MENTORING_DISPLAY_ORDER)[number],
-  mark?: MentoringDeltaMark,
+  mark?: MentoringMatrixCellMarks,
 ): HTMLElement {
   const pair = document.createElement("span");
   pair.className = "compare-pair";
@@ -8366,7 +9316,7 @@ function createMentoringComparePair(
   if (value === undefined || !Number.isFinite(value)) {
     valEl.className = "compare-val fmt-mid is-empty";
     valEl.textContent = "—";
-    pair.append(valEl, deltaEl);
+    pair.append(deltaEl, valEl);
     return pair;
   }
 
@@ -8382,18 +9332,18 @@ function createMentoringComparePair(
     .join(" ");
 
   if (mark?.kind === "plus") {
-    const shown = mark.values
-      .map((value, index) => ({ value, label: mark.labels[index] ?? "" }))
-      .filter((row) => Math.abs(row.value) >= 0.05);
+    const shown = mark.items.filter((row) => Math.abs(row.delta) >= 0.05);
     if (shown.length > 0) {
       deltaEl.replaceChildren();
       deltaEl.className = "compare-delta mentoring-delta-stack";
       deltaEl.removeAttribute("aria-hidden");
       shown.forEach((row, index) => {
         const chip = document.createElement("span");
-        chip.className = row.value > 0 ? "is-up" : "is-down";
-        chip.textContent = formatClimbDelta(row.value);
-        if (row.label) chip.title = `${formatClimbDelta(row.value)} vs ${row.label}`;
+        chip.className = row.tone;
+        chip.textContent = formatClimbDelta(row.delta);
+        if (row.label) {
+          chip.title = `${formatClimbDelta(row.delta)} vs ${row.label}`;
+        }
         deltaEl.append(chip);
         if (index < shown.length - 1) {
           deltaEl.append(document.createTextNode(" "));
@@ -8402,30 +9352,26 @@ function createMentoringComparePair(
       deltaEl.title = shown
         .map((row) =>
           row.label
-            ? `${formatClimbDelta(row.value)} vs ${row.label}`
-            : formatClimbDelta(row.value),
+            ? `${formatClimbDelta(row.delta)} vs ${row.label}`
+            : formatClimbDelta(row.delta),
         )
         .join(" · ");
     }
-  } else if (mark?.kind === "arrow") {
-    deltaEl.textContent = mark.dir === "up" ? "▲" : "▼";
-    deltaEl.className = [
-      "compare-delta",
-      "mentoring-delta-arrow",
-      mark.good ? "is-up" : "is-down",
-    ].join(" ");
+  } else if (mark?.kind === "arrow" && mark.items.length > 0) {
+    deltaEl.replaceChildren();
+    deltaEl.className = "compare-delta mentoring-delta-stack mentoring-delta-arrows";
     deltaEl.removeAttribute("aria-hidden");
-    deltaEl.title =
-      mark.dir === "up"
-        ? mark.good
-          ? "Mentors higher — pulls up"
-          : "Mentors higher — pulls the wrong way"
-        : mark.good
-          ? "Mentors lower — improves Controversy"
-          : "Mentors lower — pulls down";
+    for (const row of mark.items) {
+      const stack = createMentoringRankStack(row.dir, row.band, row.tone);
+      stack.title = mentoringArrowTitle(row.dir, row.band);
+      deltaEl.append(stack);
+    }
+    deltaEl.title = mark.items
+      .map((row) => mentoringArrowTitle(row.dir, row.band))
+      .join(" · ");
   }
 
-  pair.append(valEl, deltaEl);
+  pair.append(deltaEl, valEl);
   return pair;
 }
 
@@ -8433,6 +9379,7 @@ function createMentoringGroupTable(
   influencers: MentoringCandidate[],
   receivers: MentoringCandidate[],
   highlightPlayerId?: string,
+  influenceEdges?: Record<string, MentoringInfluenceLevel>,
 ): HTMLTableElement {
   const columns: { player: MentoringCandidate; role: MentoringInfluenceSeat }[] =
     [
@@ -8506,14 +9453,16 @@ function createMentoringGroupTable(
     nameTd.innerHTML = `<span class="attr-name" title="${label}">${abbr}</span>`;
     tr.append(nameTd);
 
-    const influencerValues = influencers
-      .map((player) => mentoringTraitValue(player, trait))
-      .filter((v): v is number => v !== undefined && Number.isFinite(v));
-    const influencerTarget =
-      influencerValues.length > 0
-        ? influencerValues.reduce((sum, v) => sum + v, 0) /
-          influencerValues.length
-        : undefined;
+    const influencerRows = influencers.map((player) => ({
+      id: String(player.id),
+      name: mentoringLastName(player.name),
+      value: mentoringTraitValue(player, trait),
+    }));
+    const receiverRows = receivers.map((player) => ({
+      id: String(player.id),
+      name: mentoringLastName(player.name),
+      value: mentoringTraitValue(player, trait),
+    }));
 
     for (const column of columns) {
       const td = document.createElement("td");
@@ -8525,46 +9474,15 @@ function createMentoringGroupTable(
       }
 
       const value = mentoringTraitValue(column.player, trait);
-      let mark: MentoringDeltaMark | undefined;
-
-      if (column.role !== "low" && value !== undefined) {
-        const paired = receivers.map((receiver) => {
-          const receiverValue = mentoringTraitValue(receiver, trait);
-          if (receiverValue === undefined) return null;
-          return {
-            value: mentoringMentorEdge(trait, value, receiverValue),
-            label: mentoringLastName(receiver.name),
-          };
-        });
-        const edges = paired.filter(
-          (row): row is { value: number; label: string } => row !== null,
-        );
-        if (edges.some((row) => Math.abs(row.value) >= 0.05)) {
-          mark = {
-            kind: "plus",
-            values: edges.map((row) => row.value),
-            labels: edges.map((row) => row.label),
-          };
-        }
-      } else if (
-        column.role === "low" &&
-        value !== undefined &&
-        influencerTarget !== undefined
-      ) {
-        const diff = influencerTarget - value;
-        if (Math.abs(diff) >= 0.05) {
-          const influencersHigher = diff > 0;
-          const good =
-            trait === "controversy"
-              ? !influencersHigher
-              : influencersHigher;
-          mark = {
-            kind: "arrow",
-            dir: influencersHigher ? "up" : "down",
-            good,
-          };
-        }
-      }
+      const mark = planMentoringMatrixCellMarks({
+        role: column.role,
+        playerId: String(column.player.id),
+        trait,
+        value,
+        influencers: influencerRows,
+        receivers: receiverRows,
+        edges: influenceEdges,
+      });
 
       td.append(createMentoringComparePair(value, trait, mark));
       tr.append(td);
@@ -8578,7 +9496,7 @@ function createMentoringGroupTable(
 /** ≥6 cards densify the 2-col grid enough to clip the Attr matrix body. */
 const MENTORING_DENSE_GROUP_THRESHOLD = 6;
 
-/** Full attr×player matrix on seat hover (optional click-pin for non-seat hosts). */
+/** Full attr×player matrix on host hover (overview: small HA hot-spot, not the seat). */
 function wireMentoringMatrixTip(
   host: HTMLElement,
   buildTable: () => HTMLTableElement,
@@ -8651,15 +9569,15 @@ function mentoringPersistKey(): string {
 /** In-memory session: rebuild candidates / suggestions when roster content or logic changes. */
 function mentoringSessionKey(): string {
   const persist = mentoringPersistKey();
-  const firstTeam = firstTeamMentoringPlayers();
-  if (!persist || firstTeam.length === 0) return "";
+  const atClub = clubAtClubMentoringPlayers();
+  if (!persist || atClub.length === 0) return "";
   return [
     persist,
     rosterMeta.gameDate ?? "",
     // Fresh extract must bust Mentoring even when gameDate/count are unchanged
     // (name fixes, loan flips at same squad size) — T010.
     rosterMeta.extractedAt ?? "",
-    String(firstTeam.length),
+    String(atClub.length),
     String(MENTORING_LOGIC_REV),
   ].join("|");
 }
@@ -8671,6 +9589,7 @@ function invalidateMentoringCache() {
     sessionKey: "",
     groups: [],
     dynamicsByPlayerId: {},
+    rejectedGroupKeys: [],
     candidates: null,
     suggestions: [],
     suggestionCursor: 0,
@@ -8683,6 +9602,7 @@ function invalidateMentoringCache() {
   mentoringDynamicsPlayerId = null;
   mentoringDynamicsGroupId = null;
   mentoringDynamicsDraft = null;
+  mentoringReplacementNotice = null;
 }
 
 function emptyMentoringCache(
@@ -8695,6 +9615,7 @@ function emptyMentoringCache(
     sessionKey,
     groups: [],
     dynamicsByPlayerId: {},
+    rejectedGroupKeys: [],
     candidates: null,
     suggestions: [],
     suggestionCursor: 0,
@@ -8702,14 +9623,6 @@ function emptyMentoringCache(
     generation,
   };
 }
-
-type MentoringStackPersist = Record<
-  string,
-  {
-    groups: MentoringGroupRecord[];
-    dynamicsByPlayerId?: Record<string, MentoringDynamicsLabel>;
-  }
->;
 
 function emptyMentoringDynamicsLabel(): MentoringDynamicsLabel {
   return {
@@ -8739,18 +9652,6 @@ function isMentoringEdgeLevel(value: unknown): value is MentoringInfluenceLevel 
   );
 }
 
-function normalizeMentoringInfluenceEdges(
-  raw: unknown,
-): Record<string, MentoringInfluenceLevel> | undefined {
-  if (!raw || typeof raw !== "object") return undefined;
-  const out: Record<string, MentoringInfluenceLevel> = {};
-  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
-    if (typeof key !== "string" || !key.includes(">")) continue;
-    if (isMentoringEdgeLevel(value)) out[key] = value;
-  }
-  return Object.keys(out).length > 0 ? out : undefined;
-}
-
 function isMentoringCaptaincyLabel(value: unknown): value is MentoringCaptaincyLabel {
   return value === "captain" || value === "viceCaptain" || value === "none";
 }
@@ -8775,24 +9676,6 @@ function isMentoringSocialGroupLabel(
     value === "secondaryC" ||
     value === "other"
   );
-}
-
-function normalizeMentoringDynamicsLabel(
-  raw: unknown,
-): MentoringDynamicsLabel | null {
-  if (!raw || typeof raw !== "object") return null;
-  const row = raw as Partial<MentoringDynamicsLabel>;
-  const label = emptyMentoringDynamicsLabel();
-  if (isMentoringCaptaincyLabel(row.captaincy)) label.captaincy = row.captaincy;
-  if (isMentoringHierarchyLabel(row.hierarchy)) label.hierarchy = row.hierarchy;
-  if (isMentoringSocialGroupLabel(row.socialGroup)) {
-    label.socialGroup = row.socialGroup;
-  }
-  if (typeof row.labeledAt === "string") label.labeledAt = row.labeledAt;
-  if (row.snapshot && typeof row.snapshot === "object") {
-    label.snapshot = { ...row.snapshot };
-  }
-  return label;
 }
 
 function mentoringDynamicsCoreComplete(
@@ -8907,6 +9790,167 @@ function mentoringHierarchyByIdMap(): Map<
   return map;
 }
 
+/** Aggregate labeled triangle edges from every persisted group on this save. */
+function mentoringManualInfluenceEdgesMap(): Map<
+  string,
+  MentoringInfluenceLevel
+> {
+  const out = new Map<string, MentoringInfluenceLevel>();
+  for (const group of mentoringCache.groups) {
+    const edges = normalizeMentoringInfluenceEdges(group.influenceEdges);
+    if (!edges) continue;
+    for (const [key, level] of Object.entries(edges)) {
+      out.set(key, level);
+    }
+  }
+  return out;
+}
+
+function mentoringRejectedGroupKeysSet(): Set<string> {
+  return new Set(mentoringCache.rejectedGroupKeys);
+}
+
+function rememberRejectedMentoringGroup(memberIds: readonly string[]) {
+  const key = mentoringGroupMemberKey(memberIds);
+  if (mentoringCache.rejectedGroupKeys.includes(key)) return;
+  mentoringCache.rejectedGroupKeys.push(key);
+  saveMentoringStackToStorage();
+  mentoringCache.suggestions = mentoringCache.suggestions.filter(
+    (row) => row.key !== key,
+  );
+}
+
+function rememberLabeledDownwardNoneTriple(group: MentoringGroupRecord) {
+  if (
+    !mentoringRolesHaveLabeledDownwardNone(group.roles, group.influenceEdges)
+  ) {
+    return;
+  }
+  rememberRejectedMentoringGroup(group.memberIds);
+}
+
+function mentoringIncompleteYoungTargets(): {
+  id: string;
+  name: string;
+  ca?: number;
+  pa?: number;
+}[] {
+  const out: { id: string; name: string; ca?: number; pa?: number }[] = [];
+  for (const player of clubAtClubMentoringPlayers()) {
+    if (isMentoringCompleteEnough(player)) continue;
+    if (player.uid == null || !Number.isFinite(player.uid)) continue;
+    const age = rosterPlayerAge(player, rosterMeta.gameDate);
+    if (age == null || age >= MENTORING_YOUNG_AGE) continue;
+    const ca = mentoringKnownAbility(player.ca);
+    const pa = mentoringKnownAbility(player.pa);
+    out.push({
+      id: String(player.uid),
+      name: rosterResolvedName(player) ?? "Name missing",
+      ...(ca !== undefined ? { ca } : {}),
+      ...(pa !== undefined ? { pa } : {}),
+    });
+  }
+  return out;
+}
+
+function mentoringYoungCoverageRows(
+  candidates: MentoringCandidate[],
+): MentoringMenteeCoverageRow[] {
+  const seatedIds = mentoringAssignedPlayerIds();
+  return mentoringMenteeCoverage(candidates, {
+    seatedIds,
+    occupiedIds: seatedIds,
+    incompleteYoung: mentoringIncompleteYoungTargets(),
+    hierarchyById: mentoringHierarchyByIdMap(),
+    manualInfluenceEdges: mentoringManualInfluenceEdgesMap(),
+    rejectedGroupKeys: mentoringRejectedGroupKeysSet(),
+  });
+}
+
+function mentoringMenteeFaceTitle(
+  row: MentoringMenteeCoverageRow,
+  state: ReturnType<typeof mentoringMenteeFaceState>,
+): string {
+  if (state === "seated") return `${row.name} — seated`;
+  if (state === "skipped") return `${row.name} — ${row.skipReason ?? "skipped"}`;
+  return `${row.name} — Suggest`;
+}
+
+function renderMentoringMenteeStrip(candidates: MentoringCandidate[]) {
+  const order = { free: 0, skipped: 1, seated: 2 } as const;
+  const rows = mentoringYoungCoverageRows(candidates)
+    .slice()
+    .sort(
+      (a, b) =>
+        order[mentoringMenteeFaceState(a)] - order[mentoringMenteeFaceState(b)],
+    );
+  if (rows.length === 0) {
+    mentoringMenteesEl.replaceChildren();
+    mentoringMenteesEl.hidden = true;
+    return;
+  }
+
+  const canSuggest = canCreateMentoringGroup(candidates);
+  const frag = document.createDocumentFragment();
+  for (const row of rows) {
+    const state = mentoringMenteeFaceState(row);
+    const clickable = state === "free" && canSuggest;
+    const face = document.createElement(clickable ? "button" : "div");
+    if (clickable) (face as HTMLButtonElement).type = "button";
+    face.className = `mentoring-mentee is-${state}`;
+    face.dataset.playerId = row.id;
+    face.dataset.state = state;
+    face.title = mentoringMenteeFaceTitle(row, state);
+    face.setAttribute("aria-label", mentoringMenteeFaceTitle(row, state));
+    const { wrap } = createMentoringPlayerFace(row.id);
+    const fallback = document.createElement("span");
+    fallback.className = "mentoring-seat-face-fallback";
+    fallback.textContent = mentoringLastName(row.name).slice(0, 1).toUpperCase();
+    wrap.append(fallback);
+    face.append(wrap);
+    frag.append(face);
+  }
+  mentoringMenteesEl.replaceChildren(frag);
+  mentoringMenteesEl.hidden = false;
+}
+
+function setMentoringStatusNotice(text: string) {
+  mentoringStatusEl.textContent = text;
+  mentoringStatusEl.hidden = !text;
+}
+
+function offerMentoringReplacementForLow(lowId: string) {
+  const candidates = mentoringCache.candidates ?? [];
+  const occupied = mentoringAssignedPlayerIds();
+  const result = mentoringReplacementForLow(candidates, lowId, {
+    seatedIds: occupied,
+    occupiedIds: occupied,
+    hierarchyById: mentoringHierarchyByIdMap(),
+    manualInfluenceEdges: mentoringManualInfluenceEdgesMap(),
+    rejectedGroupKeys: mentoringRejectedGroupKeysSet(),
+  });
+  if (result.ok) {
+    const suggestion = suggestionFromGroup(result.group);
+    if (commitMentoringSuggestion(suggestion)) {
+      mentoringReplacementNotice = null;
+      closeMentoringPicker();
+      return;
+    }
+  }
+  const kid =
+    candidates.find((row) => String(row.id) === lowId)?.name ?? lowId;
+  const reason = result.ok ? "no unused influence path" : result.skipReason;
+  mentoringReplacementNotice = `No replacement for ${kid}: ${reason}`;
+  closeMentoringPicker();
+}
+
+function suggestMentoringGroupForLow(lowId: string) {
+  const candidates = ensureMentoringCacheForRoster();
+  if (!canCreateMentoringGroup(candidates)) return;
+  offerMentoringReplacementForLow(lowId);
+  renderMentoringPage();
+}
+
 function mentoringDynamicsSnapshotFromCandidate(
   player: MentoringCandidate,
 ): MentoringDynamicsSnapshot {
@@ -8921,85 +9965,10 @@ function mentoringDynamicsSnapshotFromCandidate(
   };
 }
 
-function normalizeMentoringGroupRecord(
-  group: unknown,
-): MentoringGroupRecord | null {
-  if (!group || typeof group !== "object") return null;
-  const row = group as MentoringGroupRecord;
-  if (
-    typeof row.id !== "string" ||
-    !Array.isArray(row.memberIds) ||
-    row.memberIds.length !== 3 ||
-    !row.roles ||
-    typeof row.roles !== "object"
-  ) {
-    return null;
-  }
-  const edges = normalizeMentoringInfluenceEdges(row.influenceEdges);
-  return {
-    id: row.id,
-    memberIds: row.memberIds.map(String),
-    roles: row.roles,
-    ...(edges ? { influenceEdges: edges } : {}),
-  };
-}
-
-function loadMentoringStackFromStorage(persistKey: string): {
-  groups: MentoringGroupRecord[];
-  dynamicsByPlayerId: Record<string, MentoringDynamicsLabel>;
-} {
-  const empty = { groups: [] as MentoringGroupRecord[], dynamicsByPlayerId: {} };
-  if (!persistKey) return empty;
-
-  try {
-    const raw =
-      window.localStorage.getItem(MENTORING_STACK_STORAGE_KEY) ??
-      window.localStorage.getItem(MENTORING_STACK_STORAGE_KEY_LEGACY);
-    if (!raw) return empty;
-    const store = JSON.parse(raw) as MentoringStackPersist;
-    const direct = store[persistKey];
-    if (direct && Array.isArray(direct.groups)) {
-      const groups = direct.groups
-        .map(normalizeMentoringGroupRecord)
-        .filter((g): g is MentoringGroupRecord => g !== null);
-      const dynamicsByPlayerId: Record<string, MentoringDynamicsLabel> = {};
-      if (direct.dynamicsByPlayerId && typeof direct.dynamicsByPlayerId === "object") {
-        for (const [id, value] of Object.entries(direct.dynamicsByPlayerId)) {
-          const label = normalizeMentoringDynamicsLabel(value);
-          if (label) dynamicsByPlayerId[id] = label;
-        }
-      }
-      return { groups, dynamicsByPlayerId };
-    }
-
-    // Migrate legacy compound keys: `${saveName}|extractedAt|...|rev`
-    const prefix = `${persistKey}|`;
-    let best: {
-      groups: MentoringGroupRecord[];
-      dynamicsByPlayerId: Record<string, MentoringDynamicsLabel>;
-    } | null = null;
-    for (const [key, row] of Object.entries(store)) {
-      if (!key.startsWith(prefix) || !row || !Array.isArray(row.groups)) continue;
-      const groups = row.groups
-        .map(normalizeMentoringGroupRecord)
-        .filter((g): g is MentoringGroupRecord => g !== null);
-      if (groups.length === 0) continue;
-      const dynamicsByPlayerId: Record<string, MentoringDynamicsLabel> = {};
-      if (row.dynamicsByPlayerId && typeof row.dynamicsByPlayerId === "object") {
-        for (const [id, value] of Object.entries(row.dynamicsByPlayerId)) {
-          const label = normalizeMentoringDynamicsLabel(value);
-          if (label) dynamicsByPlayerId[id] = label;
-        }
-      }
-      if (!best || groups.length > best.groups.length) {
-        best = { groups, dynamicsByPlayerId };
-      }
-    }
-    if (best) return best;
-    return empty;
-  } catch {
-    return empty;
-  }
+function loadMentoringStackFromStorage(persistKey: string) {
+  return loadMentoringStackSnapshot(persistKey, (key) =>
+    window.localStorage.getItem(key),
+  );
 }
 
 function saveMentoringStackToStorage() {
@@ -9008,9 +9977,22 @@ function saveMentoringStackToStorage() {
   try {
     const raw = window.localStorage.getItem(MENTORING_STACK_STORAGE_KEY);
     const store: MentoringStackPersist = raw ? JSON.parse(raw) : {};
+    if (
+      !canPersistMentoringGroupsToStore(
+        mentoringCache.groups,
+        store,
+        persistKey,
+      )
+    ) {
+      console.warn(
+        "[fmt] mentoring persist skipped: would overwrite saved groups with empty stack",
+      );
+      return;
+    }
     store[persistKey] = {
       groups: mentoringCache.groups,
       dynamicsByPlayerId: mentoringCache.dynamicsByPlayerId,
+      rejectedGroupKeys: mentoringCache.rejectedGroupKeys,
     };
     window.localStorage.setItem(MENTORING_STACK_STORAGE_KEY, JSON.stringify(store));
   } catch (err) {
@@ -9027,6 +10009,15 @@ function newMentoringGroupId(): string {
 
 function mentoringMaxGroups(candidates: MentoringCandidate[]): number {
   return Math.floor(candidates.length / 3);
+}
+
+function canCreateMentoringGroup(candidates: MentoringCandidate[]): boolean {
+  const maxGroups = mentoringMaxGroups(candidates);
+  return (
+    candidates.length >= 3 &&
+    mentoringCache.groups.length < maxGroups &&
+    mentoringAssignedPlayerIds().size + 3 <= candidates.length
+  );
 }
 
 function mentoringAssignedPlayerIds(excludeGroupId?: string | null): Set<string> {
@@ -9062,85 +10053,35 @@ function mentoringGroupTableReceivers(
     .map((member) => member.player);
 }
 
-/** Keep directed edges whose endpoints remain in the trio. */
-function mentoringEdgesForMembers(
-  edges: Record<string, MentoringInfluenceLevel> | undefined,
-  memberIds: string[],
-): Record<string, MentoringInfluenceLevel> | undefined {
-  if (!edges) return undefined;
-  const members = new Set(memberIds);
-  const out: Record<string, MentoringInfluenceLevel> = {};
-  for (const [key, level] of Object.entries(edges)) {
-    const sep = key.indexOf(">");
-    if (sep <= 0) continue;
-    const from = key.slice(0, sep);
-    const to = key.slice(sep + 1);
-    if (!members.has(from) || !members.has(to)) continue;
-    if (isMentoringEdgeLevel(level)) out[key] = level;
-  }
-  return Object.keys(out).length > 0 ? out : undefined;
-}
-
 function pruneMentoringGroups(_candidates: MentoringCandidate[]) {
   // Prune against full roster UIDs — not mentoring candidates. A player can
   // remain on the squad but fail candidate filters; wiping groups then would
   // permanently delete persisted mentoring units.
-  // Also drop anyone tagged loanedOut — they cannot sit in an in-game group.
-  const loanedOutIds = new Set<string>();
-  for (const p of clubAllPlayers()) {
-    if (p.uid == null || !Number.isFinite(p.uid)) continue;
-    if (p.loan?.status === "loanedOut") loanedOutIds.add(String(p.uid));
-  }
-  const rosterIds = new Set(
-    clubAllPlayers()
-      .filter((p) => p.uid != null && Number.isFinite(p.uid))
-      .map((p) => String(p.uid))
-      .filter((id) => !loanedOutIds.has(id)),
+  const club = clubAllPlayers();
+  const rosterIds = buildMentoringPruneRosterIds(club);
+  const decision = decideMentoringPrune(
+    mentoringCache.groups,
+    rosterIds,
+    isMentoringRosterTrustworthyForPrune(club, clubAtClubMentoringPlayers()),
   );
-  if (rosterIds.size === 0) return;
 
-  const seenPlayers = new Set<string>();
-  const nextGroups: MentoringGroupRecord[] = [];
-
-  for (const group of mentoringCache.groups) {
-    const memberIds = group.memberIds.filter((id) => rosterIds.has(id));
-    if (memberIds.length !== 3) continue;
-    if (memberIds.some((id) => seenPlayers.has(id))) continue;
-    for (const id of memberIds) seenPlayers.add(id);
-    const influenceEdges = mentoringEdgesForMembers(
-      group.influenceEdges,
-      memberIds,
+  if (decision.skippedReason === "would_wipe_all") {
+    console.warn(
+      "[fmt] mentoring prune skipped: would delete all groups (fail closed)",
     );
-    nextGroups.push({
-      id: group.id,
-      memberIds,
-      roles: Object.fromEntries(
-        Object.entries(group.roles).filter(([id]) => memberIds.includes(id)),
-      ),
-      ...(influenceEdges ? { influenceEdges } : {}),
-    });
   }
 
-  const changed =
-    nextGroups.length !== mentoringCache.groups.length ||
-    nextGroups.some((group, index) => {
-      const prev = mentoringCache.groups[index];
-      return (
-        !prev ||
-        prev.id !== group.id ||
-        prev.memberIds.join("|") !== group.memberIds.join("|")
-      );
-    });
+  if (!decision.applied) return;
 
-  mentoringCache.groups = nextGroups;
+  mentoringCache.groups = decision.groups;
   if (
     mentoringDetailGroupId &&
-    !nextGroups.some((group) => group.id === mentoringDetailGroupId)
+    !decision.groups.some((group) => group.id === mentoringDetailGroupId)
   ) {
     mentoringDetailGroupId = null;
     if (mentoringDetailDialogEl.open) mentoringDetailDialogEl.close();
   }
-  if (changed) saveMentoringStackToStorage();
+  if (decision.changed) saveMentoringStackToStorage();
 }
 
 function upsertMentoringGroup(group: MentoringGroupRecord) {
@@ -9156,19 +10097,45 @@ function upsertMentoringGroup(group: MentoringGroupRecord) {
 function deleteMentoringGroup(groupId: string) {
   const index = mentoringGroupIndex(groupId);
   if (index < 0) return;
+  const removed = mentoringCache.groups[index]!;
+  const candidates = mentoringCache.candidates ?? [];
+  const byId = new Map(candidates.map((c) => [String(c.id), c]));
+  const members = mentoringUnitMembersFromRecord(removed, byId);
+  const edgeRecord = normalizeMentoringInfluenceEdges(removed.influenceEdges);
+  const manualEdges = edgeRecord
+    ? new Map(Object.entries(edgeRecord))
+    : undefined;
+  const deadGroup = Boolean(
+    members && isMentoringZeroInfluenceGroup(members, manualEdges),
+  );
+  if (
+    deadGroup ||
+    mentoringRolesHaveLabeledDownwardNone(removed.roles, removed.influenceEdges)
+  ) {
+    rememberRejectedMentoringGroup(removed.memberIds);
+  }
+  const lowId =
+    members?.find((m) => m.role === "low")?.player.id ??
+    Object.entries(removed.roles).find(([, role]) => role === "low")?.[0];
   mentoringCache.groups.splice(index, 1);
   if (mentoringDetailGroupId === groupId) {
     mentoringDetailGroupId = null;
     if (mentoringDetailDialogEl.open) mentoringDetailDialogEl.close();
   }
   saveMentoringStackToStorage();
+  if (deadGroup && lowId) {
+    offerMentoringReplacementForLow(String(lowId));
+  }
 }
 
 function availableMentoringSuggestions(): MentoringCachedSuggestion[] {
   const excludeGroupId = mentoringPicker?.groupId ?? null;
   const assigned = mentoringAssignedPlayerIds(excludeGroupId);
-  return mentoringCache.suggestions.filter((suggestion) =>
-    suggestion.memberIds.every((id) => !assigned.has(id)),
+  const rejected = mentoringRejectedGroupKeysSet();
+  return mentoringCache.suggestions.filter(
+    (suggestion) =>
+      suggestion.memberIds.every((id) => !assigned.has(id)) &&
+      !rejected.has(suggestion.key),
   );
 }
 
@@ -9235,6 +10202,7 @@ function suggestionFromGroup(
     roles[String(seat.player.id)] = seat.role;
   }
   const key = [...memberIds].sort().join("|");
+  const reasons = group.reasons.filter((row) => row.trim().length > 0).slice(0, 4);
   return {
     id: key,
     memberIds,
@@ -9242,6 +10210,7 @@ function suggestionFromGroup(
     score: group.score,
     path: `${group.shape}:${group.path}`,
     key,
+    ...(reasons.length ? { reasons } : {}),
   };
 }
 
@@ -9269,6 +10238,8 @@ async function warmMentoringSuggestions(
     groups = findInfluenceSafeMentoringGroups(pool, {
       max: 32,
       hierarchyById: mentoringHierarchyByIdMap(),
+      manualInfluenceEdges: mentoringManualInfluenceEdgesMap(),
+      rejectedGroupKeys: mentoringRejectedGroupKeysSet(),
     });
   } catch (err) {
     console.error("Mentoring suggestion warm failed", err);
@@ -9342,6 +10313,7 @@ function ensureMentoringCacheForRoster(): MentoringCandidate[] {
       ...emptyMentoringCache(persistKey, "", mentoringCache.generation),
       groups: persisted.groups,
       dynamicsByPlayerId: persisted.dynamicsByPlayerId,
+      rejectedGroupKeys: persisted.rejectedGroupKeys,
     };
     mentoringRenderFingerprint = "";
   }
@@ -9357,7 +10329,7 @@ function ensureMentoringCacheForRoster(): MentoringCandidate[] {
 
   if (!mentoringCache.candidates) {
     mentoringCache.candidates = mentoringSuggestPool(
-      firstTeamMentoringPlayers(),
+      clubAtClubMentoringPlayers(),
     )
       .map(candidateFromRosterPlayer)
       .filter((row): row is MentoringCandidate => row !== null);
@@ -9369,25 +10341,81 @@ function ensureMentoringCacheForRoster(): MentoringCandidate[] {
   return candidates;
 }
 
-function updateMentoringSuggestButton() {
-  if (!mentoringPickerSuggestBtn) return;
+function nextUnusedMentoringSuggestion(): MentoringCachedSuggestion | null {
+  if (mentoringCache.suggestionsStatus !== "ready") return null;
+  const skipped = mentoringPicker?.shownSuggestionKeys;
+  const eligibleIds = new Set(
+    (mentoringCache.candidates ?? []).map((player) => String(player.id)),
+  );
+  const available = availableMentoringSuggestions()
+    .filter((suggestion) => !skipped?.has(suggestion.key))
+    .filter((suggestion) =>
+      suggestion.memberIds.every((id) => eligibleIds.has(id)),
+    );
+  available.sort((a, b) => b.score - a.score);
+  return available[0] ?? null;
+}
+
+function commitMentoringSuggestion(
+  suggestion: MentoringCachedSuggestion,
+  groupId?: string | null,
+): boolean {
+  const assigned = mentoringAssignedPlayerIds(groupId);
+  if (suggestion.memberIds.some((id) => assigned.has(id))) return false;
+  const existing = groupId
+    ? mentoringCache.groups.find((group) => group.id === groupId)
+    : null;
+  const influenceEdges = mentoringEdgesForMembers(
+    existing?.influenceEdges,
+    suggestion.memberIds,
+  );
+  const reasons = suggestion.reasons?.filter((row) => row.trim().length > 0);
+  upsertMentoringGroup({
+    id: groupId ?? newMentoringGroupId(),
+    memberIds: [...suggestion.memberIds],
+    roles: { ...suggestion.roles },
+    ...(influenceEdges ? { influenceEdges } : {}),
+    ...(reasons?.length ? { reasons: reasons.slice(0, 4) } : {}),
+  });
+  return true;
+}
+
+function syncMentoringSuggestButton(
+  btn: HTMLButtonElement,
+  options: { requireCreateSlot: boolean },
+) {
   const available = availableMentoringSuggestions();
   if (mentoringCache.suggestionsStatus === "loading") {
-    mentoringPickerSuggestBtn.disabled = true;
-    mentoringPickerSuggestBtn.textContent = "Suggest…";
+    btn.disabled = true;
+    btn.textContent = "Suggest…";
+    btn.title = "";
     return;
   }
   if (
     mentoringCache.suggestionsStatus === "ready" &&
     available.length === 0
   ) {
-    mentoringPickerSuggestBtn.disabled = true;
-    mentoringPickerSuggestBtn.textContent = "No ideas";
+    btn.disabled = true;
+    btn.textContent = "No ideas";
+    btn.title = "No unused suggestions";
     return;
   }
-  mentoringPickerSuggestBtn.disabled =
-    mentoringCache.suggestionsStatus !== "ready";
-  mentoringPickerSuggestBtn.textContent = "Suggest";
+  const blockedCreate =
+    options.requireCreateSlot &&
+    !canCreateMentoringGroup(mentoringCache.candidates ?? []);
+  btn.disabled =
+    mentoringCache.suggestionsStatus !== "ready" || blockedCreate;
+  btn.textContent = "Suggest";
+  btn.title = blockedCreate ? mentoringAddBtn.title : "";
+}
+
+function updateMentoringSuggestButton() {
+  syncMentoringSuggestButton(mentoringPickerSuggestBtn, {
+    requireCreateSlot: false,
+  });
+  syncMentoringSuggestButton(mentoringBoardSuggestBtn, {
+    requireCreateSlot: true,
+  });
 }
 
 function openMentoringPicker(options?: { groupId?: string | null }) {
@@ -9416,8 +10444,8 @@ function closeMentoringPicker() {
   if (mentoringPickerDialogEl.open) mentoringPickerDialogEl.close();
 }
 
-function applyMentoringPickerSelection() {
-  if (!mentoringPicker) return;
+function applyMentoringPickerSelection(): boolean {
+  if (!mentoringPicker) return false;
   const candidates = ensureMentoringCacheForRoster();
   const byId = new Map(candidates.map((c) => [String(c.id), c]));
   const groupId = mentoringPicker.groupId;
@@ -9425,17 +10453,17 @@ function applyMentoringPickerSelection() {
   if (mentoringPicker.selectedIds.length !== 3) {
     if (groupId) deleteMentoringGroup(groupId);
     renderMentoringPage();
-    return;
+    return false;
   }
 
   const players = mentoringPicker.selectedIds
     .map((id) => byId.get(id))
     .filter((row): row is MentoringCandidate => row !== undefined);
-  if (players.length !== 3) return;
+  if (players.length !== 3) return false;
 
   const assignedElsewhere = mentoringAssignedPlayerIds(groupId);
   if (mentoringPicker.selectedIds.some((id) => assignedElsewhere.has(id))) {
-    return;
+    return false;
   }
 
   const defaults = defaultMentoringUnitRoles(players, {
@@ -9447,21 +10475,22 @@ function applyMentoringPickerSelection() {
   const existing = groupId
     ? mentoringCache.groups.find((group) => group.id === groupId)
     : null;
-  if (existing) {
-    const prev = new Set(existing.memberIds);
-    const sameTrio = mentoringPicker.selectedIds.every((id) => prev.has(id));
-    if (sameTrio) {
-      for (const id of mentoringPicker.selectedIds) {
-        if (existing.roles[id]) roles[id] = existing.roles[id]!;
-      }
-      const seats = Object.values(roles);
-      const missing =
-        !seats.includes("high") ||
-        !seats.includes("mid") ||
-        !seats.includes("low");
-      if (missing) {
-        for (const seat of defaults) roles[String(seat.player.id)] = seat.role;
-      }
+  const sameTrio = Boolean(
+    existing &&
+      existing.memberIds.length === mentoringPicker.selectedIds.length &&
+      mentoringPicker.selectedIds.every((id) => existing.memberIds.includes(id)),
+  );
+  if (existing && sameTrio) {
+    for (const id of mentoringPicker.selectedIds) {
+      if (existing.roles[id]) roles[id] = existing.roles[id]!;
+    }
+    const seats = Object.values(roles);
+    const missing =
+      !seats.includes("high") ||
+      !seats.includes("mid") ||
+      !seats.includes("low");
+    if (missing) {
+      for (const seat of defaults) roles[String(seat.player.id)] = seat.role;
     }
   }
 
@@ -9474,16 +10503,23 @@ function applyMentoringPickerSelection() {
     existing?.influenceEdges,
     nextMemberIds,
   );
+  const reasons = hit?.reasons?.length
+    ? [...hit.reasons]
+    : sameTrio
+      ? existing?.reasons
+      : undefined;
   upsertMentoringGroup({
     id: groupId ?? newMentoringGroupId(),
     memberIds: nextMemberIds,
     roles: hit ? { ...hit.roles } : roles,
     ...(influenceEdges ? { influenceEdges } : {}),
+    ...(reasons?.length ? { reasons: reasons.slice(0, 4) } : {}),
   });
   if (!groupId) {
     mentoringPicker.groupId = mentoringCache.groups.at(-1)?.id ?? null;
   }
   renderMentoringPage();
+  return true;
 }
 
 function syncMentoringPickerRowStates() {
@@ -9543,34 +10579,40 @@ function suggestMentoringPickerSelection() {
   if (!mentoringPicker) return;
   if (mentoringCache.suggestionsStatus === "loading") return;
 
-  let available = availableMentoringSuggestions().filter(
-    (suggestion) => !mentoringPicker!.shownSuggestionKeys.has(suggestion.key),
-  );
-
-  if (available.length === 0) {
+  let suggestion = nextUnusedMentoringSuggestion();
+  if (!suggestion) {
     refreshMentoringSuggestionsForPicker(true);
-    available = availableMentoringSuggestions().filter(
-      (suggestion) => !mentoringPicker!.shownSuggestionKeys.has(suggestion.key),
-    );
-    if (available.length === 0) {
+    suggestion = nextUnusedMentoringSuggestion();
+    if (!suggestion) {
       updateMentoringSuggestButton();
       return;
     }
   }
 
-  available.sort((a, b) => b.score - a.score);
-  const eligibleIds = new Set(
-    (mentoringCache.candidates ?? []).map((player) => String(player.id)),
-  );
-  const suggestion = available.find((row) =>
-    row.memberIds.every((id) => eligibleIds.has(id)),
-  );
+  mentoringPicker.shownSuggestionKeys.add(suggestion.key);
+  setMentoringPickerSelection(suggestion.memberIds, true);
+  closeMentoringPicker();
+  updateMentoringSuggestButton();
+}
+
+function suggestMentoringGroupFromBoard() {
+  if (mentoringPickerDialogEl.open) return;
+  if (mentoringCache.suggestionsStatus === "loading") return;
+  const candidates = ensureMentoringCacheForRoster();
+  if (!canCreateMentoringGroup(candidates)) {
+    updateMentoringSuggestButton();
+    return;
+  }
+  const suggestion = nextUnusedMentoringSuggestion();
   if (!suggestion) {
     updateMentoringSuggestButton();
     return;
   }
-  mentoringPicker.shownSuggestionKeys.add(suggestion.key);
-  setMentoringPickerSelection(suggestion.memberIds, true);
+  if (!commitMentoringSuggestion(suggestion)) {
+    updateMentoringSuggestButton();
+    return;
+  }
+  renderMentoringPage();
 }
 
 function renderMentoringPicker(forceRebuild = false) {
@@ -9583,7 +10625,7 @@ function renderMentoringPicker(forceRebuild = false) {
   const visibleCandidates = candidates.filter(
     (player) => !assignedElsewhere.has(String(player.id)),
   );
-  const incompletePool = firstTeamMentoringPlayers()
+  const incompletePool = clubAtClubMentoringPlayers()
     .filter((player) => !isMentoringCompleteEnough(player))
     .sort((a, b) =>
       (rosterResolvedName(a) ?? a.name ?? "").localeCompare(
@@ -9697,6 +10739,192 @@ function createMentoringPlayerFace(uid: string): {
   return { wrap, img };
 }
 
+function createMentoringRankStack(
+  dir: "up" | "down",
+  band: MentoringDisplayBand,
+  tone?: "good" | "bad",
+): HTMLElement {
+  const stack = document.createElement("span");
+  const colorClass = tone ?? mentoringInfluenceBandClass(band);
+  stack.className = `mentoring-rank-stack is-${dir} ${colorClass}`;
+  const mark = dir === "up" ? "▲" : "▼";
+  const count = mentoringChevronCount(band);
+  for (let i = 0; i < count; i += 1) {
+    const ch = document.createElement("span");
+    ch.textContent = mark;
+    stack.append(ch);
+  }
+  return stack;
+}
+
+function createMentoringPeerRanks(mark: MentoringSeatPeerMark): HTMLElement {
+  const ranks = document.createElement("span");
+  ranks.className = "mentoring-peer-ranks";
+  if (!mark.outgoing) {
+    ranks.classList.add("is-none");
+    return ranks;
+  }
+  ranks.append(createMentoringRankStack("up", mark.outgoing));
+  return ranks;
+}
+
+function createMentoringPairCell(
+  value: number | undefined,
+  trait: (typeof MENTORING_DISPLAY_ORDER)[number],
+  side: MentoringPairSideMarks,
+): HTMLElement {
+  const cell = document.createElement("span");
+  cell.className = "compare-pair mentoring-pair-cell";
+
+  const valEl = document.createElement("span");
+  if (value === undefined || !Number.isFinite(value)) {
+    valEl.className = "compare-val fmt-mid is-empty";
+    valEl.textContent = "—";
+  } else {
+    const tone = attributeTone(trait, value);
+    valEl.textContent = formatMidCell(value);
+    valEl.className = [
+      "compare-val",
+      "fmt-mid",
+      tone === "good" ? "good" : "",
+      tone === "bad" ? "bad" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
+  const marks = document.createElement("span");
+  marks.className = "mentoring-pair-marks";
+  if (side.receive) {
+    const stack = createMentoringRankStack(
+      side.receive.dir,
+      side.receive.band,
+      side.receive.tone,
+    );
+    stack.title = mentoringArrowTitle(side.receive.dir, side.receive.band);
+    marks.append(stack);
+  }
+  if (side.exert) {
+    const deltaEl = document.createElement("span");
+    deltaEl.className = `compare-delta ${side.exert.tone}`;
+    deltaEl.textContent = formatClimbDelta(side.exert.delta);
+    marks.append(deltaEl);
+  }
+  if (!side.receive && !side.exert) {
+    marks.classList.add("is-empty");
+    marks.setAttribute("aria-hidden", "true");
+  }
+
+  cell.append(marks, valEl);
+  return cell;
+}
+
+function createMentoringPairTable(
+  subject: MentoringCandidate,
+  peer: MentoringCandidate,
+  edges?: Record<string, MentoringInfluenceLevel>,
+): HTMLTableElement {
+  const table = document.createElement("table");
+  table.className = "mentoring-matrix fmt-table mentoring-pair-table";
+  const columns = [subject, peer];
+
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  const attrTh = document.createElement("th");
+  attrTh.scope = "col";
+  attrTh.textContent = "Attr";
+  headRow.append(attrTh);
+  for (const player of columns) {
+    const th = document.createElement("th");
+    th.scope = "col";
+    th.textContent = mentoringLastName(player.name);
+    th.title = player.name;
+    headRow.append(th);
+  }
+  thead.append(headRow);
+  table.append(thead);
+
+  const tbody = document.createElement("tbody");
+  for (const trait of MENTORING_DISPLAY_ORDER) {
+    const tr = document.createElement("tr");
+    const nameTd = document.createElement("td");
+    const label =
+      trait in ATTRIBUTE_LABELS
+        ? ATTRIBUTE_LABELS[trait as keyof typeof ATTRIBUTE_LABELS]
+        : trait;
+    const abbr =
+      trait in PERSONALITY_ATTRIBUTE_ABBR
+        ? PERSONALITY_ATTRIBUTE_ABBR[
+            trait as keyof typeof PERSONALITY_ATTRIBUTE_ABBR
+          ]
+        : label.slice(0, 3);
+    nameTd.innerHTML = `<span class="attr-name" title="${label}">${abbr}</span>`;
+    tr.append(nameTd);
+
+    const subjectValue = mentoringTraitValue(subject, trait);
+    const peerValue = mentoringTraitValue(peer, trait);
+    const marks = planMentoringPairTraitMarks({
+      subjectId: String(subject.id),
+      peerId: String(peer.id),
+      trait,
+      subjectValue,
+      peerValue,
+      edges,
+    });
+
+    const subjectTd = document.createElement("td");
+    subjectTd.append(createMentoringPairCell(subjectValue, trait, marks.subject));
+    const peerTd = document.createElement("td");
+    peerTd.append(createMentoringPairCell(peerValue, trait, marks.peer));
+    tr.append(subjectTd, peerTd);
+    tbody.append(tr);
+  }
+  table.append(tbody);
+  return table;
+}
+
+function createMentoringSeatPeerRows(
+  seat: MentoringUnitMember,
+  members: MentoringUnitMember[],
+  group?: MentoringGroupRecord | null,
+): HTMLElement {
+  const host = document.createElement("div");
+  host.className = "mentoring-peer-rows";
+  const marks = planMentoringSeatPeerMarks({
+    playerId: String(seat.player.id),
+    peers: members.map((member) => ({
+      id: String(member.player.id),
+      role: member.role,
+    })),
+    edges: group?.influenceEdges,
+  });
+  for (const mark of marks) {
+    const peer = members.find((member) => String(member.player.id) === mark.peerId);
+    if (!peer) continue;
+    const row = document.createElement("div");
+    row.className = "mentoring-peer-row";
+    row.title = peer.player.name;
+    row.append(createMentoringPeerRanks(mark));
+    const { wrap } = createMentoringPlayerFace(mark.peerId);
+    const fallback = document.createElement("span");
+    fallback.className = "mentoring-seat-face-fallback";
+    fallback.textContent = mentoringLastName(peer.player.name)
+      .slice(0, 1)
+      .toUpperCase();
+    wrap.append(fallback);
+    row.append(wrap);
+    row.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+    });
+    wireMentoringMatrixTip(row, () =>
+      createMentoringPairTable(seat.player, peer.player, group?.influenceEdges),
+    );
+    host.append(row);
+  }
+  return host;
+}
+
 function renderMentoringDetailSeats(
   host: HTMLElement,
   members: MentoringUnitMember[],
@@ -9717,6 +10945,7 @@ function renderMentoringDetailSeats(
     const wrap = document.createElement("div");
     wrap.className = "mentoring-seat";
     wrap.dataset.playerId = playerId;
+    wrap.dataset.role = seat.role;
 
     const card = document.createElement(
       options?.interactive ? "button" : "div",
@@ -9727,7 +10956,7 @@ function renderMentoringDetailSeats(
       (card as HTMLButtonElement).type = "button";
       card.setAttribute(
         "aria-label",
-        `${seat.player.name}: Dynamics ${state === "complete" ? "collected" : state === "partial" ? "partial" : "missing"}. Hover for attributes, click for Dynamics.`,
+        `${seat.player.name}: Dynamics ${state === "complete" ? "collected" : state === "partial" ? "partial" : "missing"}. Click for Dynamics.`,
       );
       card.addEventListener("click", (event) => {
         event.stopPropagation();
@@ -9743,6 +10972,24 @@ function renderMentoringDetailSeats(
       .slice(0, 1)
       .toUpperCase();
     faceWrap.append(fallback);
+    if (seat.role === "low") {
+      const digits = mentoringCaPaFaceDigits(seat.player.ca, seat.player.pa);
+      if (digits) {
+        const capa = document.createElement("span");
+        capa.className = "mentoring-seat-capa";
+        if (digits.ca !== undefined) {
+          const caEl = document.createElement("span");
+          caEl.textContent = String(digits.ca);
+          capa.append(caEl);
+        }
+        if (digits.pa !== undefined) {
+          const paEl = document.createElement("span");
+          paEl.textContent = String(digits.pa);
+          capa.append(paEl);
+        }
+        faceWrap.append(capa);
+      }
+    }
 
     const meta = document.createElement("div");
     meta.className = "mentoring-seat-meta";
@@ -9764,7 +11011,7 @@ function renderMentoringDetailSeats(
 
     meta.append(name, dyn);
     card.append(faceWrap, meta);
-    wrap.append(card);
+    wrap.append(card, createMentoringSeatPeerRows(seat, members, options?.group));
     host.append(wrap);
   }
 }
@@ -9807,17 +11054,31 @@ function renderMentoringGroupPanel(
     group,
   });
 
-  // Overview = face + name only. Full HA×player matrix (with deltas) on seat hover.
+  // Overview = face + name only. Full HA×player matrix on a small avoidable hot-spot.
   if (canShowAttrs) {
     for (const card of seats.querySelectorAll<HTMLElement>(
       ".mentoring-seat-card[data-player-id]",
     )) {
       const playerId = card.dataset.playerId;
       if (!playerId) continue;
-      card.classList.add("has-attrs-tip");
       card.removeAttribute("title");
-      wireMentoringMatrixTip(card, () =>
-        createMentoringGroupTable(influencers, receivers, playerId),
+      const hot = document.createElement("span");
+      hot.className = "mentoring-seat-ha-tip";
+      hot.textContent = "HA";
+      hot.title = "Hidden attributes";
+      hot.setAttribute("aria-label", "Hidden attributes");
+      hot.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      });
+      card.append(hot);
+      wireMentoringMatrixTip(hot, () =>
+        createMentoringGroupTable(
+          influencers,
+          receivers,
+          playerId,
+          group.influenceEdges,
+        ),
       );
     }
   }
@@ -9844,8 +11105,20 @@ function renderMentoringDetailModal(groupId: string) {
   }
 
   const evaluation = evaluateMentoringUnit(members);
+  const manualEdges = new Map(
+    Object.entries(group.influenceEdges ?? {}) as [
+      string,
+      MentoringInfluenceLevel,
+    ][],
+  );
+  const deadGroup = isMentoringZeroInfluenceGroup(members, manualEdges);
   applyMentoringVerdictTone(mentoringDetailVerdictEl, evaluation);
-  mentoringDetailVerdictEl.textContent = mentoringVerdictText(evaluation);
+  mentoringDetailVerdictEl.textContent = deadGroup
+    ? "Zero influence on Low — dissolve this group; it will not be suggested again."
+    : mentoringVerdictText(evaluation);
+  if (deadGroup) {
+    mentoringDetailVerdictEl.className = "mentoring-verdict is-bad";
+  }
   renderMentoringDetailSeats(mentoringDetailSeatsEl, members, {
     interactive: true,
     group,
@@ -9855,7 +11128,12 @@ function renderMentoringDetailModal(groupId: string) {
   const receivers = mentoringGroupTableReceivers(members);
   if (influencers.length && receivers.length) {
     mentoringDetailAttrsEl.append(
-      createMentoringGroupTable(influencers, receivers),
+      createMentoringGroupTable(
+        influencers,
+        receivers,
+        undefined,
+        group.influenceEdges,
+      ),
     );
   }
 }
@@ -10076,6 +11354,7 @@ function saveMentoringDynamicsModal() {
       }
       if (Object.keys(edges).length === 0) delete group.influenceEdges;
       else group.influenceEdges = edges;
+      rememberLabeledDownwardNoneTriple(group);
     }
   }
 
@@ -10207,10 +11486,15 @@ function renderMentoringPage() {
   if (rosterMeta.source !== "save" || rosterPlayers.length === 0) {
     mentoringCardsEl.replaceChildren();
     mentoringCardsEl.classList.remove("is-dense");
+    mentoringMenteesEl.replaceChildren();
+    mentoringMenteesEl.hidden = true;
     mentoringEmptyEl.hidden = false;
     mentoringEmptyEl.textContent = "Load a Career Save";
     mentoringAddBtn.disabled = true;
-    mentoringStatusEl.textContent = "Load a Career Save";
+    mentoringBoardSuggestBtn.disabled = true;
+    mentoringBoardSuggestBtn.textContent = "Suggest";
+    mentoringBoardSuggestBtn.title = "Load a Career Save";
+    setMentoringStatusNotice("Load a Career Save");
     mentoringRenderFingerprint = "";
     return;
   }
@@ -10225,24 +11509,21 @@ function renderMentoringPage() {
     dynamics: mentoringCache.dynamicsByPlayerId,
     canCreatePool: candidates.length,
     dense,
-    // Bust card DOM when overview drops on-card attr matrix (T021).
-    attrUi: "seat-fill-tip-v1",
+    attrUi: "t032-tool-v1",
   });
 
   const maxGroups = mentoringMaxGroups(candidates);
-  const canCreate =
-    candidates.length >= 3 &&
-    mentoringCache.groups.length < maxGroups &&
-    mentoringAssignedPlayerIds().size + 3 <= candidates.length;
+  const canCreate = canCreateMentoringGroup(candidates);
   mentoringAddBtn.disabled = !canCreate;
   mentoringAddBtn.title = canCreate
     ? ""
     : mentoringCache.groups.length >= maxGroups
       ? `Max ${maxGroups} groups for this squad`
       : "Need 3 unassigned players";
+  updateMentoringSuggestButton();
 
   mentoringEmptyEl.hidden = mentoringCache.groups.length > 0;
-  const incompleteCount = firstTeamMentoringPlayers().filter(
+  const incompleteCount = clubAtClubMentoringPlayers().filter(
     (player) => !isMentoringCompleteEnough(player),
   ).length;
   mentoringEmptyEl.textContent =
@@ -10252,12 +11533,8 @@ function renderMentoringPage() {
         : "No personality data"
       : "No mentoring groups yet";
 
-  mentoringStatusEl.textContent =
-    mentoringCache.groups.length === 0
-      ? incompleteCount > 0
-        ? `No groups · ${incompleteCount} incomplete`
-        : "No groups"
-      : `${mentoringCache.groups.length} group${mentoringCache.groups.length === 1 ? "" : "s"}`;
+  renderMentoringMenteeStrip(candidates);
+  setMentoringStatusNotice(mentoringReplacementNotice ?? "");
 
   // Avoid tearing down face imgs on every roster refresh / disk poll.
   if (
@@ -10278,6 +11555,19 @@ function renderMentoringPage() {
 }
 
 mentoringAddBtn.addEventListener("click", () => openMentoringPicker({ groupId: null }));
+mentoringBoardSuggestBtn.addEventListener("click", () => {
+  suggestMentoringGroupFromBoard();
+});
+mentoringMenteesEl.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const face = target.closest<HTMLElement>(".mentoring-mentee");
+  if (!face || face.dataset.state !== "free") return;
+  const id = face.dataset.playerId;
+  if (!id) return;
+  event.preventDefault();
+  suggestMentoringGroupForLow(id);
+});
 mentoringPickerBodyEl.addEventListener("click", (event) => {
   const target = event.target;
   if (!(target instanceof Element)) return;

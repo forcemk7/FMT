@@ -156,6 +156,8 @@ export type PlayerDynamics = {
   captaincy?: CaptaincyRole | null;
   hierarchy?: HierarchyRole | null;
   socialGroup?: SocialGroupId | null;
+  /** Index in that social list; 0 = highest in-group. Null if group unknown. */
+  socialRank?: number | null;
 };
 
 export type PlayerTraining = {

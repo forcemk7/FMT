@@ -7,7 +7,7 @@
     "input": "managed parent short name only (e.g. Schalke 04)",
     "steps": [
       "Prefer exact mid-file (~40–120MB) catalog row: u32le length prefix + UTF-8 f'{parentShort} U19'",
-      "From the start of the name, within −220 bytes, take the last subunit header motif: ff×4 | 00 | ff×4 | count:u16∈[3,50] | jobs:u32×n (list precedes name)",
+      "From the start of the name, within −400 bytes, take the last subunit header motif: ff×4 | 00 | ff×4 | count:u16∈[3,50] | jobs:u32×n (list precedes name)",
       "Require a majority of jobs in 50000..2000000",
       "Fallback only: list within +150 bytes after the name (often neighbour/decoy)",
       "If exact miss: fuzzy-match other lp32 names ending ' U19' in the same band (exact core, endswith, token cover, or stem≥6 chars / ≥70% of shorter)",

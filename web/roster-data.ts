@@ -275,6 +275,10 @@ export function normalizeRosterPlayer(raw: LegacyRosterPlayer): RosterPlayer {
       (raw as { loan?: unknown }).loan ??
         (incoming as { loan?: unknown } | null)?.loan,
     ),
+    ca:
+      raw.ca != null && Number.isFinite(Number(raw.ca)) ? Number(raw.ca) : null,
+    pa:
+      raw.pa != null && Number.isFinite(Number(raw.pa)) ? Number(raw.pa) : null,
     _extract: extract,
     personIndex: raw.personIndex,
     kind: normalizePopulationKind(raw.kind, raw.uid),

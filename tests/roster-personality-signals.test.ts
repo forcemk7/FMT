@@ -84,4 +84,43 @@ describe("rosterPersonalitySignals", () => {
     expect(normalized.attributes?.mental?.leadership).toBe(8);
     expect(rosterHasPersonalityData(normalized)).toBe(true);
   });
+
+  it("keeps extracted CA/PA (does not invent)", () => {
+    const withCapa = normalizeRosterPlayer({
+      uid: 42,
+      name: "Reserve Kid",
+      jobId: 1,
+      kind: "UNKNOWN",
+      source: "save",
+      ca: 128,
+      pa: 160,
+      attributes: null,
+      attributeHistory: null,
+      dateOfBirth: null,
+      nation: null,
+      secondNation: null,
+      positions: null,
+      dynamics: { captaincy: null, hierarchy: null, socialGroup: null },
+      training: { unit: null },
+    });
+    expect(withCapa.ca).toBe(128);
+    expect(withCapa.pa).toBe(160);
+    const missing = normalizeRosterPlayer({
+      uid: 43,
+      name: "No Capa",
+      jobId: 1,
+      kind: "UNKNOWN",
+      source: "save",
+      attributes: null,
+      attributeHistory: null,
+      dateOfBirth: null,
+      nation: null,
+      secondNation: null,
+      positions: null,
+      dynamics: { captaincy: null, hierarchy: null, socialGroup: null },
+      training: { unit: null },
+    });
+    expect(missing.ca).toBeNull();
+    expect(missing.pa).toBeNull();
+  });
 });

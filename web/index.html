@@ -1148,7 +1148,7 @@
 
             <section
               class="roster-table-panel squad-grid-panel is-empty-roster"
-              aria-label="First Team"
+              aria-label="Club personalities"
             >
               <div class="squad-view-toolbar">
                 <div class="squad-view-toolbar-start" hidden>
@@ -1174,7 +1174,17 @@
                       aria-selected="true"
                       data-squad-view="firstTeam"
                     >
-                      First Team
+                      Personalities
+                    </button>
+                    <button
+                      type="button"
+                      id="squad-view-progress"
+                      class="squad-view-tab"
+                      role="tab"
+                      aria-selected="false"
+                      data-squad-view="progress"
+                    >
+                      Progress
                     </button>
                     <button
                       type="button"
@@ -1183,6 +1193,7 @@
                       role="tab"
                       aria-selected="false"
                       data-squad-view="reserves"
+                      hidden
                     >
                       Reserves
                     </button>
@@ -1193,6 +1204,7 @@
                       role="tab"
                       aria-selected="false"
                       data-squad-view="under19s"
+                      hidden
                     >
                       Under 19s
                     </button>
@@ -1215,6 +1227,24 @@
                       data-squad-view="mentoring"
                     >
                       Mentoring
+                    </button>
+                  </div>
+                  <div class="ranker-filter-wrap" id="squad-filter-wrap" hidden>
+                    <button
+                      type="button"
+                      id="squad-filter-toggle"
+                      class="ranker-filter-toggle"
+                      aria-expanded="false"
+                      aria-controls="squad-filter-popover"
+                      title="Filters"
+                    >
+                      Filter
+                      <span
+                        id="squad-filter-count"
+                        class="ranker-filter-count"
+                        hidden
+                        aria-live="polite"
+                      ></span>
                     </button>
                   </div>
                 </div>
@@ -1302,15 +1332,62 @@
                 </div>
               </div>
 
+              <div
+                id="squad-filter-popover"
+                class="squad-filter-panel"
+                hidden
+                role="dialog"
+                aria-label="Attribute filters"
+              >
+                <div
+                  id="squad-filter-rows"
+                  class="ranker-filter-rows"
+                ></div>
+                <div class="squad-filter-panel-actions">
+                  <button
+                    type="button"
+                    id="squad-filter-add"
+                    class="ranker-filter-add"
+                    title="Add filter"
+                  >
+                    + Add filter
+                  </button>
+                  <button
+                    type="button"
+                    id="squad-filter-clear"
+                    class="squad-filter-clear"
+                    title="Clear all filters"
+                  >
+                    Clear All
+                  </button>
+                  <button
+                    type="button"
+                    id="squad-filter-loosen"
+                    class="squad-filter-nudge"
+                    title="Decrease all numeric filter values by 1"
+                  >
+                    −1
+                  </button>
+                  <button
+                    type="button"
+                    id="squad-filter-tighten"
+                    class="squad-filter-nudge"
+                    title="Increase all numeric filter values by 1"
+                  >
+                    +1
+                  </button>
+                </div>
+              </div>
+
               <div class="squad-grid-wrap fmt-scroll" id="squad-personalities-pane">
                 <div
                   id="roster-body"
-                  class="squad-personality-grid"
-                  role="list"
-                  aria-label="Squad ranked by HAS"
+                  class="squad-ha-list"
+                  role="region"
+                  aria-label="Squad personality HA"
                 ></div>
                 <p id="roster-empty" class="roster-empty" hidden>
-                  Load a Career Save to rank your First Team by personality HAS.
+                  Load a Career Save to see personality HA numbers.
                 </p>
               </div>
 
@@ -1372,25 +1449,26 @@
                       <div
                         class="squad-evo-attr-mode"
                         role="group"
-                        aria-label="Chart attribute visibility"
+                        aria-label="Progress chips"
                         id="squad-evo-visibility-tools"
                       >
-                        <button
-                          type="button"
-                          id="squad-evo-show-all"
-                          class="squad-evo-attr-mode-btn"
-                          aria-pressed="false"
+                        <select
+                          id="squad-evo-visibility-select"
+                          class="squad-evo-select"
+                          aria-label="Chip visibility"
                         >
-                          Show all
-                        </button>
-                        <button
-                          type="button"
-                          id="squad-evo-hide-all"
-                          class="squad-evo-attr-mode-btn"
-                          aria-pressed="false"
+                          <option value="default">-</option>
+                          <option value="all">Show all</option>
+                          <option value="none">Hide all</option>
+                        </select>
+                        <select
+                          id="squad-evo-window-select"
+                          class="squad-evo-select"
+                          aria-label="Delta window"
                         >
-                          Hide all
-                        </button>
+                          <option value="recent">Recent</option>
+                          <option value="allTime">All time</option>
+                        </select>
                       </div>
                     </div>
                   </div>
@@ -1456,23 +1534,39 @@
                 class="squad-mentoring-pane"
                 hidden
               >
+                <div
+                  id="mentoring-mentees"
+                  class="mentoring-mentees"
+                  aria-label="Young pool"
+                  hidden
+                ></div>
                 <p
                   id="mentoring-status"
-                  class="mentoring-status visually-hidden"
+                  class="mentoring-status"
                   aria-live="polite"
+                  hidden
                 ></p>
 
                 <p id="mentoring-empty" class="mentoring-empty" hidden>
                   No mentoring groups yet
                 </p>
                 <div id="mentoring-cards" class="mentoring-cards"></div>
-                <button
-                  type="button"
-                  id="mentoring-add-btn"
-                  class="mentoring-add-btn"
-                >
-                  Add group
-                </button>
+                <div class="mentoring-board-actions">
+                  <button
+                    type="button"
+                    id="mentoring-suggest-btn"
+                    class="mentoring-add-btn mentoring-board-suggest"
+                  >
+                    Suggest
+                  </button>
+                  <button
+                    type="button"
+                    id="mentoring-add-btn"
+                    class="mentoring-add-btn"
+                  >
+                    Add group
+                  </button>
+                </div>
               </div>
 
               <dialog
@@ -1789,25 +1883,35 @@
         }
         if (!body) return;
 
-        const frag = document.createDocumentFragment();
-        for (let i = 0; i < count; i += 1) {
-          const wrap = document.createElement("div");
-          wrap.className = "squad-card-wrap is-boot-skeleton";
-          wrap.setAttribute("role", "listitem");
-          wrap.setAttribute("aria-hidden", "true");
-          wrap.innerHTML =
-            '<article class="ranker-podium-slot check-combo-card squad-player-card" data-card-size="small">' +
-            '<span class="ranker-place">#00</span>' +
-            '<p class="ranker-combo-name">Personality Name</p>' +
-            '<p class="ranker-combo-media">Media Handling</p>' +
-            '<div class="ranker-podium-meta check-combo-meta">' +
-            '<span class="ranker-ha"><span class="ha-score-icon" aria-hidden="true"></span><span>00.0</span></span>' +
-            "</div></article>" +
-            '<button type="button" class="squad-player-badge has-no-face" disabled tabindex="-1">' +
-            '<span class="squad-player-name">Player Name</span></button>';
-          frag.append(wrap);
+        const table = document.createElement("table");
+        table.className = "ranker-list-table fmt-table";
+        table.setAttribute("aria-hidden", "true");
+        table.innerHTML =
+          "<thead><tr>" +
+          '<th class="ranker-col-name">Name</th>' +
+          '<th class="ranker-col-personality">Personality</th>' +
+          '<th class="ranker-col-label">Media</th>' +
+          '<th class="ranker-col-mid">DET</th><th class="ranker-col-mid">PRO</th>' +
+          '<th class="ranker-col-mid">PRE</th><th class="ranker-col-mid">AMB</th>' +
+          '<th class="ranker-col-mid">TEM</th><th class="ranker-col-mid">LEA</th>' +
+          '<th class="ranker-col-mid">LOY</th><th class="ranker-col-mid">SPO</th>' +
+          '<th class="ranker-col-mid">CON</th><th class="ranker-col-ha">HAS</th>' +
+          "</tr></thead>";
+        const tbody = document.createElement("tbody");
+        const n = Math.min(count, 12);
+        for (let i = 0; i < n; i += 1) {
+          const tr = document.createElement("tr");
+          tr.setAttribute("aria-hidden", "true");
+          tr.innerHTML =
+            '<td class="ranker-col-name"><span class="sk-bone">Player Name</span></td>' +
+            '<td class="ranker-col-personality"><span class="sk-bone">Personality</span></td>' +
+            '<td class="ranker-col-label"><span class="sk-bone">Media</span></td>' +
+            '<td class="ranker-col-mid"><span class="sk-bone">00</span></td>'.repeat(9) +
+            '<td class="ranker-col-ha"><span class="ranker-ha"><span class="ha-score-icon" aria-hidden="true"></span><span class="sk-bone">00.00</span></span></td>';
+          tbody.append(tr);
         }
-        body.replaceChildren(frag);
+        table.append(tbody);
+        body.replaceChildren(table);
         body.setAttribute("aria-busy", "true");
         body.classList.add("is-boot-skeleton");
       })();

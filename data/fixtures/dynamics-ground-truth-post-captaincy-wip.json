@@ -1,0 +1,238 @@
+{
+  "status": "complete-for-lock",
+  "label": "Schalke 04 FT — Dynamics after captaincy change (screenshots 2026-08-13, dynamics-b.fm)",
+  "notes": [
+    "Paired with dynamics-ground-truth-baseline-wip.json / dynamics-a.fm.",
+    "This is a captaincy-only change: Gilson captain, Radović VC.",
+    "Hierarchy and social membership match baseline for all 23 labeled players.",
+    "Tusjak remains Team Leader in Secondary A (not demoted / not FT→II).",
+    "Core crop 2 is Core continuation (same as A)."
+  ],
+  "extractAnchors": {
+    "clubId": 920,
+    "teamId": 193616
+  },
+  "summary": {
+    "captaincy": {
+      "captain": "Domenico Gilson",
+      "viceCaptain": "Marko Radović"
+    },
+    "hierarchyCounts": {
+      "teamLeader": 3,
+      "highlyInfluential": 15,
+      "influential": 1,
+      "other": 4
+    },
+    "socialGroupCounts": {
+      "core": 14,
+      "secondaryA": 8,
+      "other": 1
+    }
+  },
+  "changesFromBaseline": [
+    {
+      "type": "captaincy",
+      "field": "captain",
+      "before": "Josef Tusjak",
+      "after": "Domenico Gilson"
+    },
+    {
+      "type": "captaincy",
+      "field": "viceCaptain",
+      "before": "Paco Suárez",
+      "after": "Marko Radović"
+    },
+    {
+      "type": "note",
+      "note": "No hierarchy or socialGroup changes on the 23 labeled players."
+    }
+  ],
+  "players": [
+    {
+      "name": "Paco Suárez",
+      "hierarchy": "teamLeader",
+      "socialGroup": "core",
+      "personality": "Model Professional",
+      "uid": 2000136577,
+      "jobId": 106935
+    },
+    {
+      "name": "Elias Hoßmang",
+      "hierarchy": "teamLeader",
+      "socialGroup": "core",
+      "personality": "Fairly Professional",
+      "uid": 2002154423,
+      "jobId": 254165
+    },
+    {
+      "name": "Alejandro Núñez",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "core",
+      "personality": "Resolute",
+      "uid": 2002202241,
+      "jobId": 301983
+    },
+    {
+      "name": "Jannis Mandelkow",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "core",
+      "personality": "Resolute",
+      "uid": 2002090082,
+      "jobId": 189824
+    },
+    {
+      "name": "Dennis Seimen",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "core",
+      "personality": "Professional",
+      "uid": 2000175080,
+      "jobId": 113517
+    },
+    {
+      "name": "Pietro Miraglia",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "core",
+      "personality": "Spirited",
+      "uid": 2002201952,
+      "jobId": 301694
+    },
+    {
+      "name": "Santiago Contreras",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "core",
+      "personality": "Model Citizen",
+      "uid": 2002220356,
+      "jobId": 320098
+    },
+    {
+      "name": "Marco Tassinari",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "core",
+      "personality": "Perfectionist",
+      "uid": 2002083070,
+      "jobId": 182812
+    },
+    {
+      "name": "Patrick Bandeira",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "core",
+      "personality": "Spirited",
+      "uid": 2002234366,
+      "jobId": 334108
+    },
+    {
+      "name": "Sam Kizza",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "core",
+      "personality": "Model Citizen",
+      "uid": 2002185604,
+      "jobId": 285346
+    },
+    {
+      "name": "Rodrigo Cadavid",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "core",
+      "personality": "Ambitious",
+      "uid": 2002171319,
+      "jobId": 271061
+    },
+    {
+      "name": "Yoan Robert",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "core",
+      "personality": "Resilient",
+      "uid": 2002089146,
+      "jobId": 188888
+    },
+    {
+      "name": "Robert Müller",
+      "hierarchy": "influential",
+      "socialGroup": "core",
+      "personality": "Professional",
+      "uid": 2002266341,
+      "jobId": 366083
+    },
+    {
+      "name": "Ilan Kramarić",
+      "hierarchy": "other",
+      "socialGroup": "core",
+      "personality": "Professional",
+      "uid": 2002354919,
+      "jobId": 469373
+    },
+    {
+      "name": "Josef Tusjak",
+      "hierarchy": "teamLeader",
+      "socialGroup": "secondaryA",
+      "personality": "Fairly Professional",
+      "uid": 2002200827,
+      "jobId": 300569
+    },
+    {
+      "name": "Dieudonné Koné",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "secondaryA",
+      "personality": "Resolute",
+      "uid": 2002166919,
+      "jobId": 266661
+    },
+    {
+      "name": "Franco Viera",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "secondaryA",
+      "personality": "Resolute",
+      "uid": 2002141787,
+      "jobId": 241529
+    },
+    {
+      "name": "Nathan Jones",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "secondaryA",
+      "personality": "Resolute",
+      "uid": 2002264900,
+      "jobId": 364642
+    },
+    {
+      "name": "Edis Hasanovic",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "secondaryA",
+      "personality": "Resolute",
+      "uid": 2002216605,
+      "jobId": 316347
+    },
+    {
+      "name": "Jordan Dobler",
+      "hierarchy": "other",
+      "socialGroup": "secondaryA",
+      "personality": "Fairly Professional",
+      "uid": 2002282661,
+      "jobId": 382403
+    },
+    {
+      "name": "Florin Gabor",
+      "hierarchy": "other",
+      "socialGroup": "secondaryA",
+      "personality": "Driven",
+      "uid": 2002400283,
+      "jobId": 516409
+    },
+    {
+      "name": "Marko Radović",
+      "hierarchy": "other",
+      "socialGroup": "secondaryA",
+      "captaincy": "viceCaptain",
+      "personality": "Resolute",
+      "uid": 2002417447,
+      "jobId": 534057
+    },
+    {
+      "name": "Domenico Gilson",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "other",
+      "captaincy": "captain",
+      "personality": "Light-Hearted",
+      "uid": 2002200653,
+      "jobId": 300395
+    }
+  ]
+}

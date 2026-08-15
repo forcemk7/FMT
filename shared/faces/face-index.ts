@@ -81,6 +81,26 @@ export function findFacepackConfigs(graphicsRoot: string): string[] {
   return configs;
 }
 
+/** True when the folder has a portrait file (not config-only XML). */
+function dirHasImageFiles(dir: string): boolean {
+  let dh: fs.Dir;
+  try {
+    dh = fs.opendirSync(dir);
+  } catch {
+    return false;
+  }
+  try {
+    for (;;) {
+      const e = dh.readSync();
+      if (!e) return false;
+      if (!e.isFile()) continue;
+      if (/\.(png|jpe?g|webp)$/i.test(e.name)) return true;
+    }
+  } finally {
+    dh.closeSync();
+  }
+}
+
 export function discoverFaceDirs(graphicsRoot: string): string[] {
   const dirs: string[] = [];
   let packs: fs.Dirent[];
@@ -107,7 +127,8 @@ export function discoverFaceDirs(graphicsRoot: string): string[] {
 /**
  * Build a UID→image index.
  * Large face_* megapack XMLs are skipped — those resolve via face_{uid}.png on demand.
- * Smaller configs (newgens etc.) are parsed for from/to mappings (no existsSync per row).
+ * Regen ethnicity configs are parsed for from/to mappings (no existsSync per row).
+ * Config-only duplicate packs (XML, no PNGs) are skipped so they cannot steal UIDs.
  */
 export async function buildFaceIndex(
   graphicsRoot: string = resolveDefaultGraphicsRoot(),
@@ -120,6 +141,7 @@ export async function buildFaceIndex(
   for (const configPath of configs) {
     const dir = path.dirname(configPath);
     if (faceDirSet.has(path.normalize(dir))) continue;
+    if (!dirHasImageFiles(dir)) continue;
 
     const stream = fs.createReadStream(configPath, { encoding: "utf8" });
     const rl = readline.createInterface({ input: stream, crlfDelay: Infinity });

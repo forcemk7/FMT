@@ -1,19 +1,16 @@
 # FMT — Football Manager 26 companion
 
-Out-of-game tool for **personality intelligence** from Career Saves: who has the best hidden attributes, how to mentor safely, and whether mentoring actually moved the needle.
+Read-only **personality HA** from a Career Save. You make mentoring groups in FM; this is the borrowed look-up so you do not seat a worse senior. Not an editor. Not Genie Scout. Not a mentoring oracle.
 
 ## Product wedge
 
 ```
-Best Personalities (web funnel)     Squad Analyzer (the product)
-├── Rank personality × media        ├── Personalities — batch HAS from save
-├── Hidden Attributes Calculator    ├── Mentoring — influence-safe groups
-└── Compare                         └── Attributes — HA/CA feedback after mentoring
+Squad (HA, at-club)   Loans (honesty / youth out)   Mentoring   Progress (CA + HA)
 ```
 
-**Livelihood loop:** load a save → rank squad personalities → build mentoring groups that won't ruin Determination → watch HA/personality shifts.
+**Loop:** Squad → Loans → Progress → store unit → create the group in FM.
 
-**Not in scope (quarantined):** penalty taker ranks, favoured-club scouting zoo, match-HA completeness for its own sake.
+**Not in scope:** Suggest, editor, full-save GS extract, exe, Stripe, FM27.
 
 ## Status
 
@@ -21,28 +18,18 @@ Living backlog, roadmap, and agent handoff: **[`scrum/`](./scrum/)** (start at `
 
 | Area | State |
 |------|--------|
-| HAS ranker / checker / compare | Shipped (static Pages OK) |
-| Career Save → First Team / II / U19 + HAS | Working in `npm run dev` (FT = managed club) |
-| Loans tab (club-wide loaned-out) | Shipped — unit grids are at-club only |
-| Mentoring suggestions (influence-safe) | Working; loaned-out excluded; Dynamics labels still **manual** |
-| Dynamics extract (hierarchy / social / captaincy) | **Active priority** — ground truth fixtures + A/B saves in progress |
-| Attributes evolution (CA + personality HA history) | Working; closes mentoring feedback loop |
-
-## Dynamics lock path
-
-1. Ground truth: `data/fixtures/dynamics-ground-truth-*-wip.json`
-2. Binary hunt near FT `listAbs` / team body → `dynamics-layout-locked.json`
-3. Wire `dynamics{}` in `scripts/extract-first-team-fast.py`
-4. Feed Mentoring seating (replace attr-only influence proxy)
-
-Best RE signal: paired saves where **one** player changes hierarchy tier (`dynamics-a.fm` / `dynamics-b.fm` today are a squad move — prefer a pure demotion pair when available).
+| HAS ranker / checker / compare | Not the ship — strip from chrome (T075) |
+| Squad HA table (was Personalities) | **Ship** — T073 rename |
+| Loans tab | **Ship** — honesty + youth out (T074 cancelled) |
+| Mentoring | **Ship** — no Suggest (T071) |
+| Progress (CA + HA points) | **Ship** — who to mentor / influence |
 
 ## Layout
 
 ```
 data/raw/          spreadsheet CSV source for catalog
 data/fixtures/     binary layout locks + Dynamics ground truth
-data/saves/        local Career Saves for extract / RE
+data/saves/        Career .fm copies FMT extracts (copied from SI games/; never extract the live file)
 src/domain/        attributes, ranges, HAS scoring
 src/data/          personality / media / case tables
 src/inference/     estimate, rank, mentoring, match-combo

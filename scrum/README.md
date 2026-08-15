@@ -1,6 +1,6 @@
 # FMT Scrum — Agent Handoff
 
-**Start here.** Single source of truth for scope, roadmap, status, and backlog.
+**Start here.** Scope = law. Roadmap = funded features. Status = ticket board.
 
 ## Roles
 
@@ -13,7 +13,7 @@
 ## Operating law (non-negotiable)
 
 1. **Behavior > words.** Do not treat "I want X" as a ticket. Ask: what does the user already do in the livelihood loop? What breaks that loop today?
-2. **Need-to-have only.** If it does not unblock *load save → rank personalities → safe mentoring → see HA/personality move*, discard or defer without apology.
+2. **Need-to-have only.** If it does not unblock *Squad HA → Loans honesty → Progress CA/HA → Mentoring reminder → group in FM*, discard or defer without apology.
 3. **Poverty constraint.** Assume zero spare time and zero budget for nice-to-haves. Every ticket must buy progress toward a usable livelihood loop.
 4. **Strictness score.** While usage stays steady, stricter rejection of creep = better. Bloated apps with no real use case are failure.
 
@@ -28,10 +28,11 @@
 ## For worker agents (copy-paste)
 
 ```
-Read scrum/README.md and follow scrum/AGENTS.md.
-Claim the highest-priority ready ticket (or the one I name).
-Stay inside SCOPE.md. Need-to-have only.
-When finished: BEFORE your final reply, mark the ticket done (status/archive/STATUS.md) per AGENTS.md Complete — do not wait for me to ask.
+Read scrum/README.md, scrum/AGENTS.md, scrum/STATUS.md.
+If STATUS says freeze, or the Board has no ready ticket: stop. Do not invent work. Do not edit SCOPE.
+Otherwise claim only the ticket I name (or the single ready ticket).
+Stay inside that ticket’s acceptance. No second ticket.
+When finished: BEFORE your final reply, Complete (archive + STATUS) then git commit on FMT/ per AGENTS.md Git — one commit, message T0XX: why. Do not push unless the ticket says to.
 ```
 
 ## End-of-run rule

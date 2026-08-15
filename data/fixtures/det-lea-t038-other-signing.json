@@ -1,0 +1,65 @@
+{
+  "layout": "t038-other-signing-det-lea-v1",
+  "description": "T038: on newest save, the other hist=0-class Det/Lea is II Lars Gabrielsen via the same T014 first-wiped Progress Report tip. Remaining hist=0 stay —.",
+  "saveUsed": "data/saves/dynamics-b.fm",
+  "saveNote": "Newest .fm by mtime/size (same file as T014). Extract gameDate field 2039-07-25 (not used for Det/Lea class).",
+  "answer": {
+    "otherSigning": "Lars Gabrielsen",
+    "uid": 2002323685,
+    "unit": "II",
+    "kind": "NEWGEN",
+    "determination": 16,
+    "leadership": 9,
+    "source": "t014_first_wiped_tip",
+    "not": "live/non-wiped CA card"
+  },
+  "t014Class": {
+    "rule": "snapshotU16>0, gap in ATTR_CARD_GAP_MIN..MAX, technical stripped, mental Det/Lea kept",
+    "gilson": {
+      "uid": 2002200653,
+      "unit": "FT",
+      "gap": 2060,
+      "snapshotU16": 41360,
+      "b23": 40,
+      "determination": 14,
+      "leadership": 16
+    },
+    "gabrielsen": {
+      "uid": 2002323685,
+      "unit": "II",
+      "gap": 1369,
+      "snapshotU16": 36520,
+      "b23": 41,
+      "determination": 16,
+      "leadership": 9,
+      "historyPoints": 1,
+      "technicalPresent": false
+    }
+  },
+  "cohort": {
+    "t014_first_wiped_tip": 2,
+    "live_or_history_card": 81,
+    "hist0_missing": 2
+  },
+  "hist0Remaining": [
+    {
+      "unit": "FT",
+      "name": null,
+      "uid": 2002115380,
+      "kind": "NEWGEN",
+      "note": "extract name fallback uid:2002115380; Det/Lea —"
+    },
+    {
+      "unit": "II",
+      "name": "Christian Yao",
+      "uid": 2002424608,
+      "kind": "NEWGEN",
+      "note": "Det/Lea —"
+    }
+  ],
+  "productRule": {
+    "when": "another recent signing gets first Progress Report tip of T014 class",
+    "must": "same accept path already ships Det/Lea (no extract wire)",
+    "mustNot": "invent Det/Lea for remaining hist=0"
+  }
+}

@@ -17,8 +17,9 @@ MOTIF_LIST = b"\xff\xff\xff\xff\x00\xff\xff\xff\xff"
 # Youth name table on the probe lives ~55–70MB; keep a generous mid-file window.
 NAME_BAND_LO = 40_000_000
 NAME_BAND_HI = 120_000_000
-# Live list precedes the name (Δ ≈ −120…−200). After-name lists are decoys.
-LIST_WINDOW_BEFORE = 220
+# Live list precedes the name (Δ ≈ −120…−250). After-name lists are decoys.
+# König 2040 short-row list drifted to Δ≈−229; 220 missed it and took the after-name decoy.
+LIST_WINDOW_BEFORE = 400
 LIST_WINDOW_AFTER = 150
 FUZZY_MIN_SCORE = 70
 

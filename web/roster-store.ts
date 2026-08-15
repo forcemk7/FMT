@@ -74,6 +74,8 @@ export type StoredRoster = {
   diskPath?: string | null;
   /** File mtimeMs at last extract — used to detect FM saves on disk. */
   diskMtimeMs?: number | null;
+  /** Dest size at last extract — same snapshot as diskMtimeMs. */
+  diskSize?: number | null;
 };
 
 export type RosterStore = {
@@ -161,10 +163,10 @@ function migrateStore(parsed: RosterStore): RosterStore {
   };
 }
 
-function compactRosterForStorage(entry: StoredRoster): StoredRoster {
+/** II/U19 only — FT CA strip (Det/Lea Progress) must survive quota compact. */
+function compactSubunitsForStorage(entry: StoredRoster): StoredRoster {
   return {
     ...entry,
-    players: entry.players.map(tipOnlyAttributeHistory),
     ...(entry.reserves
       ? {
           reserves: {
@@ -184,12 +186,47 @@ function compactRosterForStorage(entry: StoredRoster): StoredRoster {
   };
 }
 
-function compactStoreForStorage(store: RosterStore): RosterStore {
-  const saves: Record<string, StoredRoster> = {};
+const FT_HISTORY_TRIMS = [24, 8] as const;
+
+function trimFtAttributeHistory(
+  entry: StoredRoster,
+  keep: number,
+): StoredRoster {
+  return {
+    ...entry,
+    players: entry.players.map((p) => {
+      const hist = p.attributeHistory;
+      if (!Array.isArray(hist) || hist.length <= keep) return p;
+      const sliced = hist.slice(-keep).map((pt, i) => ({ ...pt, index: i }));
+      return { ...p, attributeHistory: sliced };
+    }),
+  };
+}
+
+function dropInactiveSaves(store: RosterStore): RosterStore {
+  const active = store.activeSaveName;
+  if (!active || !store.saves[active]) return store;
+  if (Object.keys(store.saves).length <= 1) return store;
+  return { activeSaveName: active, saves: { [active]: store.saves[active]! } };
+}
+
+function* quotaCompactCandidates(store: RosterStore): Generator<RosterStore> {
+  const subunits: Record<string, StoredRoster> = {};
   for (const [name, entry] of Object.entries(store.saves)) {
-    saves[name] = compactRosterForStorage(entry);
+    subunits[name] = compactSubunitsForStorage(entry);
   }
-  return { ...store, saves };
+  yield { ...store, saves: subunits };
+
+  const dropped = dropInactiveSaves({ ...store, saves: subunits });
+  if (dropped !== store) yield dropped;
+
+  for (const keep of FT_HISTORY_TRIMS) {
+    const trimmed: Record<string, StoredRoster> = {};
+    for (const [name, entry] of Object.entries(dropped.saves)) {
+      trimmed[name] = trimFtAttributeHistory(entry, keep);
+    }
+    yield { ...dropped, saves: trimmed };
+  }
 }
 
 export function loadRosterStore(): RosterStore {
@@ -225,8 +262,19 @@ export function saveRosterStore(store: RosterStore): void {
     localStorage.setItem(STORAGE_KEY, payload);
   } catch (err) {
     if (!isQuotaExceededError(err)) throw err;
-    const compacted = compactStoreForStorage(store);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(compacted));
+    let lastErr: unknown = err;
+    for (const candidate of quotaCompactCandidates(store)) {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(candidate));
+        return;
+      } catch (inner) {
+        lastErr = inner;
+        if (!isQuotaExceededError(inner)) throw inner;
+      }
+    }
+    throw lastErr instanceof Error
+      ? lastErr
+      : new Error("saveRosterStore quota exceeded");
   }
 }
 
@@ -308,6 +356,32 @@ export function listRosterSaveNames(store: RosterStore): string[] {
   );
 }
 
+/** Dest mtime jitter that must not retrigger a 690MB extract. */
+export const PERSIST_MTIME_JITTER_MS = 2000;
+
+/**
+ * True when dest is the snapshot we already extracted.
+ * Recopy/touch with the same size+mtime must not chain another extract.
+ */
+export function destMatchesLastPersist(
+  dest: { mtimeMs: number; size: number },
+  entry: Pick<StoredRoster, "diskMtimeMs" | "diskSize" | "extractedAt">,
+): boolean {
+  if (entry.diskMtimeMs == null || !Number.isFinite(entry.diskMtimeMs)) {
+    return false;
+  }
+  if (Math.abs(dest.mtimeMs - entry.diskMtimeMs) > PERSIST_MTIME_JITTER_MS) {
+    return false;
+  }
+  if (entry.diskSize != null && dest.size !== entry.diskSize) {
+    return false;
+  }
+  const extractedMs = Date.parse(entry.extractedAt);
+  if (!Number.isFinite(extractedMs)) return false;
+  // Bind-only stamps have dest.mtime ≈ now and extractedAt in the past — not a match.
+  return dest.mtimeMs <= extractedMs + PERSIST_MTIME_JITTER_MS;
+}
+
 /**
  * Whether the on-disk Career Save is newer than the last committed extract.
  *
@@ -316,15 +390,22 @@ export function listRosterSaveNames(store: RosterStore): string[] {
  * FM writes that happened after the extract in the store.
  */
 export function shouldRefreshRosterFromDisk(
-  entry: Pick<StoredRoster, "diskMtimeMs" | "extractedAt">,
+  entry: Pick<StoredRoster, "diskMtimeMs" | "diskSize" | "extractedAt">,
   diskMtimeMs: number,
+  diskSize?: number,
 ): boolean {
+  if (
+    diskSize != null &&
+    destMatchesLastPersist({ mtimeMs: diskMtimeMs, size: diskSize }, entry)
+  ) {
+    return false;
+  }
   const extractedMs = Date.parse(entry.extractedAt);
   if (Number.isFinite(extractedMs) && diskMtimeMs > extractedMs + 1000) {
     return true;
   }
   if (entry.diskMtimeMs != null && Number.isFinite(entry.diskMtimeMs)) {
-    return diskMtimeMs > entry.diskMtimeMs + 1;
+    return diskMtimeMs > entry.diskMtimeMs + PERSIST_MTIME_JITTER_MS;
   }
   // No usable baseline — extract once to establish diskMtime/extractedAt.
   return !Number.isFinite(extractedMs);

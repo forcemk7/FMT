@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  destMatchesLastPersist,
   loadRosterStore,
   saveRosterStore,
   shouldRefreshRosterFromDisk,
@@ -140,5 +141,122 @@ describe("shouldRefreshRosterFromDisk (T010)", () => {
         nextMtime,
       ),
     ).toBe(true);
+  });
+
+  it("skips when dest already matches the last persist (T067)", () => {
+    const extractedAt = "2026-08-15T00:10:00.000Z";
+    const destMtime = Date.parse("2026-08-15T00:05:00.000Z");
+    const destSize = 688_314_098;
+    expect(
+      destMatchesLastPersist(
+        { mtimeMs: destMtime, size: destSize },
+        { extractedAt, diskMtimeMs: destMtime, diskSize: destSize },
+      ),
+    ).toBe(true);
+    expect(
+      shouldRefreshRosterFromDisk(
+        { extractedAt, diskMtimeMs: destMtime, diskSize: destSize },
+        destMtime,
+        destSize,
+      ),
+    ).toBe(false);
+    // Filesystem mtime jitter on the same snapshot must not re-extract.
+    expect(
+      shouldRefreshRosterFromDisk(
+        { extractedAt, diskMtimeMs: destMtime, diskSize: destSize },
+        destMtime + 5,
+        destSize,
+      ),
+    ).toBe(false);
+  });
+
+  it("refreshes when dest mtime advances after persist (new copy)", () => {
+    const extractedAt = "2026-08-15T00:10:00.000Z";
+    const destMtime = Date.parse("2026-08-15T00:05:00.000Z");
+    const destSize = 688_314_098;
+    expect(
+      shouldRefreshRosterFromDisk(
+        { extractedAt, diskMtimeMs: destMtime, diskSize: destSize },
+        destMtime + 60_000,
+        destSize,
+      ),
+    ).toBe(true);
+  });
+});
+
+describe("saveRosterStore quota (T068)", () => {
+  function ftPlayerWithStrip(points: number): RosterPlayer {
+    return {
+      ...player(1, "Jan Lundqvist"),
+      attributeHistory: Array.from({ length: points }, (_, i) => ({
+        index: i,
+        mental: { determination: 6 + i },
+      })),
+    } as RosterPlayer;
+  }
+
+  function iiPlayerWithStrip(): RosterPlayer {
+    return {
+      ...player(2, "II Kid"),
+      attributeHistory: Array.from({ length: 8 }, (_, i) => ({
+        index: i,
+        mental: { determination: 10 },
+      })),
+    } as RosterPlayer;
+  }
+
+  it("quota compact keeps FT CA strip; II/U19 go tip-only", () => {
+    let writes = 0;
+    Object.defineProperty(globalThis, "localStorage", {
+      configurable: true,
+      value: {
+        getItem: (key: string) => memory.get(key) ?? null,
+        setItem: (key: string, value: string) => {
+          writes += 1;
+          if (writes === 1) {
+            const err = new Error("quota") as Error & { name: string };
+            err.name = "QuotaExceededError";
+            throw err;
+          }
+          memory.set(key, String(value));
+        },
+        removeItem: (key: string) => {
+          memory.delete(key);
+        },
+        clear: () => memory.clear(),
+      },
+    });
+
+    const entry: StoredRoster = {
+      saveName: "Schalke.fm",
+      clubId: 920,
+      extractedAt: "2026-08-15T00:00:00.000Z",
+      gameDate: "2040-01-13",
+      players: [ftPlayerWithStrip(12)],
+      reserves: {
+        iiName: "II",
+        players: [iiPlayerWithStrip()],
+      },
+      u19: {
+        u19Name: "Schalke 04 U19",
+        players: [iiPlayerWithStrip()],
+      },
+      diskPath: null,
+      diskMtimeMs: null,
+    };
+    saveRosterStore({
+      activeSaveName: "Schalke.fm",
+      saves: { "Schalke.fm": entry },
+    });
+    const reloaded = loadRosterStore();
+    const ft = reloaded.saves["Schalke.fm"]!.players[0]!;
+    expect(ft.attributeHistory?.length).toBe(12);
+    expect(ft.attributeHistory?.at(-1)?.mental?.determination).toBe(17);
+    expect(
+      reloaded.saves["Schalke.fm"]!.reserves?.players[0]?.attributeHistory?.length,
+    ).toBe(1);
+    expect(reloaded.saves["Schalke.fm"]!.u19?.players[0]?.attributeHistory?.length).toBe(
+      1,
+    );
   });
 });

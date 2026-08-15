@@ -114,6 +114,10 @@ export type MentoringSubject = {
 export type MentoringCandidate = MentoringSubject & {
   id: string;
   name: string;
+  /** Current Ability 1–200 when extract resolved it. Do not invent. */
+  ca?: number;
+  /** Potential Ability 1–200 when extract resolved it. Do not invent. */
+  pa?: number;
 };
 
 /** Save-roster / board match row used by mentee scoring and package boards. */
@@ -229,7 +233,7 @@ const MENTOR_MIN_AGE = 21;
  */
 const MENTEE_HA_FLOOR = 9;
 /** Above this, prefer tiny tweaks only (already near elite). */
-const MENTEE_HA_ELITE = 13;
+export const MENTEE_HA_ELITE = 13;
 /**
  * From-this-save matches shown on the scout-style board.
  * In-game mentoring groups are three players (2+1 or 1+2).
@@ -2336,7 +2340,11 @@ export function mentoringHierarchyBias(
 
 export function mentoringInfluenceScore(
   player: MentoringSubject,
-  options?: { hierarchy?: MentoringHierarchyLabel | null },
+  options?: {
+    hierarchy?: MentoringHierarchyLabel | null | undefined;
+    /** Seat ranking only — HA must not invert young over senior without manual hierarchy. */
+    excludeHa?: boolean;
+  },
 ): number {
   const lead = player.leadership;
   const det = traitValue(player, "determination") ?? player.determination;
@@ -2346,9 +2354,365 @@ export function mentoringInfluenceScore(
   if (lead !== undefined && Number.isFinite(lead)) score += lead * 4;
   if (det !== undefined && Number.isFinite(det)) score += det * 3;
   if (age !== undefined && Number.isFinite(age)) score += Math.min(40, age);
-  if (ha !== undefined && Number.isFinite(ha)) score += ha * 2;
+  if (!options?.excludeHa && ha !== undefined && Number.isFinite(ha)) {
+    score += ha * 2;
+  }
   score += mentoringHierarchyBias(options?.hierarchy);
   return score;
+}
+
+/** Stable sorted key for a 3-player mentoring unit (persist / reject memory). */
+export function mentoringGroupMemberKey(
+  memberIds: readonly string[],
+): string {
+  return [...memberIds].map(String).sort().join("|");
+}
+
+export function mentoringInfluenceEdgeKey(
+  fromId: string,
+  toId: string,
+): string {
+  return `${fromId}>${toId}`;
+}
+
+/** FM influence bands that may paint HA matrix marks. `none` never paints. */
+export type MentoringDisplayBand = Exclude<MentoringInfluenceLevel, "none">;
+
+export type MentoringMoveTone = "good" | "bad";
+
+export type MentoringMatrixPlusItem = {
+  delta: number;
+  label: string;
+  band: MentoringDisplayBand;
+  tone: MentoringMoveTone;
+};
+
+export type MentoringMatrixArrowItem = {
+  dir: "up" | "down";
+  band: MentoringDisplayBand;
+  tone: MentoringMoveTone;
+};
+
+export type MentoringMatrixCellMarks =
+  | { kind: "plus"; items: MentoringMatrixPlusItem[] }
+  | { kind: "arrow"; items: MentoringMatrixArrowItem[] };
+
+const MENTORING_MATRIX_GAP = 0.05;
+
+/** Numeric influencer − mentee. CON is not inverted. Equal if abs < gap. */
+export function mentoringNumericTraitDelta(
+  influencerValue: number,
+  menteeValue: number,
+): number {
+  return influencerValue - menteeValue;
+}
+
+/** Mentee number will move: lower than influencer → up; higher → down. */
+function mentoringNumericMoveDir(
+  menteeValue: number,
+  influencerValue: number,
+): "up" | "down" | null {
+  const delta = mentoringNumericTraitDelta(influencerValue, menteeValue);
+  if (Math.abs(delta) < MENTORING_MATRIX_GAP) return null;
+  return delta > 0 ? "up" : "down";
+}
+
+/** Arrow color: green towards a better value. CON inverts (down is good). */
+export function mentoringAttrMoveTone(
+  trait: string,
+  dir: "up" | "down",
+): MentoringMoveTone {
+  const improving = trait === "controversy" ? dir === "down" : dir === "up";
+  return improving ? "good" : "bad";
+}
+
+/** Delta color: + green, − red. CON inverts (lower is better, so − is green). */
+export function mentoringDeltaSignTone(
+  trait: string,
+  delta: number,
+): MentoringMoveTone {
+  const improving = trait === "controversy" ? delta < 0 : delta > 0;
+  return improving ? "good" : "bad";
+}
+
+function readMentoringInfluenceEdge(
+  fromId: string,
+  toId: string,
+  edges?: Readonly<Record<string, MentoringInfluenceLevel>> | null,
+): MentoringInfluenceLevel | undefined {
+  if (!edges) return undefined;
+  return edges[mentoringInfluenceEdgeKey(String(fromId), String(toId))];
+}
+
+/**
+ * Matrix display only: labeled non-none edges. Unlabeled and `none` → no marks.
+ * Does not fall back to the attr-score proxy.
+ */
+export function mentoringLabeledDisplayInfluence(
+  fromId: string | number,
+  toId: string | number,
+  edges?: Readonly<Record<string, MentoringInfluenceLevel>> | null,
+): MentoringDisplayBand | null {
+  const level = readMentoringInfluenceEdge(String(fromId), String(toId), edges);
+  if (level === "light" || level === "average" || level === "significant") {
+    return level;
+  }
+  return null;
+}
+
+/** Signed mentor-better gap. Controversy inverted. Not weighted by influence band. */
+export function mentoringUnweightedTraitDelta(
+  trait: string,
+  mentorValue: number,
+  menteeValue: number,
+): number {
+  return trait === "controversy"
+    ? menteeValue - mentorValue
+    : mentorValue - menteeValue;
+}
+
+export type MentoringMatrixPlayerValue = {
+  id: string;
+  name: string;
+  value: number | undefined;
+};
+
+/**
+ * HA matrix marks from labeled edges only. Receivers: stacked arrows in
+ * numeric attr direction vs each influencer. Influencers: numeric ±
+ * (influencer − mentee) vs each receiver they influence.
+ */
+export function planMentoringMatrixCellMarks(input: {
+  role: MentoringInfluenceSeat;
+  playerId: string;
+  trait: string;
+  value: number | undefined;
+  influencers: readonly MentoringMatrixPlayerValue[];
+  receivers: readonly MentoringMatrixPlayerValue[];
+  edges?: Readonly<Record<string, MentoringInfluenceLevel>> | null;
+}): MentoringMatrixCellMarks | undefined {
+  const { role, playerId, trait, value, influencers, receivers, edges } = input;
+  if (value === undefined || !Number.isFinite(value)) return undefined;
+
+  if (role !== "low") {
+    const items: MentoringMatrixPlusItem[] = [];
+    for (const receiver of receivers) {
+      const band = mentoringLabeledDisplayInfluence(playerId, receiver.id, edges);
+      if (!band) continue;
+      if (receiver.value === undefined || !Number.isFinite(receiver.value)) {
+        continue;
+      }
+      const delta = mentoringNumericTraitDelta(value, receiver.value);
+      if (Math.abs(delta) < MENTORING_MATRIX_GAP) continue;
+      items.push({
+        delta,
+        label: receiver.name,
+        band,
+        tone: mentoringDeltaSignTone(trait, delta),
+      });
+    }
+    return items.length > 0 ? { kind: "plus", items } : undefined;
+  }
+
+  const items: MentoringMatrixArrowItem[] = [];
+  for (const influencer of influencers) {
+    const band = mentoringLabeledDisplayInfluence(
+      influencer.id,
+      playerId,
+      edges,
+    );
+    if (!band) continue;
+    if (influencer.value === undefined || !Number.isFinite(influencer.value)) {
+      continue;
+    }
+    const dir = mentoringNumericMoveDir(value, influencer.value);
+    if (!dir) continue;
+    items.push({ dir, band, tone: mentoringAttrMoveTone(trait, dir) });
+  }
+  return items.length > 0 ? { kind: "arrow", items } : undefined;
+}
+
+export function mentoringChevronCount(
+  band: MentoringDisplayBand | null | undefined,
+): 0 | 1 | 2 | 3 {
+  if (band === "light") return 1;
+  if (band === "average") return 2;
+  if (band === "significant") return 3;
+  return 0;
+}
+
+export type MentoringSeatPeerMark = {
+  peerId: string;
+  /** This seat → peer. `null` = none or unlabeled. */
+  outgoing: MentoringDisplayBand | null;
+};
+
+/** Other two members: outgoing = this exerts (▲ only). Incoming is on their row. */
+export function planMentoringSeatPeerMarks(input: {
+  playerId: string;
+  peers: readonly { id: string; role: MentoringInfluenceSeat }[];
+  edges?: Readonly<Record<string, MentoringInfluenceLevel>> | null;
+}): MentoringSeatPeerMark[] {
+  const others = (["high", "mid", "low"] as const)
+    .map((role) => input.peers.find((peer) => peer.role === role))
+    .filter((peer): peer is { id: string; role: MentoringInfluenceSeat } =>
+      Boolean(peer && peer.id !== input.playerId),
+    )
+    .slice(0, 2);
+
+  return others.map((peer) => ({
+    peerId: peer.id,
+    outgoing: mentoringLabeledDisplayInfluence(
+      input.playerId,
+      peer.id,
+      input.edges,
+    ),
+  }));
+}
+
+export type MentoringPairSideMarks = {
+  receive?: {
+    dir: "up" | "down";
+    band: MentoringDisplayBand;
+    count: 1 | 2 | 3;
+    tone: MentoringMoveTone;
+  };
+  exert?: { delta: number; band: MentoringDisplayBand; tone: MentoringMoveTone };
+};
+
+/**
+ * Pair hover only (this seat + one peer). Receiver → stacked arrows in
+ * numeric attr direction. Exerter → numeric ±. Mutual → both.
+ * Equal / unlabeled → no marks. Third member never included.
+ */
+export function planMentoringPairTraitMarks(input: {
+  subjectId: string;
+  peerId: string;
+  trait: string;
+  subjectValue: number | undefined;
+  peerValue: number | undefined;
+  edges?: Readonly<Record<string, MentoringInfluenceLevel>> | null;
+}): { subject: MentoringPairSideMarks; peer: MentoringPairSideMarks } {
+  const subject: MentoringPairSideMarks = {};
+  const peer: MentoringPairSideMarks = {};
+  const outgoing = mentoringLabeledDisplayInfluence(
+    input.subjectId,
+    input.peerId,
+    input.edges,
+  );
+  const incoming = mentoringLabeledDisplayInfluence(
+    input.peerId,
+    input.subjectId,
+    input.edges,
+  );
+  const subjectOk =
+    input.subjectValue !== undefined && Number.isFinite(input.subjectValue);
+  const peerOk =
+    input.peerValue !== undefined && Number.isFinite(input.peerValue);
+  const bothOk = subjectOk && peerOk;
+
+  if (outgoing && bothOk) {
+    const dir = mentoringNumericMoveDir(
+      input.peerValue as number,
+      input.subjectValue as number,
+    );
+    if (dir) {
+      const delta = mentoringNumericTraitDelta(
+        input.subjectValue as number,
+        input.peerValue as number,
+      );
+      peer.receive = {
+        dir,
+        band: outgoing,
+        count: mentoringChevronCount(outgoing) as 1 | 2 | 3,
+        tone: mentoringAttrMoveTone(input.trait, dir),
+      };
+      subject.exert = {
+        delta,
+        band: outgoing,
+        tone: mentoringDeltaSignTone(input.trait, delta),
+      };
+    }
+  }
+  if (incoming && bothOk) {
+    const dir = mentoringNumericMoveDir(
+      input.subjectValue as number,
+      input.peerValue as number,
+    );
+    if (dir) {
+      const delta = mentoringNumericTraitDelta(
+        input.peerValue as number,
+        input.subjectValue as number,
+      );
+      subject.receive = {
+        dir,
+        band: incoming,
+        count: mentoringChevronCount(incoming) as 1 | 2 | 3,
+        tone: mentoringAttrMoveTone(input.trait, dir),
+      };
+      peer.exert = {
+        delta,
+        band: incoming,
+        tone: mentoringDeltaSignTone(input.trait, delta),
+      };
+    }
+  }
+  return { subject, peer };
+}
+
+function hierarchyAllowsYoungAbove(
+  hierarchy: MentoringHierarchyLabel | null | undefined,
+): boolean {
+  return hierarchy === "teamLeader" || hierarchy === "highlyInfluential";
+}
+
+function influenceLevelRank(level: MentoringInfluenceLevel): number {
+  switch (level) {
+    case "significant":
+      return 3;
+    case "average":
+      return 2;
+    case "light":
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+/** High-influence first; HA cannot seat a youngling above a senior without manual hierarchy. */
+function compareMentoringInfluenceSeating(
+  a: MentoringCandidate,
+  b: MentoringCandidate,
+  hierarchyById?: ReadonlyMap<
+    string,
+    MentoringHierarchyLabel | null | undefined
+  >,
+): number {
+  const hierarchyOf = (player: MentoringCandidate) =>
+    hierarchyById?.get(String(player.id));
+  const scoreOf = (player: MentoringCandidate, excludeHa = false) =>
+    mentoringInfluenceScore(player, {
+      hierarchy: hierarchyOf(player) ?? null,
+      excludeHa,
+    });
+
+  let scoreA = scoreOf(a);
+  let scoreB = scoreOf(b);
+  const youngA = isMentoringInfluenceSubject(a);
+  const youngB = isMentoringInfluenceSubject(b);
+
+  if (youngA && !youngB && !hierarchyAllowsYoungAbove(hierarchyOf(a))) {
+    const noHa = scoreOf(a, true);
+    if (scoreA > scoreB && noHa <= scoreB) scoreA = noHa;
+  }
+  if (youngB && !youngA && !hierarchyAllowsYoungAbove(hierarchyOf(b))) {
+    const noHa = scoreOf(b, true);
+    if (scoreB > scoreA && noHa <= scoreA) scoreB = noHa;
+  }
+
+  const diff = scoreB - scoreA;
+  if (Math.abs(diff) > 1e-9) return diff;
+  return a.name.localeCompare(b.name);
 }
 
 /** Rank players highest-influence first. */
@@ -2358,18 +2722,366 @@ export function rankMentoringInfluence<T extends MentoringCandidate>(
     hierarchyById?: ReadonlyMap<string, MentoringHierarchyLabel | null | undefined>;
   },
 ): T[] {
-  return [...players].sort((a, b) => {
-    const hierarchyOf = options?.hierarchyById;
-    const diff =
-      mentoringInfluenceScore(b, {
-        hierarchy: hierarchyOf?.get(String(b.id)),
-      }) -
-      mentoringInfluenceScore(a, {
-        hierarchy: hierarchyOf?.get(String(a.id)),
-      });
-    if (Math.abs(diff) > 1e-9) return diff;
-    return a.name.localeCompare(b.name);
+  return [...players].sort((a, b) =>
+    compareMentoringInfluenceSeating(a, b, options?.hierarchyById),
+  );
+}
+
+/**
+ * Resolve FM-style influence on a directed pair: manual label wins, else attr score.
+ */
+export function resolveMentoringInfluenceLevel(
+  from: MentoringCandidate,
+  to: MentoringCandidate,
+  manualEdges?: ReadonlyMap<string, MentoringInfluenceLevel>,
+): MentoringInfluenceLevel {
+  const key = mentoringInfluenceEdgeKey(String(from.id), String(to.id));
+  if (manualEdges?.has(key)) return manualEdges.get(key)!;
+  const safe = scoreSafeInfluence(from, to);
+  if (!safe) return "none";
+  return mentoringInfluenceLevel(safeEdgeToPair(safe));
+}
+
+/** Young with better HA seated above a worse-HA senior without manual hierarchy override. */
+export function violatesHaInfluenceSeating(
+  members: readonly MentoringUnitMember[],
+  hierarchyById?: ReadonlyMap<
+    string,
+    MentoringHierarchyLabel | null | undefined
+  >,
+): boolean {
+  const seatRank: Record<MentoringInfluenceSeat, number> = {
+    high: 0,
+    mid: 1,
+    low: 2,
+  };
+  const ordered = [...members].sort(
+    (a, b) => seatRank[a.role] - seatRank[b.role],
+  );
+
+  for (let i = 0; i < ordered.length; i++) {
+    for (let j = i + 1; j < ordered.length; j++) {
+      const upper = ordered[i]!.player;
+      const lower = ordered[j]!.player;
+      if (!isMentoringInfluenceSubject(upper)) continue;
+      if (isMentoringInfluenceSubject(lower)) continue;
+      if (hierarchyAllowsYoungAbove(hierarchyById?.get(String(upper.id)))) {
+        continue;
+      }
+      const upperHa = estimateSubjectHa(upper) ?? upper.haScore;
+      const lowerHa = estimateSubjectHa(lower) ?? lower.haScore;
+      if (
+        upperHa !== undefined &&
+        lowerHa !== undefined &&
+        upperHa > lowerHa + 0.5
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function lowWouldHarmSenior(
+  low: MentoringCandidate,
+  senior: MentoringCandidate,
+  hierarchyById?: ReadonlyMap<
+    string,
+    MentoringHierarchyLabel | null | undefined
+  >,
+): boolean {
+  const lowScore = mentoringInfluenceScore(low, {
+    hierarchy: hierarchyById?.get(String(low.id)) ?? null,
   });
+  const seniorScore = mentoringInfluenceScore(senior, {
+    hierarchy: hierarchyById?.get(String(senior.id)) ?? null,
+  });
+  // Weak Low seats cannot drag seniors — only check when Low is influence-competitive.
+  if (lowScore + 8 < seniorScore) return false;
+
+  const edge = scoreSafeInfluence(low, senior);
+  if (edge !== null) return false;
+
+  const reasons = mentorHarmReasons(senior, low);
+  return reasons.some((reason) =>
+    /lowers determination|lowers professionalism|lowers pressure|toxic/i.test(
+      reason,
+    ),
+  );
+}
+
+/** High→Low and Mid→Low are both none (manual or attr-scored). */
+export function isMentoringZeroInfluenceGroup(
+  members: readonly MentoringUnitMember[],
+  manualEdges?: ReadonlyMap<string, MentoringInfluenceLevel>,
+): boolean {
+  const high = members.find((m) => m.role === "high")?.player;
+  const mid = members.find((m) => m.role === "mid")?.player;
+  const low = members.find((m) => m.role === "low")?.player;
+  if (!high || !mid || !low) return false;
+  const highLow = resolveMentoringInfluenceLevel(high, low, manualEdges);
+  const midLow = resolveMentoringInfluenceLevel(mid, low, manualEdges);
+  return highLow === "none" && midLow === "none";
+}
+
+/** True when the user labeled High→Low or Mid→Low as FM `none`. */
+export function mentoringRolesHaveLabeledDownwardNone(
+  roles: Readonly<Record<string, MentoringInfluenceSeat>>,
+  edges?: Readonly<Record<string, MentoringInfluenceLevel>>,
+): boolean {
+  if (!edges) return false;
+  let high: string | undefined;
+  let mid: string | undefined;
+  let low: string | undefined;
+  for (const [id, role] of Object.entries(roles)) {
+    if (role === "high") high = id;
+    else if (role === "mid") mid = id;
+    else if (role === "low") low = id;
+  }
+  if (!high || !mid || !low) return false;
+  return (
+    edges[mentoringInfluenceEdgeKey(high, low)] === "none" ||
+    edges[mentoringInfluenceEdgeKey(mid, low)] === "none"
+  );
+}
+
+export function mentoringUnitHasLabeledDownwardNone(
+  members: readonly MentoringUnitMember[],
+  manualEdges?: ReadonlyMap<string, MentoringInfluenceLevel>,
+): boolean {
+  const high = members.find((m) => m.role === "high")?.player;
+  const mid = members.find((m) => m.role === "mid")?.player;
+  const low = members.find((m) => m.role === "low")?.player;
+  if (!high || !mid || !low || !manualEdges) return false;
+  return (
+    manualEdges.get(mentoringInfluenceEdgeKey(String(high.id), String(low.id))) ===
+      "none" ||
+    manualEdges.get(mentoringInfluenceEdgeKey(String(mid.id), String(low.id))) ===
+      "none"
+  );
+}
+
+export type MentoringMenteeSkipReason =
+  | "already elite HA"
+  | "no safe senior"
+  | "no unused influence path"
+  | "incomplete attrs"
+  | "Det above squad mean";
+
+export type MentoringMenteeCoverageRow = {
+  id: string;
+  name: string;
+  seated: boolean;
+  skipReason?: MentoringMenteeSkipReason;
+  ca?: number;
+  pa?: number;
+};
+
+/** Glance state for the young-pool face strip. Skip reason → skipped, else free. */
+export type MentoringMenteeFaceState = "seated" | "free" | "skipped";
+
+export function mentoringMenteeFaceState(
+  row: Pick<MentoringMenteeCoverageRow, "seated" | "skipReason">,
+): MentoringMenteeFaceState {
+  if (row.seated) return "seated";
+  if (row.skipReason) return "skipped";
+  return "free";
+}
+
+export type MentoringMenteeCoverageOptions = {
+  seatedIds: ReadonlySet<string>;
+  occupiedIds?: ReadonlySet<string>;
+  incompleteYoung?: readonly {
+    id: string;
+    name: string;
+    ca?: number | null;
+    pa?: number | null;
+  }[];
+  hierarchyById?: ReadonlyMap<
+    string,
+    MentoringHierarchyLabel | null | undefined
+  >;
+  manualInfluenceEdges?: ReadonlyMap<string, MentoringInfluenceLevel>;
+  rejectedGroupKeys?: ReadonlySet<string>;
+};
+
+export type MentoringReplacementResult =
+  | { ok: true; group: MentoringInfluenceSafeGroup }
+  | { ok: false; skipReason: MentoringMenteeSkipReason };
+
+function mentoringLowSeatId(
+  members: readonly MentoringUnitMember[],
+): string | undefined {
+  const low = members.find((m) => m.role === "low")?.player;
+  return low ? String(low.id) : undefined;
+}
+
+/** Extract CA/PA 1–200 only. Missing / junk → undefined (do not invent). */
+export function mentoringKnownAbility(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) return undefined;
+  if (value < 1 || value > 200) return undefined;
+  return value;
+}
+
+export function formatMentoringCaPa(
+  ca?: number | null,
+  pa?: number | null,
+): string {
+  const shown = (raw: number | null | undefined) => {
+    const n = mentoringKnownAbility(raw);
+    return n !== undefined ? String(Math.round(n)) : "—";
+  };
+  return `${shown(ca)}/${shown(pa)}`;
+}
+
+/** Low-seat face digits. Missing / junk → omit (no dash placeholders). */
+export function mentoringCaPaFaceDigits(
+  ca?: number | null,
+  pa?: number | null,
+): { ca?: number; pa?: number } | null {
+  const knownCa = mentoringKnownAbility(ca);
+  const knownPa = mentoringKnownAbility(pa);
+  if (knownCa === undefined && knownPa === undefined) return null;
+  return {
+    ...(knownCa !== undefined ? { ca: knownCa } : {}),
+    ...(knownPa !== undefined ? { pa: knownPa } : {}),
+  };
+}
+
+function coverageAbilityFields(src: {
+  ca?: number | null;
+  pa?: number | null;
+}): { ca?: number; pa?: number } {
+  const ca = mentoringKnownAbility(src.ca);
+  const pa = mentoringKnownAbility(src.pa);
+  return {
+    ...(ca !== undefined ? { ca } : {}),
+    ...(pa !== undefined ? { pa } : {}),
+  };
+}
+
+function mentoringLowSeatKnownPa(
+  group: MentoringInfluenceSafeGroup,
+): number | undefined {
+  const low =
+    group.members.find((m) => m.role === "low")?.player ?? group.subject;
+  return mentoringKnownAbility(low.pa);
+}
+
+function mentoringCandidateHa(player: MentoringCandidate): number | undefined {
+  return estimateSubjectHa(player) ?? player.haScore;
+}
+
+function mentoringIsEligibleSenior(
+  player: MentoringCandidate,
+  kidId: string,
+): boolean {
+  if (String(player.id) === kidId) return false;
+  if (!isMentoringInfluenceSubject(player)) return true;
+  return player.age !== undefined && player.age >= MENTOR_MIN_AGE;
+}
+
+function mentoringHasSafeSenior(
+  kid: MentoringCandidate,
+  players: readonly MentoringCandidate[],
+  edges?: ReadonlyMap<string, MentoringInfluenceLevel>,
+): boolean {
+  const kidId = String(kid.id);
+  for (const player of players) {
+    if (!mentoringIsEligibleSenior(player, kidId)) continue;
+    if (resolveMentoringInfluenceLevel(player, kid, edges) !== "none") {
+      return true;
+    }
+  }
+  return false;
+}
+
+function mentoringYounglingDetEligible(
+  player: MentoringCandidate,
+  meanDet: number | undefined,
+): boolean {
+  const det = traitValue(player, "determination");
+  return meanDet === undefined || det === undefined || det <= meanDet + 0.5;
+}
+
+function mentoringSkipReasonForUnseated(
+  kid: MentoringCandidate,
+  options: {
+    players: readonly MentoringCandidate[];
+    unusedGroupsForKid: number;
+    meanDet?: number | undefined;
+    manualInfluenceEdges?:
+      | ReadonlyMap<string, MentoringInfluenceLevel>
+      | undefined;
+  },
+): MentoringMenteeSkipReason | undefined {
+  const ha = mentoringCandidateHa(kid);
+  if (ha !== undefined && Number.isFinite(ha) && ha > MENTEE_HA_ELITE) {
+    return "already elite HA";
+  }
+  if (
+    !mentoringHasSafeSenior(kid, options.players, options.manualInfluenceEdges)
+  ) {
+    return "no safe senior";
+  }
+  if (!mentoringYounglingDetEligible(kid, options.meanDet)) {
+    return "Det above squad mean";
+  }
+  if (options.unusedGroupsForKid <= 0) return "no unused influence path";
+  return undefined;
+}
+
+export type MentoringSuggestConstraints = {
+  hierarchyById?: ReadonlyMap<
+    string,
+    MentoringHierarchyLabel | null | undefined
+  >;
+  manualInfluenceEdges?: ReadonlyMap<string, MentoringInfluenceLevel>;
+  rejectedGroupKeys?: ReadonlySet<string>;
+};
+
+/** Gate for Suggest: influence shape, HA seating, zero-influence, Low harming seniors. */
+export function passesMentoringSuggestGate(
+  group: MentoringInfluenceSafeGroup,
+  constraints?: MentoringSuggestConstraints,
+): boolean {
+  const memberIds = group.members.map((m) => String(m.player.id));
+  const key = mentoringGroupMemberKey(memberIds);
+  if (constraints?.rejectedGroupKeys?.has(key)) return false;
+  if (violatesHaInfluenceSeating(group.members, constraints?.hierarchyById)) {
+    return false;
+  }
+
+  const high = group.members.find((m) => m.role === "high")!.player;
+  const mid = group.members.find((m) => m.role === "mid")!.player;
+  const low = group.members.find((m) => m.role === "low")!.player;
+  const edges = constraints?.manualInfluenceEdges;
+
+  const highLowKey = mentoringInfluenceEdgeKey(String(high.id), String(low.id));
+  const midLowKey = mentoringInfluenceEdgeKey(String(mid.id), String(low.id));
+  const highLowManual = edges?.has(highLowKey) ?? false;
+  const midLowManual = edges?.has(midLowKey) ?? false;
+
+  if (edges?.get(highLowKey) === "none" || edges?.get(midLowKey) === "none") {
+    return false;
+  }
+
+  const highLow = resolveMentoringInfluenceLevel(high, low, edges);
+  const midLow = resolveMentoringInfluenceLevel(mid, low, edges);
+
+  if (highLow === "none" && midLow === "none") return false;
+
+  if (!highLowManual && influenceLevelRank(highLow) < 1) return false;
+  if (!midLowManual && influenceLevelRank(midLow) < 1) return false;
+
+  if (
+    lowWouldHarmSenior(low, high, constraints?.hierarchyById) ||
+    lowWouldHarmSenior(low, mid, constraints?.hierarchyById)
+  ) {
+    return false;
+  }
+
+  return true;
 }
 
 export type SafeInfluenceEdge = {
@@ -2541,7 +3253,9 @@ export function defaultMentoringUnitRoles(
     hierarchyById?: ReadonlyMap<string, MentoringHierarchyLabel | null | undefined>;
   },
 ): MentoringUnitMember[] {
-  const ranked = rankMentoringInfluence(players, options);
+  const ranked = [...players].sort((a, b) =>
+    compareMentoringInfluenceSeating(a, b, options?.hierarchyById),
+  );
   if (ranked.length === 0) return [];
   if (ranked.length === 1) {
     return [{ player: ranked[0]!, role: "high" }];
@@ -2583,33 +3297,43 @@ export function findInfluenceSafeMentoringGroups(
     max?: number;
     roster?: MentorRosterFilter;
     hierarchyById?: ReadonlyMap<string, MentoringHierarchyLabel | null | undefined>;
+    manualInfluenceEdges?: ReadonlyMap<string, MentoringInfluenceLevel>;
+    rejectedGroupKeys?: ReadonlySet<string>;
   },
 ): MentoringInfluenceSafeGroup[] {
   const max = options?.max ?? 12;
   if (players.length < 3) return [];
 
   const hierarchyById = options?.hierarchyById;
+  const suggestConstraints: MentoringSuggestConstraints = {
+    ...(hierarchyById ? { hierarchyById } : {}),
+    ...(options?.manualInfluenceEdges
+      ? { manualInfluenceEdges: options.manualInfluenceEdges }
+      : {}),
+    ...(options?.rejectedGroupKeys
+      ? { rejectedGroupKeys: options.rejectedGroupKeys }
+      : {}),
+  };
   const meanDet = squadMeanDetermination(players);
-  const ranked = rankMentoringInfluence(players, { hierarchyById });
+  const ranked = rankMentoringInfluence(
+    players,
+    hierarchyById ? { hierarchyById } : undefined,
+  );
   const influenceOf = new Map(
     ranked.map((p) => [
       String(p.id),
       mentoringInfluenceScore(p, {
-        hierarchy: hierarchyById?.get(String(p.id)),
+        hierarchy: hierarchyById?.get(String(p.id)) ?? null,
       }),
     ]),
   );
 
   const younglings = ranked
-    .filter((p) => {
-      if (!isMentoringInfluenceSubject(p)) return false;
-      const det = traitValue(p, "determination");
-      return (
-        meanDet === undefined ||
-        det === undefined ||
-        det <= meanDet + 0.5
-      );
-    })
+    .filter(
+      (p) =>
+        isMentoringInfluenceSubject(p) &&
+        mentoringYounglingDetEligible(p, meanDet),
+    )
     .slice(0, 10);
 
   const seniors = ranked
@@ -2636,6 +3360,7 @@ export function findInfluenceSafeMentoringGroups(
   const out: MentoringInfluenceSafeGroup[] = [];
 
   const pushGroup = (group: MentoringInfluenceSafeGroup) => {
+    if (!passesMentoringSuggestGate(group, suggestConstraints)) return false;
     const key = group.members
       .map((m) => String(m.player.id))
       .sort()
@@ -2651,13 +3376,26 @@ export function findInfluenceSafeMentoringGroups(
     b: MentoringCandidate,
     c: MentoringCandidate,
   ): [MentoringCandidate, MentoringCandidate, MentoringCandidate] => {
-    const trio = [a, b, c].sort(
-      (x, y) =>
-        (influenceOf.get(String(y.id)) ?? 0) -
-          (influenceOf.get(String(x.id)) ?? 0) ||
-        x.name.localeCompare(y.name),
+    const trio = [a, b, c].sort((x, y) =>
+      compareMentoringInfluenceSeating(x, y, hierarchyById),
     );
     return [trio[0]!, trio[1]!, trio[2]!];
+  };
+
+  const overloadShapeBonus = (
+    seniorA: MentoringCandidate,
+    seniorB: MentoringCandidate,
+    young: MentoringCandidate,
+  ): number => {
+    const youngHa = estimateSubjectHa(young) ?? young.haScore ?? 0;
+    const youngInf = influenceOf.get(String(young.id)) ?? 0;
+    let bonus = 0;
+    for (const senior of [seniorA, seniorB]) {
+      const sHa = estimateSubjectHa(senior) ?? senior.haScore ?? 0;
+      const sInf = influenceOf.get(String(senior.id)) ?? 0;
+      if (sHa > youngHa + 0.5 && sInf > youngInf) bonus += 6;
+    }
+    return bonus;
   };
 
   // --- Overload: 2 seniors → 1 youngling ---
@@ -2706,7 +3444,10 @@ export function findInfluenceSafeMentoringGroups(
             { player: low, role: "low" },
           ],
           subject: young,
-          score: edgeHigh.score + edgeMid.score,
+          score:
+            edgeHigh.score +
+            edgeMid.score +
+            overloadShapeBonus(a.senior, b.senior, young),
           path: "balance",
           edges: [safeEdgeToPair(edgeHigh), safeEdgeToPair(edgeMid)],
           reasons: [
@@ -2790,12 +3531,148 @@ export function findInfluenceSafeMentoringGroups(
     }
   }
 
-  out.sort(
-    (a, b) =>
-      (a.shape === "overload" ? 0 : 1) - (b.shape === "overload" ? 0 : 1) ||
-      b.score - a.score,
-  );
+  out.sort((a, b) => {
+    const shape =
+      (a.shape === "overload" ? 0 : 1) - (b.shape === "overload" ? 0 : 1);
+    if (shape !== 0) return shape;
+    const score = b.score - a.score;
+    if (score !== 0) return score;
+    if (a.shape !== "overload" || b.shape !== "overload") return 0;
+    const paA = mentoringLowSeatKnownPa(a);
+    const paB = mentoringLowSeatKnownPa(b);
+    if (paA !== undefined && paB !== undefined) return paB - paA;
+    if (paA !== undefined) return -1;
+    if (paB !== undefined) return 1;
+    return 0;
+  });
   return out.slice(0, max);
+}
+
+/** Next unused safe trio with this Low, or why Suggest cannot replace them. */
+export function mentoringReplacementForLow(
+  players: MentoringCandidate[],
+  lowId: string,
+  options?: MentoringMenteeCoverageOptions,
+): MentoringReplacementResult {
+  const kid = players.find((p) => String(p.id) === lowId);
+  if (!kid) return { ok: false, skipReason: "incomplete attrs" };
+  if (!isMentoringInfluenceSubject(kid)) {
+    return { ok: false, skipReason: "no unused influence path" };
+  }
+
+  const occupied = options?.occupiedIds ?? options?.seatedIds ?? new Set();
+  const pool = players.filter(
+    (p) => String(p.id) === lowId || !occupied.has(String(p.id)),
+  );
+  const groups = findInfluenceSafeMentoringGroups(pool, {
+    max: 32,
+    ...(options?.hierarchyById ? { hierarchyById: options.hierarchyById } : {}),
+    ...(options?.manualInfluenceEdges
+      ? { manualInfluenceEdges: options.manualInfluenceEdges }
+      : {}),
+    ...(options?.rejectedGroupKeys
+      ? { rejectedGroupKeys: options.rejectedGroupKeys }
+      : {}),
+  }).filter((group) => mentoringLowSeatId(group.members) === lowId);
+
+  if (groups[0]) return { ok: true, group: groups[0] };
+
+  const skipReason =
+    mentoringSkipReasonForUnseated(kid, {
+      players,
+      unusedGroupsForKid: 0,
+      meanDet: squadMeanDetermination(players),
+      manualInfluenceEdges: options?.manualInfluenceEdges,
+    }) ?? "no unused influence path";
+  return { ok: false, skipReason };
+}
+
+/** Young FT pool: seated vs skipped with a one-line reason. */
+export function mentoringMenteeCoverage(
+  players: MentoringCandidate[],
+  options: MentoringMenteeCoverageOptions,
+): MentoringMenteeCoverageRow[] {
+  const seatedIds = options.seatedIds;
+  const occupied = options.occupiedIds ?? seatedIds;
+  const meanDet = squadMeanDetermination(players);
+  const pool = players.filter((p) => !occupied.has(String(p.id)));
+  const unused = findInfluenceSafeMentoringGroups(pool, {
+    max: 32,
+    ...(options.hierarchyById ? { hierarchyById: options.hierarchyById } : {}),
+    ...(options.manualInfluenceEdges
+      ? { manualInfluenceEdges: options.manualInfluenceEdges }
+      : {}),
+    ...(options.rejectedGroupKeys
+      ? { rejectedGroupKeys: options.rejectedGroupKeys }
+      : {}),
+  });
+  const unusedCountByLow = new Map<string, number>();
+  for (const group of unused) {
+    const lowId = mentoringLowSeatId(group.members);
+    if (!lowId) continue;
+    unusedCountByLow.set(lowId, (unusedCountByLow.get(lowId) ?? 0) + 1);
+  }
+
+  const rows: MentoringMenteeCoverageRow[] = [];
+  const seen = new Set<string>();
+
+  for (const kid of players) {
+    if (!isMentoringInfluenceSubject(kid)) continue;
+    const id = String(kid.id);
+    seen.add(id);
+    if (seatedIds.has(id)) {
+      rows.push({ id, name: kid.name, seated: true, ...coverageAbilityFields(kid) });
+      continue;
+    }
+    const skipReason = mentoringSkipReasonForUnseated(kid, {
+      players,
+      unusedGroupsForKid: unusedCountByLow.get(id) ?? 0,
+      meanDet,
+      manualInfluenceEdges: options.manualInfluenceEdges,
+    });
+    rows.push({
+      id,
+      name: kid.name,
+      seated: false,
+      ...(skipReason ? { skipReason } : {}),
+      ...coverageAbilityFields(kid),
+    });
+  }
+
+  for (const young of options.incompleteYoung ?? []) {
+    const id = String(young.id);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    if (seatedIds.has(id)) {
+      rows.push({
+        id,
+        name: young.name,
+        seated: true,
+        ...coverageAbilityFields(young),
+      });
+      continue;
+    }
+    rows.push({
+      id,
+      name: young.name,
+      seated: false,
+      skipReason: "incomplete attrs",
+      ...coverageAbilityFields(young),
+    });
+  }
+
+  rows.sort((a, b) => {
+    if (a.seated !== b.seated) return a.seated ? 1 : -1;
+    if (!a.seated && !b.seated) {
+      const paA = mentoringKnownAbility(a.pa);
+      const paB = mentoringKnownAbility(b.pa);
+      if (paA !== undefined && paB !== undefined && paA !== paB) return paB - paA;
+      if (paA !== undefined && paB === undefined) return -1;
+      if (paA === undefined && paB !== undefined) return 1;
+    }
+    return a.name.localeCompare(b.name);
+  });
+  return rows;
 }
 
 /**

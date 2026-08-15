@@ -171,16 +171,30 @@ def anchor_person(window: bytes, fav_rel: int) -> tuple[int | None, str | None]:
     return best_uid, best_name
 
 
+def refuse_live_fm_games_save(path: Path) -> None:
+    parts = [p.lower() for p in Path(path).resolve().parts]
+    if (
+        "sports interactive" in parts
+        and "games" in parts
+        and Path(path).suffix.lower() == ".fm"
+    ):
+        raise SystemExit(
+            fail("Refusing Sports Interactive/games/*.fm — copy the Career Save into data/saves")
+        )
+
+
 def resolve_save() -> Path:
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     if args:
         p = Path(args[0])
         if not p.is_file():
             raise SystemExit(fail(f"Save not found: {p}"))
+        refuse_live_fm_games_save(p)
         return p
     saves = sorted((Path(__file__).resolve().parents[1] / "data" / "saves").glob("*.fm"))
     if not saves:
         raise SystemExit(fail("No .fm save given and none in data/saves"))
+    refuse_live_fm_games_save(saves[0])
     return saves[0]
 
 

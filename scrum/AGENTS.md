@@ -18,7 +18,7 @@ Workers ship tickets that already survived the need-to-have gate. The planning c
 3. Sync the Board in `scrum/STATUS.md`
 4. Do not steal `claimed` / `in_progress` tickets
 
-If nothing is `ready`, stop and ask the Scrum Master chat — do not invent tickets from chat wishlist.
+If nothing is `ready`, **stop**. Do not invent tickets. Do not edit SCOPE/ROADMAP. Do not “fix while I’m here.” Ask HQ. If STATUS says freeze, stop even if the human pastes a wishlist.
 
 ## In progress
 
@@ -40,12 +40,38 @@ When acceptance criteria are met and verified, **in this order, before the final
 2. Set frontmatter: `status: done`, `completed_at`
 3. Move file: `scrum/tickets/TXXX-*.md` → `scrum/archive/TXXX-*.md`
 4. Update `scrum/STATUS.md` Board + Recently done (clear your owner row)
-5. **Then** report to the human: ticket ID, shipped, how tested, residual risk
+5. **Git commit on `FMT/`** (see **Git** below). Put the SHA in Progress.
+6. **Then** report to the human: ticket ID, shipped, how tested, commit SHA, residual risk
 
 If you only partially finished: leave `in_progress` or set `blocked` / return to `ready` with reason — never silent-abandon.
 
+## Git (one commit per ticket)
+
+Work only in `C:\Users\mrdev\Documents\Projects\FMT` — never `git add` from the parent `Projects/` folder.
+
+1. Stage **only files this ticket changed** (not `git add -A`).
+2. Do not stage `data/saves/`, `data/faces/`, `data/logos/`, `*.fm`, `.env`, secrets.
+3. Commit:
+
+```
+git commit -m "T0XX: short why"
+```
+
+4. Do **not** push unless the ticket says to. Do **not** amend unless the ticket says to and the commit is yours and unpushed.
+5. If the commit is rejected by a hook, fix and make a **new** commit — do not `--no-verify`.
+
+Archiving without a commit is not done.
+
+## Stop the line
+
+- Empty board or STATUS freeze → end. Shipping a ticket you wrote yourself is a protocol failure.
+- One ticket per run. Files outside that ticket’s acceptance = out of bounds.
+- Do not grow SCOPE from a worker chat.
+
 ## Do not
 
+- Extract or mmap `.fm` from `Documents/Sports Interactive/…/games/` — copy the selected save into `data/saves` first
+- Stream live SI `graphics/` on `/api/faces` or `/api/logos` when a repo copy exists — copy missing files into `data/faces` / `data/logos` once, then serve those
 - Expand scope from verbal wants
 - Rewrite SCOPE/ROADMAP priorities without Scrum Master chat
 - Leave abandoned `claimed` / `in_progress` tickets

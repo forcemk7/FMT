@@ -1,16 +1,17 @@
 {
-  "status": "wip",
-  "label": "Schalke 04 FT — Dynamics baseline (screenshots 2026-08-11, pre-demotion)",
+  "status": "complete-for-lock",
+  "label": "Schalke 04 FT — Dynamics baseline (screenshots 2026-08-13, dynamics-a.fm)",
   "notes": [
-    "Ground truth from in-game Dynamics tab screenshots before hierarchy demotions.",
-    "Map to extract via uid/name; lock binary layout after save diff.",
-    "Counts must sum to 26: hierarchy 3+14+1+8, social 13+11+2."
+    "Ground truth from in-game Dynamics screenshots against current data/saves/dynamics-a.fm.",
+    "Core (14): screenshot 1 + continuation (Kizza…Kramarić). Binary counted list matches this order — crop is Core, not Hierarchy-only.",
+    "Secondary A (8): Tusjak still captain + Team Leader.",
+    "Social Others (1): Gilson HI / Light-Hearted.",
+    "Hierarchy: TL 3, HI 15, Inf 1, Other 4. Social: 14+8+1=23.",
+    "Not on these shots (do not invent): Lundqvist, Erinin, Lawal, Itu."
   ],
   "extractAnchors": {
     "clubId": 920,
-    "teamId": 193616,
-    "listAbs": 56254242,
-    "countHeader": 33
+    "teamId": 193616
   },
   "summary": {
     "captaincy": {
@@ -19,14 +20,14 @@
     },
     "hierarchyCounts": {
       "teamLeader": 3,
-      "highlyInfluential": 14,
+      "highlyInfluential": 15,
       "influential": 1,
-      "other": 8
+      "other": 4
     },
     "socialGroupCounts": {
-      "core": 13,
-      "secondaryA": 11,
-      "other": 2
+      "core": 14,
+      "secondaryA": 8,
+      "other": 1
     }
   },
   "players": [
@@ -40,53 +41,12 @@
       "jobId": 106935
     },
     {
-      "name": "Josef Tusjak",
-      "hierarchy": "teamLeader",
-      "socialGroup": "secondaryA",
-      "captaincy": "captain",
-      "personality": "Fairly Professional",
-      "uid": 2002200827,
-      "jobId": 300569
-    },
-    {
       "name": "Elias Hoßmang",
       "hierarchy": "teamLeader",
       "socialGroup": "core",
       "personality": "Fairly Professional",
       "uid": 2002154423,
       "jobId": 254165
-    },
-    {
-      "name": "Dennis Seimen",
-      "hierarchy": "highlyInfluential",
-      "socialGroup": "core",
-      "personality": "Professional",
-      "uid": 2000175080,
-      "jobId": 113517
-    },
-    {
-      "name": "Dieudonné Koné",
-      "hierarchy": "highlyInfluential",
-      "socialGroup": "secondaryA",
-      "personality": "Resolute",
-      "uid": 2002166919,
-      "jobId": 266661
-    },
-    {
-      "name": "Jannis Mandelkow",
-      "hierarchy": "highlyInfluential",
-      "socialGroup": "core",
-      "personality": "Resolute",
-      "uid": 2002090082,
-      "jobId": 189824
-    },
-    {
-      "name": "Pietro Miraglia",
-      "hierarchy": "highlyInfluential",
-      "socialGroup": "core",
-      "personality": "Spirited",
-      "uid": 2002201952,
-      "jobId": 301694
     },
     {
       "name": "Alejandro Núñez",
@@ -97,36 +57,28 @@
       "jobId": 301983
     },
     {
-      "name": "Franco Viera",
+      "name": "Jannis Mandelkow",
       "hierarchy": "highlyInfluential",
-      "socialGroup": "secondaryA",
+      "socialGroup": "core",
       "personality": "Resolute",
-      "uid": 2002141787,
-      "jobId": 241529
+      "uid": 2002090082,
+      "jobId": 189824
     },
     {
-      "name": "Patrick Bandeira",
+      "name": "Dennis Seimen",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "core",
+      "personality": "Professional",
+      "uid": 2000175080,
+      "jobId": 113517
+    },
+    {
+      "name": "Pietro Miraglia",
       "hierarchy": "highlyInfluential",
       "socialGroup": "core",
       "personality": "Spirited",
-      "uid": 2002234366,
-      "jobId": 334108
-    },
-    {
-      "name": "Marco Tassinari",
-      "hierarchy": "highlyInfluential",
-      "socialGroup": "core",
-      "personality": "Perfectionist",
-      "uid": 2002083070,
-      "jobId": 182812
-    },
-    {
-      "name": "Rodrigo Cadavid",
-      "hierarchy": "highlyInfluential",
-      "socialGroup": "core",
-      "personality": "Ambitious",
-      "uid": 2002171319,
-      "jobId": 271061
+      "uid": 2002201952,
+      "jobId": 301694
     },
     {
       "name": "Santiago Contreras",
@@ -137,20 +89,20 @@
       "jobId": 320098
     },
     {
-      "name": "Edis Hasanovic",
+      "name": "Marco Tassinari",
       "hierarchy": "highlyInfluential",
       "socialGroup": "core",
-      "personality": "Resolute",
-      "uid": 2002216605,
-      "jobId": 316347
+      "personality": "Perfectionist",
+      "uid": 2002083070,
+      "jobId": 182812
     },
     {
-      "name": "Nathan Jones",
+      "name": "Patrick Bandeira",
       "hierarchy": "highlyInfluential",
-      "socialGroup": "secondaryA",
-      "personality": "Resolute",
-      "uid": 2002264900,
-      "jobId": 364642
+      "socialGroup": "core",
+      "personality": "Spirited",
+      "uid": 2002234366,
+      "jobId": 334108
     },
     {
       "name": "Sam Kizza",
@@ -161,9 +113,17 @@
       "jobId": 285346
     },
     {
+      "name": "Rodrigo Cadavid",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "core",
+      "personality": "Ambitious",
+      "uid": 2002171319,
+      "jobId": 271061
+    },
+    {
       "name": "Yoan Robert",
       "hierarchy": "highlyInfluential",
-      "socialGroup": "secondaryA",
+      "socialGroup": "core",
       "personality": "Resilient",
       "uid": 2002089146,
       "jobId": 188888
@@ -177,12 +137,53 @@
       "jobId": 366083
     },
     {
-      "name": "Jan Lundqvist",
+      "name": "Ilan Kramarić",
       "hierarchy": "other",
+      "socialGroup": "core",
+      "personality": "Professional",
+      "uid": 2002354919,
+      "jobId": 469373
+    },
+    {
+      "name": "Josef Tusjak",
+      "hierarchy": "teamLeader",
       "socialGroup": "secondaryA",
-      "personality": "Spirited",
-      "uid": 2002307555,
-      "jobId": 413297
+      "captaincy": "captain",
+      "personality": "Fairly Professional",
+      "uid": 2002200827,
+      "jobId": 300569
+    },
+    {
+      "name": "Dieudonné Koné",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "secondaryA",
+      "personality": "Resolute",
+      "uid": 2002166919,
+      "jobId": 266661
+    },
+    {
+      "name": "Franco Viera",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "secondaryA",
+      "personality": "Resolute",
+      "uid": 2002141787,
+      "jobId": 241529
+    },
+    {
+      "name": "Nathan Jones",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "secondaryA",
+      "personality": "Resolute",
+      "uid": 2002264900,
+      "jobId": 364642
+    },
+    {
+      "name": "Edis Hasanovic",
+      "hierarchy": "highlyInfluential",
+      "socialGroup": "secondaryA",
+      "personality": "Resolute",
+      "uid": 2002216605,
+      "jobId": 316347
     },
     {
       "name": "Jordan Dobler",
@@ -193,6 +194,14 @@
       "jobId": 382403
     },
     {
+      "name": "Florin Gabor",
+      "hierarchy": "other",
+      "socialGroup": "secondaryA",
+      "personality": "Driven",
+      "uid": 2002400283,
+      "jobId": 516409
+    },
+    {
       "name": "Marko Radović",
       "hierarchy": "other",
       "socialGroup": "secondaryA",
@@ -201,44 +210,12 @@
       "jobId": 534057
     },
     {
-      "name": "Ivaylo Erinin",
-      "hierarchy": "other",
-      "socialGroup": "secondaryA",
-      "personality": "Spirited",
-      "uid": 2002351241,
-      "jobId": 465321
-    },
-    {
-      "name": "Ilan Kramarić",
-      "hierarchy": "other",
-      "socialGroup": "secondaryA",
-      "personality": "Professional",
-      "uid": 2002354919,
-      "jobId": 469373
-    },
-    {
-      "name": "Samuel Lawal",
-      "hierarchy": "other",
-      "socialGroup": "secondaryA",
-      "personality": "Fairly Professional",
-      "uid": 2002331939,
-      "jobId": 439147
-    },
-    {
-      "name": "Adrian Itu",
-      "hierarchy": "other",
+      "name": "Domenico Gilson",
+      "hierarchy": "highlyInfluential",
       "socialGroup": "other",
-      "personality": "Resilient",
-      "uid": 2002400248,
-      "jobId": 516374
-    },
-    {
-      "name": "Florin Gabor",
-      "hierarchy": "other",
-      "socialGroup": "other",
-      "personality": "Driven",
-      "uid": 2002400283,
-      "jobId": 516409
+      "personality": "Light-Hearted",
+      "uid": 2002200653,
+      "jobId": 300395
     }
   ]
 }

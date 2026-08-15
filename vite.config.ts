@@ -11,11 +11,24 @@ import {
   type FaceIndex,
 } from "./shared/faces/face-index.ts";
 import {
+  collectExtractFaceUids,
+  copyFaceIntoRepo,
+  findCachedFace,
+  resolveRepoFacesDir,
+} from "./shared/faces/face-cache.ts";
+import {
   buildLogoIndex,
   buildLogoIndexStub,
   resolveLogoPath,
   type LogoIndex,
 } from "./shared/logos/logo-index.ts";
+import {
+  collectExtractLogoIds,
+  copyLogoIntoRepo,
+  countCachedImages,
+  findCachedLogo,
+  resolveRepoLogosDir,
+} from "./shared/logos/logo-cache.ts";
 import {
   emptyHistoryStore,
   normalizeHistoryStore,
@@ -27,10 +40,18 @@ import {
   resolveDefaultSavePath,
 } from "./shared/save/extract-first-team.ts";
 import { extractFavouredClubScouts } from "./shared/save/extract-favoured-scouts.ts";
+import { createExtractGate } from "./shared/save/extract-gate.ts";
+import { killStaleExtractPid } from "./shared/save/extract-child.ts";
 import {
+  copyLiveFmSaveToRepo,
+  destCoversLiveSnapshot,
+  isFmBackupVersionName,
+  repoSaveDestPath,
   resolveFmGamesDir,
   resolveFmSaveByName,
+  resolveRepoSavesDir,
   SAVE_WATCH_DEBOUNCE_MS,
+  shouldCopyLiveFmSave,
   statFmSave,
   waitForFileStable,
 } from "./shared/save/save-paths.ts";
@@ -38,6 +59,8 @@ import {
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)));
 const historyPath = path.join(rootDir, "data", "history.json");
 const historyBakPath = path.join(rootDir, "data", "history.json.bak");
+const repoFacesDir = resolveRepoFacesDir(rootDir);
+const repoLogosDir = resolveRepoLogosDir(rootDir);
 
 let faceIndex: FaceIndex | null = null;
 let faceIndexPromise: Promise<FaceIndex> | null = null;
@@ -101,6 +124,57 @@ function resolveFacePathForRequest(uid: number): string | null {
   return null;
 }
 
+/** Copy SI portrait into data/faces. Returns the repo path, or null if no pack file. */
+async function ensureRepoFace(uid: number): Promise<string | null> {
+  const cached = findCachedFace(repoFacesDir, uid);
+  if (cached) return cached;
+  let src = resolveFacePathForRequest(uid);
+  if (!src) {
+    const idx = await ensureFaceIndex();
+    src = resolveFacePath(idx, uid);
+  }
+  if (!src) return null;
+  return copyFaceIntoRepo(src, repoFacesDir, uid);
+}
+
+async function extractRosterFaces(uids: number[]): Promise<void> {
+  const missing = uids.filter((uid) => !findCachedFace(repoFacesDir, uid));
+  if (missing.length === 0) return;
+  let copied = 0;
+  for (const uid of missing) {
+    const dest = await ensureRepoFace(uid);
+    if (dest) copied += 1;
+  }
+  console.info(
+    `[fmt faces] extracted ${copied}/${missing.length} portraits into ${repoFacesDir}`,
+  );
+}
+
+async function ensureRepoLogo(clubId: number): Promise<string | null> {
+  const cached = findCachedLogo(repoLogosDir, clubId);
+  if (cached) return cached;
+  let src = resolveLogoPathForRequest(clubId);
+  if (!src) {
+    const idx = await ensureLogoIndex();
+    src = resolveLogoPath(idx, clubId);
+  }
+  if (!src) return null;
+  return copyLogoIntoRepo(src, repoLogosDir, clubId);
+}
+
+async function extractRosterLogos(clubIds: number[]): Promise<void> {
+  const missing = clubIds.filter((id) => !findCachedLogo(repoLogosDir, id));
+  if (missing.length === 0) return;
+  let copied = 0;
+  for (const clubId of missing) {
+    const dest = await ensureRepoLogo(clubId);
+    if (dest) copied += 1;
+  }
+  console.info(
+    `[fmt logos] extracted ${copied}/${missing.length} crests into ${repoLogosDir}`,
+  );
+}
+
 function getLogoStub(): LogoIndex {
   if (!logoStub) {
     logoStub = buildLogoIndexStub(resolveDefaultGraphicsRoot());
@@ -147,13 +221,7 @@ function logosApiPlugin(): Plugin {
   return {
     name: "fmt-logos-api",
     configureServer(server) {
-      void ensureLogoIndex().catch((err) => {
-        console.warn(
-          "[fmt logos] index failed:",
-          err instanceof Error ? err.message : err,
-        );
-      });
-
+      fs.mkdirSync(repoLogosDir, { recursive: true });
       server.middlewares.use(async (req, res, next) => {
         const url = req.url?.split("?")[0] ?? "";
         if (!url.startsWith("/api/logos")) {
@@ -163,27 +231,11 @@ function logosApiPlugin(): Plugin {
 
         try {
           if (req.method === "GET" && url === "/api/logos/status") {
-            try {
-              const idx = await ensureLogoIndex();
-              sendJson(res, 200, {
-                graphicsRoot: idx.graphicsRoot,
-                packRoot: idx.packRoot,
-                mapped: idx.byClubId.size,
-                clubDirs: idx.clubDirs.length,
-                configCount: idx.configCount,
-                ready: true,
-              });
-            } catch (error) {
-              sendJson(res, 200, {
-                graphicsRoot: resolveDefaultGraphicsRoot(),
-                mapped: 0,
-                clubDirs: 0,
-                configCount: 0,
-                ready: false,
-                error:
-                  error instanceof Error ? error.message : "Logo index failed",
-              });
-            }
+            sendJson(res, 200, {
+              logosDir: repoLogosDir,
+              cached: countCachedImages(repoLogosDir),
+              ready: true,
+            });
             return;
           }
 
@@ -204,14 +256,8 @@ function logosApiPlugin(): Plugin {
           const match = /^\/api\/logos\/(\d+)$/.exec(url);
           if (req.method === "GET" && match) {
             const clubId = Number(match[1]);
-            let filePath = resolveLogoPathForRequest(clubId);
+            const filePath = await ensureRepoLogo(clubId);
             if (!filePath) {
-              const idx = await ensureLogoIndex();
-              filePath = resolveLogoPath(idx, clubId);
-            } else {
-              void ensureLogoIndex();
-            }
-            if (!filePath || !fs.existsSync(filePath)) {
               res.statusCode = 404;
               res.setHeader("Cache-Control", "no-store");
               res.end();
@@ -254,13 +300,7 @@ function facesApiPlugin(): Plugin {
   return {
     name: "fmt-faces-api",
     configureServer(server) {
-      void ensureFaceIndex().catch((err) => {
-        console.warn(
-          "[fmt faces] index failed:",
-          err instanceof Error ? err.message : err,
-        );
-      });
-
+      fs.mkdirSync(repoFacesDir, { recursive: true });
       server.middlewares.use(async (req, res, next) => {
         const url = req.url?.split("?")[0] ?? "";
         if (!url.startsWith("/api/faces")) {
@@ -270,26 +310,11 @@ function facesApiPlugin(): Plugin {
 
         try {
           if (req.method === "GET" && url === "/api/faces/status") {
-            try {
-              const idx = await ensureFaceIndex();
-              sendJson(res, 200, {
-                graphicsRoot: idx.graphicsRoot,
-                mapped: idx.byUid.size,
-                faceDirs: idx.faceDirs.length,
-                configCount: idx.configCount,
-                ready: true,
-              });
-            } catch (error) {
-              sendJson(res, 200, {
-                graphicsRoot: resolveDefaultGraphicsRoot(),
-                mapped: 0,
-                faceDirs: 0,
-                configCount: 0,
-                ready: false,
-                error:
-                  error instanceof Error ? error.message : "Face index failed",
-              });
-            }
+            sendJson(res, 200, {
+              facesDir: repoFacesDir,
+              cached: countCachedImages(repoFacesDir),
+              ready: true,
+            });
             return;
           }
 
@@ -309,15 +334,7 @@ function facesApiPlugin(): Plugin {
           const match = /^\/api\/faces\/(\d+)$/.exec(url);
           if (req.method === "GET" && match) {
             const uid = Number(match[1]);
-            let filePath = resolveFacePathForRequest(uid);
-            // Regen faces need the full index; wait only when cutout missed.
-            if (!filePath) {
-              const idx = await ensureFaceIndex();
-              filePath = resolveFacePath(idx, uid);
-            } else {
-              // Kick off full index in background if not ready yet.
-              void ensureFaceIndex();
-            }
+            const filePath = await ensureRepoFace(uid);
             if (!filePath) {
               res.statusCode = 404;
               res.setHeader("Cache-Control", "no-store");
@@ -492,14 +509,20 @@ function beginNdjson(res: import("http").ServerResponse) {
 async function runExtractStreaming(
   res: import("http").ServerResponse,
   savePath: string,
+  signal?: AbortSignal,
 ) {
   beginNdjson(res);
   try {
     const result = await extractFirstTeam(savePath, {
+      signal,
       onProgress: (p) => {
         writeNdjson(res, { type: "progress", ...p, extract: "first-team" });
       },
     });
+    if (signal?.aborted) {
+      if (!res.writableEnded) res.end();
+      return;
+    }
     writeNdjson(res, {
       type: "progress",
       phase: "scout",
@@ -510,6 +533,7 @@ async function runExtractStreaming(
     let favouredClub: Record<string, unknown> | null = null;
     try {
       const scout = await extractFavouredClubScouts(savePath, {
+        signal,
         onProgress: (p) => {
           const pct =
             typeof p.pct === "number"
@@ -535,6 +559,10 @@ async function runExtractStreaming(
         error: null,
       };
     } catch (scoutError) {
+      if (signal?.aborted) {
+        if (!res.writableEnded) res.end();
+        return;
+      }
       const raw =
         scoutError instanceof Error
           ? scoutError.message
@@ -563,7 +591,23 @@ async function runExtractStreaming(
     }
     writeNdjson(res, { type: "result", ...result, favouredClub });
     res.end();
+    void extractRosterFaces(collectExtractFaceUids(result)).catch((err) => {
+      console.warn(
+        "[fmt faces] roster extract failed:",
+        err instanceof Error ? err.message : err,
+      );
+    });
+    void extractRosterLogos(collectExtractLogoIds(result)).catch((err) => {
+      console.warn(
+        "[fmt logos] roster extract failed:",
+        err instanceof Error ? err.message : err,
+      );
+    });
   } catch (error) {
+    if (signal?.aborted) {
+      if (!res.writableEnded) res.end();
+      return;
+    }
     writeNdjson(res, {
       type: "error",
       error: error instanceof Error ? error.message : "Roster API error",
@@ -575,17 +619,27 @@ async function runExtractStreaming(
 async function runScoutStreaming(
   res: import("http").ServerResponse,
   savePath: string,
+  signal?: AbortSignal,
 ) {
   beginNdjson(res);
   try {
     const result = await extractFavouredClubScouts(savePath, {
+      signal,
       onProgress: (p) => {
         writeNdjson(res, { type: "progress", ...p });
       },
     });
+    if (signal?.aborted) {
+      if (!res.writableEnded) res.end();
+      return;
+    }
     writeNdjson(res, { type: "result", ...result });
     res.end();
   } catch (error) {
+    if (signal?.aborted) {
+      if (!res.writableEnded) res.end();
+      return;
+    }
     writeNdjson(res, {
       type: "error",
       error: error instanceof Error ? error.message : "Scout API error",
@@ -635,6 +689,10 @@ type SaveChangeEvent = {
 
 const saveChangeListeners = new Set<(event: SaveChangeEvent) => void>();
 let saveWatchStarted = false;
+/** Active FMT save basename — copy even when data/saves has no file yet. */
+let selectedSaveName: string | null = null;
+const ingestInFlight = new Map<string, Promise<SaveChangeEvent | null>>();
+const runExtractExclusive = createExtractGate();
 
 function notifySaveChanged(event: SaveChangeEvent): void {
   for (const listener of saveChangeListeners) {
@@ -646,20 +704,76 @@ function notifySaveChanged(event: SaveChangeEvent): void {
   }
 }
 
+function setSelectedSaveName(saveName: string | null | undefined): void {
+  if (!saveName) return;
+  const base = path.basename(saveName);
+  if (!base.toLowerCase().endsWith(".fm")) return;
+  if (isFmBackupVersionName(base)) return;
+  selectedSaveName = base;
+}
+
+async function ingestTrackedLiveSave(
+  liveName: string,
+): Promise<SaveChangeEvent | null> {
+  const key = path.basename(liveName).toLowerCase();
+  const existing = ingestInFlight.get(key);
+  if (existing) return existing;
+  const run = ingestTrackedLiveSaveBody(liveName).finally(() => {
+    ingestInFlight.delete(key);
+  });
+  ingestInFlight.set(key, run);
+  return run;
+}
+
+async function ingestTrackedLiveSaveBody(
+  liveName: string,
+): Promise<SaveChangeEvent | null> {
+  if (!shouldCopyLiveFmSave(liveName, rootDir, selectedSaveName)) {
+    return null;
+  }
+  const dest =
+    resolveFmSaveByName(liveName, rootDir) ?? repoSaveDestPath(liveName, rootDir);
+  if (!dest) return null;
+  const livePath = path.join(resolveFmGamesDir(), path.basename(liveName));
+  if (!fs.existsSync(livePath)) return null;
+  try {
+    const liveNow = fs.statSync(livePath);
+    if (destCoversLiveSnapshot(dest, liveNow)) return null;
+  } catch {
+    return null;
+  }
+  const stable = await waitForFileStable(livePath);
+  if (!stable) return null;
+  if (destCoversLiveSnapshot(dest, stable)) return null;
+  const copied = await copyLiveFmSaveToRepo(livePath, dest);
+  return {
+    saveName: path.basename(dest),
+    mtimeMs: copied.mtimeMs,
+    size: copied.size,
+  };
+}
+
 function ensureSaveWatch(): void {
   if (saveWatchStarted) return;
   saveWatchStarted = true;
-  const dir = resolveFmGamesDir();
-  if (!fs.existsSync(dir)) {
-    console.info(`[fmt saves] FM games dir not found (auto-sync idle): ${dir}`);
+  const repoDir = resolveRepoSavesDir(rootDir);
+  fs.mkdirSync(repoDir, { recursive: true });
+  const gamesDir = resolveFmGamesDir();
+  if (!fs.existsSync(gamesDir)) {
+    console.info(
+      `[fmt saves] SI games dir not found (copy-sync idle): ${gamesDir}`,
+    );
     return;
   }
-  console.info(`[fmt saves] watching ${dir} for .fm changes`);
+  console.info(
+    `[fmt saves] watching ${gamesDir} — copy selected/tracked .fm into data/saves, then extract`,
+  );
   const pending = new Map<string, ReturnType<typeof setTimeout>>();
   const settling = new Set<string>();
-  fs.watch(dir, (_event, filename) => {
+  fs.watch(gamesDir, (_event, filename) => {
     if (!filename || !String(filename).toLowerCase().endsWith(".fm")) return;
     const key = String(filename);
+    if (!shouldCopyLiveFmSave(key, rootDir, selectedSaveName)) return;
     const prev = pending.get(key);
     if (prev) clearTimeout(prev);
     pending.set(
@@ -670,14 +784,8 @@ function ensureSaveWatch(): void {
         settling.add(key);
         void (async () => {
           try {
-            const full = path.join(dir, key);
-            const stable = await waitForFileStable(full);
-            if (!stable) return;
-            notifySaveChanged({
-              saveName: key,
-              mtimeMs: stable.mtimeMs,
-              size: stable.size,
-            });
+            const event = await ingestTrackedLiveSave(key);
+            if (event) notifySaveChanged(event);
           } catch {
             // FM may still be writing — poll/SSE client will retry
           } finally {
@@ -693,6 +801,7 @@ function rosterApiPlugin(): Plugin {
   return {
     name: "fmt-roster-api",
     configureServer(server) {
+      killStaleExtractPid();
       // Long extracts must not be killed by idle sockets.
       server.httpServer?.setTimeout(0);
       server.middlewares.use(async (req, res, next) => {
@@ -724,7 +833,38 @@ function rosterApiPlugin(): Plugin {
             return;
           }
 
+          if (req.method === "POST" && url === "/api/roster/pull-live") {
+            const save = reqUrl.searchParams.get("save");
+            if (!save) {
+              sendJson(res, 400, { error: "Query ?save=filename.fm required" });
+              return;
+            }
+            if (isFmBackupVersionName(save)) {
+              sendJson(res, 400, {
+                error: "Versioned Career Save copies are not pulled",
+              });
+              return;
+            }
+            setSelectedSaveName(save);
+            ensureSaveWatch();
+            const event = await ingestTrackedLiveSave(save);
+            if (event) {
+              sendJson(res, 200, event);
+              return;
+            }
+            const destStat = statFmSave(save, rootDir);
+            if (destStat) {
+              sendJson(res, 200, destStat);
+              return;
+            }
+            sendJson(res, 404, {
+              error: `Live save not copied: ${path.basename(save)}`,
+            });
+            return;
+          }
+
           if (req.method === "GET" && url === "/api/roster/events") {
+            setSelectedSaveName(reqUrl.searchParams.get("save"));
             ensureSaveWatch();
             res.writeHead(200, {
               "Content-Type": "text/event-stream; charset=utf-8",
@@ -759,13 +899,21 @@ function rosterApiPlugin(): Plugin {
             } else {
               savePath = resolveDefaultSavePath(rootDir);
             }
-            await runExtractStreaming(res, savePath);
+            const ac = new AbortController();
+            req.on("close", () => ac.abort());
+            await runExtractExclusive(() =>
+              runExtractStreaming(res, savePath, ac.signal),
+            );
             return;
           }
 
           if (req.method === "GET" && url === "/api/scout/favoured-club") {
             const savePath = resolveDefaultSavePath(rootDir);
-            await runScoutStreaming(res, savePath);
+            const ac = new AbortController();
+            req.on("close", () => ac.abort());
+            await runExtractExclusive(() =>
+              runScoutStreaming(res, savePath, ac.signal),
+            );
             return;
           }
 
@@ -833,7 +981,11 @@ function rosterApiPlugin(): Plugin {
                   message: "Upload complete — starting extract",
                   pct: 9,
                 });
-                await runStreaming(res, savePath);
+                await runExtractExclusive(() => {
+                  const ac = new AbortController();
+                  req.on("close", () => ac.abort());
+                  return runStreaming(res, savePath, ac.signal);
+                });
               } finally {
                 try {
                   fs.unlinkSync(savePath);

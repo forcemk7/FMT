@@ -46,6 +46,19 @@ from u19_squad_discovery import (  # noqa: E402
     resolve_u19_squad,
 )
 
+
+def refuse_live_fm_games_save(path: Path) -> None:
+    """Copy Career Saves into data/saves. Live SI games/*.fm locks FM autosave."""
+    parts = [p.lower() for p in Path(path).resolve().parts]
+    if (
+        "sports interactive" in parts
+        and "games" in parts
+        and Path(path).suffix.lower() == ".fm"
+    ):
+        raise SystemExit(
+            "Refusing Sports Interactive/games/*.fm — copy the Career Save into data/saves"
+        )
+
 CHUNK = 8 * 1024 * 1024
 LIST_SENTINEL = bytes.fromhex("7f02000000ffffffff")
 LIST_SENTINEL_LOOSE = bytes.fromhex("7f02000000")  # without requiring ff×4
@@ -80,6 +93,10 @@ NAME_TABLE_LO = 100 * 1024 * 1024
 NAME_TABLE_HI = 160 * 1024 * 1024
 SQUAD_COUNT_LO, SQUAD_COUNT_HI = 11, 55
 SQUAD_JOBS_MIN = 11
+# Dynamics (T002): cap tail after FT job list; social lists after this motif.
+DYNAMICS_SOCIAL_MOTIF = bytes.fromhex("b51ae70701f7020000")
+DYNAMICS_SOCIAL_LABELS = ("core", "secondaryA", "secondaryB", "other")
+DYNAMICS_SOCIAL_LIST_MAX = 80
 
 # Lazy caches keyed by id(buf): nameId → mid-file strings in offset order
 _NAME_ID_HITS: dict[int, dict[int, list[str]]] = {}
@@ -357,6 +374,7 @@ def resolve_save() -> tuple[Path, bool]:
         p = Path(args[0])
         if not p.is_file():
             raise FileNotFoundError(f"not found: {p}")
+        refuse_live_fm_games_save(p)
         return p, p.suffix.lower() == ".bin"
     saves = sorted(
         (ROOT / "data" / "saves").glob("*.fm"),
@@ -365,6 +383,7 @@ def resolve_save() -> tuple[Path, bool]:
     )
     if not saves:
         raise FileNotFoundError("no .fm in data/saves")
+    refuse_live_fm_games_save(saves[0])
     return saves[0], False
 
 
@@ -580,10 +599,49 @@ def _technical_wiped(point: dict) -> bool:
 def _inherit_tech_from_tip(point: dict, tip: dict) -> dict:
     """Keep live mental/phys; reuse tip technical/gk when the live tech tail is junk."""
     out = dict(point)
-    if isinstance(tip.get("technical"), dict):
-        out["technical"] = dict(tip["technical"])
-    if isinstance(tip.get("goalkeeping"), dict) and not out.get("goalkeeping"):
-        out["goalkeeping"] = dict(tip["goalkeeping"])
+    tip_tech = tip.get("technical")
+    if isinstance(tip_tech, dict) and tip_tech:
+        out["technical"] = dict(tip_tech)
+    else:
+        # Tip was a first wiped Progress Report (tech stripped). Drop junk tail.
+        out.pop("technical", None)
+    tip_gk = tip.get("goalkeeping")
+    if isinstance(tip_gk, dict) and tip_gk and not out.get("goalkeeping"):
+        out["goalkeeping"] = dict(tip_gk)
+    elif not (isinstance(tip_gk, dict) and tip_gk):
+        if not (isinstance(tip_tech, dict) and tip_tech):
+            out.pop("goalkeeping", None)
+    return out
+
+
+def _accept_first_wiped_progress_tip(point: dict) -> dict | None:
+    """
+    Gilson-class first Progress Report tip: mental/phys are live, technical tail
+    still Technique=0 junk, and there is no prior tip to inherit tech from.
+
+    Require snapshotU16>0 (Progress Report class) and in-band gap when known so
+    hist=0 foreign decoys (typically u16=0, e.g. Det20/Lea3) stay rejected.
+    Strip technical so Technique=0 is not treated as a real CA value.
+    """
+    if int(point.get("snapshotU16") or 0) <= 0:
+        return None
+    gap = point.get("gap")
+    if gap is None:
+        return None
+    g = int(gap)
+    if not (ATTR_CARD_GAP_MIN <= g <= ATTR_CARD_GAP_MAX):
+        return None
+    mental = point.get("mental")
+    if not isinstance(mental, dict):
+        return None
+    det, lea = mental.get("determination"), mental.get("leadership")
+    if not isinstance(det, int) or not isinstance(lea, int):
+        return None
+    if not (1 <= det <= 20 and 0 <= lea <= 20):
+        return None
+    out = dict(point)
+    out.pop("technical", None)
+    out.pop("goalkeeping", None)
     return out
 
 
@@ -593,9 +651,15 @@ def _recover_wiped_against_tip(point: dict, tip: dict | None) -> dict | None:
     foreign garbage (Technique 0). Sipho 01.12.2039: nearer Det=15/Lea=4 card
     matched FM exactly but was dropped as wiped. Recover when mental+phys stay
     continuous with the tip and inherit tip technical.
+
+    First tip (no prior history): still keep mental/phys when the card looks like
+    a Progress Report tip (T014 Gilson Det14/Lea16) — see
+    `_accept_first_wiped_progress_tip`.
     """
-    if tip is None or not _technical_wiped(point):
-        return point if not _technical_wiped(point) else None
+    if not _technical_wiped(point):
+        return point
+    if tip is None:
+        return _accept_first_wiped_progress_tip(point)
     if _mental_phys_l1(tip, point) > 80:
         return None
     return _inherit_tech_from_tip(point, tip)
@@ -835,7 +899,7 @@ def days_y1900_to_iso(days: int) -> str | None:
 
 
 def parse_save_game_date_hint(path: Path | None) -> date | None:
-    """Parse 'In-game date DD.MM.YYYY' (or trailing DD.MM.YYYY) from a save filename."""
+    """Filename 'In-game date DD.MM.YYYY' — unused for extract (T064: blob only)."""
     if path is None:
         return None
     import re
@@ -861,13 +925,13 @@ def discover_game_date(
     """
     Locate in-game date from early decompressed bytes.
 
-    Prefer (in order):
-      1) today_ptr closest to optional filename hint (within 14 days)
-      2) densest rolling 14-day today_ptr cluster -> its latest day
-      3) latest today_ptr inside a consecutive calendar run (len >= 5)
-      4) start of densest calendar run
-      5) filename hint alone
+    Filename dates are ignored (stale / T056 strips them). Prefer:
+      1) latest today_ptr (not the dense July pre-season cluster)
+      2) walk consecutive calendar prelude days after that ptr (run end)
+      3) start of densest calendar run
+    `hint` is accepted but never used.
     """
+    _ = hint  # T064: filename dates are not a source
     hi = min(len(buf), limit)
     days_hits: set[int] = set()
     first_abs: dict[int, int] = {}
@@ -891,16 +955,6 @@ def discover_game_date(
         start = j + 1
 
     if not days_hits:
-        if hint is not None:
-            return {
-                "gameDate": hint.isoformat(),
-                "daysY1900": (hint - DATE_EPOCH).days,
-                "runLength": 0,
-                "runStart": None,
-                "abs": None,
-                "method": "filename_hint_only",
-                "hint": hint.isoformat(),
-            }
         return None
 
     ordered = sorted(days_hits)
@@ -921,9 +975,6 @@ def discover_game_date(
     best_start, best_len = (
         max(runs, key=lambda t: (t[1], t[0])) if runs else (ordered[0], 1)
     )
-    in_long_run: set[int] = set()
-    for rs, rl in runs:
-        in_long_run.update(range(rs, rs + rl))
 
     today_by_day: dict[int, int] = {}
     for days in days_hits:
@@ -936,46 +987,20 @@ def discover_game_date(
     chosen_abs: int | None = None
     method = "calendar_run_start"
 
-    if hint is not None:
-        # Filename date is copied from FM UI — treat as ground truth.
-        hint_days = (hint - DATE_EPOCH).days
-        chosen_days = hint_days
-        near = [
-            (abs(d - hint_days), d)
-            for d in today_by_day
-            if abs(d - hint_days) <= 14
-        ]
-        if near:
-            near.sort()
-            chosen_abs = today_by_day[near[0][1]]
-            method = "filename_hint+today_ptr"
-        else:
-            chosen_abs = first_abs.get(hint_days)
-            method = "filename_hint"
-
-    if chosen_days is None and today_by_day:
-        ptr_days = sorted(today_by_day)
-        best = (-1, -1)
-        for end in ptr_days:
-            count = sum(1 for d in ptr_days if end - 14 <= d <= end)
-            if count > best[0] or (count == best[0] and end > best[1]):
-                best = (count, end)
-        if best[0] >= 3:
-            chosen_days = best[1]
-            chosen_abs = today_by_day[chosen_days]
-            method = "today_ptr_dense_window"
-        else:
-            in_run_ptrs = [d for d in ptr_days if d in in_long_run]
-            if in_run_ptrs:
-                chosen_days = max(in_run_ptrs)
-                chosen_abs = today_by_day[chosen_days]
-                method = "calendar_run+today_ptr_latest"
-            else:
-                chosen_days = max(ptr_days)
-                chosen_abs = today_by_day[chosen_days]
-                method = "today_ptr_latest"
-
-    if chosen_days is None:
+    if today_by_day:
+        # Do not use densest 14-day window — that locks to the pre-season
+        # table (2039-07-25) while later sparse ptrs are "today".
+        ptr_days = max(today_by_day)
+        chosen_days = ptr_days
+        # today_ptr is sparse; consecutive prelude days after it are the
+        # current calendar-run end (Jan 14+) without jumping to fixtures.
+        while (chosen_days + 1) in days_hits:
+            chosen_days += 1
+        chosen_abs = first_abs.get(chosen_days, today_by_day[ptr_days])
+        method = (
+            "calendar_run_end" if chosen_days != ptr_days else "today_ptr_latest"
+        )
+    else:
         chosen_days = best_start
         chosen_abs = first_abs.get(best_start)
         method = "calendar_run_start"
@@ -991,7 +1016,7 @@ def discover_game_date(
         "abs": chosen_abs,
         "method": method,
         "longRunCount": len(runs),
-        "hint": hint.isoformat() if hint else None,
+        "hint": None,
     }
 
 
@@ -1479,6 +1504,100 @@ def pick_tid(
     return ranked[0]
 
 
+def empty_player_dynamics() -> dict:
+    return {
+        "captaincy": None,
+        "hierarchy": None,
+        "socialGroup": None,
+        "socialRank": None,
+    }
+
+
+def read_ft_captaincy_jobs(
+    buf, list_abs: int, jobs: list[int]
+) -> tuple[int | None, int | None]:
+    """Captain / VC jobIds immediately after the FT job u32 list."""
+    n = len(jobs)
+    if n <= 0 or list_abs < 0:
+        return None, None
+    tail = list_abs + 4 * n
+    if tail + 8 > len(buf):
+        return None, None
+    cap, vc = struct.unpack_from("<II", buf, tail)
+    job_set = set(jobs)
+    if cap not in job_set:
+        cap = None
+    if vc not in job_set:
+        vc = None
+    return cap, vc
+
+
+def _parse_social_job_lists(
+    buf, off: int, job_set: set[int], n_lists: int = 4
+) -> list[list[int]] | None:
+    groups: list[list[int]] = []
+    for _ in range(n_lists):
+        if off + 2 > len(buf):
+            return None
+        n = struct.unpack_from("<H", buf, off)[0]
+        off += 2
+        if n > DYNAMICS_SOCIAL_LIST_MAX:
+            return None
+        need = 4 * n
+        if off + need > len(buf):
+            return None
+        listed = [struct.unpack_from("<I", buf, off + 4 * i)[0] for i in range(n)]
+        if any(job not in job_set for job in listed):
+            return None
+        groups.append(listed)
+        off += need
+    return groups
+
+
+def find_ft_social_job_lists(buf, jobs: list[int]) -> list[list[int]] | None:
+    """Four counted FT job lists after the social motif. None if missing."""
+    job_set = set(jobs)
+    if not job_set:
+        return None
+    pos = 0
+    motif_len = len(DYNAMICS_SOCIAL_MOTIF)
+    while True:
+        hit = buf.find(DYNAMICS_SOCIAL_MOTIF, pos)
+        if hit < 0:
+            return None
+        groups = _parse_social_job_lists(buf, hit + motif_len, job_set, 4)
+        if groups is not None:
+            return groups
+        pos = hit + 1
+
+
+def apply_ft_dynamics(
+    buf, players: list[dict], list_abs: int, jobs: list[int]
+) -> None:
+    """Fill FT captaincy + social group + list-order rank. hierarchy stays None."""
+    cap_job, vc_job = read_ft_captaincy_jobs(buf, list_abs, jobs)
+    social_lists = find_ft_social_job_lists(buf, jobs)
+    by_job: dict[int, tuple[str, int]] = {}
+    if social_lists:
+        for label, group in zip(DYNAMICS_SOCIAL_LABELS, social_lists):
+            for rank, job in enumerate(group):
+                by_job.setdefault(job, (label, rank))
+    for player in players:
+        job = int(player.get("jobId") or 0)
+        cap = None
+        if cap_job is not None and job == cap_job:
+            cap = "captain"
+        elif vc_job is not None and job == vc_job:
+            cap = "viceCaptain"
+        soc, rank = by_job.get(job, (None, None))
+        player["dynamics"] = {
+            "captaincy": cap,
+            "hierarchy": None,
+            "socialGroup": soc,
+            "socialRank": rank,
+        }
+
+
 def scan_manager_hits(
     mm, tids: list[int], *, windows: list[tuple[int, int]] | None = None
 ) -> dict[int, int]:
@@ -1715,7 +1834,8 @@ def resolve_job_uids_batch(mm: mmap.mmap, jobs: list[int]) -> dict[int, int]:
 # raising club-hi FPs at-club U19 (Eschweiler). Pad+hi tags Kasprakov / Boxleitner.
 # Lookback 8..73 — Vlad needs 49; Risse (gap II) needs 57; Abbe (FT) needs 73.
 # Per-unit job sets avoid cross-unit collisions (Abbe↔Zetzmann @904).
-# Club hi 5M — youth host clubs (Kasprakov 877204, Boxleitner 3609393).
+# Club hi 5M — youth host clubs (Kasprakov 877204). 3609393 is an II team-body
+# dup, not a host — list-adjacent 64ff24 FPs that club (T040 Itu).
 LOAN_OUT_MOTIF_PREFIX = b"\x64\xff"
 LOAN_OUT_PAD = b"\x00\x00\x00\x00\xff\xff\xff\xff\xff\x00\x00\x00\x00"
 LOAN_KIND_LO, LOAN_KIND_HI = 0x20, 0x30
@@ -1723,6 +1843,10 @@ LOAN_LOOKBACK_LO, LOAN_LOOKBACK_HI = 8, 73
 LOAN_TEMPLATE_LEN = 3 + 4 + 10 + 4 + 4 + 4 + 2  # motif..0x000A
 LOAN_CLUB_LO = 50
 LOAN_CLUB_HI = 5_000_000
+# Packed subunit job arrays sit 4 bytes apart. A team-body `64 ff 24` after the
+# list matches the loan template; true loan objects have one unit job in
+# lookback (Konya noise is 2). Reject runs of 3+.
+LOAN_LIST_STRIDE4_RUN_MIN = 3
 
 
 def _parse_loan_out_template(
@@ -1756,6 +1880,29 @@ def _parse_loan_out_template(
     return c1
 
 
+def _lookback_unit_stride4_run(mm: mmap.mmap, motif_at: int, jobs: set[int]) -> int:
+    """Longest 4-byte-stride run of unit jobs in the loan lookback window."""
+    backs: list[int] = []
+    for back in range(LOAN_LOOKBACK_LO, LOAN_LOOKBACK_HI + 1):
+        start = motif_at - back
+        if start < 0:
+            continue
+        job = struct.unpack_from("<I", mm, start)[0]
+        if job in jobs:
+            backs.append(back)
+    best = run = 0
+    prev: int | None = None
+    for b in backs:
+        if prev is not None and b - prev == 4:
+            run += 1
+        else:
+            run = 1
+        if run > best:
+            best = run
+        prev = b
+    return best
+
+
 def detect_loaned_out_jobs(
     mm: mmap.mmap, jobs: set[int], parent_club: int
 ) -> dict[int, int | None]:
@@ -1770,6 +1917,10 @@ def detect_loaned_out_jobs(
     avoids cross-unit collisions on shared motifs (Abbe FT @73 vs Zetzmann II
     @57 on club 904). Do not widen to endpoint multi-tag: on II-only pools the
     farthest match is at-club noise (Konya on Abbe's motif).
+
+    Skip templates whose lookback is a packed subunit job-list (T040): the
+    next team-body `64 ff 24` + dup satisfies the loan template and would
+    tag the last at-club II/FT body (Itu) as loanedOut.
     """
     if not jobs:
         return {}
@@ -1781,6 +1932,9 @@ def detect_loaned_out_jobs(
             break
         loan_club = _parse_loan_out_template(mm, j, parent_club)
         if loan_club is None:
+            pos = j + 1
+            continue
+        if _lookback_unit_stride4_run(mm, j, jobs) >= LOAN_LIST_STRIDE4_RUN_MIN:
             pos = j + 1
             continue
         matched_job: int | None = None
@@ -1883,7 +2037,8 @@ def rehome_loaned_newgen_to_u19(
     T012: Boxleitner-class youth sit on II discovery but are outgoing U19 loans.
     Move only NEWGEN loanedOut with high host clubId (>200k youth hosts) from
     II → U19 so Loans → Under 19s matches FM. Domestic II loans (Manole/Dunkel)
-    stay on Reserves.
+    stay on Reserves. T040: do not feed this with list-adjacent team-dup
+    FPs (3609393) — detect drops those before rehome.
     """
     if not reserves or not u19:
         return
@@ -2175,11 +2330,7 @@ def build_players_from_jobs(
                 "nation": None,
                 "secondNation": None,
                 "positions": None,
-                "dynamics": {
-                    "captaincy": None,
-                    "hierarchy": None,
-                    "socialGroup": None,
-                },
+                "dynamics": empty_player_dynamics(),
                 "training": {"unit": None},
                 "attributes": attrs,
                 "attributeHistory": attribute_history,
@@ -2530,11 +2681,9 @@ def main() -> int:
                 jobsTarget=len(jobs),
             )
 
-            game_date_hint = parse_save_game_date_hint(save) if not is_bin else None
             game_date_info = discover_game_date(
                 mm,
                 min(len(mm), GAME_DATE_EARLY),
-                hint=game_date_hint,
             )
             game_date = game_date_info["gameDate"] if game_date_info else None
             if game_date:
@@ -2553,6 +2702,7 @@ def main() -> int:
                 t0=t0,
                 phase="players",
             )
+            apply_ft_dynamics(mm, players, list_abs, jobs)
             if club_id:
                 loaned = detect_loaned_out_jobs(mm, set(jobs), int(club_id))
                 apply_loan_status(players, loaned, parent_club=int(club_id))

@@ -11,6 +11,12 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import type { FirstTeamExtract } from "./types.ts";
+import { assertNotLiveFmGamesSave } from "./save-paths.ts";
+import {
+  attachExtractAbort,
+  forgetExtractPid,
+  rememberExtractPid,
+} from "./extract-child.ts";
 export type {
   FirstTeamExtract,
   FirstTeamPlayer,
@@ -117,10 +123,17 @@ function formatFailure(stdout: string, stderr: string, code: number | null): Err
 /** Extract managed club identity + First Team Unique IDs / names. */
 export async function extractFirstTeam(
   savePath: string,
-  opts?: { onProgress?: (p: ExtractProgress) => void },
+  opts?: {
+    onProgress?: (p: ExtractProgress) => void;
+    signal?: AbortSignal;
+  },
 ): Promise<FirstTeamExtract> {
+  assertNotLiveFmGamesSave(savePath);
   if (!fs.existsSync(savePath)) {
     throw new Error(`Save not found: ${savePath}`);
+  }
+  if (opts?.signal?.aborted) {
+    throw new Error("Extract aborted");
   }
   const script = path.join(repoRoot(), "scripts", "extract-first-team-fast.py");
   const raw = await new Promise<string>((resolve, reject) => {
@@ -134,6 +147,8 @@ export async function extractFirstTeam(
         PYTHONIOENCODING: "utf-8",
       },
     });
+    rememberExtractPid(child.pid);
+    attachExtractAbort(child, opts?.signal);
     let stdout = "";
     let stderrBuf = "";
     let stderrAll = "";
@@ -155,8 +170,16 @@ export async function extractFirstTeam(
         if (prog) opts?.onProgress?.(prog);
       }
     });
-    child.on("error", reject);
+    child.on("error", (err) => {
+      forgetExtractPid(child.pid);
+      reject(err);
+    });
     child.on("close", (code) => {
+      forgetExtractPid(child.pid);
+      if (opts?.signal?.aborted) {
+        reject(new Error("Extract aborted"));
+        return;
+      }
       if (stderrBuf.trim()) {
         const prog = parseProgressLine(stderrBuf.trim());
         if (prog) opts?.onProgress?.(prog);

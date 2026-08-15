@@ -97,6 +97,42 @@ class LiveCardContinuityTests(unittest.TestCase):
         self.assertIsNone(det)
         self.assertIsNone(lea)
 
+    def test_first_wiped_progress_tip_keeps_det_lea(self):
+        """T014: Gilson first tip — tech wiped, u16>0, in-band gap → Det/Lea live."""
+        gilson_mental = [14, 19, 17, 15, 17, 14, 12, 16, 12, 16, 15, 13, 14, 18]
+        card = _synth_attr_card(
+            mental=gilson_mental, tech=0, u16=41360, b23=40
+        )
+        # Foreign decoy shape still rejected (u16=0).
+        decoy = _synth_attr_card(
+            mental=DECOY_MENTAL, physical=DECOY_PHYS, tech=0, u16=0, b23=83
+        )
+        self.assertIsNone(mod._ca_point_from_rec(decoy, gap=2060))
+
+        point = mod._ca_point_from_rec(card, gap=2060)
+        assert point is not None
+        self.assertEqual(point["mental"]["determination"], 14)
+        self.assertEqual(point["mental"]["leadership"], 16)
+        self.assertNotIn("technical", point)
+
+        # Out-of-band gap must not unlock hist=0 wiped cards.
+        self.assertIsNone(mod._ca_point_from_rec(card, gap=30_000))
+
+        history = mod.build_ca_history(card + bytes([0x11] * 2_500))
+        self.assertEqual(len(history), 1)
+        self.assertEqual(history[-1]["mental"]["determination"], 14)
+        self.assertEqual(history[-1]["mental"]["leadership"], 16)
+
+        out, status = mod.ensure_live_ca_on_history(None, card, gap=2060)
+        self.assertEqual(status, "appended")
+        self.assertEqual(out[-1]["mental"]["determination"], 14)
+        self.assertEqual(out[-1]["mental"]["leadership"], 16)
+
+        # Live same tip → same (tech stripped on both sides).
+        out2, status2 = mod.ensure_live_ca_on_history(out, card, gap=2060)
+        self.assertEqual(status2, "same")
+        self.assertEqual(out2[-1]["mental"]["determination"], 14)
+
     def test_score_prefers_nearest_continuing_card_over_far_high_b23(self):
         """Seimen regression: max-b23 favourite sat farther with Cmp=14."""
         mental_cmp13 = [*TIP_MENTAL[:12], 13, TIP_MENTAL[13]]

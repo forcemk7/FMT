@@ -40,6 +40,9 @@
   --radius-pill: 999px;
   --mono: "IBM Plex Mono", "Cascadia Mono", "Consolas", monospace;
   --sans: "IBM Plex Sans", "Segoe UI", sans-serif;
+  --mentoring-influence-light: #2f6fad;
+  --mentoring-influence-average: #c4a012;
+  --mentoring-influence-significant: #146b34;
 }
 
 /* FM-inspired dark: navy/charcoal, gold headings, mint positives, soft cards */
@@ -80,6 +83,9 @@
   --panel-border: transparent;
   --radius: 0.7rem;
   --radius-control: 0.45rem;
+  --mentoring-influence-light: #6cb6f5;
+  --mentoring-influence-average: #e8c547;
+  --mentoring-influence-significant: #3dffb0;
 }
 
 * {
@@ -1293,6 +1299,29 @@ html[data-boot="pending"][data-boot-tool="rank"] #roster {
 }
 
 .ranker-filter-row select:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent, var(--good)) 55%, var(--line));
+}
+
+.ranker-filter-row input.ranker-filter-value {
+  field-sizing: content;
+  height: 2rem;
+  margin: 0;
+  padding: 0 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background-color: var(--surface-soft);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.78rem;
+  box-sizing: border-box;
+  min-width: 3.5rem;
+  max-width: 5rem;
+  flex: 0 0 auto;
+  width: 4.25rem;
+}
+
+.ranker-filter-row input.ranker-filter-value:focus {
   outline: none;
   border-color: color-mix(in srgb, var(--accent, var(--good)) 55%, var(--line));
 }
@@ -4826,8 +4855,86 @@ td.attr-band {
   padding-bottom: 0.35rem;
 }
 
+.mentoring-mentees {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.4rem;
+  flex-shrink: 0;
+  min-height: 2.35rem;
+}
+
+.mentoring-mentees[hidden] {
+  display: none !important;
+}
+
+.mentoring-mentee {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 0;
+}
+
+button.mentoring-mentee {
+  cursor: pointer;
+}
+
+.mentoring-mentee .mentoring-seat-face-wrap {
+  width: 2.15rem;
+  height: 2.15rem;
+  min-width: 2.15rem;
+  min-height: 2.15rem;
+  max-width: 2.15rem;
+  max-height: 2.15rem;
+  border-radius: 50%;
+  flex: none;
+}
+
+.mentoring-mentee .mentoring-seat-face-fallback {
+  font-size: 0.72rem;
+}
+
+.mentoring-mentee.is-free .mentoring-seat-face-wrap {
+  outline: 2px solid color-mix(in srgb, var(--accent) 70%, var(--line));
+  outline-offset: 1px;
+}
+
+.mentoring-mentee.is-seated .mentoring-seat-face-wrap {
+  outline: 2px solid color-mix(in srgb, var(--good) 75%, var(--line));
+  outline-offset: 1px;
+}
+
+.mentoring-mentee.is-skipped {
+  opacity: 0.38;
+  filter: grayscale(0.65);
+}
+
+.mentoring-mentee.is-skipped .mentoring-seat-face-wrap {
+  outline: 1px dashed color-mix(in srgb, var(--muted) 55%, var(--line));
+  outline-offset: 1px;
+}
+
+button.mentoring-mentee.is-free:hover .mentoring-seat-face-wrap,
+button.mentoring-mentee.is-free:focus-visible .mentoring-seat-face-wrap {
+  outline-color: var(--accent);
+}
+
 .mentoring-status {
   margin: 0;
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.mentoring-status[hidden] {
+  display: none !important;
 }
 
 .mentoring-empty {
@@ -4900,6 +5007,10 @@ td.attr-band {
   color: color-mix(in srgb, var(--good) 75%, var(--ink));
 }
 
+.mentoring-card-why {
+  display: none;
+}
+
 .mentoring-card-shell {
   flex: 1;
   min-height: 0;
@@ -4929,6 +5040,7 @@ td.attr-band {
 
 .mentoring-card .mentoring-seat-card,
 .mentoring-card.is-dense .mentoring-seat-card {
+  position: relative;
   flex: 1;
   width: 100%;
   height: 100%;
@@ -4976,9 +5088,160 @@ td.attr-band {
   font-weight: 600;
 }
 
-.mentoring-seats.has-attrs-tip,
-.mentoring-seat-card.has-attrs-tip {
+.mentoring-seat-ha-tip {
+  position: absolute;
+  top: 0.16rem;
+  right: 0.16rem;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.05rem;
+  height: 1.05rem;
+  border-radius: 0.22rem;
+  border: 1px solid color-mix(in srgb, var(--ink) 16%, var(--line));
+  background: color-mix(in srgb, var(--panel) 90%, var(--surface));
+  color: var(--muted);
+  font-size: 0.5rem;
+  font-weight: 750;
+  letter-spacing: 0.03em;
+  line-height: 1;
   cursor: help;
+}
+
+.mentoring-seat-ha-tip:hover {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--line));
+}
+
+.mentoring-peer-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.18rem;
+  flex-shrink: 0;
+  width: 100%;
+  padding: 0 0.15rem 0.1rem;
+}
+
+.mentoring-peer-row {
+  display: flex;
+  align-items: center;
+  gap: 0.28rem;
+  min-width: 0;
+  cursor: help;
+}
+
+.mentoring-peer-ranks {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.12rem;
+  min-width: 1.05rem;
+  flex-shrink: 0;
+}
+
+.mentoring-peer-ranks.is-none {
+  min-height: 1em;
+}
+
+.mentoring-rank-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 0.52;
+  font-size: 0.42rem;
+}
+
+.mentoring-rank-stack.is-influence-light {
+  color: var(--mentoring-influence-light);
+}
+
+.mentoring-rank-stack.is-influence-average {
+  color: var(--mentoring-influence-average);
+}
+
+.mentoring-rank-stack.is-influence-significant {
+  color: var(--mentoring-influence-significant);
+}
+
+.mentoring-rank-stack.good,
+.mentoring-pair-marks .compare-delta.good,
+.mentoring-delta-stack .good {
+  color: var(--good);
+}
+
+.mentoring-rank-stack.bad,
+.mentoring-pair-marks .compare-delta.bad,
+.mentoring-delta-stack .bad {
+  color: var(--bad);
+}
+
+.mentoring-peer-row .mentoring-seat-face-wrap,
+.mentoring-card .mentoring-peer-row .mentoring-seat-face-wrap,
+.mentoring-card.is-dense .mentoring-peer-row .mentoring-seat-face-wrap {
+  width: 1.35rem;
+  height: 1.35rem;
+  min-width: 1.35rem;
+  min-height: 1.35rem;
+  max-width: 1.35rem;
+  max-height: 1.35rem;
+  flex: none;
+  aspect-ratio: auto;
+  border-radius: 50%;
+}
+
+.mentoring-peer-row .mentoring-seat-face-fallback,
+.mentoring-card .mentoring-peer-row .mentoring-seat-face-fallback {
+  font-size: 0.55rem;
+}
+
+.mentoring-pair-cell {
+  display: inline-grid;
+  grid-template-columns: minmax(2.85em, auto) 2ch;
+  justify-items: end;
+  align-items: center;
+  column-gap: 0.55rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.mentoring-pair-cell .compare-val {
+  width: 100%;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.mentoring-pair-marks {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.18rem;
+  width: 100%;
+  min-width: 2.85em;
+  min-height: 1em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.mentoring-seat-capa {
+  position: absolute;
+  left: 0.12rem;
+  right: 0.12rem;
+  bottom: 0.1rem;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  gap: 0.18rem;
+  font-size: 0.52rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  color: #fff;
+  text-shadow:
+    0 0 2px rgb(0 0 0 / 90%),
+    0 1px 2px rgb(0 0 0 / 80%);
+  pointer-events: none;
 }
 
 .mentoring-card .mentoring-matrix {
@@ -5044,10 +5307,16 @@ td.attr-band {
   color: color-mix(in srgb, var(--muted) 70%, var(--ink));
 }
 
-.mentoring-add-btn {
+.mentoring-board-actions {
   position: absolute;
   right: 0.85rem;
   bottom: 0.85rem;
+  display: flex;
+  gap: 0.4rem;
+  z-index: 1;
+}
+
+.mentoring-add-btn {
   padding: 0.55rem 1rem;
   border-radius: calc(var(--radius) - 2px);
   border: 1px solid color-mix(in srgb, var(--good) 45%, var(--line));
@@ -5063,6 +5332,16 @@ td.attr-band {
 .mentoring-add-btn:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--good) 60%, var(--line));
   background: color-mix(in srgb, var(--good) 30%, var(--panel));
+}
+
+.mentoring-board-suggest {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: color-mix(in srgb, var(--accent) 22%, var(--panel));
+}
+
+.mentoring-board-suggest:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
+  background: color-mix(in srgb, var(--accent) 30%, var(--panel));
 }
 
 .mentoring-add-btn:disabled {
@@ -5140,6 +5419,7 @@ td.attr-band {
 }
 
 .mentoring-seat-card {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -5353,10 +5633,27 @@ button.mentoring-seat-card:hover {
 }
 
 .mentoring-matrix .compare-pair {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.25rem;
-  justify-content: center;
+  display: inline-grid;
+  grid-template-columns: minmax(2.85em, auto) 2ch;
+  justify-items: end;
+  align-items: center;
+  column-gap: 0.55rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.mentoring-matrix .compare-val {
+  width: 100%;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.mentoring-matrix .compare-delta {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 2.85em;
+  min-height: 1em;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
 }
 
 .mentoring-matrix .compare-val.good,
@@ -5380,22 +5677,46 @@ button.mentoring-seat-card:hover {
 .mentoring-delta-stack {
   display: inline-flex;
   flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
   gap: 0.15rem;
   font-size: 0.68rem;
 }
 
-.mentoring-delta-stack .is-up,
-.mentoring-matrix .compare-delta.is-up {
+.mentoring-delta-stack .is-influence-light,
+.mentoring-matrix .compare-delta.is-influence-light,
+.mentoring-delta-arrow.is-influence-light {
+  color: var(--mentoring-influence-light);
+}
+
+.mentoring-delta-stack .is-influence-average,
+.mentoring-matrix .compare-delta.is-influence-average,
+.mentoring-delta-arrow.is-influence-average {
+  color: var(--mentoring-influence-average);
+}
+
+.mentoring-delta-stack .is-influence-significant,
+.mentoring-matrix .compare-delta.is-influence-significant,
+.mentoring-delta-arrow.is-influence-significant {
+  color: var(--mentoring-influence-significant);
+}
+
+.mentoring-matrix .compare-delta.good,
+.mentoring-matrix .mentoring-delta-stack .good {
   color: var(--good);
 }
 
-.mentoring-delta-stack .is-down,
-.mentoring-matrix .compare-delta.is-down {
+.mentoring-matrix .compare-delta.bad,
+.mentoring-matrix .mentoring-delta-stack .bad {
   color: var(--bad);
 }
 
 .mentoring-delta-arrow {
   font-size: 0.65rem;
+}
+
+.mentoring-delta-arrows .mentoring-rank-stack {
+  flex-shrink: 0;
 }
 
 .mentoring-picker-dialog,
@@ -5703,7 +6024,7 @@ button.mentoring-seat-card:hover {
     grid-template-columns: 1fr;
   }
 
-  .mentoring-add-btn {
+  .mentoring-board-actions {
     right: 0.65rem;
     bottom: 0.65rem;
   }
@@ -5909,6 +6230,7 @@ button.mentoring-seat-card:hover {
   min-width: 0;
   /* Keep tabs fully visible; status strip yields first. */
   z-index: 1;
+  overflow: visible;
 }
 
 .squad-toolbar-club {
@@ -5987,6 +6309,300 @@ button.mentoring-seat-card:hover {
   margin-top: 0;
   border-top: none;
   padding: 0.75rem 1rem 0.85rem;
+}
+
+.squad-ha-list {
+  min-height: 0;
+  padding: 0;
+}
+
+.squad-ha-list .ranker-list-table {
+  table-layout: fixed;
+}
+
+.squad-ha-list .ranker-list-table col.ranker-col-unit-check {
+  width: 3.75rem;
+}
+
+.squad-ha-list .ranker-list-table col.ranker-col-name {
+  width: 12%;
+}
+
+.squad-ha-list .ranker-list-table col.ranker-col-unit {
+  width: 3.5rem;
+}
+
+.squad-ha-list .ranker-list-table col.ranker-col-age {
+  width: 3.25rem;
+}
+
+.squad-ha-list .ranker-list-table col.ranker-col-personality {
+  width: 12%;
+}
+
+.squad-ha-list .ranker-list-table col.ranker-col-label {
+  width: 10%;
+}
+
+.squad-ha-list .ranker-list-table col.ranker-col-mid {
+  width: 5.2%;
+}
+
+.squad-ha-list .ranker-list-table col.ranker-col-ha {
+  width: 4.75rem;
+}
+
+.squad-ha-list .ranker-list-table th.ranker-col-unit-check,
+.squad-ha-list .ranker-list-table td.ranker-col-unit-check {
+  text-align: center;
+  vertical-align: middle;
+  padding-left: 0.35rem;
+  padding-right: 0.35rem;
+}
+
+.squad-ha-list .ranker-list-table th.ranker-col-unit-check {
+  font-weight: 650;
+}
+
+.squad-ha-list .squad-ha-unit-check {
+  width: 0.95rem;
+  height: 0.95rem;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--text, #222);
+}
+
+.squad-ha-list .squad-ha-group-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  margin: 0;
+  padding: 0 0.3rem;
+  border: 1px solid color-mix(in srgb, var(--border, #888) 70%, transparent);
+  border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.squad-ha-list .squad-ha-group-num:hover {
+  background: color-mix(in srgb, var(--text, #111) 8%, transparent);
+}
+
+.squad-ha-list .ranker-list-table th.ranker-col-name,
+.squad-ha-list .ranker-list-table td.ranker-col-name,
+.squad-ha-list .ranker-list-table th.ranker-col-personality,
+.squad-ha-list .ranker-list-table td.ranker-col-personality,
+.squad-ha-list .ranker-list-table th.ranker-col-label,
+.squad-ha-list .ranker-list-table td.ranker-col-label {
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.squad-ha-list .ranker-list-table td.ranker-col-name .squad-ha-ellipsis,
+.squad-ha-list .ranker-list-table td.ranker-col-personality .squad-ha-ellipsis,
+.squad-ha-list .ranker-list-table td.ranker-col-label .squad-ha-ellipsis {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  width: 100%;
+}
+
+.squad-ha-list .ranker-list-table th.ranker-col-unit,
+.squad-ha-list .ranker-list-table td.ranker-col-unit,
+.squad-ha-list .ranker-list-table th.ranker-col-age,
+.squad-ha-list .ranker-list-table td.ranker-col-age {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.squad-ha-list .ranker-list-table td.ranker-col-name {
+  font-weight: 650;
+}
+
+.squad-ha-list .ranker-list-table tbody tr {
+  cursor: pointer;
+}
+
+.squad-ha-list .ranker-list-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--accent) 8%, var(--ranker-sticky-row));
+}
+
+.squad-ha-list .ranker-list-table tbody tr.is-squad-selected td {
+  background: color-mix(in srgb, var(--accent) 16%, var(--ranker-sticky-row));
+}
+
+.squad-ha-list .ranker-list-table td.ranker-col-ha.is-empty,
+.squad-ha-list .ranker-list-table td.ranker-col-personality.is-empty,
+.squad-ha-list .ranker-list-table td.ranker-col-label.is-empty,
+.squad-ha-list .ranker-list-table td.ranker-col-name.is-empty,
+.squad-ha-list .ranker-list-table td.ranker-col-age.is-empty {
+  color: var(--disabled);
+  font-weight: 500;
+}
+
+#squad-filter-wrap .ranker-filter-popover {
+  right: auto;
+  left: 0;
+}
+
+.squad-filter-panel {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  padding: 0.55rem 0.7rem 0.65rem;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--panel);
+  box-shadow: none;
+  z-index: 2;
+}
+
+.squad-filter-panel[hidden] {
+  display: none;
+}
+
+.squad-filter-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.75rem;
+}
+
+.squad-filter-clear {
+  appearance: none;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  padding: 0.2rem 0.15rem;
+  cursor: pointer;
+}
+
+.squad-filter-clear:hover {
+  color: var(--ink);
+}
+
+.squad-filter-nudge {
+  appearance: none;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  background: var(--surface-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  padding: 0.2rem 0.45rem;
+  min-width: 2rem;
+  cursor: pointer;
+}
+
+.squad-filter-nudge:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+
+#squad-filter-rows {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: flex-start;
+  gap: 0.3rem;
+}
+
+#squad-filter-rows .ranker-filter-row {
+  flex: 0 0 auto;
+  width: max-content;
+  max-width: 100%;
+}
+
+#squad-filter-rows .ranker-filter-join {
+  flex: 0 0 auto;
+  padding-left: 0;
+}
+
+#squad-filter-rows .ranker-filter-empty {
+  flex: 1 1 100%;
+}
+
+#squad-filter-rows .ranker-filter-key {
+  max-width: 14rem;
+}
+
+#squad-filter-rows .ranker-filter-value {
+  flex: 0 0 auto;
+}
+
+#squad-filter-rows .ranker-filter-row[data-filter-kind="text"] .ranker-filter-value {
+  flex: 0 0 auto;
+  field-sizing: content;
+  width: max-content;
+}
+
+.squad-filter-stepper {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  flex: 0 0 auto;
+}
+
+.squad-filter-step {
+  flex: 0 0 auto;
+  width: 1.75rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background: var(--surface-soft);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.95rem;
+  font-weight: 650;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.squad-filter-step:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+
+.squad-filter-step:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.squad-filter-stepper .ranker-filter-value {
+  flex: 0 0 auto;
+  min-width: 3.25rem;
+}
+
+.squad-grid-panel.is-empty-roster #squad-filter-wrap,
+.squad-grid-panel.is-mentoring #squad-filter-wrap,
+.squad-grid-panel.is-loans #squad-filter-wrap,
+.squad-grid-panel.is-attributes #squad-filter-wrap,
+.squad-grid-panel.is-empty-roster .squad-filter-panel,
+.squad-grid-panel.is-mentoring .squad-filter-panel,
+.squad-grid-panel.is-loans .squad-filter-panel,
+.squad-grid-panel.is-attributes .squad-filter-panel {
+  display: none !important;
 }
 
 .squad-personality-grid {
@@ -6436,64 +7052,35 @@ button.mentoring-seat-card:hover {
   align-items: stretch;
   box-sizing: border-box;
   height: var(--squad-evo-control-h);
-  padding: 0.12rem;
-  border-radius: var(--radius-control);
-  background: var(--surface-soft);
-  gap: 0.1rem;
-}
-
-.squad-evo-attr-mode-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   gap: 0.35rem;
-  box-sizing: border-box;
+}
+
+.squad-evo-select {
+  appearance: none;
+  field-sizing: content;
   height: 100%;
+  margin: 0;
+  padding: 0 1.45rem 0 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  background-color: var(--surface-soft);
+  background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%),
+    linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 0.65rem) calc(50% - 0.1rem),
+    calc(100% - 0.4rem) calc(50% - 0.1rem);
+  background-size: 0.28rem 0.28rem, 0.28rem 0.28rem;
+  background-repeat: no-repeat;
+  color: var(--ink);
   font: inherit;
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  padding: 0 0.7rem;
-  border: 0;
-  border-radius: calc(var(--radius-control) - 0.05rem);
-  background: transparent;
-  color: var(--muted);
+  font-size: 0.78rem;
   cursor: pointer;
+  box-sizing: border-box;
 }
 
-.squad-evo-attr-mode-btn:hover:not(.is-locked) {
-  color: var(--ink);
-}
-
-.squad-evo-attr-mode-btn[aria-pressed="true"] {
-  background: var(--panel);
-  color: var(--ink);
-  box-shadow: 0 0 0 1px var(--line);
-}
-
-.squad-evo-attr-mode-btn.is-locked {
-  cursor: not-allowed;
-  opacity: 0.72;
-}
-
-.squad-evo-kind-count {
-  display: inline-grid;
-  place-items: center;
-  min-width: 1.05rem;
-  height: 1.05rem;
-  padding: 0 0.22rem;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--ink) 14%, transparent);
-  color: var(--ink);
-  font-size: 0.68rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  line-height: 1;
-}
-
-.squad-evo-attr-mode-btn.is-locked .squad-evo-kind-count {
-  background: color-mix(in srgb, var(--muted) 28%, transparent);
-  color: var(--muted);
+.squad-evo-select:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--accent, var(--good)) 55%, var(--line));
 }
 
 .squad-evolution-toggles {
@@ -6570,11 +7157,14 @@ button.mentoring-seat-card:hover {
 }
 
 .squad-evo-toggle-meta {
-  display: inline-flex;
+  display: inline-grid;
+  grid-template-columns: 2.85em 2ch;
+  justify-items: end;
   align-items: baseline;
-  gap: 0.28rem;
+  column-gap: 0.45rem;
   flex: 0 0 auto;
   margin-left: auto;
+  padding-left: 0.4rem;
   font-variant-numeric: tabular-nums;
   font-weight: 650;
   line-height: 1;
@@ -6582,16 +7172,29 @@ button.mentoring-seat-card:hover {
 
 .squad-evo-toggle-val {
   color: inherit;
-  min-width: 1.1rem;
+  width: 100%;
   text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.squad-evo-toggle-val.good {
+  color: var(--good);
+}
+
+.squad-evo-toggle-val.bad {
+  color: var(--bad);
 }
 
 .squad-evo-toggle-delta {
-  min-width: 1.35rem;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 1em;
   text-align: right;
   font-size: 0.66rem;
   font-weight: 700;
-  color: transparent;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .squad-evo-toggle-delta.is-up {
@@ -6604,8 +7207,8 @@ button.mentoring-seat-card:hover {
 
 .squad-evo-toggle.is-on {
   color: var(--ink);
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color: color-mix(in srgb, var(--ink) 42%, var(--line));
+  background: transparent;
 }
 
 .squad-evo-toggle.is-stub,

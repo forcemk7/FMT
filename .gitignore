@@ -8,6 +8,8 @@ data/history.json
 data/history.json.bak
 # Local career saves for import / reverse-engineering (large binaries)
 data/saves/
+data/faces/
+data/logos/
 *.fm
 
 __pycache__/

@@ -1,12 +1,15 @@
 /**
- * FMT-side hidden-attribute (mental-trait pack) development history.
+ * FMT-side hidden-attribute development history (pack + Det/Lea).
  *
- * FM overwrites the live pack in-place — there is no CA-style strip in the save.
- * We snapshot pack values on each Career Save upload, keyed by club + gameDate.
+ * FM overwrites live HA in-place — there is no CA-style strip in the save.
+ * We snapshot pack + Det/Lea on each Career Save upload, keyed by club + gameDate.
  */
 
 import type { GeneralAttributes, GeneralKey } from "../shared/save/types.ts";
-import type { RosterPlayer } from "./roster-data.ts";
+import {
+  rosterPersonalitySignals,
+  type RosterPlayer,
+} from "./roster-data.ts";
 import type { RosterStore, StoredRoster } from "./roster-store.ts";
 
 const STORAGE_KEY = "fmt.ha-history.v1";
@@ -25,6 +28,10 @@ export const HA_PACK_KEYS = [
 
 export type HaPackKey = (typeof HA_PACK_KEYS)[number];
 
+/** Mentoring HA that live under mental (not the pack). */
+export const HA_MENTAL_KEYS = ["determination", "leadership"] as const;
+export type HaMentalKey = (typeof HA_MENTAL_KEYS)[number];
+
 export type HaPackSnapshot = {
   /** In-game date (ISO YYYY-MM-DD). */
   gameDate: string;
@@ -33,6 +40,8 @@ export type HaPackSnapshot = {
   /** Save filename that contributed this point (debug / provenance). */
   saveName?: string | null;
   values: Partial<Record<HaPackKey, number>>;
+  /** Det/Lea at this extract (same date as pack). */
+  mental?: Partial<Record<HaMentalKey, number>>;
 };
 
 export type HaCareerHistory = {
@@ -71,6 +80,23 @@ export function packValuesFromGeneral(
     n += 1;
   }
   return n > 0 ? values : null;
+}
+
+/** Det/Lea as the HA table shows them (tip over live). */
+export function mentalHaFromPlayer(
+  player: RosterPlayer,
+): Partial<Record<HaMentalKey, number>> | null {
+  const signals = rosterPersonalitySignals(player);
+  if (!signals) return null;
+  const mental: Partial<Record<HaMentalKey, number>> = {};
+  let n = 0;
+  for (const key of HA_MENTAL_KEYS) {
+    const raw = signals[key];
+    if (!isFiniteAttr(raw)) continue;
+    mental[key] = raw;
+    n += 1;
+  }
+  return n > 0 ? mental : null;
 }
 
 export function packSignature(
@@ -186,13 +212,15 @@ export function mergeHaHistoryFromRoster(
   let merged = 0;
   for (const player of pool) {
     const values = packValuesFromGeneral(player.attributes?.general);
-    if (!values) continue;
+    const mental = mentalHaFromPlayer(player);
+    if (!values && !mental) continue;
     const uid = String(player.uid);
     career.players[uid] = upsertHaSnapshot(career.players[uid] ?? [], {
       gameDate,
       extractedAt: entry.extractedAt,
       saveName: entry.saveName,
-      values,
+      values: values ?? {},
+      ...(mental ? { mental } : {}),
     });
     merged += 1;
   }
@@ -220,18 +248,22 @@ export function backfillHaHistoryFromRosterStore(
   return next;
 }
 
-/** Map snapshots → AttributeHistoryPoint-shaped series (general nest + date). */
+/** Map snapshots → AttributeHistoryPoint-shaped series (pack general + Det/Lea mental). */
 export function haSnapshotsToHistoryPoints(
   snapshots: HaPackSnapshot[],
 ): Array<{
   index: number;
   date: string;
   general: Partial<Record<HaPackKey, number>>;
+  mental?: Partial<Record<HaMentalKey, number>>;
 }> {
   return snapshots.map((snap, index) => ({
     index,
     date: snap.gameDate,
     general: { ...snap.values },
+    ...(snap.mental && Object.keys(snap.mental).length > 0
+      ? { mental: { ...snap.mental } }
+      : {}),
   }));
 }
 

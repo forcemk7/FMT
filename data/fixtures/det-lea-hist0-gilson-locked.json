@@ -1,41 +1,39 @@
 {
-  "layout": "det-lea-hist0-gilson-v1",
-  "description": "T014 negative + poison lock for recent-signing (hist=0) Det/Lea",
-  "saveBinUsed": "tmp/live-0112-decomp.bin",
+  "layout": "det-lea-gilson-tip-v2",
+  "description": "T014: Gilson first Progress Report tip unlocks Det/Lea; hist=0 poison still rejected",
+  "saveUsed": "data/saves/dynamics-b.fm",
+  "saveNote": "Newest .fm by mtime/size with tip present. Named FC Schalke Career (31.01.2040) still tip-absent (hist=0 lookback empty within ATTR_LOOKBACK).",
   "player": {
     "name": "Domenico Gilson",
     "uid": 2002200653,
-    "doubles": [124409164, 251577995],
-    "personDouble": 251577995,
-    "personalityPackAbs": 251577590,
+    "personDouble": 248762237,
     "personalityPack": [14, 15, 15, 18, 16, 16, 13, 5],
     "fmGroundTruth": {
       "determination": 14,
       "leadership": 16,
       "personality": "Light-Hearted",
-      "mediaHandling": "Evasive, Reserved"
+      "mediaHandling": "Evasive, Reserved",
+      "reconfirmedOn": "dynamics-b tip card mental decode"
     }
   },
-  "findings": {
-    "caHistoryPoints": 0,
-    "lookbackAttrCards": [
-      {
-        "gap": 11107,
-        "determination": 20,
-        "leadership": 3,
-        "technicalWiped": true,
-        "note": "Foreign decoy; live_status=rejected"
-      }
-    ],
-    "gilsonOwnedAttrishDet14Lea16Within5MB": 0,
-    "lateFileDetLea80NearUidOrIid": 0,
-    "classicStaffOrderPackWithDet": 0,
-    "note": "Det/Lea for hist>0 players come only from CA tip strips (*5 mental). No alternate locked locus for hist=0 on this save."
+  "tipPath": {
+    "gap": 2060,
+    "snapshotU16": 41360,
+    "b23": 40,
+    "determination": 14,
+    "leadership": 16,
+    "technicalWiped": true,
+    "note": "First tip: mental/phys live, Technique=0 junk tail. Accepted via _accept_first_wiped_progress_tip (u16>0 + in-band gap)."
   },
   "productRule": {
-    "when": "live_status=rejected and attributeHistory empty",
-    "mustNot": "apply decoded lookback mental as live Det/Lea",
-    "must": "attributes.mental.determination/leadership = null; keep HA pack general"
+    "when": "tech-wiped card with snapshotU16>0 and ATTR_CARD_GAP_MIN..MAX and no prior tip",
+    "must": "keep mental/phys Det/Lea; strip technical; attributeHistory tip + HA row numbers",
+    "mustNot": "accept hist=0 wiped decoys with snapshotU16==0 (Det20/Lea3 poison)"
   },
-  "notLocked": "Positive file offset / encoding where Gilson current Det=14 Lea=16 live without a CA tip strip"
+  "otherTeammates": "Superseded by T038: II Lars Gabrielsen (2002323685) is the other T014-class tip on dynamics-b (Det16/Lea9). Remaining hist=0: FT uid 2002115380 (name unresolved), II Christian Yao.",
+  "negativeLock": {
+    "layout": "det-lea-hist0-gilson-v1",
+    "when": "live_status=rejected and attributeHistory empty",
+    "mustNot": "apply decoded lookback mental as live Det/Lea"
+  }
 }

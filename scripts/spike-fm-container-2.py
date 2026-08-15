@@ -7,13 +7,7 @@ from pathlib import Path
 
 import zstandard as zstd
 
-GAMES = (
-    Path.home()
-    / "Documents"
-    / "Sports Interactive"
-    / "Football Manager 26"
-    / "games"
-)
+GAMES = Path(__file__).resolve().parents[1] / "data" / "saves"
 OUT_DIR = Path(__file__).resolve().parents[1] / "tmp" / "fm-spike"
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
