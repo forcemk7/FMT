@@ -1019,17 +1019,13 @@ main {
   display: none !important;
 }
 
-/* First paint: honor restored tool before module boot clears [hidden]. */
-html[data-boot="pending"][data-boot-tool="roster"] #rank {
+/* First paint: ranker is not a product tool (T075). */
+html[data-boot="pending"] #rank {
   display: none !important;
 }
 
-html[data-boot="pending"][data-boot-tool="roster"] #roster[hidden] {
+html[data-boot="pending"] #roster[hidden] {
   display: flex !important;
-}
-
-html[data-boot="pending"][data-boot-tool="rank"] #roster {
-  display: none !important;
 }
 
 .rank {

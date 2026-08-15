@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Best Player Personalities | FMT</title>
+    <title>Squad Analyzer | FMT</title>
     <meta
       name="description"
-      content="Football Manager 26 tools: rank the best player personalities by hidden attributes, and calculate likely hidden attribute bands from personality and media handling."
+      content="Football Manager 26 squad analyzer — Squad, Loans, Mentoring, and Progress from your Career Save."
     />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <script>
@@ -15,59 +15,8 @@
         root.dataset.theme = "arena";
         root.dataset.boot = "pending";
 
-        const hash = (location.hash || "").replace(/^#/, "");
-        const hashHead = hash.split("/")[0] || "";
-        let stored = "";
-        try {
-          stored = localStorage.getItem("fmt.activeTool") || "";
-        } catch (_) {}
-
-        // Early SEO title for deep links before main.ts runs.
-        if (hashHead === "checker" || hash === "checker") {
-          document.title = "FM26 Hidden Attributes Calculator | FMT";
-          const meta = document.querySelector('meta[name="description"]');
-          if (meta) {
-            meta.setAttribute(
-              "content",
-              "FM26 hidden attributes calculator. Enter player personality, media handling, age, Determination and Leadership to estimate likely hidden attribute mids and bands.",
-            );
-          }
-        } else if (hashHead === "compare" || hash === "compare") {
-          document.title = "Compare FM26 Personalities | Hidden Attributes | FMT";
-          const meta = document.querySelector('meta[name="description"]');
-          if (meta) {
-            meta.setAttribute(
-              "content",
-              "Compare Football Manager 26 player personalities and media handling side by side to see estimated hidden attribute bands.",
-            );
-          }
-        }
-
-        let tool = "rank";
-        if (
-          hashHead === "roster" ||
-          hashHead === "squad" ||
-          hashHead === "scouting" ||
-          hashHead === "scout" ||
-          hashHead === "mentoring"
-        ) {
-          tool = "roster";
-        } else if (
-          hashHead === "rank" ||
-          hashHead === "checker" ||
-          hashHead === "compare"
-        ) {
-          tool = "rank";
-        } else if (
-          stored === "roster" ||
-          stored === "squad" ||
-          stored === "scouting" ||
-          stored === "scout"
-        ) {
-          tool = "roster";
-        } else if (stored === "rank" || stored === "checker" || stored === "compare") {
-          tool = "rank";
-        }
+        // Ship is four tabs (T075). Ranker / checker / compare hashes land on Squad.
+        const tool = "roster";
 
         let rosterCount = 0;
         let rosterClub = "";
@@ -82,18 +31,6 @@
             rosterClub = (save && save.clubName) || "";
           }
         } catch (_) {}
-
-        // Keep an explicit #roster / #squad URL on Squad even with no saves —
-        // falling back to Rank made hard-refresh look like Career Saves vanished.
-        const hashWantsRoster =
-          hashHead === "roster" ||
-          hashHead === "squad" ||
-          hashHead === "scouting" ||
-          hashHead === "scout" ||
-          hashHead === "mentoring";
-        if (tool === "roster" && rosterCount === 0 && !hashWantsRoster) {
-          tool = "rank";
-        }
 
         root.dataset.bootTool = tool;
         root.dataset.bootRosterCount = String(Math.min(25, rosterCount));
@@ -115,22 +52,19 @@
             <button
               type="button"
               class="app-brand"
-              data-tool="rank"
-              aria-label="FMT — Best Player Personalities"
+              data-tool="roster"
+              aria-label="FMT — Squad"
             >
               FMT
             </button>
-            <nav id="tool-nav" class="tool-nav" aria-label="Tools">
-              <button type="button" class="tool-nav-btn" data-tool="rank">
-                Best Personalities
-              </button>
+            <nav id="tool-nav" class="tool-nav" aria-label="Tools" hidden>
               <button type="button" class="tool-nav-btn" data-tool="roster">
                 Squad
               </button>
             </nav>
           </header>
 
-          <section id="rank" class="tool-view rank" aria-labelledby="ranker-heading" data-density="narrow">
+          <section id="rank" class="tool-view rank" aria-labelledby="ranker-heading" data-density="narrow" hidden>
             <script>
               (() => {
                 const rank = document.currentScript && document.currentScript.parentElement;
@@ -1134,7 +1068,6 @@
             id="roster"
             class="tool-view roster"
             aria-labelledby="roster-heading"
-            hidden
           >
             <div class="rank-header">
               <h1 id="roster-heading">
@@ -1178,6 +1111,26 @@
                     </button>
                     <button
                       type="button"
+                      id="squad-view-loans"
+                      class="squad-view-tab"
+                      role="tab"
+                      aria-selected="false"
+                      data-squad-view="loans"
+                    >
+                      Loans
+                    </button>
+                    <button
+                      type="button"
+                      id="squad-view-mentoring"
+                      class="squad-view-tab"
+                      role="tab"
+                      aria-selected="false"
+                      data-squad-view="mentoring"
+                    >
+                      Mentoring
+                    </button>
+                    <button
+                      type="button"
                       id="squad-view-progress"
                       class="squad-view-tab"
                       role="tab"
@@ -1207,26 +1160,6 @@
                       hidden
                     >
                       Under 19s
-                    </button>
-                    <button
-                      type="button"
-                      id="squad-view-loans"
-                      class="squad-view-tab"
-                      role="tab"
-                      aria-selected="false"
-                      data-squad-view="loans"
-                    >
-                      Loans
-                    </button>
-                    <button
-                      type="button"
-                      id="squad-view-mentoring"
-                      class="squad-view-tab"
-                      role="tab"
-                      aria-selected="false"
-                      data-squad-view="mentoring"
-                    >
-                      Mentoring
                     </button>
                   </div>
                   <div class="ranker-filter-wrap" id="squad-filter-wrap" hidden>

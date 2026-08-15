@@ -661,7 +661,7 @@ function setSquadViewMode(mode: SquadViewMode) {
 
   syncActiveSquadPlayers();
 
-  // Navigator: Squad | Progress | Loans | Mentoring (unit tabs collapsed).
+  // Navigator: Squad | Loans | Mentoring | Progress (unit tabs collapsed).
   squadViewReservesEl.hidden = true;
   squadViewUnder19sEl.hidden = true;
   squadViewFirstTeamEl.textContent = "Squad";
@@ -1376,6 +1376,11 @@ function isAppTool(value: string | null | undefined): value is AppTool {
   return value === "rank" || value === "roster";
 }
 
+/** T075: product chrome is Squad only. Ranker stays in DOM for HAS math. */
+function productTool(_value?: string | null): AppTool {
+  return "roster";
+}
+
 /** Former Attributes/Compare pages → open HAS Rank probe modal once. */
 let pendingOpenProbe = false;
 let pendingOpenProbeMode: ProbeMode = "single";
@@ -1410,7 +1415,7 @@ function readHashRoute(): {
     return { tool: "roster", squadView: "firstTeam", unitView: null };
   }
   if (head === "checker" || head === "compare" || head === "rank") {
-    return { tool: "rank", squadView: null, unitView: null };
+    return { tool: "roster", squadView: "firstTeam", unitView: null };
   }
   if (isAppTool(head)) return { tool: head, squadView: null, unitView: null };
   return { tool: null, squadView: null, unitView: null };
@@ -1432,28 +1437,26 @@ function readStoredTool(): AppTool | null {
     pendingSquadViewMode = "mentoring";
     return "roster";
   }
-  // Former top-level Scouting tool → First Team.
+  // Former top-level Scouting tool → Squad.
   if (hashRoute.tool === "roster" && hashRoute.squadView === "firstTeam") {
     return "roster";
   }
-  // Former Attributes page / #checker → HAS Rank + single probe.
-  if (readHashToolRaw() === "checker") {
-    pendingOpenProbe = true;
-    pendingOpenProbeMode = "single";
-    return "rank";
+  // Former Ranker / Checker / Compare → Squad (T075).
+  if (
+    readHashToolRaw() === "checker" ||
+    readHashToolRaw() === "compare" ||
+    readHashToolRaw() === "rank"
+  ) {
+    pendingOpenProbe = false;
+    return "roster";
   }
-  // Former Compare page → HAS Rank + compare probe.
-  if (readHashToolRaw() === "compare") {
-    pendingOpenProbe = true;
-    pendingOpenProbeMode = "compare";
-    return "rank";
-  }
-  if (hashRoute.tool) return hashRoute.tool;
-  if (isAppTool(stored)) return stored;
+  if (hashRoute.tool) return productTool(hashRoute.tool);
+  if (isAppTool(stored)) return productTool(stored);
   return null;
 }
 
 function persistActiveTool(tool: AppTool) {
+  tool = productTool(tool);
   try {
     window.localStorage.setItem(TOOL_STORAGE_KEY, tool);
   } catch {
@@ -1461,8 +1464,7 @@ function persistActiveTool(tool: AppTool) {
   }
   const view = pendingSquadViewMode ?? squadViewMode;
   const unitView = pendingSquadUnitView ?? squadUnitView;
-  const nextHash =
-    tool === "roster" ? rosterHashForView(view, unitView) : `#${tool}`;
+  const nextHash = rosterHashForView(view, unitView);
   if (window.location.hash !== nextHash) {
     window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${nextHash}`);
   }
@@ -1550,7 +1552,7 @@ function restoreCheckerDraft() {
 
 /** Active tool pane — independent of drawer saves/players panel. */
 let activeTool: AppTool = (() => {
-  return readStoredTool() ?? "rank";
+  return readStoredTool() ?? "roster";
 })();
 
 /** Default: mixed REAL+NEWGEN list with labels where HA differs. */
@@ -11739,11 +11741,8 @@ function createProbeNudge(): HTMLElement {
 let suppressProbeHashRestore = false;
 
 function syncProbeHash(open: boolean) {
-  const nextHash = !open
-    ? "#rank"
-    : probeMode === "compare"
-      ? "#compare"
-      : "#checker";
+  if (open) return;
+  const nextHash = rosterHashForView(squadViewMode, squadUnitView);
   if (window.location.hash !== nextHash) {
     window.history.replaceState(
       null,
@@ -11786,8 +11785,8 @@ function syncDocumentSeo() {
     meta?.setAttribute("content", SEO_DESC_ROSTER);
     return;
   }
-  document.title = SEO_TITLE_RANK;
-  meta?.setAttribute("content", SEO_DESC_RANK);
+  document.title = SEO_TITLE_ROSTER;
+  meta?.setAttribute("content", SEO_DESC_ROSTER);
 }
 
 function syncProbeModeChrome() {
@@ -11849,10 +11848,10 @@ function setProbeMode(
 
 /** HAS Rank detail modal (ex Attributes / Compare pages). */
 function openProbe(options?: { mode?: ProbeMode; seedCompare?: boolean }) {
-  if (activeTool !== "rank") {
-    activeTool = "rank";
+  if (activeTool !== "roster") {
+    activeTool = "roster";
     try {
-      window.localStorage.setItem(TOOL_STORAGE_KEY, "rank");
+      window.localStorage.setItem(TOOL_STORAGE_KEY, "roster");
     } catch {
       // ignore private-mode / quota failures
     }
@@ -11883,10 +11882,10 @@ function closeProbe(options?: { restoreHash?: boolean }) {
 }
 
 function syncToolView() {
-  rankEl.hidden = activeTool !== "rank";
-  rosterEl.hidden = activeTool !== "roster";
+  rankEl.hidden = true;
+  rosterEl.hidden = false;
 
-  shellEl.dataset.tool = activeTool;
+  shellEl.dataset.tool = "roster";
   // Mentoring no longer uses the history probe drawer.
   shellEl.dataset.drawer = "off";
   // Clear first-paint boot skeletons / tool restore markers.
@@ -11905,9 +11904,8 @@ function syncToolView() {
     else btn.removeAttribute("aria-current");
   }
 
-  document.documentElement.dataset.tool = activeTool;
-  if (activeTool === "rank") scheduleRankerDensitySync();
-  if (activeTool === "roster") {
+  document.documentElement.dataset.tool = "roster";
+  {
     const restoreView = pendingSquadViewMode;
     const restoreUnitView = pendingSquadUnitView;
     pendingSquadViewMode = null;
@@ -11932,8 +11930,8 @@ function syncToolView() {
  */
 function setTool(tool: AppTool) {
   if (isProbeOpen()) closeProbe({ restoreHash: false });
-  activeTool = tool;
-  persistActiveTool(tool);
+  activeTool = productTool(tool);
+  persistActiveTool(activeTool);
   syncToolView();
 }
 
@@ -12460,7 +12458,7 @@ function createNewSave() {
   history.activeSaveId = save.id;
   history.activePlayerId = null;
   history.panel = "saves";
-  activeTool = "rank";
+  activeTool = "roster";
   forceCreateNext = false;
   renderHistory();
   fillSaveForm(save);
@@ -14077,19 +14075,7 @@ void loadHistory()
     fillPlayerForm(player ?? null);
     restoreCheckerDraft();
     const stored = readStoredTool();
-    activeTool =
-      stored ??
-      (history.panel === "players" && player ? "roster" : "rank");
-    // Stay on Squad when the URL asks for it — empty state is the upload CTA,
-    // not a bounce to Rank (that looked like Career Saves were wiped).
-    const hashWantsRoster = readHashRoute().tool === "roster";
-    if (
-      activeTool === "roster" &&
-      rosterSaveCount() === 0 &&
-      !hashWantsRoster
-    ) {
-      activeTool = "rank";
-    }
+    activeTool = productTool(stored ?? "roster");
     persistActiveTool(activeTool);
     applyActiveRosterFromStore();
     syncToolView();
@@ -14108,15 +14094,7 @@ void loadHistory()
     fillSaveForm(null);
     fillPlayerForm(null);
     restoreCheckerDraft();
-    activeTool = readStoredTool() ?? "rank";
-    const hashWantsRoster = readHashRoute().tool === "roster";
-    if (
-      activeTool === "roster" &&
-      rosterSaveCount() === 0 &&
-      !hashWantsRoster
-    ) {
-      activeTool = "rank";
-    }
+    activeTool = productTool(readStoredTool() ?? "roster");
     persistActiveTool(activeTool);
     applyActiveRosterFromStore();
     syncToolView();
@@ -14130,7 +14108,9 @@ void loadHistory()
 
 appBrandEl.addEventListener("click", () => {
   closeProbe({ restoreHash: false });
-  setTool("rank");
+  squadUnitView = "personalities";
+  setSquadViewMode("firstTeam");
+  setTool("roster");
 });
 
 toolNavEl.addEventListener("click", (event) => {
@@ -14140,7 +14120,7 @@ toolNavEl.addEventListener("click", (event) => {
   if (!btn || !toolNavEl.contains(btn) || btn.disabled) return;
   const tool = btn.dataset.tool;
   if (tool === "rank" || tool === "roster") {
-    setTool(tool);
+    setTool("roster");
   }
 });
 

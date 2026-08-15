@@ -30,7 +30,7 @@ Last updated: 2026-08-15 (HQ: Squad + Loans + Mentoring + Progress)
 
 **SHIP.** Lookup is the product (Itu → Robert + Miraglia → Group 3). Git: one commit per ticket. Money: Buy Me a Coffee, not a paywall.
 
-**Next:** T075 strip other chrome, T070 BMC (needs URL). T074 cancelled (Loans stays).
+**Next:** T070 BMC (needs URL). T074 cancelled (Loans stays).
 
 | Area | State | Need-to-have? |
 |------|--------|---------------|
@@ -74,12 +74,12 @@ Last updated: 2026-08-15 (HQ: Squad + Loans + Mentoring + Progress)
 | One extract Python (no 5×2GB on start) | **T072 done** | **Yes** |
 | Extract this club only (not world) | **T076 done** | **Yes** |
 | Personalities label → Squad | **T073 done** | Yes |
+| Ranker / checker / compare chrome | **T075 done** | Yes |
 
 ## Board
 
 | ID | Title | Status | Owner |
 |----|-------|--------|-------|
-| T075 | Strip chrome that is not the four tabs | ready | |
 | T070 | Buy Me a Coffee tip on the UI | ready | |
 
 ## Behavior
@@ -108,6 +108,7 @@ Last updated: 2026-08-15 (HQ: Squad + Loans + Mentoring + Progress)
 
 ## Recently done
 
+- **T075** — Navigator is Squad | Loans | Mentoring | Progress. Ranker / Best Personalities / checker hashes land on Squad. Loans + HAS table unchanged.
 - **T076** — Extract walks this club’s FT/II/U19 only (skip all-club 7f02 + foreign staff-link ranking; stadiums never walked). König `data/saves` copy: 372s → 316s; same 34/30/30 UIDs, U19 before-name, FT CA strip. Live `games/*.fm` still refused. Restart `npm run dev`.
 - **T071** — Mentoring board and Add-group picker have no Suggest button. Groups + Add group / HA Group checks unchanged. Suggest engine left in place.
 - **T073** — Navigator tab Personalities → Squad. Click/filter/Group unchanged. Ranker chrome left for T075.
