@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-08-16 (T093 done)
+Last updated: 2026-08-16 (T094 done; T087 frozen)
 
 ## Now
 
@@ -42,9 +42,13 @@ Last updated: 2026-08-16 (T093 done)
 
 **T092 done** — FT join primary key is identity club UniqueID; UTF-8 parent_short is fallback. Strict `7f02…ffffffff` / +128 / 00×10 expand to loose `7f02` and `010302`. Resolve PROGRESS includes `jobsFound`. Identity known + miss still `ft-club-squad-join-miss`, never `pick_tid`. Restart `npm run dev` and re-extract a non-Schalke career.
 
-**T093 done** — Two recipes in one Python: continue = club-object `7f02`; native = UniqueID-keyed `parse_squad_candidates` / `010302`. PROGRESS `layout` is `continue` | `native`. Identity known no longer skips native list discovery and still never `pick_tid` or world-club walk. Restart `npm run dev` and re-extract a native FM26 career.
+**T093 done** — Two recipes in one Python: continue = club-object `7f02`; native = UniqueID glued to `7f02`+`010302`. PROGRESS `layout` is `continue` | `native`. Identity known no longer skips native list discovery and still never `pick_tid` or world-club walk.
 
-**Next:** **T087** (Progress GK vs outfield CA layout). Do not claim T077 / T080 / T081.
+**T094 done** — Native UniqueID then nearby `7f02`+`010302` (expanding `LIST_WINDOWS`). Glued UniqueID|`7f02` still hits. Identity known + miss still `ft-club-squad-join-miss`. Restart `npm run dev` and re-extract a native FM26 career.
+
+**Used (2026-08-16 HQ):** T093 glued UniqueID|`7f02` missed real club objects. **T094 done** — nearby list. Native `players[]` still unknown until re-extract.
+
+**Next:** **T087 frozen** until native `players[]` is non-empty. Do not claim T077 / T080 / T081. Empty ready board — do not invent work.
 
 | Area | State | Need-to-have? |
 |------|--------|---------------|
@@ -98,7 +102,8 @@ Last updated: 2026-08-16 (T093 done)
 | Non-Schalke extract empty Squad (first catalog hit) | **T091 done** | **Yes** |
 | Non-Schalke extract still 0 players | **T092 done** | **Yes** |
 | Native FM26 0 players (continue join only) | **T093 done** | **Yes** |
-| Progress GK abilities + outfield GK rating | **T087 ready** (after T093) | after T093 |
+| Native FM26 still 0 players (UniqueID glued to 7f02) | **T094 done** | **Yes** |
+| Progress GK abilities + outfield GK rating | **T087 blocked** (on T094) | after native roster |
 | npm run dev from HQ | **T089 cancelled** | — |
 | Sync steals Active save when extract finishes | **T088 done** | **Yes** |
 | II/U19 Progress CA strip | **T079 done** | **Yes** |
@@ -107,7 +112,7 @@ Last updated: 2026-08-16 (T093 done)
 
 | ID | Title | Status | Owner |
 |----|-------|--------|-------|
-| T087 | Progress GK vs outfield CA layout | ready | |
+| T087 | Progress GK vs outfield CA layout | blocked | |
 | T077 | Live www URL — upload save, extract, four tabs | blocked | |
 | T080 | Stop favoured-club extract on roster path | blocked | |
 | T081 | Faster loan motif search — same loan flags | blocked | |
@@ -118,7 +123,7 @@ Last updated: 2026-08-16 (T093 done)
 - Units in FMT = planning reminder for FM. Mentoring pool = at-club only. Loaned names on Loans. Same person must not be on both.
 - **Used (2026-08-14):** Clear filters → click Adrian Itu → loosen-all → Yoan Robert + Miraglia. FT-only hid this. Empty FT list was correct.
 - **Used (2026-08-16 HQ):** Start sync on save A → select save B in Manage saves → extract finishes → view jumped back to A. **T088 done** — persist stays on A’s slot; Active / Squad stay on B.
-- **Used (2026-08-16 HQ):** Club id/name on Manage saves, 0 players. Schalke = FM24 continue; others = native FM26. Identity works; continue 7f02 join does not. Native list parse is skipped because identity is known. **T093 done** — native UniqueID-keyed `010302`; restart `npm run dev` and re-extract a native career.
+- **Used (2026-08-16 HQ):** Club id/name on Manage saves, 0 players. Schalke = FM24 continue; others = native FM26. Identity works; continue 7f02 join does not. Native list parse is skipped because identity is known. **T093 done** — native UniqueID glued to `010302`. **Used after T093:** still 0 players on native. Glued UniqueID|`7f02` misses real club objects. **T094 done** — UniqueID then nearby `7f02`. Re-extract a native career.
 - **Used (2026-08-16 HQ):** Extract `NameError: name 'match_reserve_name_score' is not defined`. **T090 done** — scorer lives next to `match_unit_core_score`; dead block after `lp32_name_ending_at` removed. Restart `npm run dev` and re-extract.
 - After groups exist in FM: extract on a new in-game date → Progress HA delta (pack + Det/Lea). Two different gameDates required; one extract → value, empty delta.
 - Extract is two blobs once (pack + CA card). UI: Squad HA = pack + Det/Lea from the card. Progress CA = card history; Progress HA = pack snapshots + Det/Lea from the card (T066). Do not hunt Det/Lea as a third extract.
@@ -131,7 +136,7 @@ Last updated: 2026-08-16 (T093 done)
 
 ## Gate
 
-- T087 next (Progress GK vs outfield CA layout). T077 / T080 / T081 blocked. One ticket per worker.
+- T094 done (native UniqueID nearby 7f02). T087 frozen until native `players[]` is non-empty. T077 / T080 / T081 blocked. Empty ready board — do not invent work.
 - Refuse Suggest. Refuse CA/PA. Refuse Stripe paywall / packaging / FM27.
 - BMC is a tip. Do not gate the table.
 - Workers: one ticket, one commit on `FMT/`. If freeze, do not claim anything else.
@@ -141,6 +146,8 @@ Last updated: 2026-08-16 (T093 done)
 - Host RAM / T077 after owner says the local loop is honest (any save + Active not stolen).
 
 ## Recently done
+
+- **T094** — Native UniqueID then nearby `7f02`+`010302` (continue `LIST_WINDOWS` expand; glued T093 still hits). Continue club-object `7f02…ffffffff` unchanged. Identity known + miss still `ft-club-squad-join-miss`, never `pick_tid`. Synthetic padded + glued + continue + miss tests. Restart `npm run dev` and re-extract a native FM26 career. If `jobsFound > 0` and UI empty, stop (names / T042). No committed `.fm`.
 
 - **T093** — Native FM26 this-club FT list: layout `continue` | `native` on PROGRESS (`00950e02` / zstd@26 vs `00950e01`). Continue club-object `7f02…ffffffff` unchanged. Native UniqueID | `7f02`+`010302` via `parse_squad_candidates`; 11–55 count is not law. Identity known does not skip native discovery, does not walk every club, miss still `ft-club-squad-join-miss`. Synthetic native + continue + miss tests. Restart `npm run dev` and re-extract a native FM26 career. No committed `.fm`.
 

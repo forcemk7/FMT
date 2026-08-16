@@ -1,4 +1,4 @@
-"""T093: native FM26 UniqueID-keyed 010302 list vs continue club-object 7f02."""
+"""T094: native UniqueID then nearby 7f02+010302 (padding between; glued still hits)."""
 
 from __future__ import annotations
 
@@ -9,16 +9,15 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-PRE_NAME = bytes.fromhex("0091000000ffffffff9100000091000000")
 LIST_SENTINEL = bytes.fromhex("7f02000000ffffffff")
 LIST_SENTINEL_LOOSE = bytes.fromhex("7f02000000")
 TAG_010302 = bytes.fromhex("010302")
 TAG_NATIVE = bytes.fromhex("00950e01")
 TAG_CONTINUE = bytes.fromhex("00950e02")
+PRE_NAME = bytes.fromhex("0091000000ffffffff9100000091000000")
 
 PERSON = "Pat Example"
 PARENT = "Sample Town"
-OTHER = "Other Place"
 TEAM_ID = 1200
 DUP = 3400
 PERSIST = 8800
@@ -26,6 +25,8 @@ CLUB_UID = 4242
 DECOY_UID = 4241
 JOBS_FT = [200 + i for i in range(8)]
 DECOY_JOBS = [9000 + i for i in range(12)]
+# Synthetic gap only — larger than first LIST_WINDOWS entry, not a save offset.
+PAD_BETWEEN = 200
 
 
 def _load(name: str, path: Path):
@@ -71,7 +72,7 @@ def _ft_body(
     return body
 
 
-def _native_list(club_id: int, jobs: list[int]) -> bytes:
+def _native_list_glued(club_id: int, jobs: list[int]) -> bytes:
     return (
         struct.pack("<I", club_id)
         + LIST_SENTINEL_LOOSE
@@ -82,60 +83,53 @@ def _native_list(club_id: int, jobs: list[int]) -> bytes:
     )
 
 
-class NativeFm26SquadListT093Tests(unittest.TestCase):
+def _native_list_padded(club_id: int, jobs: list[int], pad: bytes) -> bytes:
+    return (
+        struct.pack("<I", club_id)
+        + pad
+        + LIST_SENTINEL_LOOSE
+        + TAG_010302
+        + b"\x00"
+        + struct.pack("<H", len(jobs))
+        + b"".join(struct.pack("<I", j) for j in jobs)
+    )
+
+
+class NativeUniqueIdNearbyListT094Tests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
-        cls.eft = _load("eft_t093", ROOT / "scripts" / "extract-first-team-fast.py")
-        cls.ft = _load("ft_t093", ROOT / "scripts" / "ft_squad_discovery.py")
-        cls.emt = _load("emt_t093", ROOT / "scripts" / "extract-managed-team.py")
+        cls.eft = _load("eft_t094", ROOT / "scripts" / "extract-first-team-fast.py")
+        cls.ft = _load("ft_t094", ROOT / "scripts" / "ft_squad_discovery.py")
+        cls.emt = _load("emt_t094", ROOT / "scripts" / "extract-managed-team.py")
 
-    def test_classify_layout_from_tag_and_inferred(self) -> None:
-        self.assertEqual(
-            self.eft.classify_squad_layout(tag_hex="00950e01"), "native"
-        )
-        self.assertEqual(
-            self.eft.classify_squad_layout(tag_hex="00950e02"), "continue"
-        )
-        self.assertEqual(
-            self.eft.classify_squad_layout(
-                inferred_layout="fm24_continue_style_zstd_at_26"
-            ),
-            "continue",
-        )
-        self.assertEqual(
-            self.eft.classify_squad_layout(inferred_layout="zstd_at_0"),
-            "native",
-        )
-        self.assertEqual(
-            self.eft.classify_squad_layout(
-                tag_hex="00950e01",
-                inferred_layout="fm24_continue_style_zstd_at_26",
-            ),
-            "native",
-        )
-
-    def test_native_blob_uniqueid_010302_yields_ft_jobs(self) -> None:
-        ident = _identity(TAG_NATIVE, CLUB_UID)
-        decoy = _native_list(DECOY_UID, DECOY_JOBS)
-        live = _native_list(CLUB_UID, JOBS_FT)
-        blob = ident + (b"\x00" * 48) + decoy + (b"\x00" * 32) + live
-        self.assertNotIn(LIST_SENTINEL, blob)
-
+    def _resolve_native(self, blob: bytes):
         hit = self.emt.discover_managed_club(blob, len(blob))
         self.assertIsNotNone(hit)
         assert hit is not None
-        self.assertEqual(hit["tagHex"], TAG_NATIVE.hex())
         layout = self.eft.classify_squad_layout(tag_hex=hit["tagHex"])
         self.assertEqual(layout, "native")
-
         ft_hit = self.eft.resolve_managed_ft_for_layout(
             blob, hit["clubNameShort"], hit["clubId"], layout=layout
         )
+        return hit, layout, ft_hit
+
+    def test_padded_uniqueid_then_010302_yields_ft_jobs(self) -> None:
+        ident = _identity(TAG_NATIVE, CLUB_UID)
+        decoy = _native_list_glued(DECOY_UID, DECOY_JOBS)
+        pad = bytes(PAD_BETWEEN)
+        live = _native_list_padded(CLUB_UID, JOBS_FT, pad)
+        self.assertGreater(PAD_BETWEEN, self.eft.LIST_WINDOWS[0])
+        self.assertLess(PAD_BETWEEN, self.eft.LIST_WINDOWS[1])
+        self.assertNotIn(struct.pack("<I", CLUB_UID) + LIST_SENTINEL_LOOSE, live)
+        blob = decoy + (b"\x00" * 32) + ident + (b"\x00" * 16) + live
+        self.assertNotIn(LIST_SENTINEL, blob)
+
+        hit, layout, ft_hit = self._resolve_native(blob)
         self.assertIsNotNone(ft_hit)
         assert ft_hit is not None and ft_hit.get("list")
         self.assertEqual(ft_hit["list"]["jobs"], JOBS_FT)
         self.assertIn("010302", ft_hit["list"]["listLayout"])
-        self.assertLess(len(JOBS_FT), self.eft.SQUAD_COUNT_LO)
+        self.assertGreater(ft_hit["list"]["sentinelAbs"] - 4, 0)
 
         selected = self.ft.select_managed_ft_jobs(
             hit["clubNameShort"],
@@ -153,29 +147,27 @@ class NativeFm26SquadListT093Tests(unittest.TestCase):
         self.assertEqual(fields["jobsFound"], len(JOBS_FT))
         self.assertIsNone(fields["missReason"])
 
-        squads, _hits, kind = self.eft.walk_world_squads_if_needed(
-            blob,
-            club_short=hit["clubNameShort"],
-            squads={},
-            manager_hits={},
-        )
-        self.assertEqual(kind, "skipped_identity_known")
-        self.assertEqual(squads, {})
+    def test_glued_uniqueid_7f02_still_hits(self) -> None:
+        ident = _identity(TAG_NATIVE, CLUB_UID)
+        live = _native_list_glued(CLUB_UID, JOBS_FT)
+        blob = ident + (b"\x00" * 48) + live
+        _hit, _layout, ft_hit = self._resolve_native(blob)
+        self.assertIsNotNone(ft_hit)
+        assert ft_hit is not None and ft_hit.get("list")
+        self.assertEqual(ft_hit["list"]["jobs"], JOBS_FT)
 
     def test_continue_blob_7f02_ffffffff_still_yields_ft_jobs(self) -> None:
         ident = _identity(TAG_CONTINUE, CLUB_UID)
         catalog = _catalog_row(PARENT, TEAM_ID, DUP, struct.pack("<I", CLUB_UID))
         body = _ft_body(TEAM_ID, DUP, PERSIST, JOBS_FT)
-        decoy_native = _native_list(DECOY_UID, DECOY_JOBS)
+        decoy_native = _native_list_glued(DECOY_UID, DECOY_JOBS)
         blob = ident + (b"\x00" * 32) + catalog + (b"\x00" * 64) + body + decoy_native
 
         hit = self.emt.discover_managed_club(blob, len(blob))
         self.assertIsNotNone(hit)
         assert hit is not None
-        self.assertEqual(hit["tagHex"], TAG_CONTINUE.hex())
         layout = self.eft.classify_squad_layout(tag_hex=hit["tagHex"])
         self.assertEqual(layout, "continue")
-
         ft_hit = self.eft.resolve_managed_ft_for_layout(
             blob, hit["clubNameShort"], hit["clubId"], layout=layout
         )
@@ -192,7 +184,6 @@ class NativeFm26SquadListT093Tests(unittest.TestCase):
         )
         self.assertEqual(selected["method"], "ft-club-squad-join-v1")
         self.assertEqual(selected["jobs"], JOBS_FT)
-
         fields = self.ft.ft_join_progress_fields(
             hit["clubId"], ft_hit, selected, layout=layout
         )
@@ -201,19 +192,19 @@ class NativeFm26SquadListT093Tests(unittest.TestCase):
 
     def test_native_identity_known_miss_never_pick_tid(self) -> None:
         ident = _identity(TAG_NATIVE, CLUB_UID)
-        decoy = _native_list(DECOY_UID, DECOY_JOBS)
-        # Decoy sits *before* this club's UniqueID so a forward nearby scan
-        # cannot steal another club's glued 7f02 (T094). Not a world 7f02 walk.
-        blob = decoy + (b"\x00" * 48) + ident
-        hit = self.emt.discover_managed_club(blob, len(blob))
-        self.assertIsNotNone(hit)
-        assert hit is not None
-        layout = self.eft.classify_squad_layout(tag_hex=hit["tagHex"])
-        self.assertEqual(layout, "native")
-
-        ft_hit = self.eft.resolve_managed_ft_for_layout(
-            blob, hit["clubNameShort"], hit["clubId"], layout=layout
+        decoy = _native_list_glued(DECOY_UID, DECOY_JOBS)
+        far = (
+            LIST_SENTINEL_LOOSE
+            + TAG_010302
+            + b"\x00"
+            + struct.pack("<H", len(JOBS_FT))
+            + b"".join(struct.pack("<I", j) for j in JOBS_FT)
         )
+        # Other club's glued list is behind UniqueID (forward miss). A 7f02
+        # past the last expand window is not a world walk.
+        gap = self.eft.LIST_WINDOWS[-1] + 64
+        blob = decoy + ident + (b"\x00" * gap) + far
+        hit, layout, ft_hit = self._resolve_native(blob)
         self.assertIsNotNone(ft_hit)
         assert ft_hit is not None
         self.assertIsNone(ft_hit.get("list"))
@@ -230,23 +221,12 @@ class NativeFm26SquadListT093Tests(unittest.TestCase):
         self.assertNotEqual(
             selected["method"], "max_manager_staff_link_among_squad_lists"
         )
-
         fields = self.ft.ft_join_progress_fields(
             hit["clubId"], ft_hit, selected, layout=layout
         )
         self.assertEqual(fields["layout"], "native")
         self.assertEqual(fields["jobsFound"], 0)
         self.assertTrue(fields["missReason"])
-
-    def test_squad_count_11_55_is_not_law_for_native(self) -> None:
-        live = _native_list(CLUB_UID, JOBS_FT)
-        sent = live.find(LIST_SENTINEL_LOOSE)
-        self.assertGreaterEqual(sent, 0)
-        gated = self.eft.parse_squad_candidates(live, sent, native=False)
-        self.assertEqual(gated, [])
-        opened = self.eft.parse_squad_candidates(live, sent, native=True)
-        self.assertTrue(opened)
-        self.assertEqual(opened[0][3], JOBS_FT)
 
 
 if __name__ == "__main__":

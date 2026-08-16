@@ -38,6 +38,7 @@ if hasattr(sys.stderr, "reconfigure"):
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 from ft_squad_discovery import (  # noqa: E402
+    LIST_WINDOWS,
     ft_join_progress_fields,
     resolve_ft_squad,
     select_managed_ft_jobs,
@@ -1223,17 +1224,29 @@ def try_jobs_at(
 
 
 def parse_squad_candidates(
-    buf, sentinel_off: int, *, native: bool = False
+    buf,
+    sentinel_off: int,
+    *,
+    native: bool = False,
+    tid_hint: int | None = None,
 ) -> list[tuple[int, int, int, list[int], str]]:
     """
     Try known layouts at a 7f02000000 hit.
     Returns zero or more (tid, jobs_off, count, jobs, layout).
+    Native nearby UniqueID may sit before padding; tid_hint is that club id
+    when the 4 bytes immediately before 7f02 are not a persist tid.
     """
     if sentinel_off + 5 > len(buf) or buf[sentinel_off : sentinel_off + 5] != LIST_SENTINEL_LOOSE:
         return []
     out: list[tuple[int, int, int, list[int], str]] = []
     after = sentinel_off + 5
     pre_tid = struct.unpack_from("<I", buf, sentinel_off - 4)[0] if sentinel_off >= 4 else 0
+    if (
+        native
+        and tid_hint not in (None, 0)
+        and not (TID_LO <= pre_tid <= TID_HI)
+    ):
+        pre_tid = int(tid_hint)
 
     attempts: list[tuple[int, int, str]] = []  # tid, c_off, layout
 
@@ -1465,9 +1478,13 @@ def pick_tid(
     return ranked[0]
 
 
-def _native_list_at_sentinel(buf, sentinel_off: int) -> dict | None:
+def _native_list_at_sentinel(
+    buf, sentinel_off: int, *, tid_hint: int | None = None
+) -> dict | None:
     """parse_squad_candidates layout B (010302) preferred; 11–55 is not law."""
-    cands = parse_squad_candidates(buf, sentinel_off, native=True)
+    cands = parse_squad_candidates(
+        buf, sentinel_off, native=True, tid_hint=tid_hint
+    )
     if not cands:
         return None
     cands.sort(
@@ -1491,35 +1508,53 @@ def _native_list_at_sentinel(buf, sentinel_off: int) -> dict | None:
     }
 
 
+def _native_list_near_uniqueid(buf, uid_abs: int, club_id: int) -> dict | None:
+    """Forward UniqueID → 7f02+010302. Same expanding windows as continue."""
+    n = len(buf)
+    scan_from = uid_abs + 4
+    if scan_from >= n:
+        return None
+    cid = int(club_id)
+    for win in LIST_WINDOWS:
+        hi = min(n, scan_from + win)
+        start = scan_from
+        while start < hi:
+            sent = buf.find(LIST_SENTINEL_LOOSE, start, hi)
+            if sent < 0:
+                break
+            parsed = _native_list_at_sentinel(buf, sent, tid_hint=cid)
+            if (
+                parsed
+                and parsed.get("jobs")
+                and "010302" in parsed["listLayout"]
+            ):
+                return parsed
+            start = sent + 1
+    return None
+
+
 def resolve_native_ft_squad(buf, club_id: int | None) -> dict | None:
-    """This club's UniqueID | 7f02+010302. Does not walk every club's 7f02."""
+    """This club's UniqueID, then nearby 7f02+010302. Not every 7f02 in the file."""
     if club_id in (None, 0):
         return None
     cid = int(club_id)
-    needle = struct.pack("<I", cid) + LIST_SENTINEL_LOOSE
+    packed = struct.pack("<I", cid)
     catalog_hits = 0
     best: dict | None = None
+    best_key: tuple | None = None
     start = 0
     while True:
-        j = buf.find(needle, start)
+        j = buf.find(packed, start)
         if j < 0:
             break
         catalog_hits += 1
-        parsed = _native_list_at_sentinel(buf, j + 4)
+        parsed = _native_list_near_uniqueid(buf, j, cid)
         if parsed and parsed.get("jobs"):
-            if best is None:
+            gap = parsed["sentinelAbs"] - (j + 4)
+            key = (gap, -len(parsed["jobs"]))
+            if best is None or best_key is None or key < best_key:
                 best = parsed
-            else:
-                prefer_native = "010302" in parsed["listLayout"] and "010302" not in best[
-                    "listLayout"
-                ]
-                same_family = ("010302" in parsed["listLayout"]) == (
-                    "010302" in best["listLayout"]
-                )
-                if prefer_native or (
-                    same_family and len(parsed["jobs"]) > len(best["jobs"])
-                ):
-                    best = parsed
+                best_key = key
         start = j + 1
 
     if best:
@@ -1554,7 +1589,7 @@ def resolve_managed_ft_for_layout(
     *,
     layout: str,
 ) -> dict | None:
-    """Continue = club-object 7f02. Native = UniqueID-keyed 010302. Never pick_tid."""
+    """Continue = club-object 7f02. Native = UniqueID nearby 010302. Never pick_tid."""
     if layout == "native":
         return resolve_native_ft_squad(mm, club_id)
     return resolve_ft_squad(mm, club_short, club_id=club_id)
