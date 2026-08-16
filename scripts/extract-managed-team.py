@@ -4,9 +4,11 @@ Managed club identity from a career .fm save.
 
 Locked path (continue + native FM26):
   1) Tag 00 95 0e 01|02 → manager lp32 → club short lp32 → club UniqueID u32
-     (Club Site “ID” — e.g. Schalke 920, Liverpool 676, Leicester 673)
   2) Optional catalog: long/short name pair for the official club name
-     (e.g. FC Schalke 04 / Leicester City)
+
+EARLY_SCAN / IDENTITY_DEADLINE are first-pass bounds, not a save's byte as law.
+If the tag sits later, search continues. Miss = diagnostic (tags / offset /
+bytes scanned), not a silent wrong club.
 
 Stops as soon as identity (+ optional catalog name) is resolved — no squad-list
 scan in this phase (First Team teamId / players come later).
@@ -37,6 +39,8 @@ HUMAN_TAGS = (
 
 EARLY_SCAN = 500_000
 IDENTITY_DEADLINE = 2 * 1024 * 1024
+# Give-up cap after expanding past the deadline — a bound, not a save offset.
+IDENTITY_SCAN_MAX = 64 * 1024 * 1024
 CATALOG_LO = 500_000
 CATALOG_TARGET = 12 * 1024 * 1024
 CALIB_DUMP = ROOT / "tmp" / "calib" / "early-last.bin"
@@ -137,7 +141,7 @@ def _looks_club_short(s: str) -> bool:
 def discover_managed_club(buf, limit: int = EARLY_SCAN) -> dict | None:
     """
     00 95 0e 01|02 + manager + club short + club UniqueID (u32).
-    Returns clubId matching Club Site display ID.
+    Searches [0, limit). Callers expand limit if this returns None.
     """
     hi = min(limit, len(buf))
     best: dict | None = None
@@ -164,7 +168,6 @@ def discover_managed_club(buf, limit: int = EARLY_SCAN) -> dict | None:
                 start = j + 1
                 continue
             club_id = struct.unpack_from("<I", buf, id_off)[0]
-            # Club Site IDs are small historical ids or large generated ones.
             if club_id in (0, 0xFFFFFFFF) or club_id > 3_000_000_000:
                 start = j + 1
                 continue
@@ -173,7 +176,6 @@ def discover_managed_club(buf, limit: int = EARLY_SCAN) -> dict | None:
                 score += 2
             if person.lower().startswith(("mr ", "mrs ", "ms ", "dr ")):
                 score += 2
-            # Prefer plausible club UniqueID magnitudes (pre-gen often < 100k).
             if 1 <= club_id <= 100_000:
                 score += 1
             cand = {
@@ -190,6 +192,62 @@ def discover_managed_club(buf, limit: int = EARLY_SCAN) -> dict | None:
                 best = cand
             start = j + 1
     return best
+
+
+def identity_scan_diagnostics(buf, limit: int) -> dict:
+    """Tag hit counts / offsets for a miss — not a guessed club."""
+    hi = min(max(0, int(limit)), len(buf))
+    tags: dict[str, dict] = {}
+    last_tag_abs: int | None = None
+    for tag in HUMAN_TAGS:
+        first: int | None = None
+        count = 0
+        start = 0
+        while start + len(tag) <= hi:
+            j = buf.find(tag, start, hi)
+            if j < 0:
+                break
+            count += 1
+            if first is None:
+                first = j
+            last_tag_abs = j if last_tag_abs is None else max(last_tag_abs, j)
+            start = j + 1
+        tags[tag.hex()] = {"count": count, "firstAbs": first}
+    return {
+        "bytesScanned": hi,
+        "tags": tags,
+        "lastTagAbs": last_tag_abs,
+        "tagHexes": [t.hex() for t in HUMAN_TAGS],
+    }
+
+
+def try_discover_managed_club(
+    buf,
+    *,
+    limits: tuple[int, ...] | None = None,
+) -> tuple[dict | None, dict]:
+    """Expanding bounds. First bound that parses wins. Deadline is not fail."""
+    n = len(buf)
+    raw = limits if limits is not None else (EARLY_SCAN, IDENTITY_DEADLINE, n)
+    seen: list[int] = []
+    for x in raw:
+        b = min(n, max(0, int(x)))
+        if not seen or b > seen[-1]:
+            seen.append(b)
+    hit: dict | None = None
+    bound = seen[-1] if seen else 0
+    for bound in seen:
+        hit = discover_managed_club(buf, bound)
+        if hit:
+            break
+    scan_hi = bound if hit else (seen[-1] if seen else 0)
+    diag = identity_scan_diagnostics(buf, scan_hi)
+    diag["searchBound"] = bound
+    diag["identityFound"] = hit is not None
+    if hit:
+        diag["tagHex"] = hit.get("tagHex")
+        diag["identityAbs"] = hit.get("identityAbs")
+    return hit, diag
 
 
 def catalog_long_name(
@@ -258,16 +316,18 @@ def main() -> int:
 
     buf = bytearray()
     identity: dict | None = None
+    ident_diag: dict = {}
     club_long: str | None = None
     cat_diag: dict = {}
     zstd_exc: str | None = None
     last_prog = 0
+    scan_cap = max(CATALOG_TARGET, IDENTITY_SCAN_MAX)
 
     with save.open("rb") as f:
         f.seek(int(zstd_off))
         reader = zstd.ZstdDecompressor().stream_reader(f)
         try:
-            while len(buf) < CATALOG_TARGET:
+            while len(buf) < scan_cap:
                 try:
                     block = reader.read(CHUNK)
                 except zstd.ZstdError as e:
@@ -290,12 +350,15 @@ def main() -> int:
                         t0,
                         phase="decompress",
                         message="Decompressing (club identity)",
-                        pct=min(80, int(80 * len(buf) / CATALOG_TARGET)),
+                        pct=min(80, int(80 * len(buf) / scan_cap)),
                         outBytes=len(buf),
                     )
 
-                if identity is None and len(buf) >= EARLY_SCAN:
-                    identity = discover_managed_club(buf, EARLY_SCAN)
+                if identity is None:
+                    identity, ident_diag = try_discover_managed_club(
+                        buf,
+                        limits=(EARLY_SCAN, IDENTITY_DEADLINE, len(buf)),
+                    )
                     if identity:
                         progress(
                             t0,
@@ -306,39 +369,8 @@ def main() -> int:
                             ),
                             pct=50,
                             outBytes=len(buf),
+                            searchBound=ident_diag.get("searchBound"),
                         )
-
-                if identity is None and len(buf) >= IDENTITY_DEADLINE:
-                    identity = discover_managed_club(
-                        buf, min(len(buf), IDENTITY_DEADLINE)
-                    )
-                    if not identity:
-                        write_calib_dump(
-                            buf,
-                            {
-                                "saveName": save.name,
-                                "saveBytes": save.stat().st_size,
-                                **container,
-                            },
-                        )
-                        return fail(
-                            t0,
-                            "No managed-club identity (human tag → club UniqueID). "
-                            "Paste diagnostics.",
-                            decompressedBytes=len(buf),
-                            calibDump=str(CALIB_DUMP.relative_to(ROOT)),
-                            **container,
-                        )
-                    progress(
-                        t0,
-                        phase="resolve",
-                        message=(
-                            f"club={identity['clubNameShort']} "
-                            f"id={identity['clubId']}"
-                        ),
-                        pct=50,
-                        outBytes=len(buf),
-                    )
 
                 if identity and club_long is None and len(buf) >= max(CATALOG_LO, 2 << 20):
                     club_long, cat_diag = catalog_long_name(
@@ -353,16 +385,27 @@ def main() -> int:
                             outBytes=len(buf),
                         )
                         break
+
+                if identity and len(buf) >= CATALOG_TARGET:
+                    break
+                if identity is None and len(buf) >= IDENTITY_SCAN_MAX:
+                    break
         finally:
             reader.close()
 
     if identity is None:
-        write_calib_dump(buf, {"saveName": save.name, **container})
+        if not ident_diag:
+            ident_diag = identity_scan_diagnostics(buf, len(buf))
+            ident_diag["searchBound"] = len(buf)
+            ident_diag["identityFound"] = False
+        write_calib_dump(buf, {"saveName": save.name, **container, **ident_diag})
         return fail(
             t0,
             "No managed-club identity (human tag → club UniqueID).",
             decompressedBytes=len(buf),
+            calibDump=str(CALIB_DUMP.relative_to(ROOT)),
             **container,
+            **ident_diag,
         )
 
     if club_long is None:
@@ -390,6 +433,8 @@ def main() -> int:
             "managerNameLen": len(identity["managerName"]),
             "earlyStop": True,
             "identityFound": True,
+            "searchBound": ident_diag.get("searchBound"),
+            "bytesScanned": ident_diag.get("bytesScanned"),
             **cat_diag,
             "zstdNote": zstd_exc,
         },

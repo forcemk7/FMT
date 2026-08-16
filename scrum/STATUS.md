@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-08-15 (HQ: Squad + Loans + Mentoring + Progress)
+Last updated: 2026-08-16 (HQ: Squad + Loans + Mentoring + Progress)
 
 ## Now
 
@@ -32,7 +32,16 @@ Last updated: 2026-08-15 (HQ: Squad + Loans + Mentoring + Progress)
 
 **T070 done** — Header Buy me a coffee → `https://buymeacoffee.com/mrramirez` (new tab, optional thank-you). Table stays free.
 
-**Next:** T077 live www (needs host).
+**FREEZE.** Launch waits. Product = four extract steps, any Career Save. Worker edits extract Python, never a `.fm`. Do not claim T077 / T080 / T081 / T087.
+
+1. **T083** Managed club (**done**)  
+2. **T084** Employed players — FT / II / U19 (ready)  
+3. **T085** Those players’ CA + HA (blocked on T084)  
+4. **T086** Contracts — at-club vs loaned out (blocked on T085)  
+
+Wrong Squad/Loans split poisons Mentoring Group checks. There is no Suggest. Empty Squad on a non-development save is `ft-club-squad-join-miss`. Do not custom-fit a local `.fm`. Never commit saves. T082 cancelled (loans = T086). T087 (Progress GK layout) after T086.
+
+**Next:** T084 ready. Blind: synthetic/object joins; optional smoke on untracked `data/saves/*.fm`; never git add `*.fm`; never mmap live `games/`.
 
 | Area | State | Need-to-have? |
 |------|--------|---------------|
@@ -75,24 +84,36 @@ Last updated: 2026-08-15 (HQ: Squad + Loans + Mentoring + Progress)
 | Buy Me a Coffee | **T070 done** | Tip only |
 | One extract Python (no 5×2GB on start) | **T072 done** | **Yes** |
 | Extract this club only (not world) | **T076 done** | **Yes** |
+| Extract four steps, any Career Save | **T083 done**; T084–T086 | **Yes** |
+| Favoured-club / scout extract | **T080 blocked** (on T086) | No |
+| Loan scan speed | **T081 blocked** (on T086) | later |
+| Loans as König counts | **T082 cancelled** (absorbed: T086) | — |
 | Personalities label → Squad | **T073 done** | Yes |
 | Ranker / checker / compare chrome | **T075 done** | Yes |
 | Progress default chip + FM columns | **T078 done** | Yes |
+| Progress GK abilities + outfield GK rating | **T087 blocked** (on T086) | after freeze |
 | II/U19 Progress CA strip | **T079 done** | **Yes** |
 
 ## Board
 
 | ID | Title | Status | Owner |
 |----|-------|--------|-------|
-| T077 | Live www URL — upload save, extract, four tabs | ready | |
+| T084 | FT II U19 lists from this club on any Career Save | ready | |
+| T085 | HA and CA for listed players on any Career Save | blocked | |
+| T086 | At-club vs loaned-out on any Career Save | blocked | |
+| T087 | Progress GK vs outfield CA layout | blocked | |
+| T077 | Live www URL — upload save, extract, four tabs | blocked | |
+| T080 | Stop favoured-club extract on roster path | blocked | |
+| T081 | Faster loan motif search — same loan flags | blocked | |
 
 ## Behavior
 
 - ≥ filter without Det/Lea is dishonest for mentoring suitability.
-- Units in FMT = planning reminder for FM.
+- Units in FMT = planning reminder for FM. Mentoring pool = at-club only. Loaned names on Loans. Same person must not be on both.
 - **Used (2026-08-14):** Clear filters → click Adrian Itu → loosen-all → Yoan Robert + Miraglia. FT-only hid this. Empty FT list was correct.
-- **Used (2026-08-15 HQ):** Loans tab stays — honesty + youth out on loan. Tab name: **Squad**. Progress CA = growth/PA proxy; HA points = influence.
+- **Used (2026-08-16 HQ):** Upload a different Career Save → Squad empty. Cause: identity can succeed, then development-save FT join misses (`BODY` 40–100MB, FT count 15–45, `{short} II` / `{short} U19` name gates) and `select_managed_ft_jobs` returns `jobs: []`. T083–T086. Worker is save-blind: no committed `.fm`, no new constants from a local file.
 - After groups exist in FM: extract on a new in-game date → Progress HA delta (pack + Det/Lea). Two different gameDates required; one extract → value, empty delta.
+- Extract is two blobs once (pack + CA card). UI: Squad HA = pack + Det/Lea from the card. Progress CA = card history; Progress HA = pack snapshots + Det/Lea from the card (T066). Do not hunt Det/Lea as a third extract.
 - Progress plot: HA pack has no in-save strip (extract snapshots). Det/Lea use the attributes-card CA strip (T066). Pack chips stay on `fmt.ha-history.v1`.
 - Career `.fm`: copy selected live save into `data/saves`, then extract. Never extract the live file.
 - **T065:** selected live `.fm` copies into `data/saves` even when dest was missing; `(v02)` and other careers stay out. 97/99 after a live save is a new extract.
@@ -102,15 +123,20 @@ Last updated: 2026-08-15 (HQ: Squad + Loans + Mentoring + Progress)
 
 ## Gate
 
+- **Freeze:** T083 done. T084 then T085 then T086. Refuse www, scout drop, scan speed, GK Progress layout until T086. Launch waits. One ticket per worker.
 - Refuse Suggest. Refuse CA/PA. Refuse Stripe paywall / packaging / FM27.
 - BMC is a tip. Do not gate the table.
-- Workers: one ticket, one commit on `FMT/`.
+- Workers: one ticket, one commit on `FMT/`. If freeze, do not claim anything else.
 
 ## Blockers
 
-- T077: host with ≥2GB RAM (Fly / Railway / VPS). Not Vercel.
+- **Freeze:** T083 → T086. Workers stay save-blind (no committed `.fm`, no live `games/`). Host RAM after T086.
 
 ## Recently done
+
+- **T083** — Managed-club identity is tag → person lp32 → club short lp32 → UniqueID. Same parser on the roster extract. Search bounds expand if the tag sits later; miss is tag/offset/bytes scanned, not a guessed club. Synthetic blob test. No committed `.fm`.
+
+- **T082 cancelled** — loan counts ticket absorbed: T086 is the generic loan object.
 
 - **T079** — II/U19 Progress keeps the in-save CA strip (not one tip). Pack HA still uses extract snapshots. Quota may trim to 24/8; tip-only II/U19 only if that still overflows. Restart `npm run dev` and re-extract.
 - **T078** — Progress starts with no attribute selected (empty chart until a click). Chip grid matches FM: outfield Technical+Set Pieces | Mental | Physical; GK Goalkeeping | Mental | Physical+Technical. Pack Personality sits below as extra. `-` still restores HA chips. No GK/outfield 1–10 ratings.

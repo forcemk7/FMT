@@ -16,6 +16,7 @@ Pipeline:
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import mmap
 import os
@@ -45,6 +46,17 @@ from u19_squad_discovery import (  # noqa: E402
     read_lp32,
     resolve_u19_squad,
 )
+
+_emt_spec = importlib.util.spec_from_file_location(
+    "extract_managed_team", ROOT / "scripts" / "extract-managed-team.py"
+)
+_emt = importlib.util.module_from_spec(_emt_spec)
+assert _emt_spec and _emt_spec.loader
+_emt_spec.loader.exec_module(_emt)
+EARLY_SCAN = _emt.EARLY_SCAN
+IDENTITY_DEADLINE = _emt.IDENTITY_DEADLINE
+discover_managed_club = _emt.discover_managed_club
+try_discover_managed_club = _emt.try_discover_managed_club
 
 
 def refuse_live_fm_games_save(path: Path) -> None:
@@ -1048,11 +1060,6 @@ def dob_from_personality_pack(buf, pack_abs: int | None) -> str | None:
 
 
 # --- Managed club identity (Club Site UniqueID) ---
-HUMAN_TAGS = (
-    bytes.fromhex("00950e01"),
-    bytes.fromhex("00950e02"),
-)
-EARLY_IDENTITY = 2 * 1024 * 1024
 CATALOG_LO = 500_000
 CATALOG_TARGET = 12 * 1024 * 1024
 
@@ -1072,82 +1079,6 @@ def read_lp32(buf, off: int):
         if all(32 <= b < 127 for b in raw):
             return raw.decode("ascii")
         return None
-
-
-def _looks_comp_name(s: str) -> bool:
-    low = s.lower()
-    return any(
-        k in low
-        for k in (
-            "liga",
-            "league",
-            "division",
-            "premier",
-            "serie",
-            "bundes",
-            "championship",
-            "cup",
-            "divisi",
-            "wsl",
-        )
-    )
-
-
-def _looks_person_name(s: str) -> bool:
-    return 3 <= len(s) <= 48 and s[0].isalpha() and not _looks_comp_name(s)
-
-
-def _looks_club_short(s: str) -> bool:
-    return 3 <= len(s) <= 48 and s[0].isalpha() and not _looks_comp_name(s)
-
-
-def discover_managed_club(buf, limit: int = EARLY_IDENTITY) -> dict | None:
-    hi = min(limit, len(buf))
-    best: dict | None = None
-    for tag in HUMAN_TAGS:
-        start = 0
-        while start + 12 < hi:
-            j = buf.find(tag, start, hi)
-            if j < 0:
-                break
-            off = j + len(tag)
-            person = read_lp32(buf, off)
-            if not person or not _looks_person_name(person):
-                start = j + 1
-                continue
-            n1 = struct.unpack_from("<I", buf, off)[0]
-            o2 = off + 4 + n1
-            club = read_lp32(buf, o2)
-            if not club or not _looks_club_short(club):
-                start = j + 1
-                continue
-            n2 = struct.unpack_from("<I", buf, o2)[0]
-            id_off = o2 + 4 + n2
-            if id_off + 4 > len(buf):
-                start = j + 1
-                continue
-            club_id = struct.unpack_from("<I", buf, id_off)[0]
-            if club_id in (0, 0xFFFFFFFF) or club_id > 3_000_000_000:
-                start = j + 1
-                continue
-            score = 0
-            if " " in person:
-                score += 2
-            if person.lower().startswith(("mr ", "mrs ", "ms ", "dr ")):
-                score += 2
-            if 1 <= club_id <= 100_000:
-                score += 1
-            cand = {
-                "managerName": person,
-                "clubNameShort": club,
-                "clubId": club_id,
-                "score": score,
-                "method": "human_tag_club_uid",
-            }
-            if best is None or cand["score"] > best["score"]:
-                best = cand
-            start = j + 1
-    return best
 
 
 def catalog_long_name(buf, club_short: str) -> str | None:
@@ -2511,14 +2442,17 @@ def main() -> int:
     ft_list: dict | None = None
     abort_world: dict | None = None
     world_lists = "skipped_identity_known"
+    ident_diag: dict = {}
     with tmp.open("rb") as f:
         mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
         try:
-            early = bytes(mm[: min(len(mm), CATALOG_TARGET)])
-            identity = discover_managed_club(early, min(len(early), EARLY_IDENTITY))
+            identity, ident_diag = try_discover_managed_club(
+                mm,
+                limits=(EARLY_SCAN, IDENTITY_DEADLINE, CATALOG_TARGET, len(mm)),
+            )
             club_id = identity["clubId"] if identity else None
             club_short = identity["clubNameShort"] if identity else None
-            club_name = catalog_long_name(early, club_short) if club_short else None
+            club_name = catalog_long_name(mm, club_short) if club_short else None
             if club_short and not club_name:
                 club_name = club_short
             if not club_short and parent_short_override:
@@ -2530,6 +2464,21 @@ def main() -> int:
                     phase="identity",
                     message=f"club={club_name} id={club_id}",
                     pct=73,
+                )
+            elif ident_diag:
+                progress(
+                    t0,
+                    phase="identity",
+                    message=(
+                        "No managed-club identity "
+                        f"(scanned {ident_diag.get('bytesScanned')} bytes)"
+                    ),
+                    pct=73,
+                    **{
+                        k: ident_diag[k]
+                        for k in ("bytesScanned", "lastTagAbs", "searchBound", "tagHexes")
+                        if k in ident_diag
+                    },
                 )
 
             squads, manager_hits, world_lists = walk_world_squads_if_needed(
@@ -2902,6 +2851,11 @@ def main() -> int:
             "playersWithDetLea": with_det,
             "namesOnly": names_only,
             "clubId": club_id,
+            "identityFound": bool(ident_diag.get("identityFound")) if ident_diag else False,
+            "identitySearchBound": ident_diag.get("searchBound"),
+            "identityBytesScanned": ident_diag.get("bytesScanned"),
+            "identityLastTagAbs": ident_diag.get("lastTagAbs"),
+            "identityTagHexes": ident_diag.get("tagHexes"),
             "gameDate": game_date_info,
             "dobStatus": (
                 "dateOfBirth from personalityPackAbs-21 (dayOfYear_u16) + "
