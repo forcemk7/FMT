@@ -912,7 +912,7 @@ function rosterApiPlugin(): Plugin {
             // T109: + / Update lands in tmp/uploads working copy; delete after extract.
             const uploadDir = resolveWorkingUploadsDir(rootDir);
             fs.mkdirSync(uploadDir, { recursive: true });
-            // T110: + / roster POST runs first-principles squad lists
+            // T111: + / roster POST runs Senior Squad object-path extract
             // (native identity namelist; continue = not-yet). Not extract-first-team-fast.
             // Identity-only helper remains for non-roster callers.
             const runStreaming =

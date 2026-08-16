@@ -663,6 +663,7 @@ describe("T039 Age column + one-click mentor/mentee preset", () => {
   it("lists every data column in table order for filters", () => {
     expect([...SQUAD_HA_FILTER_KEYS]).toEqual([
       "name",
+      "uid",
       "unit",
       "age",
       "personality",

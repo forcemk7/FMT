@@ -7477,6 +7477,10 @@ function defaultSquadHaFilterValue(key: SquadHaFilterKey): number | string {
       .filter((name) => Boolean(name));
     return names[0] ?? "";
   }
+  if (key === "uid") {
+    const uids = lastSquadHaRows.map((row) => String(row.uid));
+    return uids[0] ?? "";
+  }
   if (key === "unit") return "FT";
   if (key === "age") return SQUAD_HA_YOUNG_AGE;
   return key === "has" ? 12 : 10;
@@ -7488,6 +7492,7 @@ function newSquadHaFilter(): SquadHaFilter {
 
 function squadHaColumnClass(key: SquadHaFilterKey): string {
   if (key === "name") return "ranker-col-name";
+  if (key === "uid") return "ranker-col-uid";
   if (key === "unit") return "ranker-col-unit";
   if (key === "age") return "ranker-col-age";
   if (key === "personality") return "ranker-col-personality";
@@ -7498,7 +7503,8 @@ function squadHaColumnClass(key: SquadHaFilterKey): string {
 
 function squadHaColumnTip(key: SquadHaFilterKey): string {
   if (key === "name") return "Player name";
-  if (key === "unit") return "First Team, Reserves (II), or Under 19s";
+  if (key === "uid") return "Player UniqueID";
+  if (key === "unit") return "Senior Squad (T111); Reserves / U19 later";
   if (key === "age") return "Age at this save’s game date";
   if (key === "personality" || key === "mediaHandling") {
     return "Label of this save’s personality vector";
@@ -7577,6 +7583,11 @@ function renderSquadHaFilters() {
   ]
     .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))
     .map((name) => ({ value: name, label: name }));
+  const uidOptions = [
+    ...new Set(lastSquadHaRows.map((row) => String(row.uid))),
+  ]
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+    .map((uid) => ({ value: uid, label: uid }));
   const unitOptions = SQUAD_HA_UNIT_ORDER.map((unit) => ({
     value: unit,
     label: unit,
@@ -7643,14 +7654,19 @@ function renderSquadHaFilters() {
           ? mediaOptions
           : filter.key === "name"
             ? nameOptions
-            : filter.key === "unit"
-              ? unitOptions
-              : isSquadHaNumericFilterKey(filter.key)
-                ? squadHaNumericFilterValueOptions(filter.key)
-                : [];
+            : filter.key === "uid"
+              ? uidOptions
+              : filter.key === "unit"
+                ? unitOptions
+                : isSquadHaNumericFilterKey(filter.key)
+                  ? squadHaNumericFilterValueOptions(filter.key)
+                  : [];
     const selectedValue = String(filter.value);
     if (!valueOptions.some((opt) => opt.value === selectedValue)) {
-      if (filter.key === "name" && selectedValue) {
+      if (
+        (filter.key === "name" || filter.key === "uid") &&
+        selectedValue
+      ) {
         valueOptions.unshift({ value: selectedValue, label: selectedValue });
       } else if (valueOptions[0]) {
         filter.value = textKey
@@ -8114,14 +8130,20 @@ function renderSquadHaTable() {
       td.className = squadHaColumnClass(key);
       if (isSquadHaEllipsisKey(key)) {
         fillSquadHaEllipsisCell(td, squadHaEllipsisCellText(row, key));
+      } else if (key === "uid") {
+        td.textContent = String(row.uid);
+        td.title = `UniqueID ${row.uid}`;
+        if (squadHaSortKey === key) td.classList.add("is-sorted-col");
       } else if (key === "unit") {
         td.textContent = row.unit;
         td.title =
-          row.unit === "FT"
-            ? "First Team"
-            : row.unit === "II"
-              ? "Reserves"
-              : "Under 19s";
+          row.unit === "Senior"
+            ? "Senior Squad"
+            : row.unit === "FT"
+              ? "First Team"
+              : row.unit === "II"
+                ? "Reserves"
+                : "Under 19s";
       } else if (key === "age") {
         const text = formatSquadHaCell(row.age);
         td.textContent = text;
@@ -8299,6 +8321,14 @@ function renderRoster() {
     firstTeam: firstTeamPlayers,
     reserves: reservesPlayers,
     under19s: under19sPlayers,
+  }).map((entry) => {
+    const extractUnit = (
+      entry.player as { _extract?: { unit?: string | null } | null }
+    )._extract?.unit;
+    if (extractUnit === "Senior") {
+      return { ...entry, unit: "Senior" as const };
+    }
+    return entry;
   });
   const ranked = rankPlayersForPersonalityGrid(merged.map((entry) => entry.player));
   const unitByUid = new Map(
@@ -8308,7 +8338,7 @@ function renderRoster() {
     const row = buildSquadHaRow(
       entry.player,
       entry.score,
-      unitByUid.get(Number(entry.player.uid)) ?? "FT",
+      unitByUid.get(Number(entry.player.uid)) ?? "Senior",
     );
     return row ? [row] : [];
   });

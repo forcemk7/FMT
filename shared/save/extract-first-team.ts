@@ -1,9 +1,9 @@
 /**
  * Squad lists (+ club identity) from an FM career .fm save.
  *
- * T110: shells out to `scripts/extract-squad-lists.py`
- * (native identity namelist → FT names + unit; no HA/CA; continue = not-yet).
- * Replaces the cancelled T108 names-only fast extract path.
+ * T111: shells out to `scripts/extract-squad-lists.py`
+ * (Senior Squad object path: club → squad object → player ids → names;
+ * no T110 namelist; no HA/CA; Reserve/U19 out of scope).
  */
 
 import fs from "node:fs";

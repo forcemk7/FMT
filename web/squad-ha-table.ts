@@ -32,7 +32,12 @@ export const SQUAD_HA_COL_META: Record<
 
 export type SquadHaFilterOp = "gte" | "lte" | "eq" | "neq";
 export type SquadHaFilterJoin = "and" | "or";
-export type SquadHaTextFilterKey = "name" | "unit" | "personality" | "mediaHandling";
+export type SquadHaTextFilterKey =
+  | "name"
+  | "uid"
+  | "unit"
+  | "personality"
+  | "mediaHandling";
 export type SquadHaNumericFilterKey = SquadHaAttr | "has" | "age";
 export type SquadHaFilterKey = SquadHaNumericFilterKey | SquadHaTextFilterKey;
 
@@ -45,6 +50,7 @@ export const SQUAD_HA_AGE_GAP = 3;
 
 export const SQUAD_HA_FILTER_KEYS = [
   "name",
+  "uid",
   "unit",
   "age",
   "personality",
@@ -61,9 +67,14 @@ export type SquadHaFilter = {
 };
 
 /** Squad unit label shown on the club-wide HA table. */
-export type SquadHaUnit = "FT" | "II" | "U19";
+export type SquadHaUnit = "Senior" | "FT" | "II" | "U19";
 
-export const SQUAD_HA_UNIT_ORDER: readonly SquadHaUnit[] = ["FT", "II", "U19"];
+export const SQUAD_HA_UNIT_ORDER: readonly SquadHaUnit[] = [
+  "Senior",
+  "FT",
+  "II",
+  "U19",
+];
 
 export type SquadHaRow = {
   uid: number;
@@ -426,6 +437,7 @@ export function isSquadHaTextFilterKey(
 ): key is SquadHaTextFilterKey {
   return (
     key === "name" ||
+    key === "uid" ||
     key === "unit" ||
     key === "personality" ||
     key === "mediaHandling"
@@ -442,6 +454,7 @@ export function isSquadHaNumericFilterKey(
 export function squadHaFilterKeyLabel(key: SquadHaFilterKey): string {
   if (key === "has") return "HAS";
   if (key === "name") return "Name";
+  if (key === "uid") return "Player ID";
   if (key === "unit") return "Squad";
   if (key === "age") return "Age";
   if (key === "personality") return "Personality";
@@ -453,6 +466,7 @@ export function squadHaFilterKeyLabel(key: SquadHaFilterKey): string {
 export function squadHaTableHeaderLabel(key: SquadHaFilterKey): string {
   if (key === "has") return "HAS";
   if (key === "name") return "Name";
+  if (key === "uid") return "UID";
   if (key === "unit") return "Unit";
   if (key === "age") return "Age";
   if (key === "personality") return "Personality";
@@ -573,11 +587,13 @@ export function matchSquadHaFilter(
     const actual =
       filter.key === "name"
         ? row.name || null
-        : filter.key === "unit"
-          ? row.unit
-          : filter.key === "personality"
-            ? row.personality
-            : row.mediaHandling;
+        : filter.key === "uid"
+          ? String(row.uid)
+          : filter.key === "unit"
+            ? row.unit
+            : filter.key === "personality"
+              ? row.personality
+              : row.mediaHandling;
     return matchSquadHaText(actual, filter.op, String(filter.value));
   }
   const target =
@@ -649,9 +665,24 @@ export function sortSquadHaRows(
     if (key === "unit") {
       cmp = unitRank(a.unit) - unitRank(b.unit);
       if (!asc) cmp = -cmp;
-    } else if (key === "name" || key === "personality" || key === "mediaHandling") {
-      const av = (key === "name" ? a.name : a[key]) ?? "";
-      const bv = (key === "name" ? b.name : b[key]) ?? "";
+    } else if (
+      key === "name" ||
+      key === "uid" ||
+      key === "personality" ||
+      key === "mediaHandling"
+    ) {
+      const av =
+        key === "name"
+          ? a.name
+          : key === "uid"
+            ? String(a.uid)
+            : (a[key] ?? "");
+      const bv =
+        key === "name"
+          ? b.name
+          : key === "uid"
+            ? String(b.uid)
+            : (b[key] ?? "");
       const aEmpty = !av;
       const bEmpty = !bv;
       if (aEmpty && bEmpty) cmp = 0;
@@ -675,9 +706,10 @@ export function sortSquadHaRows(
 
 function isSquadHaTextSortKey(
   key: SquadHaSortKey,
-): key is "name" | "unit" | "personality" | "mediaHandling" {
+): key is "name" | "uid" | "unit" | "personality" | "mediaHandling" {
   return (
     key === "name" ||
+    key === "uid" ||
     key === "unit" ||
     key === "personality" ||
     key === "mediaHandling"

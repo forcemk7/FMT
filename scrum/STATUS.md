@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-08-16 (T110 done)
+Last updated: 2026-08-16 (T111 done — Senior object path; native honest miss)
 
 ## Now
 
@@ -20,9 +20,13 @@ Last updated: 2026-08-16 (T110 done)
 
 **Used (2026-08-16 HQ):** T110 prove order = **native FM26 first** (≥2 Careers). Then RE continue from that pattern; rolling continue pack only secondary (date-lock ≠ squad-lock; avoid fitting).
 
-**Next:** T087 frozen. Do not claim T077 / T080 / T081. Board empty of ready need-to-haves until HQ funds II/U19 / continue lists / Loans.
+**T110 cancelled** — owner rejected. Agent “FT=25” namelist (~+520) is wrong for gameDate1; UI showed 2 rows. Not an object path. Do not build on T110.
 
-**T110 done** — Native FM26: club identity → namelist (~+520) → FT names (+ sparse uid). ≥2 Careers (Liverpool 25 / Bournemouth 24). II/U19 empty (not in identity neighborhood). Continue = `continue-squad-lists-not-yet`. Not extract-first-team-fast.
+**Used (2026-08-16 HQ):** One squad at a time. Lock **Senior Squad** via club → squad object → player ids (native names). Then choose horizontal (Loans/Mentoring/Progress) vs vertical (Reserve/U19). Native FM terms from the save.
+
+**T111 done** — object path documented (`senior-squad-object-v1`); T110 namelist removed. Native Liverpool + Bournemouth = honest miss + dump (no fake FT=25). UI: Name + UID + Senior. Squad still empty until native club→squad object locks. T087 frozen. Do not claim T077 / T080 / T081.
+
+**Next:** Native Senior squad object (after owner FM Senior count smoke), or HQ picks horizontal vs vertical. T087 frozen. Do not claim T077 / T080 / T081.
 
 **T038 done** — II Lars Gabrielsen Det/Lea is the same T014 tip class (not a new locus). Remaining hist=0 stay `—`.
 
@@ -168,7 +172,8 @@ Last updated: 2026-08-16 (T110 done)
 | Standardize pane thead + identical drop well | **T107 done** | Yes |
 | Squad list after identity; stream if cheap | **T108 cancelled** (fitted MVP; owner rejected) | — |
 | Working-copy extract; delete `.fm` after | **T109 done** | **Yes** |
-| First-principles squad lists (native FM26 first) | **T110 done** | **Yes** |
+| First-principles squad lists (native FM26 first) | **T110 cancelled** (offset namelist; owner rejected) | — |
+| Senior Squad — club → squad object → player ids | **T111 done** (native miss + dump; no namelist) | **Yes** |
 | Progress GK abilities + outfield GK rating | **T087 blocked** (on T094) | after native roster |
 | npm run dev from HQ | **T089 cancelled** | — |
 | Sync steals Active save when extract finishes | **T088 done** | **Yes** |
@@ -203,7 +208,7 @@ Last updated: 2026-08-16 (T110 done)
 
 ## Gate
 
-- Board: no ready need-to-haves. T110 done — native FT namelist locked; II/U19 + continue lists still open for HQ. T087 frozen. T077 / T080 / T081 blocked. One ticket per worker.
+- Board empty of ready tickets. T111 done (object path + honest native miss). Next Senior lock needs owner FM smoke count — do not invent tickets. T087 frozen. T077 / T080 / T081 blocked.
 - Refuse Suggest. Refuse CA/PA. Refuse Stripe paywall / packaging / FM27.
 - BMC is a tip. Do not gate the table.
 - Workers: one ticket, one commit on `FMT/`. If freeze, do not claim anything else.
@@ -214,7 +219,9 @@ Last updated: 2026-08-16 (T110 done)
 
 ## Recently done
 
-- **T110** — Native FM26 squad lists from identity neighborhood namelist (count → lp32 names → canonical FT). Liverpool + Bournemouth smoke; II/U19 honest empty; continue `continue-squad-lists-not-yet`. Product uses `extract-squad-lists.py` (not T108 fast). Unittest + vitest. Restart `npm run dev` and + a native Career. No committed `.fm`.
+- **T111** — Senior Squad object path (`club → PRE_NAME/team → 7f02 jobs → uid → name`); killed T110 namelist. Native gameDate1/2 honest miss + dump (no FT=25). UI Name+UID+Senior. Unittest + vitest. Restart `npm run dev`. No committed `.fm`.
+
+- **T110 cancelled** — Owner rejected: namelist ~+520; claimed Liverpool FT=25 (false for gameDate1); UI 2 rows. Next T111 Senior Squad object path.
 
 - **T109** — + / Update extract lands in `tmp/uploads` working copy; `cleanupWorkingFm` deletes it after success or abort (never live SI `games/*.fm`). GET scout disk extract disabled. Vitest refuse + delete-after. Restart `npm run dev`. No committed `.fm`.
 
