@@ -624,8 +624,7 @@ async function runIdentityStreaming(
 ) {
   beginNdjson(res);
   try {
-    // T096: + / upload extracts clubId, clubName, gameDate only.
-    // T097: still identity-only; disk GET extract is gone.
+    // Kept for callers that need meta-only. T108: + / roster POST uses list extract.
     const result = await extractManagedIdentity(savePath, {
       signal,
       onProgress: (p) => {
@@ -914,10 +913,13 @@ function rosterApiPlugin(): Plugin {
             const ct = String(req.headers["content-type"] || "").toLowerCase();
             const uploadDir = path.join(rootDir, "tmp", "uploads");
             fs.mkdirSync(uploadDir, { recursive: true });
+            // T108: + / roster POST runs names-only FT/II/U19 list (T093/T094 joins).
+            // One-shot JSON result — progressive row append skipped (needs NDJSON+UI).
+            // Identity-only helper remains for non-roster callers.
             const runStreaming =
               url === "/api/scout/favoured-club"
                 ? runScoutStreaming
-                : runIdentityStreaming;
+                : runExtractStreaming;
 
             if (
               ct.includes("application/octet-stream") ||

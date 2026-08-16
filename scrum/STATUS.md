@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-08-16 (T107 done)
+Last updated: 2026-08-16 (T108 done)
 
 ## Now
 
@@ -11,6 +11,10 @@ Last updated: 2026-08-16 (T107 done)
 **T107 done** — empty panes share one thead chrome + identical `.table-pane-drop` under `.table-pane-head` (Squad no longer forks into `#roster-body`). Mentoring empty hides mentee strip.
 
 **Used (2026-08-16 HQ):** Continue date works on owner save. Final chrome: same thead look + drop well in the identical place on all four tabs.
+
+**Used (2026-08-16 HQ):** Fund Squad list next. Shortest solid FT/II/U19 path after identity; progressive row append only if cheap (else one-shot JSON).
+
+**T108 done** — + / Update runs names-only FT/II/U19 list extract (T093/T094). Progressive row append skipped (one-shot JSON; needs NDJSON+UI). T087 frozen. Do not claim T077 / T080 / T081.
 
 **Next:** T087 frozen. Do not claim T077 / T080 / T081. Board empty of ready need-to-haves until HQ funds more.
 
@@ -156,6 +160,7 @@ Last updated: 2026-08-16 (T107 done)
 | One table pane shell; same drop well slot | **T105 done** | Yes |
 | Continue FM24 gameDate (rolling stack lock) | **T106 done** | **Yes** |
 | Standardize pane thead + identical drop well | **T107 done** | Yes |
+| Squad list after identity; stream if cheap | **T108 done** | **Yes** |
 | Progress GK abilities + outfield GK rating | **T087 blocked** (on T094) | after native roster |
 | npm run dev from HQ | **T089 cancelled** | — |
 | Sync steals Active save when extract finishes | **T088 done** | **Yes** |
@@ -200,6 +205,8 @@ Last updated: 2026-08-16 (T107 done)
 - Host RAM / T077 after owner says the local loop is honest (any save + Active not stolen).
 
 ## Recently done
+
+- **T108** — + / roster POST uses names-only `extract-first-team-fast` (T093/T094 continue+native joins), not metaOnly. Progressive append skipped (one-shot `players[]`; STATUS). Smoke continue Schalke FT/II/U19 filled. Vitest T108 + T096; unittest T093/T094. Restart `npm run dev`. No committed `.fm`.
 
 - **T107** — Empty Squad / Loans / Mentoring / Progress share `.table-pane-empty` → `.table-pane-head` + `.table-pane-drop`. Shared thead typography tokens (also filled Squad HA head). Mentoring empty hides mentee strip. Drop still + identity upload. Vitest chrome. Restart `npm run dev`. No committed `.fm`.
 

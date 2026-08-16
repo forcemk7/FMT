@@ -11,20 +11,18 @@ const identityTs = fs.readFileSync(
 );
 
 describe("T096 honest club id, name, and game date on Manage saves", () => {
-  it("POST + / upload extracts identity only — no FT/II/U19 HA walk", () => {
+  it("identity helper still exists; roster POST list extract is T108", () => {
     expect(vite).toMatch(/extractManagedIdentity/);
     expect(vite).toMatch(/runIdentityStreaming/);
-    expect(vite).toMatch(
-      /T096: \+ \/ upload extracts clubId, clubName, gameDate only/,
-    );
     expect(identityTs).toMatch(/extract-managed-team\.py/);
     expect(identityTs).toMatch(/result\.players = \[\]/);
     expect(identityTs).toMatch(/result\.metaOnly = true/);
+    // T108: + fills Squad via names-only list extract (identity fields still in result).
     const postIdx = vite.indexOf('url === "/api/roster/first-team" ||');
     expect(postIdx).toBeGreaterThan(0);
-    const postBlock = vite.slice(postIdx, postIdx + 900);
-    expect(postBlock).toMatch(/runIdentityStreaming/);
-    expect(postBlock).not.toMatch(/runExtractStreaming/);
+    const postBlock = vite.slice(postIdx, postIdx + 1200);
+    expect(postBlock).toMatch(/runExtractStreaming/);
+    expect(postBlock).not.toMatch(/runIdentityStreaming/);
   });
 
   it("GET disk extract is disabled — identity is POST + only", () => {
