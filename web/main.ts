@@ -183,6 +183,7 @@ import {
   deleteRoster,
   listRosterSaveNames,
   loadRosterStore,
+  saveFileMatchesSlot,
   setActiveRoster,
   upsertRoster,
   type RosterStore,
@@ -6662,6 +6663,15 @@ function formatClubLine(
   return `${name} ${clubId}`;
 }
 
+function editionFromTagHex(
+  tagHex: string | null | undefined,
+): "FM26" | "FM24" | null {
+  const hex = (tagHex ?? "").trim().toLowerCase();
+  if (hex === "00950e01") return "FM26";
+  if (hex === "00950e02") return "FM24";
+  return null;
+}
+
 function formatUploadedAt(iso: string | null | undefined): string {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -6672,7 +6682,7 @@ function formatUploadedAt(iso: string | null | undefined): string {
   });
 }
 
-/** Compact extract timestamp for Manage Saves rows. */
+/** Compact extract timestamp for Manage Saves rows: Mon DD, H:MM AM/PM. */
 function formatUploadedAtRow(iso: string | null | undefined): string {
   if (!iso) return "—";
   const d = new Date(iso);
@@ -6680,8 +6690,9 @@ function formatUploadedAtRow(iso: string | null | undefined): string {
   return d.toLocaleString(undefined, {
     day: "numeric",
     month: "short",
-    hour: "2-digit",
+    hour: "numeric",
     minute: "2-digit",
+    hour12: true,
   });
 }
 
@@ -6739,6 +6750,9 @@ function syncRosterSavesMenu() {
 
     const inGame = formatInGameDateRow(entry.gameDate);
     const uploaded = formatUploadedAtRow(entry.extractedAt);
+    const edition = editionFromTagHex(entry.tagHex);
+    const clubName = (club ?? "").trim() || name;
+    const idText = id != null ? String(id) : "—";
 
     const selectBtn = document.createElement("button");
     selectBtn.type = "button";
@@ -6748,32 +6762,43 @@ function syncRosterSavesMenu() {
     selectBtn.title = [
       name,
       clubLine ?? "",
+      edition ? edition : "",
       `Uploaded ${uploaded}`,
-      `In-game ${formatInGameDate(entry.gameDate)}`,
+      `ID ${idText}`,
+      `Game Date ${formatInGameDate(entry.gameDate)}`,
     ]
       .filter(Boolean)
       .join("\n");
+    const pillHtml = edition
+      ? `<span class="roster-saves-item-edition">${escapeHtml(edition)}</span>`
+      : "";
     selectBtn.innerHTML = `
-      <span class="roster-saves-item-club">${escapeHtml(clubLine ?? name)}${
+      <span class="roster-saves-item-club">${pillHtml}<span class="roster-saves-item-club-name">${escapeHtml(
+        clubName,
+      )}</span>${
         isActive
           ? `<span class="roster-saves-item-badge">Active</span>`
           : ""
       }</span>
-      <span class="roster-saves-item-uploaded">${escapeHtml(uploaded)}</span>
-      <span class="roster-saves-item-date is-ingame">${escapeHtml(inGame)}</span>
+      <span class="roster-saves-item-uploaded">Uploaded: ${escapeHtml(uploaded)}</span>
+      <span class="roster-saves-item-date is-ingame"><span class="roster-saves-item-meta">ID: ${escapeHtml(
+        idText,
+      )}</span><span class="roster-saves-item-meta">Game Date: ${escapeHtml(
+        inGame,
+      )}</span></span>
     `;
 
     const actions = document.createElement("div");
     actions.className = "roster-saves-row-actions";
 
-    const editBtn = document.createElement("button");
-    editBtn.type = "button";
-    editBtn.className = "btn-icon roster-saves-row-icon";
-    editBtn.dataset.action = "edit";
-    editBtn.dataset.saveName = name;
-    editBtn.title = "Replace this Career Save";
-    editBtn.setAttribute("aria-label", "Replace this Career Save");
-    editBtn.innerHTML = `<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path fill="currentColor" d="M11.2 2.1a1.2 1.2 0 0 1 1.7 0l1 1a1.2 1.2 0 0 1 0 1.7L6.2 12.5 2.5 13.5l1-3.7 7.7-7.7zm.85 1.06L4.7 10.5l-.45 1.65 1.65-.45 7.35-7.36-.7-.7z"/></svg>`;
+    const updateBtn = document.createElement("button");
+    updateBtn.type = "button";
+    updateBtn.className = "btn-icon roster-saves-row-icon";
+    updateBtn.dataset.action = "update";
+    updateBtn.dataset.saveName = name;
+    updateBtn.title = "Update this Career Save (same filename)";
+    updateBtn.setAttribute("aria-label", "Update this Career Save");
+    updateBtn.innerHTML = `<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path fill="currentColor" d="M8 2.5a5.5 5.5 0 1 0 4.9 3.2h-1.6A4 4 0 1 1 8 4l1.4 1.4h3.4V2L11.4 3.4A5.47 5.47 0 0 0 8 2.5z"/></svg>`;
 
     const deleteBtn = document.createElement("button");
     deleteBtn.type = "button";
@@ -6785,7 +6810,7 @@ function syncRosterSavesMenu() {
     deleteBtn.setAttribute("aria-label", "Delete this Career Save");
     deleteBtn.innerHTML = `<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path fill="currentColor" d="M6.25 2h3.5l.25 1h3.25a.75.75 0 0 1 0 1.5h-.4l-.7 8.1A1.75 1.75 0 0 1 10.41 14H5.59a1.75 1.75 0 0 1-1.74-1.4L3.15 4.5h-.4a.75.75 0 0 1 0-1.5H6l.25-1zM5.66 4.5l.68 7.9c.02.2.19.35.39.35h4.54c.2 0 .37-.15.39-.35l.68-7.9H5.66z"/></svg>`;
 
-    actions.append(editBtn, deleteBtn);
+    actions.append(updateBtn, deleteBtn);
     row.append(selectBtn, actions);
     rosterSavesListEl.append(row);
   }
@@ -8171,7 +8196,7 @@ function renderRoster() {
   const emptyUploadTip =
     "Load a Career Save to see First Team, Reserves, and Under 19s personality HA in one list.";
   const loadLabel = rosterAmendTarget
-    ? "Overwrite selected save"
+    ? "Update selected save (same filename)"
     : isEmptyRoster
       ? emptyUploadTip
       : "Load Career Save";
@@ -8300,6 +8325,8 @@ type FirstTeamApiResult = {
   clubName?: string | null;
   clubNameShort?: string | null;
   gameDate?: string | null;
+  tagHex?: string | null;
+  discovery?: { tagHex?: string; [key: string]: unknown };
   listAbs?: number;
   countHeader?: number;
   players?: FirstTeamApiPlayer[];
@@ -8539,8 +8566,8 @@ function applyRosterTrustStatus() {
     statusText = rosterMeta.error;
     title = rosterMeta.error;
   } else if (rosterAmendTarget) {
-    statusText = "Ready to overwrite";
-    title = `Next upload overwrites ${rosterAmendTarget}`;
+    statusText = "Ready to update";
+    title = `Next upload must match ${rosterAmendTarget}`;
   } else if (rosterMeta.source === "save" && clubPlayerCount() > 0) {
     statusText = formatExtractTrustStatus(clubExtractTrustSummary());
     title = statusText || null;
@@ -8657,7 +8684,6 @@ function persistExtractResult(
   options?: { soft?: boolean },
 ) {
   const players: RosterPlayer[] = mapApiSquadPlayers(body.players);
-  const replaceName = rosterAmendTarget;
   const prev = rosterStore.saves[body.saveName];
   const favouredClub: StoredFavouredClub | null | undefined = body.favouredClub
     ? {
@@ -8714,6 +8740,13 @@ function persistExtractResult(
       clubName: body.clubName ?? undefined,
       clubNameShort: body.clubNameShort ?? undefined,
       gameDate: body.gameDate ?? null,
+      tagHex:
+        [
+          body.tagHex,
+          body.discovery?.tagHex,
+          prev?.tagHex,
+        ].find((v): v is string => typeof v === "string" && v.length > 0) ??
+        null,
       elapsedMs: body.elapsedMs,
       extractedAt: new Date().toISOString(),
       players,
@@ -8736,15 +8769,11 @@ function persistExtractResult(
     haHistoryStore,
     rosterStore.saves[body.saveName]!,
   );
-  const extractedName = body.saveName;
-  if (replaceName && replaceName !== extractedName) {
-    rosterStore = deleteRoster(rosterStore, replaceName);
-    rosterStore = setActiveRoster(rosterStore, extractedName);
-  }
   if (!options?.soft) rosterAmendTarget = null;
   // Apply the in-memory upsert directly — reloading LS here can resurrect a
   // pre-persist snapshot if another tab/HMR raced the write (T010).
   // T100: + / Edit persist makes this save Active.
+  // T101: Update same filename only; different Career → +.
   applyActiveRosterFromStore({
     soft: Boolean(options?.soft),
     reload: false,
@@ -8860,6 +8889,20 @@ async function uploadFirstTeamSave(file: File): Promise<void> {
     return;
   }
 
+  if (
+    rosterAmendTarget &&
+    !saveFileMatchesSlot(file.name, rosterAmendTarget)
+  ) {
+    const slot = rosterAmendTarget;
+    rosterAmendTarget = null;
+    rosterMeta = {
+      ...rosterMeta,
+      error: `File name must match ${slot} — use + for a different Career Save.`,
+    };
+    renderRoster();
+    return;
+  }
+
   rosterManualExtractQueued = true;
   if (rosterRefreshInFlight) {
     setRosterLiveStatus(
@@ -8876,7 +8919,7 @@ async function uploadFirstTeamSave(file: File): Promise<void> {
   rosterRefreshInFlight = true;
   rosterBackgroundSync = false;
   setRosterControlsDisabled(true);
-  setRosterLiveStatus(amending ? "Overwriting save…" : "Uploading…");
+  setRosterLiveStatus(amending ? "Updating save…" : "Uploading…");
   rosterStatusEl.title = amending
     ? `${rosterAmendTarget} ← ${file.name}`
     : file.name;
@@ -8989,7 +9032,7 @@ rosterSavesMenuEl.addEventListener("click", (e) => {
     return;
   }
 
-  if (action === "edit") {
+  if (action === "update") {
     rosterAmendTarget = name;
     openRosterFilePicker();
     return;

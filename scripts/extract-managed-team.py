@@ -47,11 +47,15 @@ CATALOG_TARGET = 12 * 1024 * 1024
 CALIB_DUMP = ROOT / "tmp" / "calib" / "early-last.bin"
 CALIB_META = ROOT / "tmp" / "calib" / "early-last.json"
 IDENTITY_DUMP_DIR = ROOT / "tmp" / "identity"
-# Neighborhood dump only — pick is UniqueID-tail u16 doy + u16 year (T099), not 24MB c708.
+# Neighborhood dump only — native (tag 01) pick is UniqueID-tail (T099).
 IDENTITY_DATE_WINDOW = 64 * 1024
 IDENTITY_HEX_RADIUS = 256
 DATE_EPOCH = date(1900, 1, 1)
 GAME_DATE_PRELUDE = bytes.fromhex("c708000000")
+# Continue (tag 02) calendar scan — same early bound as discover_game_date, not UniqueID-tail.
+CONTINUE_DATE_SCAN = 24 * 1024 * 1024
+TAG_NATIVE_HEX = "00950e01"
+TAG_CONTINUE_HEX = "00950e02"
 # Valid in-game years for the UniqueID-tail u16. Not a fitted club/day.
 DATE_YEAR_LO, DATE_YEAR_HI = 2020, 2050
 DAYS_Y1900_LO, DAYS_Y1900_HI = 40_000, 60_000
@@ -400,29 +404,19 @@ def collect_date_candidates(buf, lo: int, hi: int) -> list[dict]:
     return out
 
 
-def pick_game_date_near_identity(buf, identity: dict | None) -> dict | None:
-    """
-    In-game date from the UniqueID tail (T099).
-
-    After club UniqueID u32: u16 LE raw at UniqueID+4, u16 LE year at UniqueID+6.
-    ``doy = raw`` if 1..366 else ``raw & 0x1FF``.
-    ``date(year, 1, 1) + (doy - 1)``. Not packed day/month. Not 24MB ``c708``.
-    Invalid doy/year → None.
-    """
-    if not identity:
-        return None
-    abs0 = int(identity.get("identityAbs") or 0)
-    club_id_abs = int(identity.get("clubIdAbs") or abs0)
-    tail = club_id_abs + 4
-    lo = max(0, abs0 - IDENTITY_DATE_WINDOW)
-    hi = min(len(buf), abs0 + IDENTITY_DATE_WINDOW)
-    neighborhood = collect_date_candidates(buf, lo, hi)
-    empty = {
+def _empty_date_pick(
+    *,
+    lo: int,
+    hi: int,
+    candidates: list[dict],
+    tail: int | None = None,
+) -> dict:
+    return {
         "gameDate": None,
         "daysY1900": None,
         "abs": None,
         "method": "identity_unsure",
-        "candidates": neighborhood,
+        "candidates": candidates,
         "windowLo": lo,
         "windowHi": hi,
         "doy": None,
@@ -430,6 +424,74 @@ def pick_game_date_near_identity(buf, identity: dict | None) -> dict | None:
         "tailAbs": tail,
         "tailHex": None,
     }
+
+
+def pick_continue_calendar_date(buf, identity: dict) -> dict:
+    """
+    Continue (tag 00950e02) in-game date: c708 prelude / today_ptr.
+
+    Same recipe as extract-first-team-fast.discover_game_date, but never UniqueID-tail
+    (T099 is native-only). No today_ptr → unsure (—). Dense calendar table alone
+    is not today.
+    """
+    lo = 0
+    hi = min(len(buf), CONTINUE_DATE_SCAN)
+    neighborhood = collect_date_candidates(buf, lo, hi)
+    empty = _empty_date_pick(lo=lo, hi=hi, candidates=neighborhood)
+    today_ptrs = [c for c in neighborhood if c.get("kind") == "today_ptr"]
+    if not today_ptrs:
+        return empty
+    ptr = max(today_ptrs, key=lambda c: int(c["daysY1900"]))
+    chosen_days = int(ptr["daysY1900"])
+    ptr_days = chosen_days
+    prelude_days = {
+        int(c["daysY1900"]) for c in neighborhood if c.get("kind") == "prelude"
+    }
+    while chosen_days + 1 in prelude_days:
+        chosen_days += 1
+    iso = days_y1900_to_iso(chosen_days)
+    if not iso or not (DATE_YEAR_LO <= int(iso[:4]) <= DATE_YEAR_HI):
+        return empty
+    method = "calendar_run_end" if chosen_days != ptr_days else "today_ptr_latest"
+    chosen_abs = ptr["abs"]
+    if chosen_days != ptr_days:
+        for c in neighborhood:
+            if c.get("kind") == "prelude" and int(c["daysY1900"]) == chosen_days:
+                chosen_abs = c["abs"]
+                break
+    return {
+        "gameDate": iso,
+        "daysY1900": chosen_days,
+        "abs": chosen_abs,
+        "method": method,
+        "candidates": neighborhood,
+        "windowLo": lo,
+        "windowHi": hi,
+        "doy": None,
+        "year": None,
+        "tailAbs": None,
+        "tailHex": None,
+    }
+
+
+def pick_native_uniqueid_tail_date(buf, identity: dict) -> dict:
+    """
+    Native (tag 00950e01) in-game date from the UniqueID tail (T099).
+
+    After club UniqueID u32: u16 LE raw at UniqueID+4, u16 LE year at UniqueID+6.
+    ``doy = raw`` if 1..366 else ``raw & 0x1FF``.
+    ``date(year, 1, 1) + (doy - 1)``. Not packed day/month. Not 24MB ``c708``.
+    Invalid doy/year → unsure.
+    """
+    abs0 = int(identity.get("identityAbs") or 0)
+    club_id_abs = int(identity.get("clubIdAbs") or abs0)
+    tail = club_id_abs + 4
+    lo = max(0, abs0 - IDENTITY_DATE_WINDOW)
+    hi = min(len(buf), abs0 + IDENTITY_DATE_WINDOW)
+    neighborhood = collect_date_candidates(buf, lo, hi)
+    empty = _empty_date_pick(
+        lo=lo, hi=hi, candidates=neighborhood, tail=tail
+    )
     if tail + 4 > len(buf):
         return empty
     raw, year = struct.unpack_from("<HH", buf, tail)
@@ -465,6 +527,16 @@ def pick_game_date_near_identity(buf, identity: dict | None) -> dict | None:
         "tailAbs": tail,
         "tailHex": tail_bytes.hex(),
     }
+
+
+def pick_game_date_near_identity(buf, identity: dict | None) -> dict | None:
+    """Tag 01 = UniqueID-tail (T099). Tag 02 = continue calendar. Else unsure."""
+    if not identity:
+        return None
+    tag = str(identity.get("tagHex") or "").lower()
+    if tag == TAG_CONTINUE_HEX:
+        return pick_continue_calendar_date(buf, identity)
+    return pick_native_uniqueid_tail_date(buf, identity)
 
 
 def _hexdump(buf, start: int, end: int, width: int = 16) -> list[str]:
@@ -845,6 +917,7 @@ def main() -> int:
         "clubName": club_name,
         "clubNameShort": club_short,
         "gameDate": game_date,
+        "tagHex": identity["tagHex"],
         "players": [],
         "metaOnly": True,
         "discovery": {

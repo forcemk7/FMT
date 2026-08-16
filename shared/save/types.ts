@@ -270,6 +270,8 @@ export type FirstTeamExtract = {
   clubNameShort?: string | null;
   /** In-game date of the save when known (for age-from-DOB). */
   gameDate?: string | null;
+  /** Identity human tag: 00950e01 native FM26, 00950e02 continue FM24. */
+  tagHex?: string | null;
   /** Upload path (T096): identity only — no FT/II/U19/HA/loans. */
   metaOnly?: boolean;
   players: FirstTeamPlayer[];

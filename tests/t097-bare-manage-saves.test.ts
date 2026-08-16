@@ -22,7 +22,7 @@ describe("T097 bare Manage saves — no auto-sync, lock game date", () => {
     expect(main).not.toMatch(/new EventSource/);
     expect(main).not.toMatch(/savePollTimer = setInterval/);
     expect(main).not.toMatch(/Startup disk check/);
-    expect(main).not.toMatch(/dataset\.action = "update"/);
+    expect(main).not.toMatch(/updateBtn\.textContent = "Update"/);
     expect(vite).toMatch(/T097: no SSE save-changed/);
     expect(vite).toMatch(/T097: no Update-from-games/);
     expect(vite).toMatch(/T097: no disk GET extract/);

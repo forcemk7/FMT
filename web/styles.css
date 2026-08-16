@@ -7306,8 +7306,8 @@ button.mentoring-seat-card:hover {
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  min-width: min(24rem, calc(100vw - 1.5rem));
-  max-width: min(30rem, calc(100vw - 1.5rem));
+  min-width: min(36rem, calc(100vw - 1.5rem));
+  max-width: min(44rem, calc(100vw - 1.5rem));
   max-height: min(50vh, 22rem);
   overflow: auto;
   padding: 0.5rem;
@@ -7418,12 +7418,37 @@ button.mentoring-seat-card:hover {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   min-width: 0;
   font-size: 0.86rem;
   font-weight: 650;
   color: var(--heading, var(--ink));
   line-height: 1.25;
+}
+
+.roster-saves-item-edition {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2.7rem;
+  box-sizing: border-box;
+  padding: 0.06rem 0;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--heading) 35%, var(--line));
+  background: color-mix(in srgb, var(--heading) 10%, transparent);
+  color: var(--heading, var(--ink));
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+}
+
+.roster-saves-item-club-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .roster-saves-item-uploaded {
@@ -7487,6 +7512,10 @@ button.mentoring-seat-card:hover {
   grid-column: 1;
   grid-row: 2;
   min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.65rem;
   font-size: 0.72rem;
   line-height: 1.2;
   color: var(--ink);
@@ -7496,6 +7525,10 @@ button.mentoring-seat-card:hover {
 .roster-saves-item-date.is-ingame {
   justify-content: flex-start;
   text-align: left;
+}
+
+.roster-saves-item-meta {
+  white-space: nowrap;
 }
 
 .roster-saves-item-date-label {

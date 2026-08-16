@@ -20,7 +20,7 @@ describe("T100 lock identity upload; last + is Active; compact cards", () => {
     expect(main).toMatch(/formatUploadedAtRow\(entry\.extractedAt\)/);
     expect(main).toMatch(/roster-saves-item-uploaded/);
     expect(main).toMatch(/formatInGameDateRow\(entry\.gameDate\)/);
-    expect(main).toMatch(/dataset\.action = "edit"/);
+    expect(main).toMatch(/dataset\.action = "update"/);
     expect(main).toMatch(/dataset\.action = "delete"/);
     expect(main).not.toMatch(/deleteBtn\.textContent = "Delete"/);
     expect(main).not.toMatch(/roster-saves-row-btn is-danger/);
@@ -32,12 +32,12 @@ describe("T100 lock identity upload; last + is Active; compact cards", () => {
   });
 
   it("Edit opens the identity file picker into that slot; auto-sync stays dead", () => {
-    expect(main).toMatch(/action === "edit"/);
+    expect(main).toMatch(/action === "update"/);
     expect(main).toMatch(/rosterAmendTarget = name;/);
     expect(main).toMatch(/openRosterFilePicker\(\)/);
     expect(main).toMatch(
       /T097: no poll, no SSE, no startup disk refresh, no Update-from-games/,
     );
-    expect(main).not.toMatch(/dataset\.action = "update"/);
+    expect(main).not.toMatch(/dataset\.action = "edit"/);
   });
 });

@@ -61,6 +61,8 @@ export type StoredRoster = {
   lastSaved?: string | null;
   /** In-game date when extracted — used to derive age from DOB. */
   gameDate?: string | null;
+  /** Identity human tag: 00950e01 native FM26, 00950e02 continue FM24. */
+  tagHex?: string | null;
   elapsedMs?: number;
   extractedAt: string;
   players: RosterPlayer[];
@@ -322,6 +324,17 @@ function normalizeStoredSubunit(
       normalizeRosterPlayer(p as LegacyRosterPlayer),
     ),
   };
+}
+
+/** Case-insensitive: Update may replace a slot only when the .fm name matches. */
+export function saveFileMatchesSlot(
+  fileName: string,
+  slotSaveName: string,
+): boolean {
+  return (
+    fileName.localeCompare(slotSaveName, undefined, { sensitivity: "accent" }) ===
+    0
+  );
 }
 
 /** Insert or replace an extract under its save filename (no merge across saves). */

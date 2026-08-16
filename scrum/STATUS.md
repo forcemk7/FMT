@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-08-16 (T100 done)
+Last updated: 2026-08-16 (T101 done)
 
 ## Now
 
@@ -62,7 +62,11 @@ Last updated: 2026-08-16 (T100 done)
 
 **T100 done** — + / Edit persist sets Active to that save. Cards: club+id | uploaded; game date | edit+delete icons. Date parser unchanged.
 
-**Next:** empty ready board. T087 frozen. Do not claim T077 / T080 / T081.
+**Used (2026-08-16 HQ):** Continue Schalke Game Date `—` (tag `02`); native eight locked. Cards need FM24/FM26 pill, ID, Game Date labels, update-same-name (not overwrite).
+
+**T101 done** — persist tagHex FM26/FM24 pills. Tag 01 date = T099 UniqueID-tail; tag 02 = continue calendar (never T099). Cards: pill+club | Uploaded; ID + Game Date | refresh+delete. Update same filename only. Menu widened. No page shell.
+
+**Next:** no ready ticket. T087 frozen. Do not claim T077 / T080 / T081.
 
 | Area | State | Need-to-have? |
 |------|--------|---------------|
@@ -123,6 +127,7 @@ Last updated: 2026-08-16 (T100 done)
 | Game date only on inspect-save 4-byte tail | **T098 cancelled** (wrong encoding) | — |
 | Game date u16 doy + u16 year after UniqueID | **T099 done** | **Yes** |
 | Identity upload locked; last + Active; compact cards | **T100 done** | **Yes** |
+| Save cards FM24/FM26; continue date; update-same-name | **T101 done** | **Yes** |
 | Progress GK abilities + outfield GK rating | **T087 blocked** (on T094) | after native roster |
 | npm run dev from HQ | **T089 cancelled** | — |
 | Sync steals Active save when extract finishes | **T088 done** | **Yes** |
@@ -157,7 +162,7 @@ Last updated: 2026-08-16 (T100 done)
 
 ## Gate
 
-- Empty ready board. T087 frozen. T077 / T080 / T081 blocked. One ticket per worker.
+- T101 done (save-card identity lock). No app shell this ticket. T087 frozen. T077 / T080 / T081 blocked. One ticket per worker. Empty ready board.
 - Refuse Suggest. Refuse CA/PA. Refuse Stripe paywall / packaging / FM27.
 - BMC is a tip. Do not gate the table.
 - Workers: one ticket, one commit on `FMT/`. If freeze, do not claim anything else.
@@ -167,6 +172,8 @@ Last updated: 2026-08-16 (T100 done)
 - Host RAM / T077 after owner says the local loop is honest (any save + Active not stolen).
 
 ## Recently done
+
+- **T101** — Persist `tagHex`: `00950e01` → FM26 pill, `00950e02` → FM24 pill. Tag 01 gameDate stays UniqueID+4/+6 (T099). Tag 02 uses continue calendar (`c708` / today_ptr), never T099; unsure → —. Cards: pill+club name | Uploaded: Mon DD, H:MM AM/PM; ID + Game Date | refresh update + delete. Update refuses a different `.fm` name (use +). Menu widened. Auto-sync stays dead. No page shell. Restart `npm run dev`. Owner: continue Schalke should show FM24 + a Game Date or honest `—`. No committed `.fm`.
 
 - **T100** — + / Edit identity persist sets Active to that save (first upload no longer stuck). Cards: club name+id | uploaded date; game date | edit+delete icons. No DELETE text. Auto-sync stays dead. Date parser unchanged. Vitest Active + chrome. Restart `npm run dev` and + a second Career Save. No committed `.fm`.
 
