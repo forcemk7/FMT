@@ -328,6 +328,7 @@ function normalizeStoredSubunit(
 export function upsertRoster(
   store: RosterStore,
   entry: StoredRoster,
+  options?: { setActive?: boolean },
 ): RosterStore {
   const prev = store.saves[entry.saveName];
   // Omit reserves/u19 on the entry (e.g. disk-binding patch) → keep previous.
@@ -349,7 +350,10 @@ export function upsertRoster(
   };
 
   const current = store.activeSaveName;
+  // T100: + / Edit persist sets Active to this save. T088: other upserts keep Active.
+  const pinThisSave = options?.setActive === true;
   const keepActive =
+    !pinThisSave &&
     current != null &&
     (current === entry.saveName || Boolean(store.saves[current]));
   const next: RosterStore = {

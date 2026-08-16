@@ -31,11 +31,11 @@ describe("T097 bare Manage saves — no auto-sync, lock game date", () => {
     );
   });
 
-  it("Manage saves chrome is +, club id/name/in-game, Delete, Active", () => {
+  it("Manage saves chrome is +, club id/name/in-game, Active", () => {
     expect(main).toMatch(/formatClubLine\(club, id\)/);
     expect(main).toMatch(/formatInGameDateRow\(entry\.gameDate\)/);
     expect(main).toMatch(/roster-saves-item-badge">Active/);
-    expect(main).toMatch(/deleteBtn\.textContent = "Delete"/);
+    expect(main).not.toMatch(/deleteBtn\.textContent = "Delete"/);
     expect(main).not.toMatch(/updateBtn\.textContent = "Update"/);
     expect(main).not.toMatch(/disk-linked/);
     expect(main).not.toMatch(/roster-saves-item-badge is-syncing/);

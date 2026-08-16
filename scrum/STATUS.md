@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-08-16 (T099 done)
+Last updated: 2026-08-16 (T100 done)
 
 ## Now
 
@@ -56,7 +56,13 @@ Last updated: 2026-08-16 (T099 done)
 
 **Used (2026-08-16 HQ):** T097 date only works on the inspect save. Worker froze UniqueID+1/+2 (`04 04 ea 07`), not “find year, doy is the byte before it”.
 
-**Next:** Owner + four Career Saves and say if In-game matches FM. Then freeze unless the human unfreezes. T087 frozen. Do not claim T077 / T080 / T081.
+**T099 done** — gameDate is UniqueID+4 `u16` doy + UniqueID+6 `u16` year (`raw>366` → `raw & 0x1FF`). Owner: eight Careers match FM.
+
+**Used (2026-08-16 HQ):** Liverpool / Bournemouth / Leicester / Schalke / Bodø/Glimt / Legia / Melbourne Victory / Santos — club + in-game date locked. First upload stays Active; cards need uploaded date + icon edit/delete.
+
+**T100 done** — + / Edit persist sets Active to that save. Cards: club+id | uploaded; game date | edit+delete icons. Date parser unchanged.
+
+**Next:** empty ready board. T087 frozen. Do not claim T077 / T080 / T081.
 
 | Area | State | Need-to-have? |
 |------|--------|---------------|
@@ -116,6 +122,7 @@ Last updated: 2026-08-16 (T099 done)
 | Bare Manage saves; lock game date; kill auto-sync | **T097 done** | **Yes** |
 | Game date only on inspect-save 4-byte tail | **T098 cancelled** (wrong encoding) | — |
 | Game date u16 doy + u16 year after UniqueID | **T099 done** | **Yes** |
+| Identity upload locked; last + Active; compact cards | **T100 done** | **Yes** |
 | Progress GK abilities + outfield GK rating | **T087 blocked** (on T094) | after native roster |
 | npm run dev from HQ | **T089 cancelled** | — |
 | Sync steals Active save when extract finishes | **T088 done** | **Yes** |
@@ -137,7 +144,7 @@ Last updated: 2026-08-16 (T099 done)
 - **Used (2026-08-14):** Clear filters → click Adrian Itu → loosen-all → Yoan Robert + Miraglia. FT-only hid this. Empty FT list was correct.
 - **Used (2026-08-16 HQ):** Start sync on save A → select save B in Manage saves → extract finishes → view jumped back to A. **T088 done** — persist stays on A’s slot; Active / Squad stay on B.
 - **Used (2026-08-16 HQ):** Club id/name on Manage saves, 0 players. Schalke = FM24 continue; others = native FM26. Identity works; continue 7f02 join does not. Native list parse is skipped because identity is known. **T093 done** — native UniqueID glued to `010302`. **Used after T093:** still 0 players on native. Glued UniqueID|`7f02` misses real club objects. **T094 done** — UniqueID then nearby `7f02`. Re-extract a native career.
-- **Used (2026-08-16 HQ):** Four dated saves: year = u16 UniqueID+6; doy = u16 UniqueID+4 (363 / 1 / 1; Liverpool `0x0404` → `& 0x1FF`). T097 u8 and T098 u8-before-year are wrong. **T099 done.** T098 cancelled.
+- **Used (2026-08-16 HQ):** Eight Careers: club + gameDate match FM (T099). First + stayed Active (T088 keepActive). **T100 done** — last + / Edit is Active; compact icon cards.
 - **Used (2026-08-16 HQ):** Extract `NameError: name 'match_reserve_name_score' is not defined`. **T090 done** — scorer lives next to `match_unit_core_score`; dead block after `lp32_name_ending_at` removed. Restart `npm run dev` and re-extract.
 - After groups exist in FM: extract on a new in-game date → Progress HA delta (pack + Det/Lea). Two different gameDates required; one extract → value, empty delta.
 - Extract is two blobs once (pack + CA card). UI: Squad HA = pack + Det/Lea from the card. Progress CA = card history; Progress HA = pack snapshots + Det/Lea from the card (T066). Do not hunt Det/Lea as a third extract.
@@ -150,7 +157,7 @@ Last updated: 2026-08-16 (T099 done)
 
 ## Gate
 
-- T099 done (u16 doy + u16 year). T098 cancelled. T087 frozen. T077 / T080 / T081 blocked. One ticket per worker. Owner tests four new saves in the UI. Then freeze unless the human unfreezes.
+- Empty ready board. T087 frozen. T077 / T080 / T081 blocked. One ticket per worker.
 - Refuse Suggest. Refuse CA/PA. Refuse Stripe paywall / packaging / FM27.
 - BMC is a tip. Do not gate the table.
 - Workers: one ticket, one commit on `FMT/`. If freeze, do not claim anything else.
@@ -160,6 +167,8 @@ Last updated: 2026-08-16 (T099 done)
 - Host RAM / T077 after owner says the local loop is honest (any save + Active not stolen).
 
 ## Recently done
+
+- **T100** — + / Edit identity persist sets Active to that save (first upload no longer stuck). Cards: club name+id | uploaded date; game date | edit+delete icons. No DELETE text. Auto-sync stays dead. Date parser unchanged. Vitest Active + chrome. Restart `npm run dev` and + a second Career Save. No committed `.fm`.
 
 - **T099** — UniqueID-tail gameDate is u16 LE doy at +4 and u16 LE year at +6 (`doy = raw` if 1..366 else `raw & 0x1FF`; `date(year,1,1)+(doy-1)`). `0x0404` → 4 Jan not 4 Apr; 363 → 29 Dec not 1 Jan / 17 Apr. Invalid → —. Identity club parse unchanged. Unit tests only. Restart `npm run dev` and + four Career Saves. Owner: say if In-game matches FM. No committed `.fm`.
 

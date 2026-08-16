@@ -7347,9 +7347,10 @@ button.mentoring-seat-card:hover {
 .roster-saves-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: 0.35rem;
-  align-items: stretch;
-  padding: 0.2rem;
+  grid-template-rows: auto auto;
+  gap: 0.1rem 0.45rem;
+  align-items: center;
+  padding: 0.35rem 0.45rem;
   border: 1px solid transparent;
   border-radius: var(--radius-control, 6px);
 }
@@ -7368,57 +7369,71 @@ button.mentoring-seat-card:hover {
 }
 
 .roster-saves-item {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
+  grid-column: 1 / -1;
+  grid-row: 1 / span 2;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto auto;
+  column-gap: 0.45rem;
+  row-gap: 0.12rem;
+  align-items: center;
   min-width: 0;
+  padding: 0;
+  border: none;
+}
+
+.roster-saves-item::after {
+  content: "";
+  grid-column: 2;
+  grid-row: 2;
+  width: 3.6rem;
+  height: 1.55rem;
 }
 
 .roster-saves-row-actions {
+  grid-column: 2;
+  grid-row: 2;
+  z-index: 1;
   display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  justify-content: center;
+  flex-direction: row;
+  gap: 0.2rem;
+  justify-content: flex-end;
+  align-items: center;
 }
 
-.roster-saves-row-btn {
-  appearance: none;
-  font: inherit;
-  font-size: 0.68rem;
-  font-weight: 650;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  padding: 0.28rem 0.45rem;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-control, 6px);
-  background: var(--surface-soft, transparent);
-  color: var(--ink);
-  cursor: pointer;
-  white-space: nowrap;
+.roster-saves-row-icon {
+  width: 1.55rem;
+  height: 1.55rem;
 }
 
-.roster-saves-row-btn:hover {
-  background: var(--surface-hover, color-mix(in srgb, var(--heading) 8%, transparent));
-}
-
-.roster-saves-row-btn[aria-pressed="true"] {
-  border-color: color-mix(in srgb, var(--heading) 55%, var(--line));
-  color: var(--heading, var(--ink));
-}
-
-.roster-saves-row-btn.is-danger {
-  color: color-mix(in srgb, #e35d5d 80%, var(--ink));
+.roster-saves-row-icon.is-danger:hover:not(:disabled) {
+  color: var(--bad);
+  border-color: var(--bad);
+  background: var(--bad-bg);
 }
 
 .roster-saves-item-club {
+  grid-column: 1;
+  grid-row: 1;
   display: flex;
   align-items: center;
   gap: 0.4rem;
   flex-wrap: wrap;
+  min-width: 0;
   font-size: 0.86rem;
   font-weight: 650;
   color: var(--heading, var(--ink));
   line-height: 1.25;
+}
+
+.roster-saves-item-uploaded {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+  font-size: 0.68rem;
+  line-height: 1.2;
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 .roster-saves-item-badge {
@@ -7468,28 +7483,19 @@ button.mentoring-seat-card:hover {
   white-space: nowrap;
 }
 
-.roster-saves-item-dates {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-top: 0.1rem;
-  min-width: 0;
-}
-
 .roster-saves-item-date {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 0.35rem;
+  grid-column: 1;
+  grid-row: 2;
   min-width: 0;
-  font-size: 0.68rem;
+  font-size: 0.72rem;
   line-height: 1.2;
   color: var(--ink);
+  text-align: left;
 }
 
 .roster-saves-item-date.is-ingame {
-  justify-content: flex-end;
-  text-align: right;
+  justify-content: flex-start;
+  text-align: left;
 }
 
 .roster-saves-item-date-label {

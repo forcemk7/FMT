@@ -6738,6 +6738,7 @@ function syncRosterSavesMenu() {
     if (isOverwrite) row.classList.add("is-overwrite");
 
     const inGame = formatInGameDateRow(entry.gameDate);
+    const uploaded = formatUploadedAtRow(entry.extractedAt);
 
     const selectBtn = document.createElement("button");
     selectBtn.type = "button";
@@ -6747,6 +6748,7 @@ function syncRosterSavesMenu() {
     selectBtn.title = [
       name,
       clubLine ?? "",
+      `Uploaded ${uploaded}`,
       `In-game ${formatInGameDate(entry.gameDate)}`,
     ]
       .filter(Boolean)
@@ -6757,27 +6759,33 @@ function syncRosterSavesMenu() {
           ? `<span class="roster-saves-item-badge">Active</span>`
           : ""
       }</span>
-      <span class="roster-saves-item-dates" aria-label="In-game ${escapeHtml(inGame)}">
-        <span class="roster-saves-item-date is-ingame">
-          <span class="roster-saves-item-date-label">In-game</span>
-          <span class="roster-saves-item-date-value">${escapeHtml(inGame)}</span>
-        </span>
-      </span>
+      <span class="roster-saves-item-uploaded">${escapeHtml(uploaded)}</span>
+      <span class="roster-saves-item-date is-ingame">${escapeHtml(inGame)}</span>
     `;
 
     const actions = document.createElement("div");
     actions.className = "roster-saves-row-actions";
 
+    const editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "btn-icon roster-saves-row-icon";
+    editBtn.dataset.action = "edit";
+    editBtn.dataset.saveName = name;
+    editBtn.title = "Replace this Career Save";
+    editBtn.setAttribute("aria-label", "Replace this Career Save");
+    editBtn.innerHTML = `<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path fill="currentColor" d="M11.2 2.1a1.2 1.2 0 0 1 1.7 0l1 1a1.2 1.2 0 0 1 0 1.7L6.2 12.5 2.5 13.5l1-3.7 7.7-7.7zm.85 1.06L4.7 10.5l-.45 1.65 1.65-.45 7.35-7.36-.7-.7z"/></svg>`;
+
     const deleteBtn = document.createElement("button");
     deleteBtn.type = "button";
-    deleteBtn.className = "roster-saves-row-btn is-danger";
+    deleteBtn.className = "btn-icon roster-saves-row-icon is-danger";
     deleteBtn.dataset.action = "delete";
     deleteBtn.dataset.saveName = name;
-    deleteBtn.textContent = "Delete";
     deleteBtn.disabled = false;
     deleteBtn.title = "Permanently remove this extract";
+    deleteBtn.setAttribute("aria-label", "Delete this Career Save");
+    deleteBtn.innerHTML = `<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path fill="currentColor" d="M6.25 2h3.5l.25 1h3.25a.75.75 0 0 1 0 1.5h-.4l-.7 8.1A1.75 1.75 0 0 1 10.41 14H5.59a1.75 1.75 0 0 1-1.74-1.4L3.15 4.5h-.4a.75.75 0 0 1 0-1.5H6l.25-1zM5.66 4.5l.68 7.9c.02.2.19.35.39.35h4.54c.2 0 .37-.15.39-.35l.68-7.9H5.66z"/></svg>`;
 
-    actions.append(deleteBtn);
+    actions.append(editBtn, deleteBtn);
     row.append(selectBtn, actions);
     rosterSavesListEl.append(row);
   }
@@ -8697,53 +8705,50 @@ function persistExtractResult(
       : body.u19 === null
         ? null
         : undefined;
-  rosterStore = upsertRoster(rosterStore, {
-    saveName: body.saveName,
-    clubId: body.clubId,
-    teamId: body.teamId,
-    clubName: body.clubName ?? undefined,
-    clubNameShort: body.clubNameShort ?? undefined,
-    gameDate: body.gameDate ?? null,
-    elapsedMs: body.elapsedMs,
-    extractedAt: new Date().toISOString(),
-    players,
-    diskPath:
-      diskBinding?.path ??
-      body.savePath ??
-      prev?.diskPath ??
-      null,
-    diskMtimeMs:
-      diskBinding?.mtimeMs ?? prev?.diskMtimeMs ?? null,
-    diskSize:
-      diskBinding?.size ?? prev?.diskSize ?? null,
-    ...(favouredClub !== undefined ? { favouredClub } : {}),
-    ...(reserves !== undefined ? { reserves } : {}),
-    ...(u19 !== undefined ? { u19 } : {}),
-  });
+  rosterStore = upsertRoster(
+    rosterStore,
+    {
+      saveName: body.saveName,
+      clubId: body.clubId,
+      teamId: body.teamId,
+      clubName: body.clubName ?? undefined,
+      clubNameShort: body.clubNameShort ?? undefined,
+      gameDate: body.gameDate ?? null,
+      elapsedMs: body.elapsedMs,
+      extractedAt: new Date().toISOString(),
+      players,
+      diskPath:
+        diskBinding?.path ??
+        body.savePath ??
+        prev?.diskPath ??
+        null,
+      diskMtimeMs:
+        diskBinding?.mtimeMs ?? prev?.diskMtimeMs ?? null,
+      diskSize:
+        diskBinding?.size ?? prev?.diskSize ?? null,
+      ...(favouredClub !== undefined ? { favouredClub } : {}),
+      ...(reserves !== undefined ? { reserves } : {}),
+      ...(u19 !== undefined ? { u19 } : {}),
+    },
+    { setActive: true },
+  );
   haHistoryStore = mergeHaHistoryFromRoster(
     haHistoryStore,
     rosterStore.saves[body.saveName]!,
   );
   const extractedName = body.saveName;
-  const viewingReplaced = Boolean(replaceName && replaceName === rosterStore.activeSaveName);
   if (replaceName && replaceName !== extractedName) {
     rosterStore = deleteRoster(rosterStore, replaceName);
-    if (viewingReplaced) {
-      rosterStore = setActiveRoster(rosterStore, extractedName);
-    }
+    rosterStore = setActiveRoster(rosterStore, extractedName);
   }
   if (!options?.soft) rosterAmendTarget = null;
   // Apply the in-memory upsert directly — reloading LS here can resurrect a
   // pre-persist snapshot if another tab/HMR raced the write (T010).
-  // Do not steal Active / Squad view when the user selected another save (T088).
-  if (rosterStore.activeSaveName === extractedName) {
-    applyActiveRosterFromStore({
-      soft: Boolean(options?.soft),
-      reload: false,
-    });
-  } else {
-    syncRosterSavesMenu();
-  }
+  // T100: + / Edit persist makes this save Active.
+  applyActiveRosterFromStore({
+    soft: Boolean(options?.soft),
+    reload: false,
+  });
 }
 
 /** FM writes after Save click — wait until size/mtime stop changing before extract. */
@@ -8981,6 +8986,12 @@ rosterSavesMenuEl.addEventListener("click", (e) => {
     setRosterSavesMenuOpen(false);
     renderRoster();
     refreshActiveSquadSideView();
+    return;
+  }
+
+  if (action === "edit") {
+    rosterAmendTarget = name;
+    openRosterFilePicker();
     return;
   }
 

@@ -137,6 +137,26 @@ describe("upsertRoster persist (T010)", () => {
     expect(store.activeSaveName).toBe("A.fm");
     expect(store.saves["B.fm"]?.players[0]?.name).toBe("Beta Updated");
   });
+
+  it("sets Active to the upserted save when setActive (T100)", () => {
+    const alpha: StoredRoster = {
+      saveName: "A.fm",
+      clubId: 1,
+      extractedAt: "2026-08-01T00:00:00.000Z",
+      players: [player(1, "Alpha")],
+    };
+    const beta: StoredRoster = {
+      saveName: "B.fm",
+      clubId: 2,
+      extractedAt: "2026-08-16T00:00:00.000Z",
+      players: [player(2, "Beta")],
+    };
+    let store = upsertRoster(emptyStore(), alpha);
+    expect(store.activeSaveName).toBe("A.fm");
+    store = upsertRoster(store, beta, { setActive: true });
+    expect(store.activeSaveName).toBe("B.fm");
+    expect(store.saves["A.fm"]?.players[0]?.name).toBe("Alpha");
+  });
 });
 
 describe("shouldRefreshRosterFromDisk (T010)", () => {
