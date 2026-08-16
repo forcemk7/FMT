@@ -345,6 +345,11 @@ def probe_container(path: Path) -> dict:
         except Exception as e:  # noqa: BLE001
             trials.append({"offset": off, "ok": False, "error": type(e).__name__})
     best = next((t["offset"] for t in trials if t.get("ok")), None)
+    inferred = (
+        "fm24_continue_style_zstd_at_26"
+        if best == 26
+        else (f"zstd_at_{best}" if best is not None else "unsupported_or_unknown")
+    )
     return {
         "saveBytes": size,
         "magicHex": magic4.hex(),
@@ -354,11 +359,8 @@ def probe_container(path: Path) -> dict:
         "zstdMagicOffsetsInHead": zstd_offsets,
         "zstdOffset": best,
         "zstdTrials": trials,
-        "inferredLayout": (
-            "fm24_continue_style_zstd_at_26"
-            if best == 26
-            else (f"zstd_at_{best}" if best is not None else "unsupported_or_unknown")
-        ),
+        "inferredLayout": inferred,
+        "layout": classify_squad_layout(inferred_layout=inferred),
     }
 
 
@@ -1152,7 +1154,23 @@ def job_magnitude_bucket(x: int) -> str:
     return ">=2m"
 
 
-def filter_jobs(jobs_raw: list[int]) -> list[int] | None:
+def classify_squad_layout(
+    *,
+    tag_hex: str | None = None,
+    inferred_layout: str | None = None,
+) -> str:
+    """PROGRESS layout: continue (00950e02 / zstd@26) vs native (00950e01)."""
+    hx = (tag_hex or "").replace(" ", "").lower()
+    if hx == "00950e02":
+        return "continue"
+    if hx == "00950e01":
+        return "native"
+    if inferred_layout == "fm24_continue_style_zstd_at_26":
+        return "continue"
+    return "native"
+
+
+def filter_jobs(jobs_raw: list[int], *, jobs_min: int | None = None) -> list[int] | None:
     """Keep unique plausible employment IDs; reject noise lists."""
     jobs: list[int] = []
     seen: set[int] = set()
@@ -1164,7 +1182,8 @@ def filter_jobs(jobs_raw: list[int]) -> list[int] | None:
         if JOB_LO <= x <= JOB_HI and x not in seen:
             seen.add(x)
             jobs.append(x)
-    if len(jobs) < SQUAD_JOBS_MIN:
+    min_n = SQUAD_JOBS_MIN if jobs_min is None else jobs_min
+    if len(jobs) < min_n:
         return None
     if zeros > max(3, len(jobs_raw) // 5):
         return None
@@ -1177,7 +1196,7 @@ def filter_jobs(jobs_raw: list[int]) -> list[int] | None:
 
 
 def try_jobs_at(
-    buf, tid: int, c_off: int, *, layout: str
+    buf, tid: int, c_off: int, *, layout: str, native: bool = False
 ) -> tuple[int, int, int, list[int], str] | None:
     """Parse count_u16 + jobs at c_off. Returns (tid, jobs_off, count, jobs, layout)."""
     if not (TID_LO <= tid <= TID_HI):
@@ -1186,20 +1205,26 @@ def try_jobs_at(
         return None
     count = struct.unpack_from("<H", buf, c_off)[0]
     jobs_off = c_off + 2
-    if not (SQUAD_COUNT_LO <= count <= SQUAD_COUNT_HI):
+    # Continue world-walk uses 11–55. Native this-club lists are not that gate.
+    if native:
+        if not (1 <= count <= 80):
+            return None
+    elif not (SQUAD_COUNT_LO <= count <= SQUAD_COUNT_HI):
         return None
     if jobs_off + 4 * count > len(buf):
         return None
     jobs_raw = [
         struct.unpack_from("<I", buf, jobs_off + 4 * k)[0] for k in range(count)
     ]
-    jobs = filter_jobs(jobs_raw)
+    jobs = filter_jobs(jobs_raw, jobs_min=1 if native else SQUAD_JOBS_MIN)
     if not jobs:
         return None
     return tid, jobs_off, count, jobs, layout
 
 
-def parse_squad_candidates(buf, sentinel_off: int) -> list[tuple[int, int, int, list[int], str]]:
+def parse_squad_candidates(
+    buf, sentinel_off: int, *, native: bool = False
+) -> list[tuple[int, int, int, list[int], str]]:
     """
     Try known layouts at a 7f02000000 hit.
     Returns zero or more (tid, jobs_off, count, jobs, layout).
@@ -1240,7 +1265,7 @@ def parse_squad_candidates(buf, sentinel_off: int) -> list[tuple[int, int, int, 
 
     seen_keys: set[tuple[int, int]] = set()
     for tid, c_off, layout in attempts:
-        parsed = try_jobs_at(buf, tid, c_off, layout=layout)
+        parsed = try_jobs_at(buf, tid, c_off, layout=layout, native=native)
         if not parsed:
             continue
         key = (parsed[0], parsed[1])
@@ -1438,6 +1463,101 @@ def pick_tid(
 
     ranked = sorted(squads.keys(), key=score, reverse=True)
     return ranked[0]
+
+
+def _native_list_at_sentinel(buf, sentinel_off: int) -> dict | None:
+    """parse_squad_candidates layout B (010302) preferred; 11–55 is not law."""
+    cands = parse_squad_candidates(buf, sentinel_off, native=True)
+    if not cands:
+        return None
+    cands.sort(
+        key=lambda c: (
+            0 if "010302" in c[4] else 1,
+            -len(c[3]),
+            c[1],
+        )
+    )
+    tid, jobs_off, count, jobs, list_layout = cands[0]
+    if not jobs:
+        return None
+    return {
+        "persistTid": tid,
+        "sentinelAbs": sentinel_off,
+        "countAbs": jobs_off - 2,
+        "jobsAbs": jobs_off,
+        "count": count,
+        "jobs": jobs,
+        "listLayout": list_layout,
+    }
+
+
+def resolve_native_ft_squad(buf, club_id: int | None) -> dict | None:
+    """This club's UniqueID | 7f02+010302. Does not walk every club's 7f02."""
+    if club_id in (None, 0):
+        return None
+    cid = int(club_id)
+    needle = struct.pack("<I", cid) + LIST_SENTINEL_LOOSE
+    catalog_hits = 0
+    best: dict | None = None
+    start = 0
+    while True:
+        j = buf.find(needle, start)
+        if j < 0:
+            break
+        catalog_hits += 1
+        parsed = _native_list_at_sentinel(buf, j + 4)
+        if parsed and parsed.get("jobs"):
+            if best is None:
+                best = parsed
+            else:
+                prefer_native = "010302" in parsed["listLayout"] and "010302" not in best[
+                    "listLayout"
+                ]
+                same_family = ("010302" in parsed["listLayout"]) == (
+                    "010302" in best["listLayout"]
+                )
+                if prefer_native or (
+                    same_family and len(parsed["jobs"]) > len(best["jobs"])
+                ):
+                    best = parsed
+        start = j + 1
+
+    if best:
+        return {
+            "parentShort": None,
+            "clubId": cid,
+            "catalogNameAbs": None,
+            "catalogName": None,
+            "team": None,
+            "list": best,
+            "catalogHits": catalog_hits,
+            "teamObjects": 0,
+            "jobsFound": len(best["jobs"]),
+        }
+    return {
+        "parentShort": None,
+        "clubId": cid,
+        "catalogNameAbs": None,
+        "catalogName": None,
+        "team": None,
+        "list": None,
+        "catalogHits": catalog_hits,
+        "teamObjects": 0,
+        "jobsFound": 0,
+    }
+
+
+def resolve_managed_ft_for_layout(
+    mm,
+    club_short: str | None,
+    club_id: int | None,
+    *,
+    layout: str,
+) -> dict | None:
+    """Continue = club-object 7f02. Native = UniqueID-keyed 010302. Never pick_tid."""
+    if layout == "native":
+        return resolve_native_ft_squad(mm, club_id)
+    return resolve_ft_squad(mm, club_short, club_id=club_id)
 
 
 def empty_player_dynamics() -> dict:
@@ -2439,6 +2559,7 @@ def main() -> int:
     container: dict = {}
     tmp: Path
     delete_tmp = False
+    squad_layout = "native"
 
     if is_bin:
         tmp = save
@@ -2448,23 +2569,31 @@ def main() -> int:
             "saveBytes": save_size,
             "zstdOffset": None,
         }
+        squad_layout = classify_squad_layout(
+            inferred_layout=container["inferredLayout"]
+        )
         progress(
             t0,
             phase="start",
             message=f"Opening {save.name}",
             pct=0,
             saveBytes=save_size,
-            layout=container["inferredLayout"],
+            layout=squad_layout,
+            inferredLayout=container["inferredLayout"],
         )
     else:
         container = probe_container(save)
+        squad_layout = str(container.get("layout") or classify_squad_layout(
+            inferred_layout=container.get("inferredLayout")
+        ))
         progress(
             t0,
             phase="start",
             message=f"Opening {save.name}",
             pct=0,
             saveBytes=save_size,
-            layout=container.get("inferredLayout"),
+            layout=squad_layout,
+            inferredLayout=container.get("inferredLayout"),
             zstdOffset=container.get("zstdOffset"),
         )
 
@@ -2582,12 +2711,18 @@ def main() -> int:
             if not club_short and parent_short_override:
                 club_short = parent_short_override
                 club_name = club_name or club_short
+            squad_layout = classify_squad_layout(
+                tag_hex=(identity or {}).get("tagHex"),
+                inferred_layout=container.get("inferredLayout"),
+            )
             if identity:
                 progress(
                     t0,
                     phase="identity",
                     message=f"club={club_name} id={club_id}",
                     pct=73,
+                    layout=squad_layout,
+                    tagHex=identity.get("tagHex"),
                 )
             elif ident_diag:
                 progress(
@@ -2598,6 +2733,7 @@ def main() -> int:
                         f"(scanned {ident_diag.get('bytesScanned')} bytes)"
                     ),
                     pct=73,
+                    layout=squad_layout,
                     **{
                         k: ident_diag[k]
                         for k in ("bytesScanned", "lastTagAbs", "searchBound", "tagHexes")
@@ -2621,6 +2757,7 @@ def main() -> int:
                     phase="resolve",
                     message="Skipping world squad/staff lists — this club only",
                     pct=73,
+                    layout=squad_layout,
                 )
 
             # Employment rule (T006/T009): a managed-club employee is a jobId on
@@ -2628,7 +2765,9 @@ def main() -> int:
             # affiliate join; U19 via namelist. Never admit pick_tid foreign lists
             # when identity is known (non-employees poison Mentoring).
             if world_lists != "empty" and (club_short or club_id):
-                ft_hit = resolve_ft_squad(mm, club_short, club_id=club_id)
+                ft_hit = resolve_managed_ft_for_layout(
+                    mm, club_short, club_id, layout=squad_layout
+                )
             fallback_jobs: list[int] | None = None
             if abort_world is None and not club_short and not club_id and squads:
                 best_tid = pick_tid(squads, manager_hits)
@@ -2654,7 +2793,9 @@ def main() -> int:
             # else: best_tid/list_abs/count already set from pick_tid fallback
             # (identity unknown only — never when club short or UniqueID is known)
 
-            join_progress = ft_join_progress_fields(club_id, ft_hit, selected)
+            join_progress = ft_join_progress_fields(
+                club_id, ft_hit, selected, layout=squad_layout
+            )
             miss_reason = join_progress.get("missReason")
             progress(
                 t0,

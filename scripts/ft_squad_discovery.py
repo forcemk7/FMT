@@ -417,16 +417,21 @@ def ft_join_progress_fields(
     club_id: int | None,
     ft_hit: dict[str, Any] | None,
     selected: dict[str, Any],
+    *,
+    layout: str | None = None,
 ) -> dict[str, Any]:
     """PROGRESS keys for the resolve line — jobsFound is 0 vs N."""
     jobs = list(selected.get("jobs") or [])
-    return {
+    fields: dict[str, Any] = {
         "clubId": club_id,
         "missReason": selected.get("missReason"),
         "catalogHits": int((ft_hit or {}).get("catalogHits") or 0),
         "teamObjects": int((ft_hit or {}).get("teamObjects") or 0),
         "jobsFound": len(jobs),
     }
+    if layout in ("continue", "native"):
+        fields["layout"] = layout
+    return fields
 
 
 def select_managed_ft_jobs(
