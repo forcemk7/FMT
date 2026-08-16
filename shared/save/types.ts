@@ -270,6 +270,8 @@ export type FirstTeamExtract = {
   clubNameShort?: string | null;
   /** In-game date of the save when known (for age-from-DOB). */
   gameDate?: string | null;
+  /** Upload path (T096): identity only — no FT/II/U19/HA/loans. */
+  metaOnly?: boolean;
   players: FirstTeamPlayer[];
   /** Reserves / II squad when discovered from parent short name. */
   reserves?: ReservesSquadExtract | null;

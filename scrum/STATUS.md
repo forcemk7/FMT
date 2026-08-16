@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-08-16 (T095 done; T087 frozen)
+Last updated: 2026-08-16 (T096 done; T087 frozen)
 
 ## Now
 
@@ -50,7 +50,9 @@ Last updated: 2026-08-16 (T095 done; T087 frozen)
 
 **T095 done** — + stays usable while A extracts. Chosen B waits; König auto-sync does not jump that queue. Delete on Syncing aborts Python then removes the slot.
 
-**Next:** **T087 frozen** until native `players[]` is non-empty. Do not claim T077 / T080 / T081. Empty ready board — do not invent work.
+**Used (2026-08-16 HQ):** Leicester City 673 Active, Uploaded 09:13, In-game **May 25, 2038** (owner: not 2038), empty Squad. **T096 done** — that year was the 24MB calendar-run; upload In-game is neighborhood date or `—`.
+
+**Next:** Owner: do club id, name, and In-game on Manage saves match FM? Dump: `tmp/identity/convert_to_human_readable_report.txt`. No squad-list ticket until yes. **T087 frozen**. Do not claim T077 / T080 / T081.
 
 | Area | State | Need-to-have? |
 |------|--------|---------------|
@@ -106,6 +108,7 @@ Last updated: 2026-08-16 (T095 done; T087 frozen)
 | Native FM26 0 players (continue join only) | **T093 done** | **Yes** |
 | Native FM26 still 0 players (UniqueID glued to 7f02) | **T094 done** | **Yes** |
 | Cannot add/delete save while König Syncing | **T095 done** | **Yes** |
+| Honest club id / name / game date (any save) | **T096 done** | **Yes** |
 | Progress GK abilities + outfield GK rating | **T087 blocked** (on T094) | after native roster |
 | npm run dev from HQ | **T089 cancelled** | — |
 | Sync steals Active save when extract finishes | **T088 done** | **Yes** |
@@ -127,7 +130,7 @@ Last updated: 2026-08-16 (T095 done; T087 frozen)
 - **Used (2026-08-14):** Clear filters → click Adrian Itu → loosen-all → Yoan Robert + Miraglia. FT-only hid this. Empty FT list was correct.
 - **Used (2026-08-16 HQ):** Start sync on save A → select save B in Manage saves → extract finishes → view jumped back to A. **T088 done** — persist stays on A’s slot; Active / Squad stay on B.
 - **Used (2026-08-16 HQ):** Club id/name on Manage saves, 0 players. Schalke = FM24 continue; others = native FM26. Identity works; continue 7f02 join does not. Native list parse is skipped because identity is known. **T093 done** — native UniqueID glued to `010302`. **Used after T093:** still 0 players on native. Glued UniqueID|`7f02` misses real club objects. **T094 done** — UniqueID then nearby `7f02`. Re-extract a native career.
-- **Used (2026-08-16 HQ):** Cannot delete Active or click + while König shows Syncing. T088 was persist-steal, not this lock. **T095 done** — + usable during extract; Delete on Syncing aborts then removes the slot.
+- **Used (2026-08-16 HQ):** Leicester native extract finished: club **Leicester City 673**, in-game **May 25, 2038** (owner: wrong). **T096 done** — upload is identity-only; In-game is neighborhood date or `—`, not the 24MB calendar-run. Dump `tmp/identity/convert_to_human_readable_report.txt`.
 - **Used (2026-08-16 HQ):** Extract `NameError: name 'match_reserve_name_score' is not defined`. **T090 done** — scorer lives next to `match_unit_core_score`; dead block after `lp32_name_ending_at` removed. Restart `npm run dev` and re-extract.
 - After groups exist in FM: extract on a new in-game date → Progress HA delta (pack + Det/Lea). Two different gameDates required; one extract → value, empty delta.
 - Extract is two blobs once (pack + CA card). UI: Squad HA = pack + Det/Lea from the card. Progress CA = card history; Progress HA = pack snapshots + Det/Lea from the card (T066). Do not hunt Det/Lea as a third extract.
@@ -140,7 +143,7 @@ Last updated: 2026-08-16 (T095 done; T087 frozen)
 
 ## Gate
 
-- T095 done (add/delete save while extract runs). T087 frozen until native `players[]` is non-empty. T077 / T080 / T081 blocked. Empty ready board — do not invent work.
+- T096 done (honest club id / name / game date + identity dump). Wait for owner: three fields match FM. T087 frozen. T077 / T080 / T081 blocked. No squad ticket until identity matches FM. One ticket per worker.
 - Refuse Suggest. Refuse CA/PA. Refuse Stripe paywall / packaging / FM27.
 - BMC is a tip. Do not gate the table.
 - Workers: one ticket, one commit on `FMT/`. If freeze, do not claim anything else.
@@ -150,6 +153,8 @@ Last updated: 2026-08-16 (T095 done; T087 frozen)
 - Host RAM / T077 after owner says the local loop is honest (any save + Active not stolen).
 
 ## Recently done
+
+- **T096** — + / upload extracts clubId, clubName, gameDate only (no FT/II/U19/HA/loans). In-game is identity-neighborhood today_ptr or `—`, never the 24MB calendar-run year. Dump `tmp/identity/convert_to_human_readable_report.txt` (gitignored). Synthetic T083 + later-table-not-today. Restart `npm run dev` and + a Career Save. Owner: say if the three fields match FM. No committed `.fm`.
 
 - **T095** — + stays usable while A extracts (picker not disabled). Chosen B waits for the current Python; König auto-sync does not start first if a + upload is queued or the picker is open. Delete on the Syncing row aborts fetch + leftover-pid kill, then removes the slot. Vitest chrome guards. Restart `npm run dev`. No committed `.fm`.
 

@@ -62,6 +62,7 @@ EARLY_SCAN = _emt.EARLY_SCAN
 IDENTITY_DEADLINE = _emt.IDENTITY_DEADLINE
 discover_managed_club = _emt.discover_managed_club
 try_discover_managed_club = _emt.try_discover_managed_club
+pick_game_date_near_identity = _emt.pick_game_date_near_identity
 
 
 def refuse_live_fm_games_save(path: Path) -> None:
@@ -2923,11 +2924,13 @@ def main() -> int:
                 jobsTarget=len(jobs),
             )
 
-            game_date_info = discover_game_date(
-                mm,
-                min(len(mm), GAME_DATE_EARLY),
+            date_pick = pick_game_date_near_identity(mm, identity)
+            game_date = date_pick.get("gameDate") if date_pick else None
+            game_date_info = (
+                {k: v for k, v in date_pick.items() if k != "candidates"}
+                if date_pick
+                else None
             )
-            game_date = game_date_info["gameDate"] if game_date_info else None
             if game_date:
                 progress(
                     t0,

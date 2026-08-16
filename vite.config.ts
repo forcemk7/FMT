@@ -39,6 +39,7 @@ import {
   extractFirstTeam,
   resolveDefaultSavePath,
 } from "./shared/save/extract-first-team.ts";
+import { extractManagedIdentity } from "./shared/save/extract-managed-team.ts";
 import { extractFavouredClubScouts } from "./shared/save/extract-favoured-scouts.ts";
 import { createExtractGate } from "./shared/save/extract-gate.ts";
 import { killStaleExtractPid } from "./shared/save/extract-child.ts";
@@ -616,6 +617,39 @@ async function runExtractStreaming(
   }
 }
 
+async function runIdentityStreaming(
+  res: import("http").ServerResponse,
+  savePath: string,
+  signal?: AbortSignal,
+) {
+  beginNdjson(res);
+  try {
+    // T096: + / upload extracts clubId, clubName, gameDate only.
+    const result = await extractManagedIdentity(savePath, {
+      signal,
+      onProgress: (p) => {
+        writeNdjson(res, { type: "progress", ...p, extract: "identity" });
+      },
+    });
+    if (signal?.aborted) {
+      if (!res.writableEnded) res.end();
+      return;
+    }
+    writeNdjson(res, { type: "result", ...result });
+    res.end();
+  } catch (error) {
+    if (signal?.aborted) {
+      if (!res.writableEnded) res.end();
+      return;
+    }
+    writeNdjson(res, {
+      type: "error",
+      error: error instanceof Error ? error.message : "Roster API error",
+    });
+    res.end();
+  }
+}
+
 async function runScoutStreaming(
   res: import("http").ServerResponse,
   savePath: string,
@@ -934,7 +968,7 @@ function rosterApiPlugin(): Plugin {
             const runStreaming =
               url === "/api/scout/favoured-club"
                 ? runScoutStreaming
-                : runExtractStreaming;
+                : runIdentityStreaming;
 
             if (
               ct.includes("application/octet-stream") ||
