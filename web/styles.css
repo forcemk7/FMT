@@ -4897,6 +4897,20 @@ td.attr-band {
   width: 100%;
 }
 
+/* One thead chrome token set for pane heads + filled Squad HA head. */
+.table-pane-head .ranker-list-table thead th,
+.squad-ha-list .ranker-list-table thead th {
+  padding: 0.4rem 0.45rem;
+  vertical-align: middle;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
 .table-pane-drop {
   flex: 1 1 auto;
   min-height: 0;
@@ -4925,14 +4939,10 @@ td.attr-band {
   display: none !important;
 }
 
-.table-pane.is-empty-pane .mentoring-board-actions {
+.table-pane.is-empty-pane .mentoring-board-actions,
+.table-pane.is-empty-pane > .mentoring-mentees,
+.table-pane.is-empty-pane > .mentoring-status {
   display: none !important;
-}
-
-.table-pane.is-empty-pane > #roster-body,
-.table-pane.is-empty-pane > .squad-ha-list {
-  flex: 0 0 auto;
-  overflow: hidden;
 }
 
 .squad-loans-pane .table-pane-fill {
@@ -6444,7 +6454,7 @@ button.mentoring-seat-card:hover {
   overflow: hidden;
 }
 
-.squad-grid-wrap.table-pane > #roster-body {
+.squad-grid-wrap.table-pane > #roster-body.table-pane-fill {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
@@ -7725,28 +7735,6 @@ button.mentoring-seat-card:hover {
   font-variant-numeric: tabular-nums;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.9em;
-}
-
-.roster-empty {
-  margin: 0;
-  position: absolute;
-  inset: 2.6rem 0 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-  text-align: center;
-  color: var(--muted);
-  font-size: 0.86rem;
-  pointer-events: none;
-}
-
-.roster-empty[hidden] {
-  display: none;
-}
-
-.squad-grid-panel.is-empty-roster .roster-empty {
-  inset: 0;
 }
 
 .roster-table tbody tr {

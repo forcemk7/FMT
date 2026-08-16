@@ -278,6 +278,9 @@ const rosterUploadEl = document.querySelector<HTMLInputElement>("#roster-upload"
 const rosterUploadBtnEl = document.querySelector<HTMLButtonElement>("#roster-upload-btn")!;
 const rosterEmptyEl = document.querySelector<HTMLElement>("#roster-empty")!;
 const PANE_DROP_COPY = "Drop a Career Save (.fm) here, or use +";
+const squadHaEmptyHostEl = document.querySelector<HTMLElement>(
+  "#squad-ha-empty-host",
+)!;
 const squadLoansEmptyHostEl = document.querySelector<HTMLElement>(
   "#squad-loans-empty-host",
 )!;
@@ -7937,6 +7940,15 @@ function renderSquadHaTable() {
     squadHaSortAsc,
   );
 
+  const showDrop = visible.length === 0 && squadHaFilters.length === 0;
+  rosterEmptyEl.textContent = PANE_DROP_COPY;
+  squadHaEmptyHostEl.hidden = !showDrop;
+  squadPersonalitiesPaneEl.classList.toggle("is-empty-pane", showDrop);
+  if (showDrop) {
+    setPaneDropEnabled(squadPersonalitiesPaneEl, true);
+    return;
+  }
+
   const mentoringCandidates = ensureMentoringCacheForRoster();
   const groupByUid = mentoringGroupNumberByUid(mentoringCache.groups);
   const eligibleUids = squadHaMentoringEligibleUids();
@@ -8002,10 +8014,6 @@ function renderSquadHaTable() {
 
   const body = document.createElement("tbody");
   const colCount = 1 + SQUAD_HA_FILTER_KEYS.length;
-  const showDrop = visible.length === 0 && squadHaFilters.length === 0;
-  rosterEmptyEl.hidden = !showDrop;
-  rosterEmptyEl.textContent = PANE_DROP_COPY;
-  squadPersonalitiesPaneEl.classList.toggle("is-empty-pane", showDrop);
   if (visible.length === 0) {
     const emptyRow = document.createElement("tr");
     const td = document.createElement("td");
@@ -8169,10 +8177,7 @@ function renderSquadHaTable() {
   table.append(body);
   rosterBodyEl.append(table);
   rosterBodyEl.scrollTop = scrollTop;
-  setPaneDropEnabled(
-    squadPersonalitiesPaneEl,
-    visible.length === 0 && squadHaFilters.length === 0,
-  );
+  setPaneDropEnabled(squadPersonalitiesPaneEl, false);
 }
 
 rosterBodyEl.addEventListener("scroll", hideMetricTip, { passive: true });
@@ -11563,19 +11568,23 @@ function renderMentoringPage() {
       : "Need 3 unassigned players";
   updateMentoringSuggestButton();
 
+  const mentoringEmpty = mentoringCache.groups.length === 0;
   mentoringEmptyEl.hidden = false;
-  mentoringEmptyHostEl.hidden = mentoringCache.groups.length > 0;
-  mentoringCardsEl.hidden = mentoringCache.groups.length === 0;
+  mentoringEmptyHostEl.hidden = !mentoringEmpty;
+  mentoringCardsEl.hidden = mentoringEmpty;
   mentoringEmptyEl.textContent = PANE_DROP_COPY;
-  mentoringBoardActionsEl.hidden = mentoringCache.groups.length === 0;
-  squadMentoringPaneEl.classList.toggle(
-    "is-empty-pane",
-    mentoringCache.groups.length === 0,
-  );
-  setPaneDropEnabled(squadMentoringPaneEl, mentoringCache.groups.length === 0);
+  mentoringBoardActionsEl.hidden = mentoringEmpty;
+  squadMentoringPaneEl.classList.toggle("is-empty-pane", mentoringEmpty);
+  setPaneDropEnabled(squadMentoringPaneEl, mentoringEmpty);
 
-  renderMentoringMenteeStrip(candidates);
-  setMentoringStatusNotice(mentoringReplacementNotice ?? "");
+  if (mentoringEmpty) {
+    mentoringMenteesEl.replaceChildren();
+    mentoringMenteesEl.hidden = true;
+    setMentoringStatusNotice("");
+  } else {
+    renderMentoringMenteeStrip(candidates);
+    setMentoringStatusNotice(mentoringReplacementNotice ?? "");
+  }
 
   // Avoid tearing down face imgs on every roster refresh / disk poll.
   if (

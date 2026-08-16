@@ -61,6 +61,9 @@ describe("T105 one table pane shell; drop well in the same slot", () => {
   });
 
   it("empty Loans / Mentoring / Progress keep T104 thead above the drop well", () => {
+    const squad = html.match(
+      /id="squad-ha-empty-host"[\s\S]*?class="table-pane-drop"/,
+    )?.[0];
     const loans = html.match(
       /id="squad-loans-empty-host"[\s\S]*?class="table-pane-drop"/,
     )?.[0];
@@ -70,9 +73,13 @@ describe("T105 one table pane shell; drop well in the same slot", () => {
     const progress = html.match(
       /id="squad-progress-empty"[\s\S]*?class="table-pane-drop"/,
     )?.[0];
+    expect(squad).toBeTruthy();
     expect(loans).toBeTruthy();
     expect(mentoring).toBeTruthy();
     expect(progress).toBeTruthy();
+    expect(squad).toMatch(/<th[^>]*>\s*Group/);
+    expect(squad).toMatch(/<th[^>]*>\s*Name/);
+    expect(squad).toMatch(/<th[^>]*>\s*HAS/);
     expect(loans).toMatch(/<thead>[\s\S]*<th[^>]*>\s*Name/);
     expect(loans).toMatch(/<th[^>]*>\s*Unit/);
     expect(loans).toMatch(/<th[^>]*>\s*At/);
@@ -83,6 +90,7 @@ describe("T105 one table pane shell; drop well in the same slot", () => {
     expect(progress).toMatch(/<th[^>]*>\s*ΔCA/);
     expect(progress).toMatch(/<th[^>]*>\s*Det/);
     expect(progress).toMatch(/<th[^>]*>\s*ΔDet/);
+    expect(squad).not.toMatch(/<tbody>/);
     expect(loans).not.toMatch(/<tbody>/);
     expect(mentoring).not.toMatch(/<tbody>/);
     expect(progress).not.toMatch(/<tbody>/);
@@ -93,9 +101,7 @@ describe("T105 one table pane shell; drop well in the same slot", () => {
       /\.table-pane\.is-empty-pane \.mentoring-board-actions/,
     );
     expect(main).toMatch(/mentoringBoardActionsEl\.hidden = true/);
-    expect(main).toMatch(
-      /mentoringBoardActionsEl\.hidden = mentoringCache\.groups\.length === 0/,
-    );
+    expect(main).toMatch(/mentoringBoardActionsEl\.hidden = mentoringEmpty/);
     expect(main).not.toMatch(/setMentoringStatusNotice\("Load a Career Save"\)/);
     expect(main).toMatch(/function feedRosterUpload\(/);
     expect(main).toMatch(

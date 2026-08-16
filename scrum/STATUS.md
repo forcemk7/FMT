@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-08-16 (T106 done)
+Last updated: 2026-08-16 (T107 done)
 
 ## Now
 
@@ -8,7 +8,11 @@ Last updated: 2026-08-16 (T106 done)
 
 **SHIP.** Four tabs: Squad, Loans, Mentoring, Progress. Cloud-capable extract. BMC tip on the header.
 
-**T106 done** — continue tag `02` gameDate = UniqueID trailer (lp32 → 0 → ffffffff → u16 doy+year). Not UniqueID+4, not c708. König FM24Career stack deleted. T087 frozen. Do not claim T077 / T080 / T081.
+**T107 done** — empty panes share one thead chrome + identical `.table-pane-drop` under `.table-pane-head` (Squad no longer forks into `#roster-body`). Mentoring empty hides mentee strip.
+
+**Used (2026-08-16 HQ):** Continue date works on owner save. Final chrome: same thead look + drop well in the identical place on all four tabs.
+
+**Next:** T087 frozen. Do not claim T077 / T080 / T081. Board empty of ready need-to-haves until HQ funds more.
 
 **T038 done** — II Lars Gabrielsen Det/Lea is the same T014 tip class (not a new locus). Remaining hist=0 stay `—`.
 
@@ -151,6 +155,7 @@ Last updated: 2026-08-16 (T106 done)
 | Kill header Squad leftover; unified empty pane + drop | **T104 done** | Yes |
 | One table pane shell; same drop well slot | **T105 done** | Yes |
 | Continue FM24 gameDate (rolling stack lock) | **T106 done** | **Yes** |
+| Standardize pane thead + identical drop well | **T107 done** | Yes |
 | Progress GK abilities + outfield GK rating | **T087 blocked** (on T094) | after native roster |
 | npm run dev from HQ | **T089 cancelled** | — |
 | Sync steals Active save when extract finishes | **T088 done** | **Yes** |
@@ -185,7 +190,7 @@ Last updated: 2026-08-16 (T106 done)
 
 ## Gate
 
-- Empty ready board (T106 done). T087 frozen. T077 / T080 / T081 blocked. One ticket per worker.
+- Board: no ready need-to-haves. T087 frozen. T077 / T080 / T081 blocked. One ticket per worker.
 - Refuse Suggest. Refuse CA/PA. Refuse Stripe paywall / packaging / FM27.
 - BMC is a tip. Do not gate the table.
 - Workers: one ticket, one commit on `FMT/`. If freeze, do not claim anything else.
@@ -195,6 +200,8 @@ Last updated: 2026-08-16 (T106 done)
 - Host RAM / T077 after owner says the local loop is honest (any save + Active not stolen).
 
 ## Recently done
+
+- **T107** — Empty Squad / Loans / Mentoring / Progress share `.table-pane-empty` → `.table-pane-head` + `.table-pane-drop`. Shared thead typography tokens (also filled Squad HA head). Mentoring empty hides mentee strip. Drop still + identity upload. Vitest chrome. Restart `npm run dev`. No committed `.fm`.
 
 - **T106** — Continue tag `02` gameDate from UniqueID trailer (lp32 → u32 0 → u32 0xffffffff → u16 doy + u16 year; same T099 mask). Not UniqueID+4, not c708/today_ptr. Locked via König FM24Career v02–v10 diffs; those copies deleted. Native tag `01` still T099. Unittest t106+t101+t099+t097+t096. Restart `npm run dev` and + a continue save. No committed `.fm`.
 

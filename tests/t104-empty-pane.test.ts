@@ -21,6 +21,9 @@ describe("T104 drop header Squad leftover; unified empty pane", () => {
   });
 
   it("empty Loans / Mentoring / Progress show that tab's thead", () => {
+    const squad = html.match(
+      /id="squad-ha-empty-host"[\s\S]*?<\/table>/,
+    )?.[0];
     const loans = html.match(
       /id="squad-loans-empty-host"[\s\S]*?<\/table>/,
     )?.[0];
@@ -30,9 +33,13 @@ describe("T104 drop header Squad leftover; unified empty pane", () => {
     const progress = html.match(
       /id="squad-progress-empty"[\s\S]*?<\/table>/,
     )?.[0];
+    expect(squad).toBeTruthy();
     expect(loans).toBeTruthy();
     expect(mentoring).toBeTruthy();
     expect(progress).toBeTruthy();
+    const squadHeads = [...squad!.matchAll(/<th\b[^>]*>\s*([^<]+)\s*</g)].map(
+      (m) => m[1].trim(),
+    );
     const loanHeads = [...loans!.matchAll(/<th\b[^>]*>\s*([^<]+)\s*</g)].map(
       (m) => m[1].trim(),
     );
@@ -42,6 +49,9 @@ describe("T104 drop header Squad leftover; unified empty pane", () => {
     const progressHeads = [
       ...progress!.matchAll(/<th\b[^>]*>\s*([^<]+)\s*</g),
     ].map((m) => m[1].trim());
+    expect(squadHeads[0]).toBe("Group");
+    expect(squadHeads).toContain("Name");
+    expect(squadHeads).toContain("HAS");
     expect(loanHeads).toEqual(["Name", "Unit", "At"]);
     expect(mentorHeads).toEqual(["Group", "Members"]);
     expect(progressHeads).toEqual(["Name", "CA", "ΔCA", "Det", "ΔDet"]);
