@@ -35,13 +35,13 @@ Last updated: 2026-08-16 (HQ: Squad + Loans + Mentoring + Progress)
 **FREEZE.** Launch waits. Product = four extract steps, any Career Save. Worker edits extract Python, never a `.fm`. Do not claim T077 / T080 / T081 / T087.
 
 1. **T083** Managed club (**done**)  
-2. **T084** Employed players — FT / II / U19 (ready)  
-3. **T085** Those players’ CA + HA (blocked on T084)  
-4. **T086** Contracts — at-club vs loaned out (blocked on T085)  
+2. **T084** Employed players — FT / II / U19 (**done**)  
+3. **T085** Those players’ CA + HA (ready)  
+4. **T086** Contracts — at-club vs loaned out + census counts (blocked on T085)  
 
 Wrong Squad/Loans split poisons Mentoring Group checks. There is no Suggest. Empty Squad on a non-development save is `ft-club-squad-join-miss`. Do not custom-fit a local `.fm`. Never commit saves. T082 cancelled (loans = T086). T087 (Progress GK layout) after T086.
 
-**Next:** T084 ready. Blind: synthetic/object joins; optional smoke on untracked `data/saves/*.fm`; never git add `*.fm`; never mmap live `games/`.
+**Next:** T085 ready. Blind: synthetic/object joins; optional smoke on untracked `data/saves/*.fm`; never git add `*.fm`; never mmap live `games/`.
 
 | Area | State | Need-to-have? |
 |------|--------|---------------|
@@ -84,7 +84,7 @@ Wrong Squad/Loans split poisons Mentoring Group checks. There is no Suggest. Emp
 | Buy Me a Coffee | **T070 done** | Tip only |
 | One extract Python (no 5×2GB on start) | **T072 done** | **Yes** |
 | Extract this club only (not world) | **T076 done** | **Yes** |
-| Extract four steps, any Career Save | **T083 done**; T084–T086 | **Yes** |
+| Extract four steps, any Career Save | **T083+T084 done**; T085–T086 | **Yes** |
 | Favoured-club / scout extract | **T080 blocked** (on T086) | No |
 | Loan scan speed | **T081 blocked** (on T086) | later |
 | Loans as König counts | **T082 cancelled** (absorbed: T086) | — |
@@ -98,8 +98,7 @@ Wrong Squad/Loans split poisons Mentoring Group checks. There is no Suggest. Emp
 
 | ID | Title | Status | Owner |
 |----|-------|--------|-------|
-| T084 | FT II U19 lists from this club on any Career Save | ready | |
-| T085 | HA and CA for listed players on any Career Save | blocked | |
+| T085 | HA and CA for listed players on any Career Save | ready | |
 | T086 | At-club vs loaned-out on any Career Save | blocked | |
 | T087 | Progress GK vs outfield CA layout | blocked | |
 | T077 | Live www URL — upload save, extract, four tabs | blocked | |
@@ -123,16 +122,18 @@ Wrong Squad/Loans split poisons Mentoring Group checks. There is no Suggest. Emp
 
 ## Gate
 
-- **Freeze:** T083 done. T084 then T085 then T086. Refuse www, scout drop, scan speed, GK Progress layout until T086. Launch waits. One ticket per worker.
+- **Freeze:** T083–T084 done. T085 then T086. Refuse www, scout drop, scan speed, GK Progress layout until T086. Launch waits. One ticket per worker.
 - Refuse Suggest. Refuse CA/PA. Refuse Stripe paywall / packaging / FM27.
 - BMC is a tip. Do not gate the table.
 - Workers: one ticket, one commit on `FMT/`. If freeze, do not claim anything else.
 
 ## Blockers
 
-- **Freeze:** T083 → T086. Workers stay save-blind (no committed `.fm`, no live `games/`). Host RAM after T086.
+- **Freeze:** T085 → T086. Workers stay save-blind (no committed `.fm`, no live `games/`). Host RAM after T086.
 
 ## Recently done
+
+- **T084** — FT/II/U19 lists join from this club’s team object (catalog PRE_NAME → teamId/dup → job-list). Dropped MB windows, FT 15–45, `{short} II`/`{short} U19` as the only names, and subunit jobId 50k–2M as law. Identity known + miss never takes `pick_tid`. Missing II/U19 unit = empty subunit. Youth live list is before-name (after-name decoy). Synthetic blob tests. Optional local smoke counts to the human; no committed `.fm`.
 
 - **T083** — Managed-club identity is tag → person lp32 → club short lp32 → UniqueID. Same parser on the roster extract. Search bounds expand if the tag sits later; miss is tag/offset/bytes scanned, not a guessed club. Synthetic blob test. No committed `.fm`.
 

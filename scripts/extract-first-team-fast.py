@@ -2525,16 +2525,20 @@ def main() -> int:
                 list_abs = 0
                 count = 0
             # else: best_tid/list_abs/count already set from pick_tid fallback
+            # (identity unknown only — never when club_short is known)
 
+            miss_reason = selected.get("missReason")
             progress(
                 t0,
                 phase="resolve",
                 message=(
                     f"tid={best_tid} · {len(jobs)} jobIds · "
                     f"mgr={manager_hits.get(best_tid, 0)} · {ft_discovery_method}"
+                    + (f" · {miss_reason}" if miss_reason else "")
                 ),
                 pct=74,
                 jobsTarget=len(jobs),
+                **({"missReason": miss_reason} if miss_reason else {}),
             )
 
             job_uid = resolve_job_uids_batch(mm, jobs)
@@ -2584,7 +2588,7 @@ def main() -> int:
                 progress(
                     t0,
                     phase="reserves",
-                    message=f"Discovering {club_short} II…",
+                    message="Discovering reserves unit…",
                     pct=88,
                 )
                 ii_hit = resolve_ii_squad(mm, club_short)
@@ -2630,7 +2634,7 @@ def main() -> int:
                         "players": ii_players,
                         "capaResolved": ii_capa,
                         "discovery": {
-                            "method": "ii-clubid-discovery-v1 + ii-squad-join-v1",
+                            "method": "ii-club-object-join-v1",
                             "catalogNameAbs": ii_hit["catalogNameAbs"],
                             "has64ff24": ii_list.get("has64ff24"),
                             "jobsResolved": len(ii_job_uid),
@@ -2649,10 +2653,21 @@ def main() -> int:
                     reserves = {
                         "iiName": ii_hit["iiName"],
                         "clubId": ii_hit["clubId"],
+                        "teamId": (ii_hit.get("team") or {}).get("teamId"),
+                        "players": [],
+                        "discovery": {
+                            "method": "ii-club-object-join-miss",
+                            "listFound": False,
+                        },
+                    }
+                else:
+                    reserves = {
+                        "iiName": None,
+                        "clubId": None,
                         "teamId": None,
                         "players": [],
                         "discovery": {
-                            "method": "ii-clubid-only",
+                            "method": "ii-unit-absent",
                             "listFound": False,
                         },
                     }
@@ -2660,7 +2675,7 @@ def main() -> int:
                 progress(
                     t0,
                     phase="u19",
-                    message=f"Discovering {club_short} U19…",
+                    message="Discovering youth unit…",
                     pct=94,
                 )
                 u19_hit = resolve_u19_squad(mm, club_short)
@@ -2736,6 +2751,24 @@ def main() -> int:
                         ),
                         pct=98,
                     )
+                elif u19_hit:
+                    u19 = {
+                        "u19Name": u19_hit.get("u19Name"),
+                        "players": [],
+                        "discovery": {
+                            "method": "u19-join-miss",
+                            "listFound": False,
+                        },
+                    }
+                else:
+                    u19 = {
+                        "u19Name": None,
+                        "players": [],
+                        "discovery": {
+                            "method": "u19-unit-absent",
+                            "listFound": False,
+                        },
+                    }
         finally:
             mm.close()
 
@@ -2844,6 +2877,11 @@ def main() -> int:
                     "listAbs": (ft_list or {}).get("jobsAbs") if ft_list else None,
                 }
                 if ft_discovery_method == "ft-club-squad-join-v1"
+                else None
+            ),
+            "ftJoinMiss": (
+                selected.get("missReason")
+                if ft_discovery_method == "ft-club-squad-join-miss"
                 else None
             ),
             "playersWithAttrs": with_attrs,
