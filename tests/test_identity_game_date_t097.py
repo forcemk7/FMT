@@ -34,8 +34,8 @@ def _lp32(s: str) -> bytes:
     return struct.pack("<I", len(raw)) + raw
 
 
-def _date_tail(d: date, pad: int = 0) -> bytes:
-    return struct.pack("<BBH", pad, d.timetuple().tm_yday, d.year)
+def _date_tail(d: date) -> bytes:
+    return struct.pack("<HH", d.timetuple().tm_yday, d.year)
 
 
 def _identity_blob(
@@ -99,7 +99,7 @@ class IdentityGameDateT097Tests(unittest.TestCase):
     def test_later_calendar_table_is_not_picked(self) -> None:
         want = date(2026, 1, 4)
         ident = _identity_blob(
-            TAG_01, PERSON, CLUB, CLUB_UID, tail=_date_tail(want, pad=4)
+            TAG_01, PERSON, CLUB, CLUB_UID, tail=_date_tail(want)
         )
         blob = ident + _table(self.emt, TABLE_END)
         hit = self.emt.discover_managed_club(blob, len(blob))
@@ -111,7 +111,7 @@ class IdentityGameDateT097Tests(unittest.TestCase):
 
     def test_invalid_doy_year_is_dash(self) -> None:
         blob = _identity_blob(
-            TAG_02, PERSON, CLUB, CLUB_UID, tail=struct.pack("<BBH", 0, 0, 2026)
+            TAG_02, PERSON, CLUB, CLUB_UID, tail=struct.pack("<HH", 0, 2026)
         )
         hit = self.emt.discover_managed_club(blob, len(blob))
         picked = self.emt.pick_game_date_near_identity(blob, hit)
@@ -122,7 +122,7 @@ class IdentityGameDateT097Tests(unittest.TestCase):
 
     def test_year_out_of_range_is_dash(self) -> None:
         blob = _identity_blob(
-            TAG_01, PERSON, CLUB, CLUB_UID, tail=struct.pack("<BBH", 1, 4, 1999)
+            TAG_01, PERSON, CLUB, CLUB_UID, tail=struct.pack("<HH", 4, 1999)
         )
         hit = self.emt.discover_managed_club(blob, len(blob))
         picked = self.emt.pick_game_date_near_identity(blob, hit)

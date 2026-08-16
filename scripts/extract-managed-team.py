@@ -47,7 +47,7 @@ CATALOG_TARGET = 12 * 1024 * 1024
 CALIB_DUMP = ROOT / "tmp" / "calib" / "early-last.bin"
 CALIB_META = ROOT / "tmp" / "calib" / "early-last.json"
 IDENTITY_DUMP_DIR = ROOT / "tmp" / "identity"
-# Neighborhood dump only — pick is UniqueID-tail doy+year (T097), not 24MB c708.
+# Neighborhood dump only — pick is UniqueID-tail u16 doy + u16 year (T099), not 24MB c708.
 IDENTITY_DATE_WINDOW = 64 * 1024
 IDENTITY_HEX_RADIUS = 256
 DATE_EPOCH = date(1900, 1, 1)
@@ -402,11 +402,12 @@ def collect_date_candidates(buf, lo: int, hi: int) -> list[dict]:
 
 def pick_game_date_near_identity(buf, identity: dict | None) -> dict | None:
     """
-    In-game date from the UniqueID tail (T097).
+    In-game date from the UniqueID tail (T099).
 
-    After club UniqueID u32: one u8 (other field), then u8 day-of-year (1–366),
-    then u16 little-endian year. ``date(year, 1, 1) + (doy - 1)``.
-    Not packed day/month. Not 24MB ``c708`` calendar. Invalid doy/year → None.
+    After club UniqueID u32: u16 LE raw at UniqueID+4, u16 LE year at UniqueID+6.
+    ``doy = raw`` if 1..366 else ``raw & 0x1FF``.
+    ``date(year, 1, 1) + (doy - 1)``. Not packed day/month. Not 24MB ``c708``.
+    Invalid doy/year → None.
     """
     if not identity:
         return None
@@ -431,10 +432,10 @@ def pick_game_date_near_identity(buf, identity: dict | None) -> dict | None:
     }
     if tail + 4 > len(buf):
         return empty
-    tail_bytes = bytes(buf[tail : tail + 4])
-    doy = tail_bytes[1]
-    year = struct.unpack_from("<H", tail_bytes, 2)[0]
+    raw, year = struct.unpack_from("<HH", buf, tail)
+    doy = raw if 1 <= raw <= 366 else (raw & 0x1FF)
     iso = doy_year_to_iso(doy, year)
+    tail_bytes = bytes(buf[tail : tail + 4])
     tail_cand = {
         "kind": "uniqueid_tail_doy_year",
         "iso": iso,
@@ -454,7 +455,7 @@ def pick_game_date_near_identity(buf, identity: dict | None) -> dict | None:
     return {
         "gameDate": iso,
         "daysY1900": (dt - DATE_EPOCH).days,
-        "abs": tail + 1,
+        "abs": tail,
         "method": "uniqueid_tail_doy_year",
         "candidates": cands,
         "windowLo": lo,
@@ -547,8 +548,9 @@ def format_identity_report(
     lines.append(f"tailAbs: {(date_info or {}).get('tailAbs')}")
     lines.append(f"tailHex: {(date_info or {}).get('tailHex')}")
     lines.append(
-        "rule: after UniqueID u32, u8 then u8 doy (1–366) then u16 LE year; "
-        "date(year, 1, 1)+(doy-1). Not day/month. Invalid doy/year → —"
+        "rule: after UniqueID u32, u16 LE doy at +4 then u16 LE year at +6; "
+        "doy=raw if 1..366 else raw&0x1FF; date(year, 1, 1)+(doy-1). "
+        "Not day/month. Invalid doy/year → —"
     )
     lines.append("")
     lines.append("## Date candidates (iso, days-from-1900, offset, kind, nearby bytes)")

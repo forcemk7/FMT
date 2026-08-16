@@ -80,7 +80,7 @@ class IdentityGameDateT096Tests(unittest.TestCase):
 
     def test_later_calendar_table_is_not_today(self) -> None:
         ident = _identity_blob(TAG_01, PERSON, CLUB, CLUB_UID) + struct.pack(
-            "<BBH", 0, TODAY.timetuple().tm_yday, TODAY.year
+            "<HH", TODAY.timetuple().tm_yday, TODAY.year
         )
         blob = (
             ident
@@ -116,7 +116,7 @@ class IdentityGameDateT096Tests(unittest.TestCase):
 
     def test_two_today_ptr_days_do_not_pick_the_later_table(self) -> None:
         ident = _identity_blob(TAG_01, PERSON, CLUB, CLUB_UID) + struct.pack(
-            "<BBH", 0, TODAY.timetuple().tm_yday, TODAY.year
+            "<HH", TODAY.timetuple().tm_yday, TODAY.year
         )
         blob = (
             ident
