@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-08-16 (T108 done)
+Last updated: 2026-08-16 (T109 done; T110 ready)
 
 ## Now
 
@@ -14,9 +14,13 @@ Last updated: 2026-08-16 (T108 done)
 
 **Used (2026-08-16 HQ):** Fund Squad list next. Shortest solid FT/II/U19 path after identity; progressive row append only if cheap (else one-shot JSON).
 
-**T108 done** — + / Update runs names-only FT/II/U19 list extract (T093/T094). Progressive row append skipped (one-shot JSON; needs NDJSON+UI). T087 frozen. Do not claim T077 / T080 / T081.
+**T108 cancelled** — owner rejected. Worker rewired old `extract-first-team-fast` MVP; counts 94 vs FM 87; loans/names wrong; other saves 0 players. Do not build on that list path.
 
-**Next:** T087 frozen. Do not claim T077 / T080 / T081. Board empty of ready need-to-haves until HQ funds more.
+**Used (2026-08-16 HQ):** Fund hygiene + first-principles lists only. Sequence: working copy then delete → club_id → squads → names (+ uid) + unit. No HA/CA. Loans after lists are convincing.
+
+**Used (2026-08-16 HQ):** T110 prove order = **native FM26 first** (≥2 Careers). Then RE continue from that pattern; rolling continue pack only secondary (date-lock ≠ squad-lock; avoid fitting).
+
+**Next:** **T110** (native FM26 squad lists first). T087 frozen. Do not claim T077 / T080 / T081.
 
 **T038 done** — II Lars Gabrielsen Det/Lea is the same T014 tip class (not a new locus). Remaining hist=0 stay `—`.
 
@@ -160,7 +164,9 @@ Last updated: 2026-08-16 (T108 done)
 | One table pane shell; same drop well slot | **T105 done** | Yes |
 | Continue FM24 gameDate (rolling stack lock) | **T106 done** | **Yes** |
 | Standardize pane thead + identical drop well | **T107 done** | Yes |
-| Squad list after identity; stream if cheap | **T108 done** | **Yes** |
+| Squad list after identity; stream if cheap | **T108 cancelled** (fitted MVP; owner rejected) | — |
+| Working-copy extract; delete `.fm` after | **T109 done** | **Yes** |
+| First-principles squad lists (native FM26 first) | **T110 ready** | **Yes** |
 | Progress GK abilities + outfield GK rating | **T087 blocked** (on T094) | after native roster |
 | npm run dev from HQ | **T089 cancelled** | — |
 | Sync steals Active save when extract finishes | **T088 done** | **Yes** |
@@ -170,6 +176,7 @@ Last updated: 2026-08-16 (T108 done)
 
 | ID | Title | Status | Owner |
 |----|-------|--------|-------|
+| T110 | First-principles squad lists — native FM26 first | ready | |
 | T087 | Progress GK vs outfield CA layout | blocked | |
 | T077 | Live www URL — upload save, extract, four tabs | blocked | |
 | T080 | Stop favoured-club extract on roster path | blocked | |
@@ -195,7 +202,7 @@ Last updated: 2026-08-16 (T108 done)
 
 ## Gate
 
-- Board: no ready need-to-haves. T087 frozen. T077 / T080 / T081 blocked. One ticket per worker.
+- T110. T109 done — working copy + delete. T108 cancelled — do not rewire old fast extract. No HA/CA until lists honest. T087 frozen. T077 / T080 / T081 blocked. One ticket per worker.
 - Refuse Suggest. Refuse CA/PA. Refuse Stripe paywall / packaging / FM27.
 - BMC is a tip. Do not gate the table.
 - Workers: one ticket, one commit on `FMT/`. If freeze, do not claim anything else.
@@ -206,7 +213,9 @@ Last updated: 2026-08-16 (T108 done)
 
 ## Recently done
 
-- **T108** — + / roster POST uses names-only `extract-first-team-fast` (T093/T094 continue+native joins), not metaOnly. Progressive append skipped (one-shot `players[]`; STATUS). Smoke continue Schalke FT/II/U19 filled. Vitest T108 + T096; unittest T093/T094. Restart `npm run dev`. No committed `.fm`.
+- **T109** — + / Update extract lands in `tmp/uploads` working copy; `cleanupWorkingFm` deletes it after success or abort (never live SI `games/*.fm`). GET scout disk extract disabled. Vitest refuse + delete-after. Restart `npm run dev`. No committed `.fm`.
+
+- **T108 cancelled** — Owner rejected: rewired MVP list extract; 94 ≠ 87; FT/Res/U19 vs loans wrong; other Careers 0 players. Identity shell stays. Next T109–T110.
 
 - **T107** — Empty Squad / Loans / Mentoring / Progress share `.table-pane-empty` → `.table-pane-head` + `.table-pane-drop`. Shared thead typography tokens (also filled Squad HA head). Mentoring empty hides mentee strip. Drop still + identity upload. Vitest chrome. Restart `npm run dev`. No committed `.fm`.
 

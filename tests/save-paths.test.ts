@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   assertNotLiveFmGamesSave,
+  cleanupWorkingFm,
   copyLiveFmSaveToRepo,
   destCoversLiveSnapshot,
   isFmBackupVersionName,
@@ -12,6 +13,7 @@ import {
   repoSaveDestPath,
   resolveFmSaveByName,
   resolveRepoSavesDir,
+  resolveWorkingUploadsDir,
   saveSearchDirs,
   shouldCopyLiveFmSave,
   statFmSave,
@@ -50,7 +52,28 @@ describe("save-paths", () => {
       assertNotLiveFmGamesSave(
         "/Users/x/Documents/Sports Interactive/Football Manager 26/games/Career.fm",
       ),
-    ).toThrow(/data\/saves/);
+    ).toThrow(/working copy/);
+  });
+
+  it("working uploads dir is tmp/uploads under the repo root", () => {
+    const root = makeRoot();
+    expect(resolveWorkingUploadsDir(root)).toBe(
+      path.join(root, "tmp", "uploads"),
+    );
+  });
+
+  it("cleanupWorkingFm deletes a working copy; refuses live games path", () => {
+    const root = makeRoot();
+    const work = path.join(resolveWorkingUploadsDir(root), "Career.fm");
+    fs.mkdirSync(path.dirname(work), { recursive: true });
+    fs.writeFileSync(work, "temp");
+    cleanupWorkingFm(work);
+    expect(fs.existsSync(work)).toBe(false);
+    expect(() =>
+      cleanupWorkingFm(
+        "C:\\Users\\x\\Documents\\Sports Interactive\\Football Manager 26\\games\\Career.fm",
+      ),
+    ).toThrow(/only FMT working copies/);
   });
 
   it("finds saves in repo data/saves by exact and case-insensitive name", () => {
@@ -233,7 +256,7 @@ describe("save-paths", () => {
     ).rejects.toThrow(/source must be/);
     await expect(
       copyLiveFmSaveToRepo(livePath, livePath, { retries: 0 }),
-    ).rejects.toThrow(/data\/saves/);
+    ).rejects.toThrow(/working copy/);
   });
 
   it("copyLiveFmSaveToRepo creates dest when data/saves has no file yet", async () => {
@@ -266,7 +289,7 @@ describe("save-paths", () => {
       extractFirstTeam(
         "C:\\Users\\x\\Documents\\Sports Interactive\\Football Manager 26\\games\\Career.fm",
       ),
-    ).rejects.toThrow(/data\/saves/);
+    ).rejects.toThrow(/working copy/);
   });
 
   it("extractFirstTeam does not spawn when already aborted", async () => {

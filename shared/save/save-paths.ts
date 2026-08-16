@@ -1,8 +1,8 @@
 /**
- * Career .fm files: extract from repo `data/saves` only.
- * Live Sports Interactive/…/games/*.fm may be watched, stat'd, and copied
- * into data/saves — never extracted (locks FM autosave).
- * SI graphics/ for faces and logos is unrelated and allowed.
+ * Career .fm extract: always from a FMT working copy (`tmp/uploads`), never
+ * live Sports Interactive/…/games/*.fm (locks FM autosave). After extract
+ * success or abort, delete the working `.fm` — binaries are disposable;
+ * identity JSON / roster store stay. SI graphics/ faces/logos unrelated.
  */
 
 import fs from "node:fs";
@@ -29,7 +29,30 @@ export function resolveRepoSavesDir(rootDir: string): string {
   return path.join(rootDir, "data", "saves");
 }
 
-/** Directories searched for extract. Live FM games/ is never on this list. */
+/** Ephemeral upload / extract working copies (gitignored `tmp/`). */
+export function resolveWorkingUploadsDir(rootDir: string): string {
+  return path.join(rootDir, "tmp", "uploads");
+}
+
+/**
+ * Best-effort delete of a FMT working `.fm` after extract success or abort.
+ * Never call this on the user's live SI `games/*.fm`.
+ */
+export function cleanupWorkingFm(filePath: string): void {
+  if (!filePath) return;
+  if (isLiveFmGamesSavePath(filePath)) {
+    throw new Error(
+      "Refusing to delete Sports Interactive/games/*.fm — only FMT working copies",
+    );
+  }
+  try {
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+  } catch {
+    // best-effort
+  }
+}
+
+/** Directories searched for legacy disk helpers. Live FM games/ is never on this list. */
 export function saveSearchDirs(rootDir: string): string[] {
   return [resolveRepoSavesDir(rootDir)];
 }
@@ -43,7 +66,7 @@ export function isLiveFmGamesSavePath(filePath: string): boolean {
 export function assertNotLiveFmGamesSave(filePath: string): void {
   if (isLiveFmGamesSavePath(filePath)) {
     throw new Error(
-      "Refusing Sports Interactive/games/*.fm — copy the Career Save into data/saves",
+      "Refusing Sports Interactive/games/*.fm — extract only from a FMT working copy",
     );
   }
 }

@@ -35,15 +35,13 @@ import {
   playerCount,
   type HistoryStore,
 } from "./shared/history-store.ts";
-import {
-  extractFirstTeam,
-  resolveDefaultSavePath,
-} from "./shared/save/extract-first-team.ts";
+import { extractFirstTeam } from "./shared/save/extract-first-team.ts";
 import { extractManagedIdentity } from "./shared/save/extract-managed-team.ts";
 import { extractFavouredClubScouts } from "./shared/save/extract-favoured-scouts.ts";
 import { createExtractGate } from "./shared/save/extract-gate.ts";
 import { killStaleExtractPid } from "./shared/save/extract-child.ts";
 import {
+  cleanupWorkingFm,
   copyLiveFmSaveToRepo,
   destCoversLiveSnapshot,
   isFmBackupVersionName,
@@ -51,6 +49,7 @@ import {
   resolveFmGamesDir,
   resolveFmSaveByName,
   resolveRepoSavesDir,
+  resolveWorkingUploadsDir,
   SAVE_WATCH_DEBOUNCE_MS,
   shouldCopyLiveFmSave,
   statFmSave,
@@ -896,12 +895,11 @@ function rosterApiPlugin(): Plugin {
           }
 
           if (req.method === "GET" && url === "/api/scout/favoured-club") {
-            const savePath = resolveDefaultSavePath(rootDir);
-            const ac = new AbortController();
-            req.on("close", () => ac.abort());
-            await runExtractExclusive(() =>
-              runScoutStreaming(res, savePath, ac.signal),
-            );
+            // T109: no disk GET extract from data/saves — working copy + delete only.
+            sendJson(res, 405, {
+              error:
+                "Extract starts from + upload only — GET disk extract is disabled",
+            });
             return;
           }
 
@@ -911,7 +909,8 @@ function rosterApiPlugin(): Plugin {
               url === "/api/scout/favoured-club")
           ) {
             const ct = String(req.headers["content-type"] || "").toLowerCase();
-            const uploadDir = path.join(rootDir, "tmp", "uploads");
+            // T109: + / Update lands in tmp/uploads working copy; delete after extract.
+            const uploadDir = resolveWorkingUploadsDir(rootDir);
             fs.mkdirSync(uploadDir, { recursive: true });
             // T108: + / roster POST runs names-only FT/II/U19 list (T093/T094 joins).
             // One-shot JSON result — progressive row append skipped (needs NDJSON+UI).
@@ -978,11 +977,8 @@ function rosterApiPlugin(): Plugin {
                   return runStreaming(res, savePath, ac.signal);
                 });
               } finally {
-                try {
-                  fs.unlinkSync(savePath);
-                } catch {
-                  // ignore
-                }
+                // T109: delete working .fm after success or abort/fail (best-effort).
+                cleanupWorkingFm(savePath);
               }
               return;
             }
