@@ -912,8 +912,8 @@ function rosterApiPlugin(): Plugin {
             // T109: + / Update lands in tmp/uploads working copy; delete after extract.
             const uploadDir = resolveWorkingUploadsDir(rootDir);
             fs.mkdirSync(uploadDir, { recursive: true });
-            // T111: + / roster POST runs Senior Squad object-path extract
-            // (native identity namelist; continue = not-yet). Not extract-first-team-fast.
+            // T114: + / roster POST runs native clubIdAbs+488 namelist → Squad
+            // (unit `list`; continue skips +488). Not extract-first-team-fast / Senior.
             // Identity-only helper remains for non-roster callers.
             const runStreaming =
               url === "/api/scout/favoured-club"

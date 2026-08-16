@@ -7504,7 +7504,7 @@ function squadHaColumnClass(key: SquadHaFilterKey): string {
 function squadHaColumnTip(key: SquadHaFilterKey): string {
   if (key === "name") return "Player name";
   if (key === "uid") return "Player UniqueID";
-  if (key === "unit") return "Senior Squad (T111); Reserves / U19 later";
+  if (key === "unit") return "Native +488 namelist (list); not a squad-type claim";
   if (key === "age") return "Age at this save’s game date";
   if (key === "personality" || key === "mediaHandling") {
     return "Label of this save’s personality vector";
@@ -8137,13 +8137,15 @@ function renderSquadHaTable() {
       } else if (key === "unit") {
         td.textContent = row.unit;
         td.title =
-          row.unit === "Senior"
-            ? "Senior Squad"
-            : row.unit === "FT"
-              ? "First Team"
-              : row.unit === "II"
-                ? "Reserves"
-                : "Under 19s";
+          row.unit === "list"
+            ? "clubIdAbs+488 namelist (untyped)"
+            : row.unit === "Senior"
+              ? "Senior Squad"
+              : row.unit === "FT"
+                ? "First Team"
+                : row.unit === "II"
+                  ? "Reserves"
+                  : "Under 19s";
       } else if (key === "age") {
         const text = formatSquadHaCell(row.age);
         td.textContent = text;
@@ -8325,6 +8327,9 @@ function renderRoster() {
     const extractUnit = (
       entry.player as { _extract?: { unit?: string | null } | null }
     )._extract?.unit;
+    if (extractUnit === "list") {
+      return { ...entry, unit: "list" as const };
+    }
     if (extractUnit === "Senior") {
       return { ...entry, unit: "Senior" as const };
     }
@@ -8338,7 +8343,7 @@ function renderRoster() {
     const row = buildSquadHaRow(
       entry.player,
       entry.score,
-      unitByUid.get(Number(entry.player.uid)) ?? "Senior",
+      unitByUid.get(Number(entry.player.uid)) ?? "list",
     );
     return row ? [row] : [];
   });

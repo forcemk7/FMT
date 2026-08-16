@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-08-16 (T111 done — Senior object path; native honest miss)
+Last updated: 2026-08-17 (T114 done — native +488 namelist MVP)
 
 ## Now
 
@@ -24,9 +24,25 @@ Last updated: 2026-08-16 (T111 done — Senior object path; native honest miss)
 
 **Used (2026-08-16 HQ):** One squad at a time. Lock **Senior Squad** via club → squad object → player ids (native names). Then choose horizontal (Loans/Mentoring/Progress) vs vertical (Reserve/U19). Native FM terms from the save.
 
-**T111 done** — object path documented (`senior-squad-object-v1`); T110 namelist removed. Native Liverpool + Bournemouth = honest miss + dump (no fake FT=25). UI: Name + UID + Senior. Squad still empty until native club→squad object locks. T087 frozen. Do not claim T077 / T080 / T081.
+**T111 done (thin)** — removed T110 namelist; tried old club→team join; native = **0 players** (“honest miss”). Did not deliver a Senior list. Owner: jargon / felt abandoned.
 
-**Next:** Native Senior squad object (after owner FM Senior count smoke), or HQ picks horizontal vs vertical. T087 frozen. Do not claim T077 / T080 / T081.
+**Used (2026-08-17 HQ):** Break the path into bricks. Next after club id = find **“squad”** text linked to that club id (dump for humans). Player ids later.
+
+**Used (2026-08-17 HQ):** Owner UI smoke (Schalke): Senior 31 / U19 23 / II 33 — labels may be skin. Parallel T112 race: Lane A title phrases, Lane B First Team/II names, Lane C `squad` near clubId.
+
+**Race result:** Lane A titles = 0 (skin). Lane B = real `Schalke 04 II` / lots of First Team & Under 19 (mostly noise). Lane C = 0 `squad` in 64KB after club id. Next brick = team **names** + structure, not “Squad Players” strings.
+
+**Used (2026-08-17 HQ):** Owner wants **broad+shallow** — many tiny probes (name→up, II rows, incoming club id, after-id motif, job crumbs, rolling if present). **T113** race.
+
+**T113 race result:** Best clue = early Liverpool name cluster (Alisson+Frimpong+Leoni). II string = catalog only. After club id = date not squad. `7f02` not beside identity. Rolling skipped.
+
+**Used (2026-08-17 HQ):** Cluster ↔ club id: on **5 native** Careers, namelist is always at **clubIdAbs+488** (count then lp32 names). Liverpool count **35** in-file. Location generalizes; Senior-only not proven. Dump `tmp/identity/t113-cluster-clubid-tie.txt`.
+
+**Used (2026-08-17 HQ):** Owner: ship MVP — extract +488 names into Squad (no squad-type claim); owner checks FM; then decide.
+
+**T114 done** — native tag `00950e01`: after identity, namelist at clubIdAbs+488 (u32 count + lp32 names) → Squad unit `list` (not Senior). Continue skips +488. Owner: compare names to FM.
+
+**Next:** Owner FM check on +488 names. T087 frozen. Do not claim T077 / T080 / T081.
 
 **T038 done** — II Lars Gabrielsen Det/Lea is the same T014 tip class (not a new locus). Remaining hist=0 stay `—`.
 
@@ -173,7 +189,10 @@ Last updated: 2026-08-16 (T111 done — Senior object path; native honest miss)
 | Squad list after identity; stream if cheap | **T108 cancelled** (fitted MVP; owner rejected) | — |
 | Working-copy extract; delete `.fm` after | **T109 done** | **Yes** |
 | First-principles squad lists (native FM26 first) | **T110 cancelled** (offset namelist; owner rejected) | — |
-| Senior Squad — club → squad object → player ids | **T111 done** (native miss + dump; no namelist) | **Yes** |
+| Senior Squad — club → squad object → player ids | **T111 done** (0 players; thin close) | — |
+| Club id → “squad” strings dump (plain) | **T112 ready** | Yes |
+| Senior clues — broad shallow probes | **T113 ready** | Yes |
+| Native MVP — clubIdAbs+488 namelist → Squad | **T114 done** | **Yes** |
 | Progress GK abilities + outfield GK rating | **T087 blocked** (on T094) | after native roster |
 | npm run dev from HQ | **T089 cancelled** | — |
 | Sync steals Active save when extract finishes | **T088 done** | **Yes** |
@@ -183,6 +202,8 @@ Last updated: 2026-08-16 (T111 done — Senior object path; native honest miss)
 
 | ID | Title | Status | Owner |
 |----|-------|--------|-------|
+| T113 | Senior clues — broad shallow probes (any hit wins) | ready | |
+| T112 | After club id — find “squad” strings linked to that club | ready | |
 | T087 | Progress GK vs outfield CA layout | blocked | |
 | T077 | Live www URL — upload save, extract, four tabs | blocked | |
 | T080 | Stop favoured-club extract on roster path | blocked | |
@@ -208,7 +229,7 @@ Last updated: 2026-08-16 (T111 done — Senior object path; native honest miss)
 
 ## Gate
 
-- Board empty of ready tickets. T111 done (object path + honest native miss). Next Senior lock needs owner FM smoke count — do not invent tickets. T087 frozen. T077 / T080 / T081 blocked.
+- T114 done (native +488 → Squad unit `list`). Owner FM check next. T087 frozen. T077 / T080 / T081 blocked. One ticket per worker.
 - Refuse Suggest. Refuse CA/PA. Refuse Stripe paywall / packaging / FM27.
 - BMC is a tip. Do not gate the table.
 - Workers: one ticket, one commit on `FMT/`. If freeze, do not claim anything else.
@@ -219,9 +240,11 @@ Last updated: 2026-08-16 (T111 done — Senior object path; native honest miss)
 
 ## Recently done
 
-- **T111** — Senior Squad object path (`club → PRE_NAME/team → 7f02 jobs → uid → name`); killed T110 namelist. Native gameDate1/2 honest miss + dump (no FT=25). UI Name+UID+Senior. Unittest + vitest. Restart `npm run dev`. No committed `.fm`.
+- **T114** — Native tag `00950e01`: clubIdAbs+488 u32 count + lp32 names → Squad unit `list` (not Senior). Continue skips +488. Synthetic + smoke Liverpool 35 / Bournemouth 33. Working-copy delete (T109). Restart `npm run dev` and + a native Career. Owner: compare names to FM. No committed `.fm`.
 
-- **T110 cancelled** — Owner rejected: namelist ~+520; claimed Liverpool FT=25 (false for gameDate1); UI 2 rows. Next T111 Senior Squad object path.
+- **T111** — Thin close: killed T110 namelist; old club→team join → **0 players** on native. Not a usable Senior list. Follow-up **T112**.
+
+- **T110 cancelled** — Owner rejected: namelist ~+520; claimed Liverpool FT=25 (false for gameDate1); UI 2 rows.
 
 - **T109** — + / Update extract lands in `tmp/uploads` working copy; `cleanupWorkingFm` deletes it after success or abort (never live SI `games/*.fm`). GET scout disk extract disabled. Vitest refuse + delete-after. Restart `npm run dev`. No committed `.fm`.
 
