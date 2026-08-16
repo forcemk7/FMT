@@ -277,6 +277,22 @@ const rosterStatusEl = document.querySelector<HTMLElement>("#roster-status")!;
 const rosterUploadEl = document.querySelector<HTMLInputElement>("#roster-upload")!;
 const rosterUploadBtnEl = document.querySelector<HTMLButtonElement>("#roster-upload-btn")!;
 const rosterEmptyEl = document.querySelector<HTMLElement>("#roster-empty")!;
+const PANE_DROP_COPY = "Drop a Career Save (.fm) here, or use +";
+const squadLoansEmptyHostEl = document.querySelector<HTMLElement>(
+  "#squad-loans-empty-host",
+)!;
+const mentoringEmptyHostEl = document.querySelector<HTMLElement>(
+  "#mentoring-empty-host",
+)!;
+const squadProgressEmptyEl = document.querySelector<HTMLElement>(
+  "#squad-progress-empty",
+)!;
+
+function setPaneDropEnabled(el: HTMLElement | null, enabled: boolean) {
+  if (!el) return;
+  if (enabled) el.dataset.paneDrop = "1";
+  else delete el.dataset.paneDrop;
+}
 const squadViewToolbarEl = document.querySelector<HTMLElement>(
   ".squad-view-toolbar",
 )!;
@@ -353,7 +369,6 @@ const rosterSavesMenuEl = document.querySelector<HTMLElement>("#roster-saves-men
 const rosterSavesCountEl = document.querySelector<HTMLElement>("#roster-saves-count")!;
 const rosterSavesListEl = document.querySelector<HTMLElement>("#roster-saves-list")!;
 const rosterSavesEmptyEl = document.querySelector<HTMLElement>("#roster-saves-empty")!;
-const toolNavEl = document.querySelector<HTMLElement>("#tool-nav")!;
 const appBrandEl = document.querySelector<HTMLButtonElement>(".app-brand")!;
 const rankerPodiumEl = document.querySelector<HTMLElement>("#ranker-podium")!;
 const rankerListEl = document.querySelector<HTMLElement>("#ranker-list")!;
@@ -981,6 +996,14 @@ function clearSquadEvolution() {
   closeSquadEvolutionPlayerList();
   syncEvoPills();
   squadEvoVisibilityToolsEl.hidden = false;
+  syncProgressEmptyPane();
+}
+
+function syncProgressEmptyPane() {
+  const empty = clubWideEvolutionPlayers().length === 0;
+  squadEvolutionEl.classList.toggle("is-empty-progress", empty);
+  squadProgressEmptyEl.hidden = !empty;
+  setPaneDropEnabled(squadEvolutionEl, empty);
 }
 
 function syncEvoPills() {
@@ -1137,6 +1160,12 @@ function syncAttrToggleAppearance(
 
 function renderSquadEvolution() {
   if (!(isSquadUnitMode(squadViewMode) && squadUnitView === 'attributes')) return;
+  syncProgressEmptyPane();
+  if (clubWideEvolutionPlayers().length === 0) {
+    squadEvolutionSubEl.textContent = '';
+    squadEvolutionChartEl.replaceChildren();
+    return;
+  }
   if (squadEvolutionUid == null) {
     squadEvolutionSubEl.textContent = '';
     squadEvolutionChartEl.replaceChildren();
@@ -7970,10 +7999,12 @@ function renderSquadHaTable() {
     const emptyRow = document.createElement("tr");
     const td = document.createElement("td");
     td.colSpan = colCount;
-    td.textContent =
-      squadHaFilters.length > 0
-        ? "No players match the current filters."
-        : "No at-club players in First Team, Reserves, or Under 19s.";
+    if (squadHaFilters.length > 0) {
+      td.textContent = "No players match the current filters.";
+    } else {
+      td.textContent = PANE_DROP_COPY;
+      td.className = "pane-drop-copy";
+    }
     emptyRow.append(td);
     body.append(emptyRow);
   }
@@ -8130,6 +8161,10 @@ function renderSquadHaTable() {
   table.append(body);
   rosterBodyEl.append(table);
   rosterBodyEl.scrollTop = scrollTop;
+  setPaneDropEnabled(
+    squadPersonalitiesPaneEl,
+    visible.length === 0 && squadHaFilters.length === 0,
+  );
 }
 
 rosterBodyEl.addEventListener("scroll", hideMetricTip, { passive: true });
@@ -8200,8 +8235,9 @@ function renderRoster() {
   rosterTablePanelEl.classList.toggle("is-empty-roster", isEmptyRoster);
   rosterUploadBtnEl.classList.toggle("is-cta", isEmptyRoster);
   squadViewTabsEl.hidden = !hasSave;
-  // Empty copy lives on the pane when there is no save (prompt to +).
-  rosterEmptyEl.hidden = hasSave;
+  // Empty copy lives in the tab thead + shared drop body (T104).
+  rosterEmptyEl.hidden = true;
+  rosterEmptyEl.textContent = PANE_DROP_COPY;
   if (isSquadUnitMode(squadViewMode) && squadUnitView === "personalities") {
     squadPersonalitiesPaneEl.hidden = false;
     squadMentoringPaneEl.hidden = true;
@@ -8345,7 +8381,10 @@ function renderLoansPage() {
       grid.append(createSquadPersonalityCard(entry.player, entry.score));
     }
   }
-  squadLoansEmptyEl.hidden = any;
+  squadLoansEmptyEl.hidden = true;
+  squadLoansEmptyHostEl.hidden = any;
+  squadLoansEmptyEl.textContent = PANE_DROP_COPY;
+  setPaneDropEnabled(squadLoansPaneEl, !any);
 }
 
 type FirstTeamApiPlayer = LegacyRosterPlayer;
@@ -8697,6 +8736,43 @@ function openRosterFilePicker() {
   rosterFileDialogOpen = true;
   rosterUploadEl.click();
 }
+
+/** Drop on an empty pane = the + identity upload (new save, not overwrite). */
+function feedRosterUpload(file: File) {
+  rosterAmendTarget = null;
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  rosterUploadEl.files = dt.files;
+  rosterUploadEl.dispatchEvent(new Event("change"));
+}
+
+function fmFileFromDrop(dt: DataTransfer | null): File | null {
+  if (!dt) return null;
+  for (const file of dt.files) {
+    if (/\.fm$/i.test(file.name)) return file;
+  }
+  return null;
+}
+
+function paneDropZone(event: Event): HTMLElement | null {
+  const target = event.target;
+  if (!(target instanceof Element)) return null;
+  return target.closest<HTMLElement>("[data-pane-drop]");
+}
+
+rosterTablePanelEl.addEventListener("dragover", (event) => {
+  if (!paneDropZone(event)) return;
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = "copy";
+});
+
+rosterTablePanelEl.addEventListener("drop", (event) => {
+  if (!paneDropZone(event)) return;
+  event.preventDefault();
+  const file = fmFileFromDrop(event.dataTransfer);
+  if (!file) return;
+  feedRosterUpload(file);
+});
 
 function mapApiSquadPlayers(
   players: FirstTeamApiPlayer[] | undefined,
@@ -11437,11 +11513,14 @@ function renderMentoringPage() {
   if (rosterMeta.source !== "save" || rosterPlayers.length === 0) {
     mentoringCardsEl.replaceChildren();
     mentoringCardsEl.classList.remove("is-dense");
+    mentoringCardsEl.hidden = true;
     mentoringMenteesEl.replaceChildren();
     mentoringMenteesEl.hidden = true;
-    mentoringEmptyEl.hidden = false;
-    mentoringEmptyEl.textContent = "Load a Career Save";
+    mentoringEmptyEl.hidden = true;
+    mentoringEmptyHostEl.hidden = false;
+    mentoringEmptyEl.textContent = PANE_DROP_COPY;
     mentoringAddBtn.disabled = true;
+    setPaneDropEnabled(squadMentoringPaneEl, true);
     if (mentoringBoardSuggestBtn) {
       mentoringBoardSuggestBtn.disabled = true;
       mentoringBoardSuggestBtn.textContent = "Suggest";
@@ -11475,16 +11554,11 @@ function renderMentoringPage() {
       : "Need 3 unassigned players";
   updateMentoringSuggestButton();
 
-  mentoringEmptyEl.hidden = mentoringCache.groups.length > 0;
-  const incompleteCount = clubAtClubMentoringPlayers().filter(
-    (player) => !isMentoringCompleteEnough(player),
-  ).length;
-  mentoringEmptyEl.textContent =
-    candidates.length === 0
-      ? incompleteCount > 0
-        ? "No complete-enough players for Mentoring"
-        : "No personality data"
-      : "No mentoring groups yet";
+  mentoringEmptyEl.hidden = true;
+  mentoringEmptyHostEl.hidden = mentoringCache.groups.length > 0;
+  mentoringCardsEl.hidden = mentoringCache.groups.length === 0;
+  mentoringEmptyEl.textContent = PANE_DROP_COPY;
+  setPaneDropEnabled(squadMentoringPaneEl, mentoringCache.groups.length === 0);
 
   renderMentoringMenteeStrip(candidates);
   setMentoringStatusNotice(mentoringReplacementNotice ?? "");
@@ -11840,14 +11914,8 @@ function syncToolView() {
   delete document.documentElement.dataset.bootRosterClub;
   delete document.documentElement.dataset.bootRankDensity;
 
-  // FMT brand remains a home shortcut; aria-current lives on the tool nav.
+  // FMT brand remains a home shortcut.
   appBrandEl.removeAttribute("aria-current");
-
-  for (const btn of toolNavEl.querySelectorAll<HTMLButtonElement>("[data-tool]")) {
-    const isCurrent = btn.dataset.tool === activeTool;
-    if (isCurrent) btn.setAttribute("aria-current", "page");
-    else btn.removeAttribute("aria-current");
-  }
 
   document.documentElement.dataset.tool = "roster";
   {
@@ -14053,17 +14121,6 @@ appBrandEl.addEventListener("click", () => {
   squadUnitView = "personalities";
   setSquadViewMode("firstTeam");
   setTool("roster");
-});
-
-toolNavEl.addEventListener("click", (event) => {
-  const btn = (event.target as HTMLElement).closest<HTMLButtonElement>(
-    "[data-tool]",
-  );
-  if (!btn || !toolNavEl.contains(btn) || btn.disabled) return;
-  const tool = btn.dataset.tool;
-  if (tool === "rank" || tool === "roster") {
-    setTool("roster");
-  }
 });
 
 checkerCloseEl.addEventListener("click", () => {

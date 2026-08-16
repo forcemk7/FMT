@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-08-16 (T103 done)
+Last updated: 2026-08-16 (T104 done)
 
 ## Now
 
@@ -70,6 +70,10 @@ Last updated: 2026-08-16 (T103 done)
 
 **T103 done** — page shell: header FMT · club · in-game date · + · saves · coffee; tabs Squad | Loans | Mentoring | Progress; one pane. No save → No save. Empty players still show tabs.
 
+**Used (2026-08-16 HQ):** Shell suits. Leftover header Squad pill; empty panes not unified. Owner likes Squad thead; wants that + drop `.fm` on every tab.
+
+**T104 done** — header Squad pill gone. Empty tabs: thead + drop `.fm` (same as +). Filled panes unchanged.
+
 **Next:** No ready tickets. T087 frozen. Do not claim T077 / T080 / T081.
 
 | Area | State | Need-to-have? |
@@ -134,6 +138,7 @@ Last updated: 2026-08-16 (T103 done)
 | Save cards FM24/FM26; continue date; update-same-name | **T101 done** | **Yes** |
 | Structured save-card hover tooltip | **T102 done** | Yes |
 | Page shell: header identity + four tabs + one pane | **T103 done** | **Yes** |
+| Kill header Squad leftover; unified empty pane + drop | **T104 done** | Yes |
 | Progress GK abilities + outfield GK rating | **T087 blocked** (on T094) | after native roster |
 | npm run dev from HQ | **T089 cancelled** | — |
 | Sync steals Active save when extract finishes | **T088 done** | **Yes** |
@@ -168,7 +173,7 @@ Last updated: 2026-08-16 (T103 done)
 
 ## Gate
 
-- T103 done. Empty ready board. T087 frozen. T077 / T080 / T081 blocked. One ticket per worker.
+- T104 done. Empty ready board. T087 frozen. T077 / T080 / T081 blocked. One ticket per worker.
 - Refuse Suggest. Refuse CA/PA. Refuse Stripe paywall / packaging / FM27.
 - BMC is a tip. Do not gate the table.
 - Workers: one ticket, one commit on `FMT/`. If freeze, do not claim anything else.
@@ -178,6 +183,8 @@ Last updated: 2026-08-16 (T103 done)
 - Host RAM / T077 after owner says the local loop is honest (any save + Active not stolen).
 
 ## Recently done
+
+- **T104** — Header has no leftover Squad pill (`#tool-nav` gone). Empty Squad / Loans / Mentoring / Progress show that tab’s thead + `Drop a Career Save (.fm) here, or use +`. Drop on an empty pane is the + identity upload (new save, not overwrite). Filled Loans cards / Mentoring groups / Progress chart stay. Vitest chrome guard. Restart `npm run dev`. No committed `.fm`.
 
 - **T103** — Page shell: header FMT · Active club · in-game date (Mon DD, YYYY or —) · + · saves · BMC. No save → No save. Tabs Squad | Loans | Mentoring | Progress under the header; Reserves / U19 stay hidden. Empty pane prompts +. Active save with empty `players[]` still shows tabs. Hash restore (`#roster/mentoring`) does not require a non-empty roster. Save cards / extract unchanged. Vitest chrome guard. Restart `npm run dev`. No committed `.fm`.
 

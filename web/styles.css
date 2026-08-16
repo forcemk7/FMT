@@ -995,51 +995,6 @@ main {
   cursor: default;
 }
 
-.tool-nav {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.25rem 0.45rem;
-}
-
-.tool-nav-btn {
-  appearance: none;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--muted);
-  font: inherit;
-  font-size: 0.78rem;
-  font-weight: 600;
-  padding: 0.35rem 0.75rem;
-  cursor: pointer;
-}
-
-.tool-nav-btn:hover {
-  color: var(--ink);
-  background: var(--surface-hover);
-}
-
-.tool-nav-btn[aria-current="page"] {
-  color: var(--ink);
-  background: var(--surface-active);
-  border-color: var(--accent);
-}
-
-.tool-nav-btn:disabled {
-  color: var(--disabled);
-  background: transparent;
-  border-color: transparent;
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.tool-nav-btn:disabled:hover {
-  color: var(--disabled);
-  background: transparent;
-}
-
 .bmc-tip {
   margin-left: 0;
   display: inline-flex;
@@ -4139,19 +4094,6 @@ button.regen-chip-toggle:focus-visible {
     font-size: 1.2rem;
   }
 
-  .tool-nav {
-    flex: 1 1 auto;
-    min-width: 0;
-    justify-content: flex-end;
-    flex-wrap: nowrap;
-    gap: 0.15rem;
-  }
-
-  .tool-nav-btn {
-    padding: 0.3rem 0.5rem;
-    font-size: 0.78rem;
-  }
-
   .bmc-tip {
     font-size: 0.72rem;
   }
@@ -4909,6 +4851,35 @@ td.attr-band {
   display: none !important;
 }
 
+.pane-empty-host {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
+.pane-empty-host[hidden] {
+  display: none !important;
+}
+
+.pane-empty-host .ranker-list-table {
+  width: 100%;
+}
+
+.pane-drop-copy {
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 500;
+  padding: 2.4rem 1rem;
+}
+
+.squad-evolution.is-empty-progress .squad-evolution-lede,
+.squad-evolution.is-empty-progress .squad-evolution-sub,
+.squad-evolution.is-empty-progress .squad-evolution-chart,
+.squad-evolution.is-empty-progress .squad-evolution-attrs {
+  display: none !important;
+}
+
 .squad-loans-section {
   display: flex;
   flex-direction: column;
@@ -5036,6 +5007,10 @@ button.mentoring-mentee.is-free:focus-visible .mentoring-seat-face-wrap {
   gap: 0.65rem;
   align-content: stretch;
   overflow: hidden;
+}
+
+.mentoring-cards[hidden] {
+  display: none !important;
 }
 
 .mentoring-card {

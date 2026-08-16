@@ -89,11 +89,6 @@
             >
               —
             </p>
-            <nav id="tool-nav" class="tool-nav" aria-label="Tools" hidden>
-              <button type="button" class="tool-nav-btn" data-tool="roster">
-                Squad
-              </button>
-            </nav>
             <div class="app-header-actions">
               <div
                 class="squad-save-controller"
@@ -1354,7 +1349,7 @@
                   aria-label="Squad personality HA"
                 ></div>
                 <p id="roster-empty" class="roster-empty" hidden>
-                  Load a Career Save with + to see Squad, Loans, Mentoring, and Progress.
+                  Drop a Career Save (.fm) here, or use +
                 </p>
               </div>
 
@@ -1364,6 +1359,29 @@
                 hidden
                 aria-label="Mentoring feedback — attribute and personality history"
               >
+                <div id="squad-progress-empty" class="pane-empty-host" hidden>
+                  <table
+                    class="ranker-list-table fmt-table"
+                    aria-label="Progress"
+                  >
+                    <thead>
+                      <tr>
+                        <th scope="col">Name</th>
+                        <th scope="col">CA</th>
+                        <th scope="col">ΔCA</th>
+                        <th scope="col">Det</th>
+                        <th scope="col">ΔDet</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td colspan="5" class="pane-drop-copy">
+                          Drop a Career Save (.fm) here, or use +
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
                 <p class="squad-evolution-lede">
                   After mentoring, track HA and CA shifts to confirm personality
                   changes.
@@ -1453,8 +1471,29 @@
                 aria-label="Out on loan"
               >
                 <p id="squad-loans-empty" class="squad-loans-empty" hidden>
-                  No players out on loan
+                  Drop a Career Save (.fm) here, or use +
                 </p>
+                <div id="squad-loans-empty-host" class="pane-empty-host" hidden>
+                  <table
+                    class="ranker-list-table fmt-table"
+                    aria-label="Out on loan"
+                  >
+                    <thead>
+                      <tr>
+                        <th scope="col">Name</th>
+                        <th scope="col">Unit</th>
+                        <th scope="col">At</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td colspan="3" class="pane-drop-copy">
+                          Drop a Career Save (.fm) here, or use +
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
                 <section
                   class="squad-loans-section"
                   data-loans-unit="firstTeam"
@@ -1515,8 +1554,28 @@
                 ></p>
 
                 <p id="mentoring-empty" class="mentoring-empty" hidden>
-                  No mentoring groups yet
+                  Drop a Career Save (.fm) here, or use +
                 </p>
+                <div id="mentoring-empty-host" class="pane-empty-host" hidden>
+                  <table
+                    class="ranker-list-table fmt-table"
+                    aria-label="Mentoring groups"
+                  >
+                    <thead>
+                      <tr>
+                        <th scope="col">Group</th>
+                        <th scope="col">Members</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td colspan="2" class="pane-drop-copy">
+                          Drop a Career Save (.fm) here, or use +
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
                 <div id="mentoring-cards" class="mentoring-cards"></div>
                 <div class="mentoring-board-actions">
                   <button
@@ -1808,14 +1867,6 @@
           const next = w >= 900 ? "wide" : w >= 720 ? "mid" : "narrow";
           rank.dataset.density = next;
           root.dataset.bootRankDensity = next;
-        }
-
-        for (const btn of document.querySelectorAll("#tool-nav [data-tool]")) {
-          if (btn.getAttribute("data-tool") === tool) {
-            btn.setAttribute("aria-current", "page");
-          } else {
-            btn.removeAttribute("aria-current");
-          }
         }
 
         const count = Number(root.dataset.bootRosterCount || "0");
