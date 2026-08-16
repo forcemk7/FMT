@@ -625,6 +625,7 @@ async function runIdentityStreaming(
   beginNdjson(res);
   try {
     // T096: + / upload extracts clubId, clubName, gameDate only.
+    // T097: still identity-only; disk GET extract is gone.
     const result = await extractManagedIdentity(savePath, {
       signal,
       onProgress: (p) => {
@@ -868,53 +869,16 @@ function rosterApiPlugin(): Plugin {
           }
 
           if (req.method === "POST" && url === "/api/roster/pull-live") {
-            const save = reqUrl.searchParams.get("save");
-            if (!save) {
-              sendJson(res, 400, { error: "Query ?save=filename.fm required" });
-              return;
-            }
-            if (isFmBackupVersionName(save)) {
-              sendJson(res, 400, {
-                error: "Versioned Career Save copies are not pulled",
-              });
-              return;
-            }
-            setSelectedSaveName(save);
-            ensureSaveWatch();
-            const event = await ingestTrackedLiveSave(save);
-            if (event) {
-              sendJson(res, 200, event);
-              return;
-            }
-            const destStat = statFmSave(save, rootDir);
-            if (destStat) {
-              sendJson(res, 200, destStat);
-              return;
-            }
-            sendJson(res, 404, {
-              error: `Live save not copied: ${path.basename(save)}`,
+            // T097: no Update-from-games / disk-linked recopy.
+            sendJson(res, 410, {
+              error: "Live games copy is disabled — add a save with +",
             });
             return;
           }
 
           if (req.method === "GET" && url === "/api/roster/events") {
-            setSelectedSaveName(reqUrl.searchParams.get("save"));
-            ensureSaveWatch();
-            res.writeHead(200, {
-              "Content-Type": "text/event-stream; charset=utf-8",
-              "Cache-Control": "no-cache, no-transform",
-              Connection: "keep-alive",
-            });
-            res.write(": connected\n\n");
-            const listener = (event: SaveChangeEvent) => {
-              res.write(
-                `data: ${JSON.stringify({ type: "save-changed", ...event })}\n\n`,
-              );
-            };
-            saveChangeListeners.add(listener);
-            req.on("close", () => {
-              saveChangeListeners.delete(listener);
-            });
+            // T097: no SSE save-changed. Do not start SI games watch.
+            sendJson(res, 410, { error: "Save-changed events are disabled" });
             return;
           }
 
@@ -925,25 +889,10 @@ function rosterApiPlugin(): Plugin {
           }
 
           if (req.method === "GET" && url === "/api/roster/first-team") {
-            const saveQuery = reqUrl.searchParams.get("save");
-            let savePath: string;
-            if (saveQuery) {
-              const resolved = resolveFmSaveByName(saveQuery, rootDir);
-              if (!resolved) {
-                sendJson(res, 404, {
-                  error: `Save not found on disk: ${path.basename(saveQuery)}`,
-                });
-                return;
-              }
-              savePath = resolved;
-            } else {
-              savePath = resolveDefaultSavePath(rootDir);
-            }
-            const ac = new AbortController();
-            req.on("close", () => ac.abort());
-            await runExtractExclusive(() =>
-              runExtractStreaming(res, savePath, ac.signal),
-            );
+            // T097: no disk GET extract. Identity is POST + only.
+            sendJson(res, 405, {
+              error: "Extract starts from + only — GET disk extract is disabled",
+            });
             return;
           }
 

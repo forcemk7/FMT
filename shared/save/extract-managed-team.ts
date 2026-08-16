@@ -69,7 +69,7 @@ function formatFailure(stdout: string, stderr: string, code: number | null): Err
   return new Error(message);
 }
 
-/** Club UniqueID, name, and neighborhood gameDate — no squad walk. */
+/** Club UniqueID, name, and UniqueID-tail gameDate — no squad walk. */
 export async function extractManagedIdentity(
   savePath: string,
   opts?: {

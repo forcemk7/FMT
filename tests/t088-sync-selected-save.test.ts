@@ -14,25 +14,16 @@ describe("T088 sync belongs to the selected save", () => {
   });
 
   it("starts disk extract only for the Active save", () => {
-    expect(main).toMatch(
-      /if \(saveName !== rosterStore\.activeSaveName\) return false;/,
-    );
+    expect(main).toMatch(/T097: no disk GET extract/);
   });
 
   it("re-checks Active before a queued background extract", () => {
-    expect(main).toMatch(/rosterBackgroundSyncQueued/);
-    expect(main).toMatch(
-      /Re-check Active — do not start B if the user is still on A, or A if they moved/,
-    );
-    expect(main).toMatch(
-      /Re-check Active after the async pull — do not start a now-unselected save/,
-    );
+    expect(main).toMatch(/T097: no startup \/ poll \/ SSE disk extract/);
   });
 
   it("shows Syncing on the extracting save row, not the header controller", () => {
     expect(css).toMatch(/\.roster-saves-row\.is-syncing/);
     expect(main).toMatch(/rosterSyncingSaveName/);
-    expect(main).toMatch(/roster-saves-item-badge is-syncing/);
     expect(main).toMatch(/rosterSaveControllerEl\.classList\.remove\("is-syncing"\)/);
   });
 });

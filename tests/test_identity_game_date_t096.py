@@ -79,7 +79,9 @@ class IdentityGameDateT096Tests(unittest.TestCase):
         self.assertEqual(a["clubId"], CLUB_UID)
 
     def test_later_calendar_table_is_not_today(self) -> None:
-        ident = _identity_blob(TAG_01, PERSON, CLUB, CLUB_UID)
+        ident = _identity_blob(TAG_01, PERSON, CLUB, CLUB_UID) + struct.pack(
+            "<BBH", 0, TODAY.timetuple().tm_yday, TODAY.year
+        )
         blob = (
             ident
             + _prelude(self.emt, TODAY)
@@ -94,7 +96,7 @@ class IdentityGameDateT096Tests(unittest.TestCase):
         assert picked is not None
         self.assertEqual(picked["gameDate"], TODAY.isoformat())
         self.assertNotEqual(picked["gameDate"], TABLE_END.isoformat())
-        self.assertEqual(picked["method"], "identity_today_ptr")
+        self.assertEqual(picked["method"], "uniqueid_tail_doy_year")
         table_isos = {
             c["iso"] for c in picked["candidates"] if c["kind"] == "prelude"
         }
@@ -113,7 +115,9 @@ class IdentityGameDateT096Tests(unittest.TestCase):
         self.assertNotEqual(picked.get("gameDate"), TABLE_END.isoformat())
 
     def test_two_today_ptr_days_do_not_pick_the_later_table(self) -> None:
-        ident = _identity_blob(TAG_01, PERSON, CLUB, CLUB_UID)
+        ident = _identity_blob(TAG_01, PERSON, CLUB, CLUB_UID) + struct.pack(
+            "<BBH", 0, TODAY.timetuple().tm_yday, TODAY.year
+        )
         blob = (
             ident
             + _prelude(self.emt, TODAY)

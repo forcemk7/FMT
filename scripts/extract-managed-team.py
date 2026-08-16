@@ -47,13 +47,12 @@ CATALOG_TARGET = 12 * 1024 * 1024
 CALIB_DUMP = ROOT / "tmp" / "calib" / "early-last.bin"
 CALIB_META = ROOT / "tmp" / "calib" / "early-last.json"
 IDENTITY_DUMP_DIR = ROOT / "tmp" / "identity"
-# Neighborhood for in-game date — not the first 24MB calendar table (T096).
+# Neighborhood dump only — pick is UniqueID-tail doy+year (T097), not 24MB c708.
 IDENTITY_DATE_WINDOW = 64 * 1024
 IDENTITY_HEX_RADIUS = 256
 DATE_EPOCH = date(1900, 1, 1)
 GAME_DATE_PRELUDE = bytes.fromhex("c708000000")
-# FM years we will even list as candidates. Picking still requires a
-# neighborhood today-marker; a table date alone is not enough.
+# Valid in-game years for the UniqueID-tail u16. Not a fitted club/day.
 DATE_YEAR_LO, DATE_YEAR_HI = 2020, 2050
 DAYS_Y1900_LO, DAYS_Y1900_HI = 40_000, 60_000
 
@@ -309,6 +308,23 @@ def days_y1900_to_iso(days: int) -> str | None:
     return dt.isoformat()
 
 
+def doy_year_to_iso(doy: int, year: int) -> str | None:
+    """date(year, 1, 1) + (doy - 1). Invalid doy/year → None (UI —)."""
+    y = int(year)
+    n = int(doy)
+    if not (DATE_YEAR_LO <= y <= DATE_YEAR_HI):
+        return None
+    if not (1 <= n <= 366):
+        return None
+    try:
+        dt = date(y, 1, 1) + timedelta(days=n - 1)
+    except Exception:
+        return None
+    if dt.year != y:
+        return None
+    return dt.isoformat()
+
+
 def _dense_calendar_days(days_hits: set[int]) -> set[int]:
     """Consecutive prelude days of length ≥5 — a calendar table, not today."""
     if not days_hits:
@@ -386,79 +402,67 @@ def collect_date_candidates(buf, lo: int, hi: int) -> list[dict]:
 
 def pick_game_date_near_identity(buf, identity: dict | None) -> dict | None:
     """
-    In-game date from the identity neighborhood only (T096).
+    In-game date from the UniqueID tail (T097).
 
-    Calendar tables (dense consecutive prelude days) are listed as candidates
-    but never chosen — even when the table's last day is later than today.
-    Unsure → None (UI shows —).
+    After club UniqueID u32: one u8 (other field), then u8 day-of-year (1–366),
+    then u16 little-endian year. ``date(year, 1, 1) + (doy - 1)``.
+    Not packed day/month. Not 24MB ``c708`` calendar. Invalid doy/year → None.
     """
     if not identity:
         return None
     abs0 = int(identity.get("identityAbs") or 0)
     club_id_abs = int(identity.get("clubIdAbs") or abs0)
+    tail = club_id_abs + 4
     lo = max(0, abs0 - IDENTITY_DATE_WINDOW)
     hi = min(len(buf), abs0 + IDENTITY_DATE_WINDOW)
-    cands = collect_date_candidates(buf, lo, hi)
+    neighborhood = collect_date_candidates(buf, lo, hi)
     empty = {
         "gameDate": None,
         "daysY1900": None,
         "abs": None,
         "method": "identity_unsure",
-        "candidates": cands,
+        "candidates": neighborhood,
         "windowLo": lo,
         "windowHi": hi,
+        "doy": None,
+        "year": None,
+        "tailAbs": tail,
+        "tailHex": None,
     }
-    if not cands:
+    if tail + 4 > len(buf):
         return empty
-    prelude_days = {c["daysY1900"] for c in cands if c["kind"] == "prelude"}
-    table_days = _dense_calendar_days(prelude_days)
-    ptrs = [c for c in cands if c["kind"] == "today_ptr"]
-    ptr_days = {c["daysY1900"] for c in ptrs}
-    # One distinct today_ptr day in the neighborhood. Several competing ptr
-    # days → unsure (do not take the later calendar-table day).
-    if len(ptr_days) == 1:
-        day = next(iter(ptr_days))
-        best = min(
-            (c for c in ptrs if c["daysY1900"] == day),
-            key=lambda c: (abs(int(c["abs"]) - abs0), int(c["abs"])),
-        )
-        return {
-            "gameDate": best["iso"],
-            "daysY1900": best["daysY1900"],
-            "abs": best["abs"],
-            "method": "identity_today_ptr",
-            "candidates": cands,
-            "windowLo": lo,
-            "windowHi": hi,
-        }
-    # A lone prelude sitting on the club UniqueID tail — not a table run.
-    adjacent = [
-        c
-        for c in cands
-        if c["kind"] == "prelude"
-        and club_id_abs <= int(c["abs"]) <= club_id_abs + 512
-        and c["daysY1900"] not in table_days
-    ]
-    uniq = {c["daysY1900"] for c in adjacent}
-    if len(uniq) == 1:
-        best = adjacent[0]
-        return {
-            "gameDate": best["iso"],
-            "daysY1900": best["daysY1900"],
-            "abs": best["abs"],
-            "method": "identity_adjacent_prelude",
-            "candidates": cands,
-            "windowLo": lo,
-            "windowHi": hi,
-        }
+    tail_bytes = bytes(buf[tail : tail + 4])
+    doy = tail_bytes[1]
+    year = struct.unpack_from("<H", tail_bytes, 2)[0]
+    iso = doy_year_to_iso(doy, year)
+    tail_cand = {
+        "kind": "uniqueid_tail_doy_year",
+        "iso": iso,
+        "doy": doy,
+        "year": year,
+        "abs": tail,
+        "nearbyHex": tail_bytes.hex(),
+    }
+    cands = [tail_cand, *neighborhood]
+    if not iso:
+        empty["candidates"] = cands
+        empty["doy"] = doy
+        empty["year"] = year
+        empty["tailHex"] = tail_bytes.hex()
+        return empty
+    dt = date.fromisoformat(iso)
     return {
-        "gameDate": None,
-        "daysY1900": None,
-        "abs": None,
-        "method": "identity_unsure",
+        "gameDate": iso,
+        "daysY1900": (dt - DATE_EPOCH).days,
+        "abs": tail + 1,
+        "method": "uniqueid_tail_doy_year",
         "candidates": cands,
         "windowLo": lo,
         "windowHi": hi,
+        "doy": doy,
+        "year": year,
+        "tailAbs": tail,
+        "tailHex": tail_bytes.hex(),
     }
 
 
@@ -509,7 +513,7 @@ def format_identity_report(
     date_info: dict | None,
 ) -> str:
     lines: list[str] = []
-    lines.append("# FMT identity dump (T096)")
+    lines.append("# FMT identity dump (T097)")
     lines.append(f"saveName: {save.name}")
     lines.append(f"saveBytes: {save.stat().st_size if save.is_file() else 'n/a'}")
     lines.append(f"decompressedBytes: {len(buf)}")
@@ -538,11 +542,13 @@ def format_identity_report(
     lines.append("## Game date")
     lines.append(f"gameDate: {picked if picked else '—'}")
     lines.append(f"method: {(date_info or {}).get('method') or 'none'}")
+    lines.append(f"doy: {(date_info or {}).get('doy')}")
+    lines.append(f"year: {(date_info or {}).get('year')}")
+    lines.append(f"tailAbs: {(date_info or {}).get('tailAbs')}")
+    lines.append(f"tailHex: {(date_info or {}).get('tailHex')}")
     lines.append(
-        f"window: {(date_info or {}).get('windowLo')}..{(date_info or {}).get('windowHi')}"
-    )
-    lines.append(
-        "rule: identity neighborhood only; dense calendar tables are candidates, never the pick"
+        "rule: after UniqueID u32, u8 then u8 doy (1–366) then u16 LE year; "
+        "date(year, 1, 1)+(doy-1). Not day/month. Invalid doy/year → —"
     )
     lines.append("")
     lines.append("## Date candidates (iso, days-from-1900, offset, kind, nearby bytes)")
@@ -573,7 +579,7 @@ def format_identity_report(
         lines.append(f"(clubIdAbs {club_id_abs} ±64)")
         lines.extend(_hexdump(buf, club_id_abs - 64, club_id_abs + 64))
         lines.append("")
-        lines.append("## u16/u32 after club UniqueID (not a pick)")
+        lines.append("## UniqueID tail (u8 + u8 doy + u16 LE year)")
         tail = club_id_abs + 4
         if tail + 16 <= len(buf):
             u16s = struct.unpack_from("<HHHHHHHH", buf, tail)
@@ -585,8 +591,14 @@ def format_identity_report(
                 "u32: " + " ".join(f"{v}(0x{v:08x})" for v in u32s)
             )
             for i, v in enumerate(u16s):
-                if 2020 <= v <= 2050:
-                    lines.append(f"u16[{i}] looks like a year: {v} @ {tail + i * 2}")
+                if DATE_YEAR_LO <= v <= DATE_YEAR_HI:
+                    doy_at = tail + i * 2 - 1
+                    doy = buf[doy_at] if doy_at >= 0 else None
+                    iso = doy_year_to_iso(doy, v) if doy is not None else None
+                    lines.append(
+                        f"u16[{i}] year={v} @ {tail + i * 2}  "
+                        f"doy_before={doy}  iso={iso or '—'}"
+                    )
             for i, v in enumerate(u32s):
                 iso = days_y1900_to_iso(v) if DAYS_Y1900_LO <= v <= DAYS_Y1900_HI else None
                 if iso and DATE_YEAR_LO <= int(iso[:4]) <= DATE_YEAR_HI:

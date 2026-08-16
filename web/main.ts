@@ -184,7 +184,6 @@ import {
   listRosterSaveNames,
   loadRosterStore,
   setActiveRoster,
-  shouldRefreshRosterFromDisk,
   upsertRoster,
   type RosterStore,
   type StoredFavouredClub,
@@ -417,9 +416,6 @@ let rosterExtractAbort: AbortController | null = null;
 /** Bump so a superseded extract’s finally does not clear a newer lock. */
 let rosterExtractEpoch = 0;
 let rosterStatusClearTimer: ReturnType<typeof setTimeout> | null = null;
-let saveAutoSyncStarted = false;
-let savePollTimer: ReturnType<typeof setInterval> | null = null;
-let saveEventSource: EventSource | null = null;
 /** True while the native Career Save file dialog is open. */
 let rosterFileDialogOpen = false;
 let rosterSavesMenuOpen = false;
@@ -6734,17 +6730,13 @@ function syncRosterSavesMenu() {
       club && id != null ? formatClubLine(club, id) : club || name;
     const isActive = name === rosterStore.activeSaveName;
     const isOverwrite = name === rosterAmendTarget;
-    const isSyncing = name === rosterSyncingSaveName;
-    const diskLinked = rosterSaveDiskLinked(name);
 
     const row = document.createElement("div");
     row.className = "roster-saves-row";
     row.dataset.saveName = name;
     if (isActive) row.classList.add("is-active");
     if (isOverwrite) row.classList.add("is-overwrite");
-    if (isSyncing) row.classList.add("is-syncing");
 
-    const uploaded = formatUploadedAtRow(entry.extractedAt);
     const inGame = formatInGameDateRow(entry.gameDate);
 
     const selectBtn = document.createElement("button");
@@ -6754,37 +6746,18 @@ function syncRosterSavesMenu() {
     selectBtn.dataset.saveName = name;
     selectBtn.title = [
       name,
-      `Uploaded ${formatUploadedAt(entry.extractedAt)}`,
+      clubLine ?? "",
       `In-game ${formatInGameDate(entry.gameDate)}`,
-    ].join("\n");
-    const syncLabel = isSyncing
-      ? rosterSyncProgress.trim() || "Syncing"
-      : "";
+    ]
+      .filter(Boolean)
+      .join("\n");
     selectBtn.innerHTML = `
       <span class="roster-saves-item-club">${escapeHtml(clubLine ?? name)}${
         isActive
           ? `<span class="roster-saves-item-badge">Active</span>`
           : ""
-      }${
-        isSyncing
-          ? `<span class="roster-saves-item-badge is-syncing">Syncing</span>`
-          : ""
       }</span>
-      <span class="roster-saves-item-file">${escapeHtml(name)}${
-        diskLinked ? " · disk-linked" : ""
-      }${
-        isOverwrite ? " · next upload overwrites" : ""
-      }</span>
-      ${
-        isSyncing
-          ? `<span class="roster-saves-item-sync" aria-live="polite">${escapeHtml(syncLabel)}</span>`
-          : ""
-      }
-      <span class="roster-saves-item-dates" aria-label="Uploaded ${escapeHtml(uploaded)}, in-game ${escapeHtml(inGame)}">
-        <span class="roster-saves-item-date is-uploaded">
-          <span class="roster-saves-item-date-label">Uploaded</span>
-          <span class="roster-saves-item-date-value">${escapeHtml(uploaded)}</span>
-        </span>
+      <span class="roster-saves-item-dates" aria-label="In-game ${escapeHtml(inGame)}">
         <span class="roster-saves-item-date is-ingame">
           <span class="roster-saves-item-date-label">In-game</span>
           <span class="roster-saves-item-date-value">${escapeHtml(inGame)}</span>
@@ -6795,23 +6768,6 @@ function syncRosterSavesMenu() {
     const actions = document.createElement("div");
     actions.className = "roster-saves-row-actions";
 
-    const updateBtn = document.createElement("button");
-    updateBtn.type = "button";
-    updateBtn.className = "roster-saves-row-btn";
-    updateBtn.dataset.action = "update";
-    updateBtn.dataset.saveName = name;
-    updateBtn.textContent = "Update";
-    updateBtn.disabled = !isActive || rosterRefreshInFlight;
-    if (!isActive) {
-      updateBtn.title = "Select this save first — sync starts only for Active";
-    } else if (rosterRefreshInFlight) {
-      updateBtn.title = "An extract is already running";
-    } else {
-      updateBtn.title = diskLinked
-        ? "Re-read this save from disk (FM games folder)"
-        : "Replace this extract — opens file picker if not found on disk";
-    }
-
     const deleteBtn = document.createElement("button");
     deleteBtn.type = "button";
     deleteBtn.className = "roster-saves-row-btn is-danger";
@@ -6819,11 +6775,9 @@ function syncRosterSavesMenu() {
     deleteBtn.dataset.saveName = name;
     deleteBtn.textContent = "Delete";
     deleteBtn.disabled = false;
-    deleteBtn.title = isSyncing
-      ? "Abort this extract and remove the save"
-      : "Permanently remove this extract";
+    deleteBtn.title = "Permanently remove this extract";
 
-    actions.append(updateBtn, deleteBtn);
+    actions.append(deleteBtn);
     row.append(selectBtn, actions);
     rosterSavesListEl.append(row);
   }
@@ -8865,270 +8819,29 @@ function formatSaveSettleStatus(info: {
 }
 
 async function refreshSaveFromDisk(
-  saveName: string,
-  options?: {
+  _saveName: string,
+  _options?: {
     replaceName?: string | null;
-    /** Wait for FM to finish writing before extracting (auto-sync / poll). */
     waitForSettle?: boolean;
     reason?: string;
-    /**
-     * Non-blocking auto-sync: keep the UI usable, show progress in the status
-     * strip, then soft-apply when the extract finishes.
-     */
     background?: boolean;
   },
 ): Promise<boolean> {
-  if (!useRosterApi) return false;
-  if (rosterRefreshInFlight) {
-    if (options?.background) rosterBackgroundSyncQueued = true;
-    return false;
-  }
-  if (options?.background && autoSyncBlockedByQueuedUpload()) {
-    rosterBackgroundSyncQueued = true;
-    return false;
-  }
-  // Sync starts only for the save marked Active (T088). One extract at a time.
-  if (saveName !== rosterStore.activeSaveName) return false;
-
-  let stat = await fetchSaveDiskStat(saveName);
-  if (!stat) return false;
-  if (rosterRefreshInFlight) {
-    if (options?.background) rosterBackgroundSyncQueued = true;
-    return false;
-  }
-  if (options?.background && autoSyncBlockedByQueuedUpload()) {
-    rosterBackgroundSyncQueued = true;
-    return false;
-  }
-  if (saveName !== rosterStore.activeSaveName) return false;
-
-  const background = Boolean(options?.background);
-  let ok = false;
-  let updatedBody: FirstTeamApiResult | null = null;
-  let backgroundError: string | null = null;
-  const { epoch, signal } = beginRosterExtract();
-
-  rosterRefreshInFlight = true;
-  rosterBackgroundSync = background;
-  rosterSyncingSaveName = saveName;
-  rosterSyncProgress = "";
-  if (!background) {
-    rosterAmendTarget = options?.replaceName ?? saveName;
-  }
-  setRosterSyncing(true, saveName);
-
-  try {
-    if (options?.waitForSettle) {
-      setRosterSyncStatus(`${stat.saveName}\nWaiting for write…`);
-      const settled = await waitForSaveDiskStable(stat.saveName, (info) => {
-        const detail = `${info.stat.saveName}\n${formatSaveSettleStatus(info)}`;
-        setRosterSyncStatus(detail);
-      }, signal);
-      if (epoch !== rosterExtractEpoch) return false;
-      if (!settled) {
-        if (!background) rosterAmendTarget = null;
-        backgroundError = "Could not confirm save finished writing";
-        return false;
-      }
-      stat = settled;
-    }
-
-    setRosterSyncStatus(`${stat.saveName}\nReading from disk…`);
-    const res = await fetch(
-      `/api/roster/first-team?save=${encodeURIComponent(stat.saveName)}`,
-      { signal },
-    );
-    const body = await consumeExtractStream(res, (p) => {
-      const label = formatProgress(p);
-      setRosterSyncStatus(`${stat.saveName}\n${label}`);
-    });
-    if (epoch !== rosterExtractEpoch) return false;
-    body.saveName = stat.saveName;
-    const fresh = await fetchSaveDiskStat(stat.saveName);
-    // Foreground overwrite may rename the slot; background never touches amend.
-    if (!background && options?.replaceName) {
-      rosterAmendTarget = options.replaceName;
-    }
-    if (epoch !== rosterExtractEpoch) return false;
-    persistExtractResult(body, fresh ?? stat, { soft: background });
-    if (rosterStore.activeSaveName === stat.saveName) {
-      rosterMeta = { ...rosterMeta, error: undefined };
-    }
-    updatedBody = body;
-    ok = true;
-    return true;
-  } catch (err) {
-    if (epoch !== rosterExtractEpoch || isAbortError(err)) {
-      return false;
-    }
-    const raw = err instanceof Error ? err.message : String(err);
-    if (rosterStore.activeSaveName === saveName) {
-      if (background) {
-        backgroundError = raw;
-      } else {
-        rosterMeta = {
-          ...rosterMeta,
-          error: raw,
-        };
-        rosterAmendTarget = null;
-      }
-    } else {
-      backgroundError = raw;
-    }
-    return false;
-  } finally {
-    const extractedName = saveName;
-    const stillActive = rosterStore.activeSaveName === extractedName;
-    if (!endRosterExtract(epoch)) {
-      rosterUploadEl.value = "";
-      return;
-    }
-    rosterRefreshInFlight = false;
-    rosterBackgroundSync = false;
-    rosterUploadEl.value = "";
-    setRosterSyncing(false);
-    renderRoster();
-    refreshActiveSquadSideView();
-    if (ok && updatedBody && stillActive) {
-      if (background) flashRosterSoftUpdate();
-      showRosterUpdatedStatus(updatedBody);
-    } else if (backgroundError && stillActive) {
-      setRosterLiveStatus(`Background sync failed — ${backgroundError}`);
-      rosterStatusEl.classList.add("is-error");
-    }
-    notifyRosterRefreshIdle();
-    if (rosterBackgroundSyncQueued) {
-      rosterBackgroundSyncQueued = false;
-      // Let any waiting manual upload/update claim the lock first.
-      setTimeout(() => {
-        if (rosterRefreshInFlight) {
-          rosterBackgroundSyncQueued = true;
-          return;
-        }
-        // Queued + upload claims the lock first — König auto-sync does not start first (T095).
-        if (autoSyncBlockedByQueuedUpload()) {
-          rosterBackgroundSyncQueued = true;
-          return;
-        }
-        // Re-check Active — do not start B if the user is still on A, or A if they moved.
-        if (!rosterStore.activeSaveName) return;
-        void maybeRefreshActiveSaveFromDisk({
-          reason: "Save changed on disk",
-          waitForSettle: false,
-          background: true,
-        });
-      }, 0);
-    }
-  }
+  // T097: no disk GET extract, no Update-from-games. Identity is + only.
+  return false;
 }
 
-async function maybeRefreshActiveSaveFromDisk(options?: {
+async function maybeRefreshActiveSaveFromDisk(_options?: {
   reason?: string;
-  /** When false, skip client settle (server already waited). Default false. */
   waitForSettle?: boolean;
-  /** Default true — daily/auto saves should not lock the UI. */
   background?: boolean;
 }): Promise<void> {
-  const active = rosterStore.activeSaveName;
-  if (!active) return;
-  if (rosterRefreshInFlight) {
-    if (options?.background !== false) rosterBackgroundSyncQueued = true;
-    return;
-  }
-  if (options?.background !== false && autoSyncBlockedByQueuedUpload()) {
-    rosterBackgroundSyncQueued = true;
-    return;
-  }
-  const entry = rosterStore.saves[active];
-  if (!entry) return;
-
-  // Dest existing is not "caught up". Live may be newer; pull no-ops when dest
-  // already covers the live snapshot (T068). Never extract live games/*.fm.
-  let stat = await pullLiveSaveToRepo(active);
-  if (!stat) {
-    stat = await fetchSaveDiskStat(active);
-    if (!stat) return;
-  }
-
-  // Re-check Active after the async pull — do not start a now-unselected save.
-  if (rosterStore.activeSaveName !== active) return;
-  if (rosterRefreshInFlight) {
-    if (options?.background !== false) rosterBackgroundSyncQueued = true;
-    return;
-  }
-  if (options?.background !== false && autoSyncBlockedByQueuedUpload()) {
-    rosterBackgroundSyncQueued = true;
-    return;
-  }
-
-  const waitForSettle = options?.waitForSettle === true;
-  const background = options?.background !== false;
-
-  // Path bind only — never stamp diskMtimeMs ahead of a successful extract.
-  if (!entry.diskPath) {
-    patchRosterDiskPath(active, stat);
-  }
-
-  const latest = rosterStore.saves[active] ?? entry;
-  if (!shouldRefreshRosterFromDisk(latest, stat.mtimeMs, stat.size)) {
-    return;
-  }
-
-  await refreshSaveFromDisk(active, {
-    replaceName: background ? null : active,
-    waitForSettle,
-    reason: options?.reason,
-    background,
-  });
+  // T097: no startup / poll / SSE disk extract.
+  return;
 }
 
 function startSaveAutoSync(): void {
-  if (!useRosterApi || saveAutoSyncStarted) return;
-  saveAutoSyncStarted = true;
-
-  void (async () => {
-    await bindAllSavesToDisk();
-    // Heal bind-only mtime stamps / catch FM writes while FMT was closed.
-    await maybeRefreshActiveSaveFromDisk({
-      reason: "Startup disk check",
-      waitForSettle: false,
-      background: true,
-    });
-  })();
-
-  try {
-    const eventsUrl = rosterStore.activeSaveName
-      ? `/api/roster/events?save=${encodeURIComponent(rosterStore.activeSaveName)}`
-      : "/api/roster/events";
-    saveEventSource = new EventSource(eventsUrl);
-    saveEventSource.onmessage = (ev) => {
-      let data: { type?: string; saveName?: string };
-      try {
-        data = JSON.parse(ev.data) as { type?: string; saveName?: string };
-      } catch {
-        return;
-      }
-      if (data.type !== "save-changed" || !data.saveName) return;
-      const active = rosterStore.activeSaveName;
-      if (!active || !saveNamesMatch(data.saveName, active)) return;
-      // Server already debounced + waited for a stable write.
-      void maybeRefreshActiveSaveFromDisk({
-        reason: "Save changed on disk",
-        waitForSettle: false,
-        background: true,
-      });
-    };
-  } catch {
-    // SSE unavailable — poll fallback below
-  }
-
-  if (savePollTimer) clearInterval(savePollTimer);
-  savePollTimer = setInterval(() => {
-    void maybeRefreshActiveSaveFromDisk({
-      background: true,
-      waitForSettle: false,
-    });
-  }, 8000);
+  // T097: no poll, no SSE, no startup disk refresh, no Update-from-games.
 }
 
 async function uploadFirstTeamSave(file: File): Promise<void> {
@@ -9268,27 +8981,6 @@ rosterSavesMenuEl.addEventListener("click", (e) => {
     setRosterSavesMenuOpen(false);
     renderRoster();
     refreshActiveSquadSideView();
-    return;
-  }
-
-  if (action === "update") {
-    if (name !== rosterStore.activeSaveName) return;
-    if (rosterRefreshInFlight) return;
-    void (async () => {
-      const ok = await refreshSaveFromDisk(name, {
-        replaceName: name,
-        background: true,
-      });
-      if (
-        !ok &&
-        !rosterRefreshInFlight &&
-        name === rosterStore.activeSaveName
-      ) {
-        rosterAmendTarget = name;
-        renderRoster();
-        openRosterFilePicker();
-      }
-    })();
     return;
   }
 

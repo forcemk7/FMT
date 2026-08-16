@@ -27,9 +27,9 @@ describe("T096 honest club id, name, and game date on Manage saves", () => {
     expect(postBlock).not.toMatch(/runExtractStreaming/);
   });
 
-  it("GET disk extract still uses the full first-team path", () => {
-    expect(vite).toMatch(/runExtractExclusive\(\(\) =>\s*runExtractStreaming/);
-    expect(vite).toMatch(/extractFirstTeam/);
+  it("GET disk extract is disabled — identity is POST + only", () => {
+    expect(vite).toMatch(/T097: no disk GET extract/);
+    expect(vite).toMatch(/Extract starts from \+ only/);
   });
 
   it("Manage saves In-game is extract gameDate or —", () => {

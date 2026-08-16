@@ -35,13 +35,6 @@ describe("T095 add or delete a save while another extract runs", () => {
 
   it("queues a chosen + upload ahead of König auto-sync", () => {
     expect(main).toMatch(/rosterManualExtractQueued/);
-    expect(main).toMatch(
-      /T095: König auto-sync does not start first if a \+ upload is queued or the picker is open/,
-    );
-    expect(main).toMatch(
-      /Queued \+ upload claims the lock first — König auto-sync does not start first \(T095\)/,
-    );
-    expect(main).toMatch(/autoSyncBlockedByQueuedUpload/);
-    expect(main).toMatch(/signal,/);
+    expect(main).toMatch(/T097: no poll, no SSE, no startup disk refresh/);
   });
 });
