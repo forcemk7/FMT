@@ -6,6 +6,7 @@ import {
   matchSquadHaFilter,
   mentoringGroupNumberByUid,
   mergeClubWideAtClubPlayers,
+  mergeClubWideEmployedPlayers,
   newSquadHaManualFilter,
   nudgeSquadHaFilterBy,
   nudgeSquadHaFiltersBy,
@@ -513,6 +514,30 @@ describe("mergeClubWideAtClubPlayers", () => {
       [3, "II"],
       [4, "U19"],
     ]);
+  });
+
+  it("Progress picker keeps outgoing; Squad / Group checks stay at-club", () => {
+    const lists = {
+      firstTeam: [
+        { uid: 1, name: "At Club" },
+        { uid: 2, name: "Out On Loan", loan: { status: "loanedOut" as const } },
+      ],
+      reserves: [{ uid: 3, name: "II Body" }],
+      under19s: [],
+    };
+    const atClub = mergeClubWideAtClubPlayers(lists);
+    const employed = mergeClubWideEmployedPlayers(lists);
+    expect(atClub.map((e) => e.player.uid)).toEqual([1, 3]);
+    expect(employed.map((e) => e.player.uid)).toEqual([1, 2, 3]);
+    const squadNames = new Set(atClub.map((e) => e.player.name));
+    const loanNames = new Set(
+      employed
+        .filter((e) => e.player.loan?.status === "loanedOut")
+        .map((e) => e.player.name),
+    );
+    for (const name of loanNames) {
+      expect(squadNames.has(name)).toBe(false);
+    }
   });
 
   it("dedupes by uid with FT winning over II/U19", () => {

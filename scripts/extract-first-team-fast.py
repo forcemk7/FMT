@@ -1980,11 +1980,8 @@ def detect_loaned_out_via_foreign_u19(
     parent_short: str,
 ) -> dict[int, int | None]:
     """
-    T012 hole class: Millwood / Davyskiba have no pad+motif on the job, but
-    their jobIds sit on a foreign club's U19 namelist (e.g. Paderborn U19).
-
-    Scan mid-file `* U19` labels (excluding parent), parse colocated lists, and
-    tag overlapping squad jobs with a nearby host clubId.
+    Legacy T012 namelist attach. Not the extract youth-loan path (T086):
+    outgoing = loan object on a unit job, same recipe FT / II / U19.
     """
     if not jobs:
         return {}
@@ -2015,9 +2012,7 @@ def detect_loaned_out_via_foreign_u19(
         if name_abs is None or not name:
             continue
         core = name[: -len(" U19")]
-        if parent_l and (
-            parent_l in core.lower() or "schalke" in core.lower()
-        ):
+        if parent_l and parent_l in core.lower():
             continue
         lst = parse_list_near_name(mm, name_abs, name_len)
         if not lst:
@@ -2030,7 +2025,7 @@ def detect_loaned_out_via_foreign_u19(
         hi = min(len(mm), name_abs + name_len + 96)
         for o in range(lo, hi - 3, 4):
             a = struct.unpack_from("<I", mm, o)[0]
-            # Host club ids near youth labels are small catalog ids (Paderborn=2589).
+            # Host club ids near youth labels are small catalog ids.
             if LOAN_CLUB_LO <= a <= 20_000 and a != parent_club:
                 club = a
                 break
@@ -2113,6 +2108,64 @@ def apply_loan_status(
             "parentClubName": None,
             "loanClubName": None,
         }
+
+
+def loan_hits_for_unit(
+    mm: mmap.mmap, jobs: set[int], parent_club: int
+) -> dict[int, int | None]:
+    """Outgoing = loan object on this unit's jobs. Same recipe FT / II / U19."""
+    return detect_loaned_out_jobs(mm, jobs, parent_club)
+
+
+def census_unit_row(
+    name: str,
+    jobs: list[int],
+    loaned: dict[int, int | None],
+) -> dict:
+    """One unit's employed / at-club / loaned counts. Empty loaned is honest 0."""
+    employed = len(jobs)
+    loaned_n = sum(1 for j in jobs if j in loaned)
+    return {
+        "name": name,
+        "employed": employed,
+        "atClub": employed - loaned_n,
+        "loaned": loaned_n,
+    }
+
+
+def build_loan_census(
+    *,
+    club_id: int | None,
+    club_name: str,
+    units: list[dict],
+) -> dict:
+    """Census payload: missing units are omitted by the caller, not zero-filled."""
+    return {
+        "clubId": club_id,
+        "clubName": club_name,
+        "units": units,
+    }
+
+
+def emit_loan_census(t0: float, census: dict) -> None:
+    """One PROGRESS/NDJSON line after the loan split, before remaining HA fill."""
+    bits = [
+        f"{u['name']} {u['atClub']} at-club / {u['loaned']} loaned"
+        for u in (census.get("units") or [])
+        if isinstance(u, dict) and u.get("name")
+    ]
+    club = census.get("clubName") or census.get("clubId") or ""
+    progress(
+        t0,
+        phase="census",
+        message=(
+            f"{club}: " + " · ".join(bits) if bits else f"{club}: no units"
+        ),
+        pct=85,
+        clubId=census.get("clubId"),
+        clubName=census.get("clubName"),
+        units=census.get("units") or [],
+    )
 
 
 def _person_doubles_capa(mm: mmap.mmap, uid: int, *, limit: int = 40) -> list[int]:
@@ -2608,6 +2661,74 @@ def main() -> int:
                 **({"missReason": miss_reason} if miss_reason else {}),
             )
 
+            # T086: loan object on unit jobs (same recipe FT/II/U19) before HA.
+            ft_loaned: dict[int, int | None] = {}
+            ii_loaned: dict[int, int | None] = {}
+            u19_loaned: dict[int, int | None] = {}
+            ii_hit: dict | None = None
+            u19_hit: dict | None = None
+            ii_jobs_listed: list[int] | None = None
+            u19_jobs_listed: list[int] | None = None
+            parent_club = int(club_id) if club_id else 0
+            if parent_club:
+                ft_loaned = loan_hits_for_unit(mm, set(jobs), parent_club)
+
+            if club_short:
+                progress(
+                    t0,
+                    phase="reserves",
+                    message="Discovering reserves unit…",
+                    pct=76,
+                )
+                ii_hit = resolve_ii_squad(mm, club_short)
+                if ii_hit and ii_hit.get("list"):
+                    ii_jobs_listed = list(ii_hit["list"]["jobs"])
+                    if parent_club:
+                        ii_loaned = loan_hits_for_unit(
+                            mm, set(ii_jobs_listed), parent_club
+                        )
+                progress(
+                    t0,
+                    phase="u19",
+                    message="Discovering youth unit…",
+                    pct=78,
+                )
+                u19_hit = resolve_u19_squad(mm, club_short)
+                if u19_hit and u19_hit.get("list"):
+                    u19_jobs_listed = list(u19_hit["list"]["jobs"])
+                    if parent_club:
+                        u19_loaned = loan_hits_for_unit(
+                            mm, set(u19_jobs_listed), parent_club
+                        )
+
+            census_units: list[dict] = [
+                census_unit_row("FT", jobs, ft_loaned),
+            ]
+            if ii_jobs_listed is not None:
+                census_units.append(
+                    census_unit_row(
+                        (ii_hit or {}).get("iiName") or "II",
+                        ii_jobs_listed,
+                        ii_loaned,
+                    )
+                )
+            if u19_jobs_listed is not None:
+                census_units.append(
+                    census_unit_row(
+                        (u19_hit or {}).get("u19Name") or "U19",
+                        u19_jobs_listed,
+                        u19_loaned,
+                    )
+                )
+            emit_loan_census(
+                t0,
+                build_loan_census(
+                    club_id=club_id,
+                    club_name=club_name or club_short or "",
+                    units=census_units,
+                ),
+            )
+
             job_uid = resolve_job_uids_batch(mm, jobs)
             progress(
                 t0,
@@ -2640,28 +2761,13 @@ def main() -> int:
                 phase="players",
             )
             apply_ft_dynamics(mm, players, list_abs, jobs)
-            if club_id:
-                loaned = detect_loaned_out_jobs(mm, set(jobs), int(club_id))
-                apply_loan_status(players, loaned, parent_club=int(club_id))
-                if loaned:
-                    progress(
-                        t0,
-                        phase="players",
-                        message=f"Loaned out: {len(loaned)}",
-                        pct=87,
-                    )
+            if parent_club:
+                apply_loan_status(players, ft_loaned, parent_club=parent_club)
 
             if club_short:
-                progress(
-                    t0,
-                    phase="reserves",
-                    message="Discovering reserves unit…",
-                    pct=88,
-                )
-                ii_hit = resolve_ii_squad(mm, club_short)
-                if ii_hit and ii_hit.get("list"):
+                if ii_hit and ii_jobs_listed is not None:
                     ii_list = ii_hit["list"]
-                    ii_jobs = ii_list["jobs"]
+                    ii_jobs = ii_jobs_listed
                     ii_team = ii_hit.get("team")
                     progress(
                         t0,
@@ -2680,11 +2786,9 @@ def main() -> int:
                         progress_base_pct=89,
                         progress_span_pct=4,
                     )
-                    if club_id:
+                    if parent_club:
                         apply_loan_status(
-                            ii_players,
-                            detect_loaned_out_jobs(mm, set(ii_jobs), int(club_id)),
-                            parent_club=int(club_id),
+                            ii_players, ii_loaned, parent_club=parent_club
                         )
                     ii_capa = enrich_capa_on_players(mm, ii_players)
                     ii_general = sum(
@@ -2739,16 +2843,9 @@ def main() -> int:
                         },
                     }
 
-                progress(
-                    t0,
-                    phase="u19",
-                    message="Discovering youth unit…",
-                    pct=94,
-                )
-                u19_hit = resolve_u19_squad(mm, club_short)
-                if u19_hit and u19_hit.get("list"):
+                if u19_hit and u19_jobs_listed is not None:
                     u19_list = u19_hit["list"]
-                    u19_jobs = u19_list["jobs"]
+                    u19_jobs = u19_jobs_listed
                     progress(
                         t0,
                         phase="u19",
@@ -2766,21 +2863,9 @@ def main() -> int:
                         progress_base_pct=95,
                         progress_span_pct=3,
                     )
-                    if club_id:
+                    if parent_club:
                         apply_loan_status(
-                            u19_players,
-                            merge_loan_hits(
-                                detect_loaned_out_jobs(
-                                    mm, set(u19_jobs), int(club_id)
-                                ),
-                                detect_loaned_out_via_foreign_u19(
-                                    mm,
-                                    set(u19_jobs),
-                                    int(club_id),
-                                    club_short or "",
-                                ),
-                            ),
-                            parent_club=int(club_id),
+                            u19_players, u19_loaned, parent_club=parent_club
                         )
                     u19_capa = enrich_capa_on_players(mm, u19_players)
                     u19_general = sum(
@@ -2930,7 +3015,8 @@ def main() -> int:
             "employmentRule": (
                 "jobId on managed-club unit squad list "
                 "(FT: club-object→7f02; II: affiliate; U19: namelist); "
-                "Mentoring pool = FT ∩ ¬loanedOut"
+                "Squad = employed ∩ ¬loanedOut; Loans = employed ∩ loan object; "
+                "Mentoring pool = Squad"
             ),
             "employmentSearch": "tail_128mb_scan",
             "ftJoin": (

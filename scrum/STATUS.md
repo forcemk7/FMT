@@ -37,13 +37,13 @@ Last updated: 2026-08-16 (HQ: Squad + Loans + Mentoring + Progress)
 1. **T083** Managed club (**done**)  
 2. **T084** Employed players — FT / II / U19 (**done**)  
 3. **T085** Those players’ CA + HA (**done**)  
-4. **T086** Contracts — at-club vs loaned out + census counts (ready)  
+4. **T086** Contracts — at-club vs loaned out + census counts (**done**)  
 
-T088 (sync vs Active save) is ready but **not this freeze**. Do not steal T086.
+T088 (sync vs Active save) is ready but **not this freeze**. Do not claim T077 / T080 / T081 / T087 / T088 unless HQ names them.
 
 Wrong Squad/Loans split poisons Mentoring Group checks. There is no Suggest. Empty Squad on a non-development save is `ft-club-squad-join-miss`. Do not custom-fit a local `.fm`. Never commit saves. T082 cancelled (loans = T086). T087 (Progress GK layout) after T086.
 
-**Next:** T086 ready. Blind: synthetic/object joins; optional smoke on untracked `data/saves/*.fm`; never git add `*.fm`; never mmap live `games/`.
+**Next:** T086 done. Remaining board: T088 ready (after freeze); T087 / T077 / T080 / T081 blocked. Never git add `*.fm`; never mmap live `games/`.
 
 | Area | State | Need-to-have? |
 |------|--------|---------------|
@@ -86,7 +86,7 @@ Wrong Squad/Loans split poisons Mentoring Group checks. There is no Suggest. Emp
 | Buy Me a Coffee | **T070 done** | Tip only |
 | One extract Python (no 5×2GB on start) | **T072 done** | **Yes** |
 | Extract this club only (not world) | **T076 done** | **Yes** |
-| Extract four steps, any Career Save | **T083–T085 done**; T086 | **Yes** |
+| Extract four steps, any Career Save | **T083–T086 done** | **Yes** |
 | Favoured-club / scout extract | **T080 blocked** (on T086) | No |
 | Loan scan speed | **T081 blocked** (on T086) | later |
 | Loans as König counts | **T082 cancelled** (absorbed: T086) | — |
@@ -101,7 +101,6 @@ Wrong Squad/Loans split poisons Mentoring Group checks. There is no Suggest. Emp
 
 | ID | Title | Status | Owner |
 |----|-------|--------|-------|
-| T086 | At-club vs loaned-out on any Career Save | ready | |
 | T088 | Sync belongs to the selected save | ready | |
 | T087 | Progress GK vs outfield CA layout | blocked | |
 | T077 | Live www URL — upload save, extract, four tabs | blocked | |
@@ -126,16 +125,18 @@ Wrong Squad/Loans split poisons Mentoring Group checks. There is no Suggest. Emp
 
 ## Gate
 
-- **Freeze:** T086. Refuse www, scout drop, scan speed, GK Progress, **T088** until the human names it or T086 is done. Launch waits. One ticket per worker.
+- **Freeze:** T086 done. Refuse www, scout drop, scan speed, GK Progress, **T088** until the human names it. Launch waits. One ticket per worker.
 - Refuse Suggest. Refuse CA/PA. Refuse Stripe paywall / packaging / FM27.
 - BMC is a tip. Do not gate the table.
 - Workers: one ticket, one commit on `FMT/`. If freeze, do not claim anything else.
 
 ## Blockers
 
-- **Freeze:** T086. Workers stay save-blind (no committed `.fm`, no live `games/`). Host RAM after T086.
+- **Freeze:** T086 done. Workers stay save-blind (no committed `.fm`, no live `games/`). Host RAM / T077 after HQ names it.
 
 ## Recently done
+
+- **T086** — At-club vs loaned-out is the loan object on FT/II/U19 jobs (same recipe). Foreign-U19 namelist is not the youth-loan path. Packed `64ff24` stride is not a loan. One census PROGRESS line after the split. Squad / Mentoring = at-club; Loans = outgoing; Progress picker includes both. Synthetic tests. Optional local smoke census to the human; no committed `.fm`.
 
 - **T085** — HA/CA for listed people: UniqueID / NEWGEN bands are heuristics. Employment tag + person double keep out-of-band UniqueIDs; pack + CA card once each; miss is `—`, not a dropped row. Synthetic blob tests. Optional local smoke counts to the human; no committed `.fm`.
 

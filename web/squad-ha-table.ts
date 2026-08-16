@@ -90,12 +90,31 @@ export function mergeClubWideAtClubPlayers<
   reserves: readonly T[];
   under19s: readonly T[];
 }): Array<{ player: T; unit: SquadHaUnit }> {
+  return mergeClubWideEmployedPlayers(lists, { includeLoanedOut: false });
+}
+
+/** Employed FT + II + U19 (at-club + outgoing). Progress picker; Group checks stay at-club. */
+export function mergeClubWideEmployedPlayers<
+  T extends {
+    uid?: number | null;
+    name?: string | null;
+    loan?: { status?: string | null } | null;
+  },
+>(
+  lists: {
+    firstTeam: readonly T[];
+    reserves: readonly T[];
+    under19s: readonly T[];
+  },
+  opts?: { includeLoanedOut?: boolean },
+): Array<{ player: T; unit: SquadHaUnit }> {
+  const includeLoanedOut = opts?.includeLoanedOut !== false;
   const byUid = new Map<number, { player: T; unit: SquadHaUnit }>();
   const push = (players: readonly T[], unit: SquadHaUnit) => {
     for (const player of players) {
       if (player.uid == null || !Number.isFinite(player.uid)) continue;
       if (!isRosterNameResolved(player.name)) continue;
-      if (player.loan?.status === "loanedOut") continue;
+      if (!includeLoanedOut && player.loan?.status === "loanedOut") continue;
       if (byUid.has(player.uid)) continue;
       byUid.set(player.uid, { player, unit });
     }

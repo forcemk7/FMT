@@ -127,6 +127,7 @@ import {
   isSquadHaTextFilterKey,
   mentoringGroupNumberByUid,
   mergeClubWideAtClubPlayers,
+  mergeClubWideEmployedPlayers,
   newSquadHaManualFilter,
   nudgeSquadHaFilterBy,
   nudgeSquadHaFiltersBy,
@@ -602,9 +603,9 @@ function findRosterPlayer(uid: number): RosterPlayer | undefined {
   );
 }
 
-/** Same pool as the club-wide HA table (named, at-club, uid-deduped). */
+/** Employed people (at-club + loaned). Group checks stay at-club. */
 function clubWideEvolutionPlayers(): RosterPlayer[] {
-  return mergeClubWideAtClubPlayers({
+  return mergeClubWideEmployedPlayers({
     firstTeam: firstTeamPlayers,
     reserves: reservesPlayers,
     under19s: under19sPlayers,
