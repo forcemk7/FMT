@@ -4806,6 +4806,16 @@ td.attr-band {
   display: none !important;
 }
 
+.squad-mentoring-pane.table-pane {
+  padding: 0;
+  gap: 0;
+}
+
+.squad-mentoring-pane.table-pane:not(.is-empty-pane) {
+  padding: 0.65rem 0.75rem 3.75rem;
+  gap: 0.55rem;
+}
+
 .squad-grid-panel.is-mentoring .squad-grid-wrap {
   display: none;
 }
@@ -4830,6 +4840,12 @@ td.attr-band {
   display: none !important;
 }
 
+.squad-loans-pane.table-pane {
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
 .squad-grid-panel.is-loans .squad-grid-wrap {
   display: none;
 }
@@ -4851,28 +4867,86 @@ td.attr-band {
   display: none !important;
 }
 
-.pane-empty-host {
+.table-pane {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  position: relative;
+  padding: 0;
+}
+
+.table-pane-empty {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.table-pane-empty[hidden] {
+  display: none !important;
+}
+
+.table-pane-head {
+  flex: 0 0 auto;
+}
+
+.table-pane-head .ranker-list-table {
+  width: 100%;
+}
+
+.table-pane-drop {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  padding: 1rem 1.25rem;
+  text-align: center;
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 500;
+}
+
+.table-pane-drop[hidden] {
+  display: none !important;
+}
+
+.table-pane-fill {
   flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
 }
 
-.pane-empty-host[hidden] {
+.table-pane.is-empty-pane .table-pane-fill {
   display: none !important;
 }
 
-.pane-empty-host .ranker-list-table {
-  width: 100%;
+.table-pane.is-empty-pane .mentoring-board-actions {
+  display: none !important;
 }
 
-.pane-drop-copy {
-  text-align: center;
-  color: var(--muted);
-  font-size: 0.86rem;
-  font-weight: 500;
-  padding: 2.4rem 1rem;
+.table-pane.is-empty-pane > #roster-body,
+.table-pane.is-empty-pane > .squad-ha-list {
+  flex: 0 0 auto;
+  overflow: hidden;
 }
 
+.squad-loans-pane .table-pane-fill {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  padding: 0.65rem 0.75rem 1rem;
+}
+
+.squad-evolution .table-pane-fill {
+  padding: 0.75rem 1rem 0.85rem;
+}
+
+.squad-evolution.is-empty-progress .table-pane-fill,
 .squad-evolution.is-empty-progress .squad-evolution-lede,
 .squad-evolution.is-empty-progress .squad-evolution-sub,
 .squad-evolution.is-empty-progress .squad-evolution-chart,
@@ -6278,7 +6352,7 @@ button.mentoring-seat-card:hover {
 }
 
 .squad-grid-panel.is-empty-roster .squad-grid-wrap {
-  display: block;
+  display: flex;
 }
 
 .squad-grid-panel.is-empty-roster .squad-evolution,
@@ -6366,6 +6440,16 @@ button.mentoring-seat-card:hover {
   overflow: auto;
 }
 
+.squad-grid-wrap.table-pane {
+  overflow: hidden;
+}
+
+.squad-grid-wrap.table-pane > #roster-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+
 .squad-grid-panel.is-attributes .squad-grid-wrap {
   display: none;
 }
@@ -6377,7 +6461,7 @@ button.mentoring-seat-card:hover {
   flex-direction: column;
   margin-top: 0;
   border-top: none;
-  padding: 0.75rem 1rem 0.85rem;
+  padding: 0;
 }
 
 .squad-ha-list {

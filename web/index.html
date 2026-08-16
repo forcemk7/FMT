@@ -1341,47 +1341,46 @@
                 </div>
               </div>
 
-              <div class="squad-grid-wrap fmt-scroll" id="squad-personalities-pane">
+              <div class="table-pane squad-grid-wrap fmt-scroll" id="squad-personalities-pane">
                 <div
                   id="roster-body"
                   class="squad-ha-list"
                   role="region"
                   aria-label="Squad personality HA"
                 ></div>
-                <p id="roster-empty" class="roster-empty" hidden>
+                <p id="roster-empty" class="table-pane-drop" hidden>
                   Drop a Career Save (.fm) here, or use +
                 </p>
               </div>
 
               <section
                 id="squad-evolution"
-                class="squad-evolution"
+                class="squad-evolution table-pane"
                 hidden
                 aria-label="Mentoring feedback — attribute and personality history"
               >
-                <div id="squad-progress-empty" class="pane-empty-host" hidden>
-                  <table
-                    class="ranker-list-table fmt-table"
-                    aria-label="Progress"
-                  >
-                    <thead>
-                      <tr>
-                        <th scope="col">Name</th>
-                        <th scope="col">CA</th>
-                        <th scope="col">ΔCA</th>
-                        <th scope="col">Det</th>
-                        <th scope="col">ΔDet</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td colspan="5" class="pane-drop-copy">
-                          Drop a Career Save (.fm) here, or use +
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <div id="squad-progress-empty" class="table-pane-empty" hidden>
+                  <div class="table-pane-head">
+                    <table
+                      class="ranker-list-table fmt-table"
+                      aria-label="Progress"
+                    >
+                      <thead>
+                        <tr>
+                          <th scope="col">Name</th>
+                          <th scope="col">CA</th>
+                          <th scope="col">ΔCA</th>
+                          <th scope="col">Det</th>
+                          <th scope="col">ΔDet</th>
+                        </tr>
+                      </thead>
+                    </table>
+                  </div>
+                  <p class="table-pane-drop">
+                    Drop a Career Save (.fm) here, or use +
+                  </p>
                 </div>
+                <div class="table-pane-fill">
                 <p class="squad-evolution-lede">
                   After mentoring, track HA and CA shifts to confirm personality
                   changes.
@@ -1462,38 +1461,35 @@
                     class="squad-evolution-toggles"
                   ></div>
                 </div>
+                </div>
               </section>
 
               <div
                 id="squad-loans-pane"
-                class="squad-loans-pane"
+                class="table-pane squad-loans-pane"
                 hidden
                 aria-label="Out on loan"
               >
-                <p id="squad-loans-empty" class="squad-loans-empty" hidden>
-                  Drop a Career Save (.fm) here, or use +
-                </p>
-                <div id="squad-loans-empty-host" class="pane-empty-host" hidden>
-                  <table
-                    class="ranker-list-table fmt-table"
-                    aria-label="Out on loan"
-                  >
-                    <thead>
-                      <tr>
-                        <th scope="col">Name</th>
-                        <th scope="col">Unit</th>
-                        <th scope="col">At</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td colspan="3" class="pane-drop-copy">
-                          Drop a Career Save (.fm) here, or use +
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <div id="squad-loans-empty-host" class="table-pane-empty" hidden>
+                  <div class="table-pane-head">
+                    <table
+                      class="ranker-list-table fmt-table"
+                      aria-label="Out on loan"
+                    >
+                      <thead>
+                        <tr>
+                          <th scope="col">Name</th>
+                          <th scope="col">Unit</th>
+                          <th scope="col">At</th>
+                        </tr>
+                      </thead>
+                    </table>
+                  </div>
+                  <p id="squad-loans-empty" class="table-pane-drop">
+                    Drop a Career Save (.fm) here, or use +
+                  </p>
                 </div>
+                <div class="table-pane-fill">
                 <section
                   class="squad-loans-section"
                   data-loans-unit="firstTeam"
@@ -1533,11 +1529,12 @@
                     aria-label="Under 19s out on loan"
                   ></div>
                 </section>
+                </div>
               </div>
 
               <div
                 id="squad-mentoring-pane"
-                class="squad-mentoring-pane"
+                class="table-pane squad-mentoring-pane"
                 hidden
               >
                 <div
@@ -1553,30 +1550,25 @@
                   hidden
                 ></p>
 
-                <p id="mentoring-empty" class="mentoring-empty" hidden>
-                  Drop a Career Save (.fm) here, or use +
-                </p>
-                <div id="mentoring-empty-host" class="pane-empty-host" hidden>
-                  <table
-                    class="ranker-list-table fmt-table"
-                    aria-label="Mentoring groups"
-                  >
-                    <thead>
-                      <tr>
-                        <th scope="col">Group</th>
-                        <th scope="col">Members</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td colspan="2" class="pane-drop-copy">
-                          Drop a Career Save (.fm) here, or use +
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                <div id="mentoring-empty-host" class="table-pane-empty" hidden>
+                  <div class="table-pane-head">
+                    <table
+                      class="ranker-list-table fmt-table"
+                      aria-label="Mentoring groups"
+                    >
+                      <thead>
+                        <tr>
+                          <th scope="col">Group</th>
+                          <th scope="col">Members</th>
+                        </tr>
+                      </thead>
+                    </table>
+                  </div>
+                  <p id="mentoring-empty" class="table-pane-drop">
+                    Drop a Career Save (.fm) here, or use +
+                  </p>
                 </div>
-                <div id="mentoring-cards" class="mentoring-cards"></div>
+                <div id="mentoring-cards" class="mentoring-cards table-pane-fill"></div>
                 <div class="mentoring-board-actions">
                   <button
                     type="button"

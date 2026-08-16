@@ -50,7 +50,8 @@ describe("T104 drop header Squad leftover; unified empty pane", () => {
   it("all four empty panes share the drop copy; drop feeds + upload", () => {
     expect(main).toMatch(/const PANE_DROP_COPY = "Drop a Career Save \(\.fm\) here, or use \+"/);
     expect(html).toContain(DROP);
-    expect(main).toMatch(/td\.textContent = PANE_DROP_COPY/);
+    expect(main).toMatch(/rosterEmptyEl\.textContent = PANE_DROP_COPY/);
+    expect(html).toMatch(/class="table-pane-drop"/);
     expect(main).toMatch(/function feedRosterUpload\(/);
     expect(main).toMatch(
       /function feedRosterUpload\([\s\S]*?rosterAmendTarget = null/,

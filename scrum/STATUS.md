@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-08-16 (T104 done)
+Last updated: 2026-08-16 (T105 done)
 
 ## Now
 
@@ -74,6 +74,10 @@ Last updated: 2026-08-16 (T104 done)
 
 **T104 done** — header Squad pill gone. Empty tabs: thead + drop `.fm` (same as +). Filled panes unchanged.
 
+**Used (2026-08-16 HQ):** Empty copy exists on all four tabs, but the table panel and drop well are not the same component (skinny Loans row, Mentoring Add group, different drop boxes). Owner: one pane shell; drop well under thead in the same place.
+
+**T105 done** — one `.table-pane` shell; empty drop well under thead (same slot). Mentoring empty hides Add group / Load a Career Save.
+
 **Next:** No ready tickets. T087 frozen. Do not claim T077 / T080 / T081.
 
 | Area | State | Need-to-have? |
@@ -139,6 +143,7 @@ Last updated: 2026-08-16 (T104 done)
 | Structured save-card hover tooltip | **T102 done** | Yes |
 | Page shell: header identity + four tabs + one pane | **T103 done** | **Yes** |
 | Kill header Squad leftover; unified empty pane + drop | **T104 done** | Yes |
+| One table pane shell; same drop well slot | **T105 done** | Yes |
 | Progress GK abilities + outfield GK rating | **T087 blocked** (on T094) | after native roster |
 | npm run dev from HQ | **T089 cancelled** | — |
 | Sync steals Active save when extract finishes | **T088 done** | **Yes** |
@@ -173,7 +178,7 @@ Last updated: 2026-08-16 (T104 done)
 
 ## Gate
 
-- T104 done. Empty ready board. T087 frozen. T077 / T080 / T081 blocked. One ticket per worker.
+- T105 done. Empty ready board. T087 frozen. T077 / T080 / T081 blocked. One ticket per worker.
 - Refuse Suggest. Refuse CA/PA. Refuse Stripe paywall / packaging / FM27.
 - BMC is a tip. Do not gate the table.
 - Workers: one ticket, one commit on `FMT/`. If freeze, do not claim anything else.
@@ -183,6 +188,8 @@ Last updated: 2026-08-16 (T104 done)
 - Host RAM / T077 after owner says the local loop is honest (any save + Active not stolen).
 
 ## Recently done
+
+- **T105** — Squad / Loans / Mentoring / Progress share `.table-pane`. Empty: T104 thead on top, `.table-pane-drop` under it (not a table row). Mentoring empty hides Add group and “Load a Career Save”. Drop still + identity upload. Filled Loans cards / Mentoring groups / Progress chart stay in the same panel. Vitest chrome. Restart `npm run dev`. No committed `.fm`.
 
 - **T104** — Header has no leftover Squad pill (`#tool-nav` gone). Empty Squad / Loans / Mentoring / Progress show that tab’s thead + `Drop a Career Save (.fm) here, or use +`. Drop on an empty pane is the + identity upload (new save, not overwrite). Filled Loans cards / Mentoring groups / Progress chart stay. Vitest chrome guard. Restart `npm run dev`. No committed `.fm`.
 

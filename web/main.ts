@@ -785,9 +785,12 @@ function setSquadViewMode(mode: SquadViewMode) {
       console.error("Mentoring page failed to render", err);
       try {
         mentoringCardsEl.replaceChildren();
+        mentoringEmptyHostEl.hidden = false;
         mentoringEmptyEl.hidden = false;
         mentoringEmptyEl.textContent = "Mentoring failed to load";
         mentoringStatusEl.textContent = "Mentoring failed to load";
+        mentoringBoardActionsEl.hidden = true;
+        squadMentoringPaneEl.classList.add("is-empty-pane");
       } catch {
         /* still initializing */
       }
@@ -1002,6 +1005,7 @@ function clearSquadEvolution() {
 function syncProgressEmptyPane() {
   const empty = clubWideEvolutionPlayers().length === 0;
   squadEvolutionEl.classList.toggle("is-empty-progress", empty);
+  squadEvolutionEl.classList.toggle("is-empty-pane", empty);
   squadProgressEmptyEl.hidden = !empty;
   setPaneDropEnabled(squadEvolutionEl, empty);
 }
@@ -1728,6 +1732,9 @@ const mentoringMenteesEl = document.querySelector<HTMLElement>("#mentoring-mente
 const mentoringEmptyEl = document.querySelector<HTMLElement>("#mentoring-empty")!;
 const mentoringCardsEl = document.querySelector<HTMLElement>("#mentoring-cards")!;
 const mentoringAddBtn = document.querySelector<HTMLButtonElement>("#mentoring-add-btn")!;
+const mentoringBoardActionsEl = document.querySelector<HTMLElement>(
+  ".mentoring-board-actions",
+)!;
 const mentoringBoardSuggestBtn = document.querySelector<HTMLButtonElement>(
   "#mentoring-suggest-btn",
 );
@@ -7995,18 +8002,19 @@ function renderSquadHaTable() {
 
   const body = document.createElement("tbody");
   const colCount = 1 + SQUAD_HA_FILTER_KEYS.length;
+  const showDrop = visible.length === 0 && squadHaFilters.length === 0;
+  rosterEmptyEl.hidden = !showDrop;
+  rosterEmptyEl.textContent = PANE_DROP_COPY;
+  squadPersonalitiesPaneEl.classList.toggle("is-empty-pane", showDrop);
   if (visible.length === 0) {
     const emptyRow = document.createElement("tr");
     const td = document.createElement("td");
     td.colSpan = colCount;
     if (squadHaFilters.length > 0) {
       td.textContent = "No players match the current filters.";
-    } else {
-      td.textContent = PANE_DROP_COPY;
-      td.className = "pane-drop-copy";
+      emptyRow.append(td);
+      body.append(emptyRow);
     }
-    emptyRow.append(td);
-    body.append(emptyRow);
   }
 
   for (const row of visible) {
@@ -8235,9 +8243,7 @@ function renderRoster() {
   rosterTablePanelEl.classList.toggle("is-empty-roster", isEmptyRoster);
   rosterUploadBtnEl.classList.toggle("is-cta", isEmptyRoster);
   squadViewTabsEl.hidden = !hasSave;
-  // Empty copy lives in the tab thead + shared drop body (T104).
-  rosterEmptyEl.hidden = true;
-  rosterEmptyEl.textContent = PANE_DROP_COPY;
+  // Empty drop well lives under thead (T105).
   if (isSquadUnitMode(squadViewMode) && squadUnitView === "personalities") {
     squadPersonalitiesPaneEl.hidden = false;
     squadMentoringPaneEl.hidden = true;
@@ -8381,9 +8387,10 @@ function renderLoansPage() {
       grid.append(createSquadPersonalityCard(entry.player, entry.score));
     }
   }
-  squadLoansEmptyEl.hidden = true;
   squadLoansEmptyHostEl.hidden = any;
+  squadLoansEmptyEl.hidden = false;
   squadLoansEmptyEl.textContent = PANE_DROP_COPY;
+  squadLoansPaneEl.classList.toggle("is-empty-pane", !any);
   setPaneDropEnabled(squadLoansPaneEl, !any);
 }
 
@@ -11516,17 +11523,19 @@ function renderMentoringPage() {
     mentoringCardsEl.hidden = true;
     mentoringMenteesEl.replaceChildren();
     mentoringMenteesEl.hidden = true;
-    mentoringEmptyEl.hidden = true;
+    mentoringEmptyEl.hidden = false;
     mentoringEmptyHostEl.hidden = false;
     mentoringEmptyEl.textContent = PANE_DROP_COPY;
     mentoringAddBtn.disabled = true;
+    mentoringBoardActionsEl.hidden = true;
+    squadMentoringPaneEl.classList.add("is-empty-pane");
     setPaneDropEnabled(squadMentoringPaneEl, true);
     if (mentoringBoardSuggestBtn) {
       mentoringBoardSuggestBtn.disabled = true;
       mentoringBoardSuggestBtn.textContent = "Suggest";
-      mentoringBoardSuggestBtn.title = "Load a Career Save";
+      mentoringBoardSuggestBtn.removeAttribute("title");
     }
-    setMentoringStatusNotice("Load a Career Save");
+    setMentoringStatusNotice("");
     mentoringRenderFingerprint = "";
     return;
   }
@@ -11554,10 +11563,15 @@ function renderMentoringPage() {
       : "Need 3 unassigned players";
   updateMentoringSuggestButton();
 
-  mentoringEmptyEl.hidden = true;
+  mentoringEmptyEl.hidden = false;
   mentoringEmptyHostEl.hidden = mentoringCache.groups.length > 0;
   mentoringCardsEl.hidden = mentoringCache.groups.length === 0;
   mentoringEmptyEl.textContent = PANE_DROP_COPY;
+  mentoringBoardActionsEl.hidden = mentoringCache.groups.length === 0;
+  squadMentoringPaneEl.classList.toggle(
+    "is-empty-pane",
+    mentoringCache.groups.length === 0,
+  );
   setPaneDropEnabled(squadMentoringPaneEl, mentoringCache.groups.length === 0);
 
   renderMentoringMenteeStrip(candidates);
