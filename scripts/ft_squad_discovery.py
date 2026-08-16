@@ -22,7 +22,7 @@ if str(_SCRIPTS) not in sys.path:
 from ii_squad_discovery import (  # noqa: E402
     BODY_HIT_LIMIT,
     SENTINELS,
-    find_all,
+    iter_hits,
     jobs_majority_plausible,
     match_team_body,
     parse_count_jobs,
@@ -67,7 +67,7 @@ def find_ft_job_list(
 ) -> dict[str, Any] | None:
     """Locate club team body anywhere in the blob; parse persist-tid 7f02 list."""
     pat = struct.pack("<I", dup) * 2
-    for dup_abs in find_all(mm, pat, limit=BODY_HIT_LIMIT, lo=0, hi=len(mm)):
+    for dup_abs in iter_hits(mm, pat, lo=0, hi=len(mm), batch=BODY_HIT_LIMIT):
         tid_abs = match_team_body(mm, dup_abs, team_id)
         if tid_abs is None:
             continue
@@ -113,8 +113,9 @@ def resolve_ft_squad(mm: mmap.mmap | bytes, parent_short: str) -> dict[str, Any]
         spans.append((CATALOG_HINT, n))
     else:
         spans.append((0, n))
+    last: dict[str, Any] | None = None
     for lo, hi in spans:
-        for h in find_all(mm, raw, limit=80, lo=lo, hi=hi):
+        for h in iter_hits(mm, raw, lo=lo, hi=hi, batch=80):
             if h < 4:
                 continue
             if struct.unpack_from("<I", mm, h - 4)[0] != len(raw):
@@ -127,14 +128,17 @@ def resolve_ft_squad(mm: mmap.mmap | bytes, parent_short: str) -> dict[str, Any]
             if not name:
                 continue
             lst = find_ft_job_list(mm, team["teamId"], team["dup"])
-            return {
+            hit = {
                 "parentShort": parent_short,
                 "catalogNameAbs": h,
                 "catalogName": name,
                 "team": team,
                 "list": lst,
             }
-    return None
+            if lst and lst.get("jobs"):
+                return hit
+            last = hit
+    return last
 
 
 def _ft_miss_reason(ft_hit: dict[str, Any] | None) -> str:

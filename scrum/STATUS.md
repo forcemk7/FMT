@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-08-16 (HQ: Squad + Loans + Mentoring + Progress)
+Last updated: 2026-08-16 (T091 done)
 
 ## Now
 
@@ -38,7 +38,9 @@ Last updated: 2026-08-16 (HQ: Squad + Loans + Mentoring + Progress)
 
 **T090 done** — `match_reserve_name_score` is defined (was dead after `lp32_name_ending_at` return). Extract no longer NameErrors on the T084 reserve join.
 
-**Next:** **T087** (Progress GK vs outfield CA layout). T077 / T080 / T081 blocked. T089 cancelled — `cd FMT` then `npm run dev`.
+**T091 done** — `resolve_ft_squad` keeps scanning catalog hits until a 7f02 job-list exists. First PRE_NAME object with no list is skipped. `BODY_HIT_LIMIT` expands. Identity known + miss still `ft-club-squad-join-miss`. Restart `npm run dev` and re-extract a non-Schalke career.
+
+**Next:** **T087** (Progress GK vs outfield CA layout). T077 / T080 / T081 blocked.
 
 | Area | State | Need-to-have? |
 |------|--------|---------------|
@@ -89,7 +91,8 @@ Last updated: 2026-08-16 (HQ: Squad + Loans + Mentoring + Progress)
 | Ranker / checker / compare chrome | **T075 done** | Yes |
 | Progress default chip + FM columns | **T078 done** | Yes |
 | Extract NameError match_reserve_name_score | **T090 done** | **Yes** |
-| Progress GK abilities + outfield GK rating | **T087 ready — NEXT** | after T090 |
+| Non-Schalke extract empty Squad (first catalog hit) | **T091 done** | **Yes** |
+| Progress GK abilities + outfield GK rating | **T087 ready — NEXT** | after T091 |
 | npm run dev from HQ | **T089 cancelled** | — |
 | Sync steals Active save when extract finishes | **T088 done** | **Yes** |
 | II/U19 Progress CA strip | **T079 done** | **Yes** |
@@ -109,6 +112,7 @@ Last updated: 2026-08-16 (HQ: Squad + Loans + Mentoring + Progress)
 - Units in FMT = planning reminder for FM. Mentoring pool = at-club only. Loaned names on Loans. Same person must not be on both.
 - **Used (2026-08-14):** Clear filters → click Adrian Itu → loosen-all → Yoan Robert + Miraglia. FT-only hid this. Empty FT list was correct.
 - **Used (2026-08-16 HQ):** Start sync on save A → select save B in Manage saves → extract finishes → view jumped back to A. **T088 done** — persist stays on A’s slot; Active / Squad stay on B.
+- **Used (2026-08-16 HQ):** Non-Schalke Career still empty after T083–T090. `resolve_ft_squad` returned the first PRE_NAME hit even when the job-list was missing. **T091 done** — keep scanning until a 7f02 list exists. Restart `npm run dev` and re-extract.
 - **Used (2026-08-16 HQ):** Extract `NameError: name 'match_reserve_name_score' is not defined`. **T090 done** — scorer lives next to `match_unit_core_score`; dead block after `lp32_name_ending_at` removed. Restart `npm run dev` and re-extract.
 - After groups exist in FM: extract on a new in-game date → Progress HA delta (pack + Det/Lea). Two different gameDates required; one extract → value, empty delta.
 - Extract is two blobs once (pack + CA card). UI: Squad HA = pack + Det/Lea from the card. Progress CA = card history; Progress HA = pack snapshots + Det/Lea from the card (T066). Do not hunt Det/Lea as a third extract.
@@ -121,7 +125,7 @@ Last updated: 2026-08-16 (HQ: Squad + Loans + Mentoring + Progress)
 
 ## Gate
 
-- T087 next (Progress GK layout). T077 / T080 / T081 blocked. T089 cancelled. One ticket per worker.
+- T087 next (Progress GK vs outfield). T077 / T080 / T081 blocked. T089 cancelled. One ticket per worker.
 - Refuse Suggest. Refuse CA/PA. Refuse Stripe paywall / packaging / FM27.
 - BMC is a tip. Do not gate the table.
 - Workers: one ticket, one commit on `FMT/`. If freeze, do not claim anything else.
@@ -131,6 +135,8 @@ Last updated: 2026-08-16 (HQ: Squad + Loans + Mentoring + Progress)
 - Host RAM / T077 after owner says the local loop is honest (any save + Active not stolen).
 
 ## Recently done
+
+- **T091** — FT join keeps scanning catalog PRE_NAME hits until a 7f02 job-list exists. `BODY_HIT_LIMIT` expands. II skips first-hit `list: None`. Identity known + miss still `ft-club-squad-join-miss`, never `pick_tid`. Synthetic two-object test. Restart `npm run dev` and re-extract a non-Schalke career. No committed `.fm`.
 
 - **T090** — Extract NameError: `match_reserve_name_score` defined from `_reserve_suffix` + `match_unit_core_score`. Unreachable block after `lp32_name_ending_at` removed. Join recipe unchanged. Unittest II/B/U21 + T084. Restart `npm run dev` and re-extract. No committed `.fm`.
 

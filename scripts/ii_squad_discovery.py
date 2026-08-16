@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import mmap
 import struct
+from collections.abc import Iterator
 from typing import Any
 
 SENTINELS = frozenset({0, 1, 255, 256, 65535, 65536, 0xFFFFFFFF})
@@ -20,6 +21,7 @@ MOTIF_LIST = b"\xff\xff\xff\xff\x00\xff\xff\xff\xff"
 CATALOG_HINT = 30_000_000
 JOB_LO, JOB_HI = 100, 50_000_000
 SQUAD_COUNT_LO, SQUAD_COUNT_HI = 1, 80
+# First-pass dup-pair bound only — expand; not a hard 200.
 BODY_HIT_LIMIT = 200
 RESERVE_SUFFIXES = (
     " II",
@@ -49,6 +51,29 @@ def find_all(
         out.append(j)
         start = j + 1
     return out
+
+
+def iter_hits(
+    mm: mmap.mmap | bytes,
+    needle: bytes,
+    *,
+    lo: int = 0,
+    hi: int | None = None,
+    batch: int = BODY_HIT_LIMIT,
+) -> Iterator[int]:
+    """Yield every needle offset. `batch` expands; it is not a hard cap."""
+    start = lo
+    end = hi if hi is not None else len(mm)
+    limit = max(1, int(batch))
+    while start < end:
+        chunk = find_all(mm, needle, limit=limit, lo=start, hi=end)
+        if not chunk:
+            break
+        yield from chunk
+        if len(chunk) < limit:
+            break
+        start = chunk[-1] + 1
+        limit *= 4
 
 
 def read_lp32(mm: mmap.mmap | bytes, off: int) -> str | None:
@@ -221,6 +246,64 @@ def _iter_exact_reserve_names(parent_short: str) -> list[str]:
     return [f"{parent_short}{suf}" for suf in RESERVE_SUFFIXES]
 
 
+def _catalog_spans(
+    mm: mmap.mmap | bytes, *, catalog_limit: int | None = None
+) -> list[tuple[int, int]]:
+    n = len(mm)
+    hint = CATALOG_HINT if catalog_limit is None else catalog_limit
+    if n > hint:
+        return [(0, hint), (hint, n)]
+    return [(0, n)]
+
+
+def _iter_ii_club_hits(
+    mm: mmap.mmap | bytes,
+    parent_short: str,
+    *,
+    catalog_limit: int | None = None,
+) -> Iterator[dict[str, Any]]:
+    """Yield reserve catalog rows. Callers skip rows whose job-list is missing."""
+    if not parent_short:
+        return
+    spans = _catalog_spans(mm, catalog_limit=catalog_limit)
+    seen: set[int] = set()
+
+    for name in _iter_exact_reserve_names(parent_short):
+        raw = name.encode("utf-8")
+        for lo, hi in spans:
+            for h in iter_hits(mm, raw, lo=lo, hi=hi, batch=40):
+                if h < 4 or h in seen:
+                    continue
+                if struct.unpack_from("<I", mm, h - 4)[0] != len(raw):
+                    continue
+                hit = _club_from_name_hit(mm, parent_short, name, h)
+                if hit:
+                    seen.add(h)
+                    yield hit
+
+    scored: list[tuple[int, int, dict[str, Any]]] = []
+    for suf in RESERVE_SUFFIXES:
+        needle = suf.encode("utf-8")
+        for lo, hi in spans:
+            for j in iter_hits(mm, needle, lo=lo, hi=hi, batch=400):
+                found = lp32_name_ending_at(mm, j, suf)
+                if not found:
+                    continue
+                name_abs, name = found
+                if name_abs in seen:
+                    continue
+                score = match_reserve_name_score(parent_short, name)
+                if score < 70:
+                    continue
+                hit = _club_from_name_hit(mm, parent_short, name, name_abs)
+                if hit:
+                    seen.add(name_abs)
+                    scored.append((score, len(name), hit))
+    scored.sort(key=lambda t: (-t[0], t[1]))
+    for _score, _nlen, hit in scored:
+        yield hit
+
+
 def discover_ii_club_id(
     mm: mmap.mmap | bytes,
     parent_short: str,
@@ -228,48 +311,9 @@ def discover_ii_club_id(
     catalog_limit: int | None = None,
 ) -> dict[str, Any] | None:
     """Discover this club's reserve unit catalog row (any reserve suffix)."""
-    if not parent_short:
-        return None
-    spans: list[tuple[int, int]] = []
-    n = len(mm)
-    hint = CATALOG_HINT if catalog_limit is None else catalog_limit
-    if n > hint:
-        spans.append((0, hint))
-        spans.append((hint, n))
-    else:
-        spans.append((0, n))
-
-    for name in _iter_exact_reserve_names(parent_short):
-        raw = name.encode("utf-8")
-        for lo, hi in spans:
-            for h in find_all(mm, raw, limit=40, lo=lo, hi=hi):
-                if h < 4:
-                    continue
-                if struct.unpack_from("<I", mm, h - 4)[0] != len(raw):
-                    continue
-                hit = _club_from_name_hit(mm, parent_short, name, h)
-                if hit:
-                    return hit
-
-    scored: list[tuple[int, int, dict[str, Any]]] = []
-    for suf in RESERVE_SUFFIXES:
-        needle = suf.encode("utf-8")
-        for lo, hi in spans:
-            for j in find_all(mm, needle, limit=400, lo=lo, hi=hi):
-                found = lp32_name_ending_at(mm, j, suf)
-                if not found:
-                    continue
-                name_abs, name = found
-                score = match_reserve_name_score(parent_short, name)
-                if score < 70:
-                    continue
-                hit = _club_from_name_hit(mm, parent_short, name, name_abs)
-                if hit:
-                    scored.append((score, len(name), hit))
-    if not scored:
-        return None
-    scored.sort(key=lambda t: (-t[0], t[1]))
-    return scored[0][2]
+    for hit in _iter_ii_club_hits(mm, parent_short, catalog_limit=catalog_limit):
+        return hit
+    return None
 
 
 def discover_ii_team_id(mm: mmap.mmap | bytes, catalog_name_abs: int) -> dict[str, Any] | None:
@@ -303,7 +347,7 @@ def find_ii_job_list(
 ) -> dict[str, Any] | None:
     """Locate team body by tid+zeros+dup×2 (whole blob); parse subunit job-list."""
     pat = struct.pack("<I", dup) * 2
-    for dup_abs in find_all(mm, pat, limit=BODY_HIT_LIMIT, lo=0, hi=len(mm)):
+    for dup_abs in iter_hits(mm, pat, lo=0, hi=len(mm), batch=BODY_HIT_LIMIT):
         tid_abs = match_team_body(mm, dup_abs, team_id)
         if tid_abs is None:
             continue
@@ -330,11 +374,15 @@ def find_ii_job_list(
 
 def resolve_ii_squad(mm: mmap.mmap | bytes, parent_short: str) -> dict[str, Any] | None:
     """Parent short → this club's reserve team object → subunit job-list."""
-    club = discover_ii_club_id(mm, parent_short)
-    if not club:
-        return None
-    team = discover_ii_team_id(mm, club["catalogNameAbs"])
-    if not team:
-        return {**club, "team": None, "list": None}
-    lst = find_ii_job_list(mm, team["teamId"], team["dup"])
-    return {**club, "team": team, "list": lst}
+    last: dict[str, Any] | None = None
+    for club in _iter_ii_club_hits(mm, parent_short):
+        team = discover_ii_team_id(mm, club["catalogNameAbs"])
+        if not team:
+            last = {**club, "team": None, "list": None}
+            continue
+        lst = find_ii_job_list(mm, team["teamId"], team["dup"])
+        hit = {**club, "team": team, "list": lst}
+        if lst and lst.get("jobs"):
+            return hit
+        last = hit
+    return last
