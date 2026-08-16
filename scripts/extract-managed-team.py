@@ -428,49 +428,67 @@ def _empty_date_pick(
 
 def pick_continue_calendar_date(buf, identity: dict) -> dict:
     """
-    Continue (tag 00950e02) in-game date: c708 prelude / today_ptr.
+    Continue (tag 00950e02) in-game date from the UniqueID trailer (T106).
 
-    Same recipe as extract-first-team-fast.discover_game_date, but never UniqueID-tail
-    (T099 is native-only). No today_ptr → unsure (—). Dense calendar table alone
-    is not today.
+    After club UniqueID u32: lp32 label → u32 0 → u32 0xffffffff → u16 doy +
+    u16 year (same decode as T099: raw if 1..366 else raw & 0x1FF).
+
+    Locked from FM24 continue rolling-stack diffs. Not UniqueID+4 (native T099).
+    Not c708 / today_ptr / calendar-run end (T096 lie). Miss → unsure (—).
     """
-    lo = 0
-    hi = min(len(buf), CONTINUE_DATE_SCAN)
-    neighborhood = collect_date_candidates(buf, lo, hi)
-    empty = _empty_date_pick(lo=lo, hi=hi, candidates=neighborhood)
-    today_ptrs = [c for c in neighborhood if c.get("kind") == "today_ptr"]
-    if not today_ptrs:
+    abs0 = int(identity.get("identityAbs") or 0)
+    club_id_abs = int(identity.get("clubIdAbs") or abs0)
+    lo = max(0, abs0 - IDENTITY_DATE_WINDOW)
+    hi = min(len(buf), max(abs0 + IDENTITY_DATE_WINDOW, CONTINUE_DATE_SCAN))
+    neighborhood = collect_date_candidates(buf, 0, min(len(buf), CONTINUE_DATE_SCAN))
+    empty = _empty_date_pick(lo=lo, hi=hi, candidates=neighborhood, tail=None)
+
+    str_off = club_id_abs + 4
+    label = read_lp32(buf, str_off)
+    if not label:
         return empty
-    ptr = max(today_ptrs, key=lambda c: int(c["daysY1900"]))
-    chosen_days = int(ptr["daysY1900"])
-    ptr_days = chosen_days
-    prelude_days = {
-        int(c["daysY1900"]) for c in neighborhood if c.get("kind") == "prelude"
+    n = struct.unpack_from("<I", buf, str_off)[0]
+    mark_off = str_off + 4 + n
+    if mark_off + 12 > len(buf):
+        return empty
+    zero, sentinel = struct.unpack_from("<II", buf, mark_off)
+    if zero != 0 or sentinel != 0xFFFFFFFF:
+        return empty
+    tail = mark_off + 8
+    raw, year = struct.unpack_from("<HH", buf, tail)
+    doy = raw if 1 <= raw <= 366 else (raw & 0x1FF)
+    iso = doy_year_to_iso(doy, year)
+    tail_bytes = bytes(buf[tail : tail + 4])
+    trail_cand = {
+        "kind": "continue_uid_trailer_doy_year",
+        "iso": iso,
+        "doy": doy,
+        "year": year,
+        "abs": tail,
+        "nearbyHex": tail_bytes.hex(),
+        "label": label,
     }
-    while chosen_days + 1 in prelude_days:
-        chosen_days += 1
-    iso = days_y1900_to_iso(chosen_days)
-    if not iso or not (DATE_YEAR_LO <= int(iso[:4]) <= DATE_YEAR_HI):
+    cands = [trail_cand, *neighborhood]
+    if not iso:
+        empty["candidates"] = cands
+        empty["doy"] = doy
+        empty["year"] = year
+        empty["tailAbs"] = tail
+        empty["tailHex"] = tail_bytes.hex()
         return empty
-    method = "calendar_run_end" if chosen_days != ptr_days else "today_ptr_latest"
-    chosen_abs = ptr["abs"]
-    if chosen_days != ptr_days:
-        for c in neighborhood:
-            if c.get("kind") == "prelude" and int(c["daysY1900"]) == chosen_days:
-                chosen_abs = c["abs"]
-                break
+    dt = date.fromisoformat(iso)
     return {
         "gameDate": iso,
-        "daysY1900": chosen_days,
-        "abs": chosen_abs,
-        "method": method,
-        "candidates": neighborhood,
+        "daysY1900": (dt - DATE_EPOCH).days,
+        "abs": tail,
+        "method": "continue_uid_trailer_doy_year",
+        "candidates": cands,
         "windowLo": lo,
         "windowHi": hi,
-        "doy": None,
-        "year": None,
-        "tailAbs": None,
-        "tailHex": None,
+        "doy": doy,
+        "year": year,
+        "tailAbs": tail,
+        "tailHex": tail_bytes.hex(),
     }
 
 
@@ -530,7 +548,7 @@ def pick_native_uniqueid_tail_date(buf, identity: dict) -> dict:
 
 
 def pick_game_date_near_identity(buf, identity: dict | None) -> dict | None:
-    """Tag 01 = UniqueID-tail (T099). Tag 02 = continue calendar. Else unsure."""
+    """Tag 01 = UniqueID-tail (T099). Tag 02 = continue UniqueID trailer (T106)."""
     if not identity:
         return None
     tag = str(identity.get("tagHex") or "").lower()

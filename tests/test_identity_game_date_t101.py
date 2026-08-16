@@ -1,4 +1,4 @@
-"""T101: tag 01 UniqueID-tail; tag 02 continue calendar — never UniqueID-tail."""
+"""T101 + T106: tag 01 UniqueID-tail; tag 02 continue UniqueID trailer — never calendar."""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ CLUB_UID = 4242
 TWIN = 0x11111111
 TAIL_DAY = date(2026, 1, 4)
 CAL_DAY = date(2026, 8, 16)
+TRAILER_DAY = date(2040, 10, 24)
 
 
 def _load(name: str, path: Path):
@@ -37,10 +38,20 @@ def _date_tail(d: date) -> bytes:
     return struct.pack("<HH", d.timetuple().tm_yday, d.year)
 
 
-def _identity_blob(tag: bytes, *, tail: bytes | None = None) -> bytes:
+def _continue_trailer(d: date, *, label: str = "Pad Label", raw: int | None = None) -> bytes:
+    """UniqueID already in identity blob; this is the bytes after UniqueID."""
+    doy = d.timetuple().tm_yday if raw is None else raw
+    return (
+        _lp32(label)
+        + struct.pack("<II", 0, 0xFFFFFFFF)
+        + struct.pack("<HH", doy if raw is None else raw, d.year)
+    )
+
+
+def _identity_blob(tag: bytes, *, after_uid: bytes | None = None) -> bytes:
     body = tag + _lp32(PERSON) + _lp32(CLUB) + struct.pack("<I", CLUB_UID)
-    if tail is not None:
-        body += tail
+    if after_uid is not None:
+        body += after_uid
     return body
 
 
@@ -72,7 +83,7 @@ class IdentityGameDateT101Tests(unittest.TestCase):
 
     def test_native_tag_01_still_uniqueid_tail(self) -> None:
         blob = (
-            _identity_blob(TAG_01, tail=_date_tail(TAIL_DAY))
+            _identity_blob(TAG_01, after_uid=_date_tail(TAIL_DAY))
             + _prelude(self.emt, CAL_DAY)
             + _today_ptr(CAL_DAY)
         )
@@ -83,36 +94,39 @@ class IdentityGameDateT101Tests(unittest.TestCase):
         self.assertEqual(picked["doy"], TAIL_DAY.timetuple().tm_yday)
         self.assertEqual(picked["year"], TAIL_DAY.year)
 
-    def test_continue_tag_02_uses_calendar_not_uniqueid_tail(self) -> None:
+    def test_continue_tag_02_uses_trailer_not_uniqueid_tail(self) -> None:
         blob = (
-            _identity_blob(TAG_02, tail=_date_tail(TAIL_DAY))
+            _identity_blob(TAG_02, after_uid=_continue_trailer(TRAILER_DAY))
+            + _date_tail(TAIL_DAY)  # decoy if mis-aligned
             + _prelude(self.emt, CAL_DAY)
             + _today_ptr(CAL_DAY)
         )
         picked = self._pick(blob)
-        self.assertEqual(picked["gameDate"], CAL_DAY.isoformat())
+        self.assertEqual(picked["gameDate"], TRAILER_DAY.isoformat())
         self.assertNotEqual(picked["gameDate"], TAIL_DAY.isoformat())
-        self.assertIn(picked["method"], ("today_ptr_latest", "calendar_run_end"))
-        self.assertIsNone(picked.get("doy"))
+        self.assertNotEqual(picked["gameDate"], CAL_DAY.isoformat())
+        self.assertEqual(picked["method"], "continue_uid_trailer_doy_year")
+        self.assertEqual(picked["doy"], TRAILER_DAY.timetuple().tm_yday)
+        self.assertEqual(picked["year"], TRAILER_DAY.year)
 
-    def test_continue_tag_02_without_calendar_is_dash_even_with_tail(self) -> None:
-        blob = _identity_blob(TAG_02, tail=_date_tail(TAIL_DAY))
+    def test_continue_tag_02_without_trailer_is_dash_even_with_native_tail(self) -> None:
+        blob = _identity_blob(TAG_02, after_uid=_date_tail(TAIL_DAY))
         picked = self._pick(blob)
         self.assertIsNone(picked["gameDate"])
         self.assertEqual(picked["method"], "identity_unsure")
 
-    def test_continue_walks_prelude_days_after_today_ptr(self) -> None:
+    def test_continue_ignores_calendar_run_without_trailer(self) -> None:
         end = CAL_DAY + timedelta(days=2)
         blob = (
-            _identity_blob(TAG_02, tail=_date_tail(TAIL_DAY))
+            _identity_blob(TAG_02)
             + _prelude(self.emt, CAL_DAY)
             + _prelude(self.emt, CAL_DAY + timedelta(days=1))
             + _prelude(self.emt, end)
             + _today_ptr(CAL_DAY)
         )
         picked = self._pick(blob)
-        self.assertEqual(picked["gameDate"], end.isoformat())
-        self.assertEqual(picked["method"], "calendar_run_end")
+        self.assertIsNone(picked["gameDate"])
+        self.assertEqual(picked["method"], "identity_unsure")
 
 
 if __name__ == "__main__":

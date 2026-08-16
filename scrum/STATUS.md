@@ -1,12 +1,14 @@
 # Status
 
-Last updated: 2026-08-16 (T105 done)
+Last updated: 2026-08-16 (T106 done)
 
 ## Now
 
 **Loop:** Squad (HA) → Loans (honesty / youth out) → Progress (CA + HA) → Mentoring (in FM).
 
 **SHIP.** Four tabs: Squad, Loans, Mentoring, Progress. Cloud-capable extract. BMC tip on the header.
+
+**T106 done** — continue tag `02` gameDate = UniqueID trailer (lp32 → 0 → ffffffff → u16 doy+year). Not UniqueID+4, not c708. König FM24Career stack deleted. T087 frozen. Do not claim T077 / T080 / T081.
 
 **T038 done** — II Lars Gabrielsen Det/Lea is the same T014 tip class (not a new locus). Remaining hist=0 stay `—`.
 
@@ -78,7 +80,11 @@ Last updated: 2026-08-16 (T105 done)
 
 **T105 done** — one `.table-pane` shell; empty drop well under thead (same slot). Mentoring empty hides Add group / Load a Career Save.
 
-**Next:** No ready tickets. T087 frozen. Do not claim T077 / T080 / T081.
+**Used (2026-08-16 HQ):** FM24 Schalke card still `Game Date: —`. Repro `dynamics-c.fm`: tag 02, continue calendar finds prelude-only (2038–39 table), no `today_ptr` → `identity_unsure`. T101 synthetic had a planted ptr; real save does not. Do not take max prelude (T096).
+
+**Used (2026-08-16 HQ):** Owner will not give the date. Hunting via rolling continue stack in `data/saves`: `FM24Career.fm` + `(v02)`…`(v10)` (same club, different days). Lock date blob from diffs, then **delete** those copies.
+
+**T106 done** — continue gameDate from UniqueID trailer; König stack deleted. T087 frozen. Do not claim T077 / T080 / T081.
 
 | Area | State | Need-to-have? |
 |------|--------|---------------|
@@ -144,6 +150,7 @@ Last updated: 2026-08-16 (T105 done)
 | Page shell: header identity + four tabs + one pane | **T103 done** | **Yes** |
 | Kill header Squad leftover; unified empty pane + drop | **T104 done** | Yes |
 | One table pane shell; same drop well slot | **T105 done** | Yes |
+| Continue FM24 gameDate (rolling stack lock) | **T106 done** | **Yes** |
 | Progress GK abilities + outfield GK rating | **T087 blocked** (on T094) | after native roster |
 | npm run dev from HQ | **T089 cancelled** | — |
 | Sync steals Active save when extract finishes | **T088 done** | **Yes** |
@@ -178,7 +185,7 @@ Last updated: 2026-08-16 (T105 done)
 
 ## Gate
 
-- T105 done. Empty ready board. T087 frozen. T077 / T080 / T081 blocked. One ticket per worker.
+- Empty ready board (T106 done). T087 frozen. T077 / T080 / T081 blocked. One ticket per worker.
 - Refuse Suggest. Refuse CA/PA. Refuse Stripe paywall / packaging / FM27.
 - BMC is a tip. Do not gate the table.
 - Workers: one ticket, one commit on `FMT/`. If freeze, do not claim anything else.
@@ -188,6 +195,8 @@ Last updated: 2026-08-16 (T105 done)
 - Host RAM / T077 after owner says the local loop is honest (any save + Active not stolen).
 
 ## Recently done
+
+- **T106** — Continue tag `02` gameDate from UniqueID trailer (lp32 → u32 0 → u32 0xffffffff → u16 doy + u16 year; same T099 mask). Not UniqueID+4, not c708/today_ptr. Locked via König FM24Career v02–v10 diffs; those copies deleted. Native tag `01` still T099. Unittest t106+t101+t099+t097+t096. Restart `npm run dev` and + a continue save. No committed `.fm`.
 
 - **T105** — Squad / Loans / Mentoring / Progress share `.table-pane`. Empty: T104 thead on top, `.table-pane-drop` under it (not a table row). Mentoring empty hides Add group and “Load a Career Save”. Drop still + identity upload. Filled Loans cards / Mentoring groups / Progress chart stay in the same panel. Vitest chrome. Restart `npm run dev`. No committed `.fm`.
 
