@@ -37,7 +37,11 @@ if hasattr(sys.stderr, "reconfigure"):
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-from ft_squad_discovery import resolve_ft_squad, select_managed_ft_jobs  # noqa: E402
+from ft_squad_discovery import (  # noqa: E402
+    ft_join_progress_fields,
+    resolve_ft_squad,
+    select_managed_ft_jobs,
+)
 from ii_squad_discovery import resolve_ii_squad  # noqa: E402
 from u19_squad_discovery import (  # noqa: E402
     NAME_BAND_HI,
@@ -2623,14 +2627,17 @@ def main() -> int:
             # the club's unit squad list — FT via club-object → 7f02 join; II via
             # affiliate join; U19 via namelist. Never admit pick_tid foreign lists
             # when identity is known (non-employees poison Mentoring).
-            if world_lists != "empty":
-                ft_hit = resolve_ft_squad(mm, club_short) if club_short else None
+            if world_lists != "empty" and (club_short or club_id):
+                ft_hit = resolve_ft_squad(mm, club_short, club_id=club_id)
             fallback_jobs: list[int] | None = None
-            if abort_world is None and not club_short and squads:
+            if abort_world is None and not club_short and not club_id and squads:
                 best_tid = pick_tid(squads, manager_hits)
                 list_abs, count, fallback_jobs = squads[best_tid]
             selected = select_managed_ft_jobs(
-                club_short, ft_hit, fallback_jobs=fallback_jobs
+                club_short,
+                ft_hit,
+                fallback_jobs=fallback_jobs,
+                club_id=club_id,
             )
             ft_discovery_method = str(selected["method"])
             ft_list = (ft_hit or {}).get("list") if ft_hit else None
@@ -2645,9 +2652,10 @@ def main() -> int:
                 list_abs = 0
                 count = 0
             # else: best_tid/list_abs/count already set from pick_tid fallback
-            # (identity unknown only — never when club_short is known)
+            # (identity unknown only — never when club short or UniqueID is known)
 
-            miss_reason = selected.get("missReason")
+            join_progress = ft_join_progress_fields(club_id, ft_hit, selected)
+            miss_reason = join_progress.get("missReason")
             progress(
                 t0,
                 phase="resolve",
@@ -2658,7 +2666,7 @@ def main() -> int:
                 ),
                 pct=74,
                 jobsTarget=len(jobs),
-                **({"missReason": miss_reason} if miss_reason else {}),
+                **join_progress,
             )
 
             # T086: loan object on unit jobs (same recipe FT/II/U19) before HA.
