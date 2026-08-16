@@ -348,8 +348,12 @@ export function upsertRoster(
     ...(u19 !== undefined ? { u19: u19 as StoredU19Squad | null } : {}),
   };
 
+  const current = store.activeSaveName;
+  const keepActive =
+    current != null &&
+    (current === entry.saveName || Boolean(store.saves[current]));
   const next: RosterStore = {
-    activeSaveName: entry.saveName,
+    activeSaveName: keepActive ? current : entry.saveName,
     saves: {
       ...store.saves,
       [entry.saveName]: nextEntry,

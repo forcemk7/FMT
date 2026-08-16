@@ -32,18 +32,9 @@ Last updated: 2026-08-16 (HQ: Squad + Loans + Mentoring + Progress)
 
 **T070 done** — Header Buy me a coffee → `https://buymeacoffee.com/mrramirez` (new tab, optional thank-you). Table stays free.
 
-**FREEZE.** Launch waits. Product = four extract steps, any Career Save. Worker edits extract Python, never a `.fm`. Do not claim T077 / T080 / T081 / T087 / **T088**.
+**FREEZE over (extract).** T083–T086 done: managed club → employed FT/II/U19 → HA+CA → at-club vs loaned + census.
 
-1. **T083** Managed club (**done**)  
-2. **T084** Employed players — FT / II / U19 (**done**)  
-3. **T085** Those players’ CA + HA (**done**)  
-4. **T086** Contracts — at-club vs loaned out + census counts (**done**)  
-
-T088 (sync vs Active save) is ready but **not this freeze**. Do not claim T077 / T080 / T081 / T087 / T088 unless HQ names them.
-
-Wrong Squad/Loans split poisons Mentoring Group checks. There is no Suggest. Empty Squad on a non-development save is `ft-club-squad-join-miss`. Do not custom-fit a local `.fm`. Never commit saves. T082 cancelled (loans = T086). T087 (Progress GK layout) after T086.
-
-**Next:** T086 done. Remaining board: T088 ready (after freeze); T087 / T077 / T080 / T081 blocked. Never git add `*.fm`; never mmap live `games/`.
+**T088 done** — Sync belongs to the selected save. Start on A → select B → A finishes into slot A; Active / Squad stay on B.
 
 | Area | State | Need-to-have? |
 |------|--------|---------------|
@@ -93,16 +84,15 @@ Wrong Squad/Loans split poisons Mentoring Group checks. There is no Suggest. Emp
 | Personalities label → Squad | **T073 done** | Yes |
 | Ranker / checker / compare chrome | **T075 done** | Yes |
 | Progress default chip + FM columns | **T078 done** | Yes |
-| Progress GK abilities + outfield GK rating | **T087 blocked** (on T086) | after freeze |
-| Sync steals Active save when extract finishes | **T088 ready** (after freeze) | **Yes** |
+| Progress GK abilities + outfield GK rating | **T087 ready** (after T088) | after T088 |
+| Sync steals Active save when extract finishes | **T088 done** | **Yes** |
 | II/U19 Progress CA strip | **T079 done** | **Yes** |
 
 ## Board
 
 | ID | Title | Status | Owner |
 |----|-------|--------|-------|
-| T088 | Sync belongs to the selected save | ready | |
-| T087 | Progress GK vs outfield CA layout | blocked | |
+| T087 | Progress GK vs outfield CA layout | ready | |
 | T077 | Live www URL — upload save, extract, four tabs | blocked | |
 | T080 | Stop favoured-club extract on roster path | blocked | |
 | T081 | Faster loan motif search — same loan flags | blocked | |
@@ -112,7 +102,7 @@ Wrong Squad/Loans split poisons Mentoring Group checks. There is no Suggest. Emp
 - ≥ filter without Det/Lea is dishonest for mentoring suitability.
 - Units in FMT = planning reminder for FM. Mentoring pool = at-club only. Loaned names on Loans. Same person must not be on both.
 - **Used (2026-08-14):** Clear filters → click Adrian Itu → loosen-all → Yoan Robert + Miraglia. FT-only hid this. Empty FT list was correct.
-- **Used (2026-08-16 HQ):** Start sync on save A → select save B in Manage saves → extract finishes → view jumps back to A. `upsertRoster` always sets Active to the extracted save. T088. Freeze stays T086.
+- **Used (2026-08-16 HQ):** Start sync on save A → select save B in Manage saves → extract finishes → view jumped back to A. **T088 done** — persist stays on A’s slot; Active / Squad stay on B.
 - **Used (2026-08-16 HQ):** Upload a different Career Save → Squad empty. Cause: identity can succeed, then development-save FT join misses (`BODY` 40–100MB, FT count 15–45, `{short} II` / `{short} U19` name gates) and `select_managed_ft_jobs` returns `jobs: []`. T083–T086. Worker is save-blind: no committed `.fm`, no new constants from a local file.
 - After groups exist in FM: extract on a new in-game date → Progress HA delta (pack + Det/Lea). Two different gameDates required; one extract → value, empty delta.
 - Extract is two blobs once (pack + CA card). UI: Squad HA = pack + Det/Lea from the card. Progress CA = card history; Progress HA = pack snapshots + Det/Lea from the card (T066). Do not hunt Det/Lea as a third extract.
@@ -125,16 +115,18 @@ Wrong Squad/Loans split poisons Mentoring Group checks. There is no Suggest. Emp
 
 ## Gate
 
-- **Freeze:** T086 done. Refuse www, scout drop, scan speed, GK Progress, **T088** until the human names it. Launch waits. One ticket per worker.
+- T088 shipped. Remaining board: T087 ready; T077 / T080 / T081 blocked. One ticket per worker.
 - Refuse Suggest. Refuse CA/PA. Refuse Stripe paywall / packaging / FM27.
 - BMC is a tip. Do not gate the table.
 - Workers: one ticket, one commit on `FMT/`. If freeze, do not claim anything else.
 
 ## Blockers
 
-- **Freeze:** T086 done. Workers stay save-blind (no committed `.fm`, no live `games/`). Host RAM / T077 after HQ names it.
+- Host RAM / T077 after owner says the local loop is honest (any save + Active not stolen).
 
 ## Recently done
+
+- **T088** — Sync belongs to the selected save. `upsertRoster` no longer steals Active. Disk extract starts only for Active (one at a time); in-flight extract finishes into that slot. Selecting another save keeps Squad on that save. Syncing + progress live on that row in Manage saves. Queued auto-sync re-checks Active. Vitest ingest + T088 chrome guards.
 
 - **T086** — At-club vs loaned-out is the loan object on FT/II/U19 jobs (same recipe). Foreign-U19 namelist is not the youth-loan path. Packed `64ff24` stride is not a loan. One census PROGRESS line after the split. Squad / Mentoring = at-club; Loans = outgoing; Progress picker includes both. Synthetic tests. Optional local smoke census to the human; no committed `.fm`.
 

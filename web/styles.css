@@ -7363,6 +7363,10 @@ button.mentoring-seat-card:hover {
   border-color: color-mix(in srgb, var(--heading) 55%, var(--line));
 }
 
+.roster-saves-row.is-syncing {
+  border-color: color-mix(in srgb, var(--accent, #c8e06a) 40%, var(--line));
+}
+
 .roster-saves-item {
   display: flex;
   flex-direction: column;
@@ -7430,6 +7434,26 @@ button.mentoring-seat-card:hover {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   line-height: 1.2;
+}
+
+.roster-saves-item-badge.is-syncing::before {
+  content: "";
+  display: inline-block;
+  width: 0.4rem;
+  height: 0.4rem;
+  margin-right: 0.28rem;
+  border-radius: 50%;
+  background: var(--accent, #c8e06a);
+  animation: roster-status-pulse 1.1s ease-in-out infinite;
+}
+
+.roster-saves-item-sync {
+  font-size: 0.68rem;
+  color: var(--text);
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .roster-saves-row.is-active .roster-saves-item-club {

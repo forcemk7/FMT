@@ -402,6 +402,10 @@ let rosterAmendTarget: string | null = null;
 let rosterRefreshInFlight = false;
 /** True when the in-flight extract is non-blocking auto-sync. */
 let rosterBackgroundSync = false;
+/** Save currently extracting — persist into this slot even if Active changes. */
+let rosterSyncingSaveName: string | null = null;
+/** Live settle/extract label for the syncing save’s Manage saves row. */
+let rosterSyncProgress = "";
 /** Waiters for manual upload/update while a refresh is in flight. */
 let rosterRefreshIdleWaiters: Array<() => void> = [];
 /** Coalesce another auto-sync if the save changes again mid-extract. */
@@ -6724,6 +6728,7 @@ function syncRosterSavesMenu() {
       club && id != null ? formatClubLine(club, id) : club || name;
     const isActive = name === rosterStore.activeSaveName;
     const isOverwrite = name === rosterAmendTarget;
+    const isSyncing = name === rosterSyncingSaveName;
     const diskLinked = rosterSaveDiskLinked(name);
 
     const row = document.createElement("div");
@@ -6731,6 +6736,7 @@ function syncRosterSavesMenu() {
     row.dataset.saveName = name;
     if (isActive) row.classList.add("is-active");
     if (isOverwrite) row.classList.add("is-overwrite");
+    if (isSyncing) row.classList.add("is-syncing");
 
     const uploaded = formatUploadedAtRow(entry.extractedAt);
     const inGame = formatInGameDateRow(entry.gameDate);
@@ -6745,10 +6751,17 @@ function syncRosterSavesMenu() {
       `Uploaded ${formatUploadedAt(entry.extractedAt)}`,
       `In-game ${formatInGameDate(entry.gameDate)}`,
     ].join("\n");
+    const syncLabel = isSyncing
+      ? rosterSyncProgress.trim() || "Syncing"
+      : "";
     selectBtn.innerHTML = `
       <span class="roster-saves-item-club">${escapeHtml(clubLine ?? name)}${
         isActive
           ? `<span class="roster-saves-item-badge">Active</span>`
+          : ""
+      }${
+        isSyncing
+          ? `<span class="roster-saves-item-badge is-syncing">Syncing</span>`
           : ""
       }</span>
       <span class="roster-saves-item-file">${escapeHtml(name)}${
@@ -6756,6 +6769,11 @@ function syncRosterSavesMenu() {
       }${
         isOverwrite ? " · next upload overwrites" : ""
       }</span>
+      ${
+        isSyncing
+          ? `<span class="roster-saves-item-sync" aria-live="polite">${escapeHtml(syncLabel)}</span>`
+          : ""
+      }
       <span class="roster-saves-item-dates" aria-label="Uploaded ${escapeHtml(uploaded)}, in-game ${escapeHtml(inGame)}">
         <span class="roster-saves-item-date is-uploaded">
           <span class="roster-saves-item-date-label">Uploaded</span>
@@ -6777,9 +6795,16 @@ function syncRosterSavesMenu() {
     updateBtn.dataset.action = "update";
     updateBtn.dataset.saveName = name;
     updateBtn.textContent = "Update";
-    updateBtn.title = diskLinked
-      ? "Re-read this save from disk (FM games folder)"
-      : "Replace this extract — opens file picker if not found on disk";
+    updateBtn.disabled = !isActive || rosterRefreshInFlight;
+    if (!isActive) {
+      updateBtn.title = "Select this save first — sync starts only for Active";
+    } else if (rosterRefreshInFlight) {
+      updateBtn.title = "An extract is already running";
+    } else {
+      updateBtn.title = diskLinked
+        ? "Re-read this save from disk (FM games folder)"
+        : "Replace this extract — opens file picker if not found on disk";
+    }
 
     const deleteBtn = document.createElement("button");
     deleteBtn.type = "button";
@@ -6787,7 +6812,10 @@ function syncRosterSavesMenu() {
     deleteBtn.dataset.action = "delete";
     deleteBtn.dataset.saveName = name;
     deleteBtn.textContent = "Delete";
-    deleteBtn.title = "Permanently remove this extract";
+    deleteBtn.disabled = isSyncing;
+    deleteBtn.title = isSyncing
+      ? "Wait for this extract to finish"
+      : "Permanently remove this extract";
 
     actions.append(updateBtn, deleteBtn);
     row.append(selectBtn, actions);
@@ -8186,9 +8214,12 @@ function renderRoster() {
   rosterSavesBtnEl.setAttribute("aria-label", savesLabel);
 
   rosterStatusEl.classList.toggle("is-error", Boolean(rosterMeta.error));
-  // Don't clobber live settle/extract progress while a refresh is in flight,
-  // or a just-finished Updated flash from showRosterUpdatedStatus.
-  if (!rosterRefreshInFlight && !rosterStatusEl.classList.contains("is-success")) {
+  // Disk sync chrome lives on the Manage saves row (T088). Keep header trust
+  // for the viewed save. Do not clobber an in-flight upload status strip.
+  if (
+    (!rosterRefreshInFlight || rosterSyncingSaveName) &&
+    !rosterStatusEl.classList.contains("is-success")
+  ) {
     applyRosterTrustStatus();
   }
 
@@ -8439,11 +8470,21 @@ function setRosterLiveStatus(text: string, detail?: string) {
 
 /** Compact in-strip label; full process detail lives in the hover tooltip. */
 function setRosterSyncStatus(detail: string) {
-  setRosterLiveStatus("Syncing", detail);
+  const lines = detail.split("\n");
+  const label = (lines.length > 1 ? lines.slice(1).join(" · ") : detail).trim();
+  rosterSyncProgress = label || "Syncing";
+  syncRosterSavesMenu();
 }
 
-function setRosterSyncing(syncing: boolean) {
-  rosterSaveControllerEl.classList.toggle("is-syncing", syncing);
+function setRosterSyncing(syncing: boolean, saveName?: string) {
+  if (syncing) {
+    rosterSyncingSaveName = saveName ?? rosterSyncingSaveName;
+  } else {
+    rosterSyncingSaveName = null;
+    rosterSyncProgress = "";
+  }
+  rosterSaveControllerEl.classList.remove("is-syncing");
+  syncRosterSavesMenu();
 }
 
 function notifyRosterRefreshIdle() {
@@ -8559,10 +8600,6 @@ function setRosterControlsDisabled(disabled: boolean) {
   rosterTablePanelEl.classList.toggle("is-busy", disabled);
   rosterUploadEl.disabled = disabled;
   rosterUploadBtnEl.disabled = disabled;
-  rosterSavesBtnEl.disabled = disabled;
-  for (const btn of rosterSavesListEl.querySelectorAll("button")) {
-    btn.disabled = disabled;
-  }
 }
 
 function clearRosterAmendTarget() {
@@ -8678,17 +8715,26 @@ function persistExtractResult(
     haHistoryStore,
     rosterStore.saves[body.saveName]!,
   );
-  if (replaceName && replaceName !== body.saveName) {
+  const extractedName = body.saveName;
+  const viewingReplaced = Boolean(replaceName && replaceName === rosterStore.activeSaveName);
+  if (replaceName && replaceName !== extractedName) {
     rosterStore = deleteRoster(rosterStore, replaceName);
-    rosterStore = setActiveRoster(rosterStore, body.saveName);
+    if (viewingReplaced) {
+      rosterStore = setActiveRoster(rosterStore, extractedName);
+    }
   }
   if (!options?.soft) rosterAmendTarget = null;
   // Apply the in-memory upsert directly — reloading LS here can resurrect a
   // pre-persist snapshot if another tab/HMR raced the write (T010).
-  applyActiveRosterFromStore({
-    soft: Boolean(options?.soft),
-    reload: false,
-  });
+  // Do not steal Active / Squad view when the user selected another save (T088).
+  if (rosterStore.activeSaveName === extractedName) {
+    applyActiveRosterFromStore({
+      soft: Boolean(options?.soft),
+      reload: false,
+    });
+  } else {
+    syncRosterSavesMenu();
+  }
 }
 
 /** FM writes after Save click — wait until size/mtime stop changing before extract. */
@@ -8779,9 +8825,16 @@ async function refreshSaveFromDisk(
     if (options?.background) rosterBackgroundSyncQueued = true;
     return false;
   }
+  // Sync starts only for the save marked Active (T088). One extract at a time.
+  if (saveName !== rosterStore.activeSaveName) return false;
 
   let stat = await fetchSaveDiskStat(saveName);
   if (!stat) return false;
+  if (rosterRefreshInFlight) {
+    if (options?.background) rosterBackgroundSyncQueued = true;
+    return false;
+  }
+  if (saveName !== rosterStore.activeSaveName) return false;
 
   const background = Boolean(options?.background);
   let ok = false;
@@ -8790,48 +8843,35 @@ async function refreshSaveFromDisk(
 
   rosterRefreshInFlight = true;
   rosterBackgroundSync = background;
+  rosterSyncingSaveName = saveName;
+  rosterSyncProgress = "";
   if (!background) {
     rosterAmendTarget = options?.replaceName ?? saveName;
-    setRosterControlsDisabled(true);
-  } else {
-    setRosterSyncing(true);
   }
+  setRosterSyncing(true, saveName);
 
   try {
     if (options?.waitForSettle) {
-      if (background) {
-        setRosterSyncStatus(`${stat.saveName}\nWaiting for write…`);
-      } else {
-        setRosterLiveStatus("Waiting for write…", stat.saveName);
-      }
+      setRosterSyncStatus(`${stat.saveName}\nWaiting for write…`);
       const settled = await waitForSaveDiskStable(stat.saveName, (info) => {
         const detail = `${info.stat.saveName}\n${formatSaveSettleStatus(info)}`;
-        if (background) setRosterSyncStatus(detail);
-        else setRosterLiveStatus(formatSaveSettleStatus(info), detail);
+        setRosterSyncStatus(detail);
       });
       if (!settled) {
         if (!background) rosterAmendTarget = null;
-        backgroundError = background
-          ? "Could not confirm save finished writing"
-          : null;
+        backgroundError = "Could not confirm save finished writing";
         return false;
       }
       stat = settled;
     }
 
-    if (background) {
-      setRosterSyncStatus(`${stat.saveName}\nReading from disk…`);
-    } else {
-      setRosterLiveStatus("Reading from disk…", stat.saveName);
-    }
+    setRosterSyncStatus(`${stat.saveName}\nReading from disk…`);
     const res = await fetch(
       `/api/roster/first-team?save=${encodeURIComponent(stat.saveName)}`,
     );
     const body = await consumeExtractStream(res, (p) => {
       const label = formatProgress(p);
-      const detail = `${stat.saveName}\n${label}`;
-      if (background) setRosterSyncStatus(detail);
-      else setRosterLiveStatus(label, detail);
+      setRosterSyncStatus(`${stat.saveName}\n${label}`);
     });
     body.saveName = stat.saveName;
     const fresh = await fetchSaveDiskStat(stat.saveName);
@@ -8840,44 +8880,46 @@ async function refreshSaveFromDisk(
       rosterAmendTarget = options.replaceName;
     }
     persistExtractResult(body, fresh ?? stat, { soft: background });
-    rosterMeta = { ...rosterMeta, error: undefined };
+    if (rosterStore.activeSaveName === stat.saveName) {
+      rosterMeta = { ...rosterMeta, error: undefined };
+    }
     updatedBody = body;
     ok = true;
     return true;
   } catch (err) {
     const raw = err instanceof Error ? err.message : String(err);
-    if (background) {
-      backgroundError = raw;
+    if (rosterStore.activeSaveName === saveName) {
+      if (background) {
+        backgroundError = raw;
+      } else {
+        rosterMeta = {
+          ...rosterMeta,
+          error: raw,
+        };
+        rosterAmendTarget = null;
+      }
     } else {
-      rosterMeta = {
-        ...rosterMeta,
-        error: raw,
-      };
-      rosterAmendTarget = null;
+      backgroundError = raw;
     }
     return false;
   } finally {
+    const extractedName = saveName;
+    const stillActive = rosterStore.activeSaveName === extractedName;
     rosterRefreshInFlight = false;
     rosterBackgroundSync = false;
     rosterUploadEl.value = "";
-    if (!background) setRosterControlsDisabled(false);
-    else setRosterSyncing(false);
+    setRosterSyncing(false);
     renderRoster();
     refreshActiveSquadSideView();
-    if (ok && updatedBody) {
+    if (ok && updatedBody && stillActive) {
       if (background) flashRosterSoftUpdate();
       showRosterUpdatedStatus(updatedBody);
-    } else if (background && backgroundError) {
+    } else if (backgroundError && stillActive) {
       setRosterLiveStatus(`Background sync failed — ${backgroundError}`);
       rosterStatusEl.classList.add("is-error");
-    } else if (background && !ok) {
-      // Never leave the strip on Syncing after a quiet failure.
-      if (rosterStatusEl.textContent === "Syncing") {
-        setRosterLiveStatus("");
-      }
     }
     notifyRosterRefreshIdle();
-    if (background && rosterBackgroundSyncQueued) {
+    if (rosterBackgroundSyncQueued) {
       rosterBackgroundSyncQueued = false;
       // Let any waiting manual upload/update claim the lock first.
       setTimeout(() => {
@@ -8885,6 +8927,8 @@ async function refreshSaveFromDisk(
           rosterBackgroundSyncQueued = true;
           return;
         }
+        // Re-check Active — do not start B if the user is still on A, or A if they moved.
+        if (!rosterStore.activeSaveName) return;
         void maybeRefreshActiveSaveFromDisk({
           reason: "Save changed on disk",
           waitForSettle: false,
@@ -8919,6 +8963,13 @@ async function maybeRefreshActiveSaveFromDisk(options?: {
     if (!stat) return;
   }
 
+  // Re-check Active after the async pull — do not start a now-unselected save.
+  if (rosterStore.activeSaveName !== active) return;
+  if (rosterRefreshInFlight) {
+    if (options?.background !== false) rosterBackgroundSyncQueued = true;
+    return;
+  }
+
   const waitForSettle = options?.waitForSettle === true;
   const background = options?.background !== false;
 
@@ -8929,13 +8980,6 @@ async function maybeRefreshActiveSaveFromDisk(options?: {
 
   const latest = rosterStore.saves[active] ?? entry;
   if (!shouldRefreshRosterFromDisk(latest, stat.mtimeMs, stat.size)) {
-    if (
-      !rosterRefreshInFlight &&
-      rosterStatusEl.textContent === "Syncing"
-    ) {
-      setRosterSyncing(false);
-      applyRosterTrustStatus();
-    }
     return;
   }
 
@@ -9125,25 +9169,18 @@ rosterSavesMenuEl.addEventListener("click", (e) => {
   }
 
   if (action === "update") {
-    rosterStore = setActiveRoster(rosterStore, name);
-    applyActiveRosterFromStore();
-    renderRoster();
-    refreshActiveSquadSideView();
-    setRosterSavesMenuOpen(false);
+    if (name !== rosterStore.activeSaveName) return;
+    if (rosterRefreshInFlight) return;
     void (async () => {
-      if (rosterRefreshInFlight) {
-        setRosterLiveStatus(
-          rosterBackgroundSync
-            ? "Waiting for background sync to finish…"
-            : "Waiting for current extract to finish…",
-        );
-        await whenRosterRefreshIdle();
-      }
       const ok = await refreshSaveFromDisk(name, {
         replaceName: name,
-        background: false,
+        background: true,
       });
-      if (!ok) {
+      if (
+        !ok &&
+        !rosterRefreshInFlight &&
+        name === rosterStore.activeSaveName
+      ) {
         rosterAmendTarget = name;
         renderRoster();
         openRosterFilePicker();

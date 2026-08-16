@@ -3,6 +3,7 @@ import {
   destMatchesLastPersist,
   loadRosterStore,
   saveRosterStore,
+  setActiveRoster,
   shouldRefreshRosterFromDisk,
   upsertRoster,
   type RosterStore,
@@ -105,6 +106,36 @@ describe("upsertRoster persist (T010)", () => {
       "Joiner",
       "Ghost",
     ]);
+  });
+
+  it("does not steal Active when upserting another save (T088)", () => {
+    const alpha: StoredRoster = {
+      saveName: "A.fm",
+      clubId: 1,
+      extractedAt: "2026-08-01T00:00:00.000Z",
+      players: [player(1, "Alpha")],
+    };
+    const beta: StoredRoster = {
+      saveName: "B.fm",
+      clubId: 2,
+      extractedAt: "2026-08-01T00:00:00.000Z",
+      players: [player(2, "Beta")],
+    };
+    let store = upsertRoster(emptyStore(), alpha);
+    expect(store.activeSaveName).toBe("A.fm");
+    store = setActiveRoster(store, "A.fm");
+    store = upsertRoster(store, beta);
+    expect(store.activeSaveName).toBe("A.fm");
+    expect(store.saves["B.fm"]?.players[0]?.name).toBe("Beta");
+
+    const betaFresh: StoredRoster = {
+      ...beta,
+      extractedAt: "2026-08-16T00:00:00.000Z",
+      players: [player(2, "Beta Updated")],
+    };
+    store = upsertRoster(store, betaFresh);
+    expect(store.activeSaveName).toBe("A.fm");
+    expect(store.saves["B.fm"]?.players[0]?.name).toBe("Beta Updated");
   });
 });
 
