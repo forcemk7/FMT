@@ -884,6 +884,12 @@ function rosterApiPlugin(): Plugin {
             return;
           }
 
+          if (req.method === "POST" && url === "/api/roster/abort-extract") {
+            killStaleExtractPid();
+            sendJson(res, 200, { aborted: true });
+            return;
+          }
+
           if (req.method === "GET" && url === "/api/roster/first-team") {
             const saveQuery = reqUrl.searchParams.get("save");
             let savePath: string;

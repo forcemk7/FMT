@@ -6156,7 +6156,7 @@ button.mentoring-seat-card:hover {
   pointer-events: none;
 }
 
-.squad-save-controller.is-busy > :is(button, .roster-saves-wrap) {
+.squad-save-controller.is-busy > :is(button:not(#roster-upload-btn), .roster-saves-wrap) {
   opacity: 0.72;
 }
 

@@ -410,6 +410,12 @@ let rosterSyncProgress = "";
 let rosterRefreshIdleWaiters: Array<() => void> = [];
 /** Coalesce another auto-sync if the save changes again mid-extract. */
 let rosterBackgroundSyncQueued = false;
+/** Chosen + file waiting for the current Python — auto-sync must not jump (T095). */
+let rosterManualExtractQueued = false;
+/** Abort the in-flight extract fetch (Delete on the Syncing row). */
+let rosterExtractAbort: AbortController | null = null;
+/** Bump so a superseded extract’s finally does not clear a newer lock. */
+let rosterExtractEpoch = 0;
 let rosterStatusClearTimer: ReturnType<typeof setTimeout> | null = null;
 let saveAutoSyncStarted = false;
 let savePollTimer: ReturnType<typeof setInterval> | null = null;
@@ -6812,9 +6818,9 @@ function syncRosterSavesMenu() {
     deleteBtn.dataset.action = "delete";
     deleteBtn.dataset.saveName = name;
     deleteBtn.textContent = "Delete";
-    deleteBtn.disabled = isSyncing;
+    deleteBtn.disabled = false;
     deleteBtn.title = isSyncing
-      ? "Wait for this extract to finish"
+      ? "Abort this extract and remove the save"
       : "Permanently remove this extract";
 
     actions.append(updateBtn, deleteBtn);
@@ -8500,6 +8506,56 @@ function whenRosterRefreshIdle(): Promise<void> {
   });
 }
 
+function isAbortError(err: unknown): boolean {
+  if (typeof err === "object" && err && "name" in err) {
+    if ((err as { name: string }).name === "AbortError") return true;
+  }
+  const msg = err instanceof Error ? err.message : String(err);
+  return /aborted|AbortError/i.test(msg);
+}
+
+function beginRosterExtract(): { epoch: number; signal: AbortSignal } {
+  rosterExtractEpoch += 1;
+  const ac = new AbortController();
+  rosterExtractAbort = ac;
+  return { epoch: rosterExtractEpoch, signal: ac.signal };
+}
+
+function endRosterExtract(epoch: number): boolean {
+  if (epoch !== rosterExtractEpoch) return false;
+  rosterExtractAbort = null;
+  return true;
+}
+
+function abortRosterExtract(): void {
+  // T095: Delete on the Syncing row aborts that Python then removes the slot.
+  rosterExtractEpoch += 1;
+  const ac = rosterExtractAbort;
+  rosterExtractAbort = null;
+  try {
+    ac?.abort();
+  } catch {
+    // already aborted
+  }
+  rosterRefreshInFlight = false;
+  rosterBackgroundSync = false;
+  setRosterSyncing(false);
+  setRosterControlsDisabled(false);
+  notifyRosterRefreshIdle();
+  void fetch("/api/roster/abort-extract", { method: "POST" }).catch(() => {
+    // pid kill is best-effort; fetch abort already closed the stream
+  });
+}
+
+function autoSyncBlockedByQueuedUpload(): boolean {
+  // T095: König auto-sync does not start first if a + upload is queued or the picker is open.
+  return (
+    rosterManualExtractQueued ||
+    rosterFileDialogOpen ||
+    rosterRefreshIdleWaiters.length > 0
+  );
+}
+
 function flashRosterSoftUpdate() {
   rosterTablePanelEl.classList.remove("is-soft-updated");
   // Restart CSS animation.
@@ -8598,8 +8654,7 @@ async function consumeExtractStream(
 function setRosterControlsDisabled(disabled: boolean) {
   rosterSaveControllerEl.classList.toggle("is-busy", disabled);
   rosterTablePanelEl.classList.toggle("is-busy", disabled);
-  rosterUploadEl.disabled = disabled;
-  rosterUploadBtnEl.disabled = disabled;
+  // T095: + stays usable while A is extracting. File picker opens.
 }
 
 function clearRosterAmendTarget() {
@@ -8753,12 +8808,14 @@ async function waitForSaveDiskStable(
     elapsedMs: number;
     stableForMs: number;
   }) => void,
+  signal?: AbortSignal,
 ): Promise<SaveDiskStat | null> {
   const started = Date.now();
   let last: SaveDiskStat | null = null;
   let stableSince = 0;
 
   while (Date.now() - started < SAVE_SETTLE_MAX_MS) {
+    if (signal?.aborted) return last;
     const stat = await fetchSaveDiskStat(saveName);
     if (!stat) return last;
     const now = Date.now();
@@ -8784,6 +8841,7 @@ async function waitForSaveDiskStable(
       });
     }
     await sleepMs(SAVE_SETTLE_POLL_MS);
+    if (signal?.aborted) return last;
   }
   return last;
 }
@@ -8825,6 +8883,10 @@ async function refreshSaveFromDisk(
     if (options?.background) rosterBackgroundSyncQueued = true;
     return false;
   }
+  if (options?.background && autoSyncBlockedByQueuedUpload()) {
+    rosterBackgroundSyncQueued = true;
+    return false;
+  }
   // Sync starts only for the save marked Active (T088). One extract at a time.
   if (saveName !== rosterStore.activeSaveName) return false;
 
@@ -8834,12 +8896,17 @@ async function refreshSaveFromDisk(
     if (options?.background) rosterBackgroundSyncQueued = true;
     return false;
   }
+  if (options?.background && autoSyncBlockedByQueuedUpload()) {
+    rosterBackgroundSyncQueued = true;
+    return false;
+  }
   if (saveName !== rosterStore.activeSaveName) return false;
 
   const background = Boolean(options?.background);
   let ok = false;
   let updatedBody: FirstTeamApiResult | null = null;
   let backgroundError: string | null = null;
+  const { epoch, signal } = beginRosterExtract();
 
   rosterRefreshInFlight = true;
   rosterBackgroundSync = background;
@@ -8856,7 +8923,8 @@ async function refreshSaveFromDisk(
       const settled = await waitForSaveDiskStable(stat.saveName, (info) => {
         const detail = `${info.stat.saveName}\n${formatSaveSettleStatus(info)}`;
         setRosterSyncStatus(detail);
-      });
+      }, signal);
+      if (epoch !== rosterExtractEpoch) return false;
       if (!settled) {
         if (!background) rosterAmendTarget = null;
         backgroundError = "Could not confirm save finished writing";
@@ -8868,17 +8936,20 @@ async function refreshSaveFromDisk(
     setRosterSyncStatus(`${stat.saveName}\nReading from disk…`);
     const res = await fetch(
       `/api/roster/first-team?save=${encodeURIComponent(stat.saveName)}`,
+      { signal },
     );
     const body = await consumeExtractStream(res, (p) => {
       const label = formatProgress(p);
       setRosterSyncStatus(`${stat.saveName}\n${label}`);
     });
+    if (epoch !== rosterExtractEpoch) return false;
     body.saveName = stat.saveName;
     const fresh = await fetchSaveDiskStat(stat.saveName);
     // Foreground overwrite may rename the slot; background never touches amend.
     if (!background && options?.replaceName) {
       rosterAmendTarget = options.replaceName;
     }
+    if (epoch !== rosterExtractEpoch) return false;
     persistExtractResult(body, fresh ?? stat, { soft: background });
     if (rosterStore.activeSaveName === stat.saveName) {
       rosterMeta = { ...rosterMeta, error: undefined };
@@ -8887,6 +8958,9 @@ async function refreshSaveFromDisk(
     ok = true;
     return true;
   } catch (err) {
+    if (epoch !== rosterExtractEpoch || isAbortError(err)) {
+      return false;
+    }
     const raw = err instanceof Error ? err.message : String(err);
     if (rosterStore.activeSaveName === saveName) {
       if (background) {
@@ -8905,6 +8979,10 @@ async function refreshSaveFromDisk(
   } finally {
     const extractedName = saveName;
     const stillActive = rosterStore.activeSaveName === extractedName;
+    if (!endRosterExtract(epoch)) {
+      rosterUploadEl.value = "";
+      return;
+    }
     rosterRefreshInFlight = false;
     rosterBackgroundSync = false;
     rosterUploadEl.value = "";
@@ -8924,6 +9002,11 @@ async function refreshSaveFromDisk(
       // Let any waiting manual upload/update claim the lock first.
       setTimeout(() => {
         if (rosterRefreshInFlight) {
+          rosterBackgroundSyncQueued = true;
+          return;
+        }
+        // Queued + upload claims the lock first — König auto-sync does not start first (T095).
+        if (autoSyncBlockedByQueuedUpload()) {
           rosterBackgroundSyncQueued = true;
           return;
         }
@@ -8952,6 +9035,10 @@ async function maybeRefreshActiveSaveFromDisk(options?: {
     if (options?.background !== false) rosterBackgroundSyncQueued = true;
     return;
   }
+  if (options?.background !== false && autoSyncBlockedByQueuedUpload()) {
+    rosterBackgroundSyncQueued = true;
+    return;
+  }
   const entry = rosterStore.saves[active];
   if (!entry) return;
 
@@ -8967,6 +9054,10 @@ async function maybeRefreshActiveSaveFromDisk(options?: {
   if (rosterStore.activeSaveName !== active) return;
   if (rosterRefreshInFlight) {
     if (options?.background !== false) rosterBackgroundSyncQueued = true;
+    return;
+  }
+  if (options?.background !== false && autoSyncBlockedByQueuedUpload()) {
+    rosterBackgroundSyncQueued = true;
     return;
   }
 
@@ -9051,6 +9142,7 @@ async function uploadFirstTeamSave(file: File): Promise<void> {
     return;
   }
 
+  rosterManualExtractQueued = true;
   if (rosterRefreshInFlight) {
     setRosterLiveStatus(
       rosterBackgroundSync
@@ -9061,6 +9153,8 @@ async function uploadFirstTeamSave(file: File): Promise<void> {
   }
 
   const amending = Boolean(rosterAmendTarget);
+  const { epoch, signal } = beginRosterExtract();
+  rosterManualExtractQueued = false;
   rosterRefreshInFlight = true;
   rosterBackgroundSync = false;
   setRosterControlsDisabled(true);
@@ -9077,19 +9171,23 @@ async function uploadFirstTeamSave(file: File): Promise<void> {
         "X-Fmt-Filename": encodeURIComponent(file.name),
       },
       body: file,
+      signal,
     });
     const body = await consumeExtractStream(res, (p) => {
       const label = formatProgress(p);
       setRosterLiveStatus(label);
       rosterStatusEl.title = `${file.name}\n${label}`;
     });
+    if (epoch !== rosterExtractEpoch) return;
     body.saveName = file.name;
     const diskStat = await fetchSaveDiskStat(file.name);
+    if (epoch !== rosterExtractEpoch) return;
     persistExtractResult(body, diskStat);
     if (!diskStat) void tryBindSaveToDisk(file.name);
     rosterMeta = { ...rosterMeta, error: undefined };
     updatedBody = body;
   } catch (err) {
+    if (epoch !== rosterExtractEpoch || isAbortError(err)) return;
     const raw = err instanceof Error ? err.message : String(err);
     const networkish =
       /networkerror|failed to fetch|load failed|network request failed/i.test(
@@ -9103,6 +9201,11 @@ async function uploadFirstTeamSave(file: File): Promise<void> {
     };
     rosterAmendTarget = null;
   } finally {
+    rosterManualExtractQueued = false;
+    if (!endRosterExtract(epoch)) {
+      rosterUploadEl.value = "";
+      return;
+    }
     rosterRefreshInFlight = false;
     rosterBackgroundSync = false;
     rosterUploadEl.value = "";
@@ -9192,6 +9295,7 @@ rosterSavesMenuEl.addEventListener("click", (e) => {
   if (action === "delete") {
     if (!confirm(`Delete Career Save extract “${name}”?`)) return;
     if (rosterAmendTarget === name) rosterAmendTarget = null;
+    if (name === rosterSyncingSaveName) abortRosterExtract();
     rosterStore = deleteRoster(rosterStore, name);
     applyActiveRosterFromStore();
     renderRoster();
