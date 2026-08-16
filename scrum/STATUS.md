@@ -32,16 +32,18 @@ Last updated: 2026-08-16 (HQ: Squad + Loans + Mentoring + Progress)
 
 **T070 done** — Header Buy me a coffee → `https://buymeacoffee.com/mrramirez` (new tab, optional thank-you). Table stays free.
 
-**FREEZE.** Launch waits. Product = four extract steps, any Career Save. Worker edits extract Python, never a `.fm`. Do not claim T077 / T080 / T081 / T087.
+**FREEZE.** Launch waits. Product = four extract steps, any Career Save. Worker edits extract Python, never a `.fm`. Do not claim T077 / T080 / T081 / T087 / **T088**.
 
 1. **T083** Managed club (**done**)  
 2. **T084** Employed players — FT / II / U19 (**done**)  
-3. **T085** Those players’ CA + HA (ready)  
-4. **T086** Contracts — at-club vs loaned out + census counts (blocked on T085)  
+3. **T085** Those players’ CA + HA (**done**)  
+4. **T086** Contracts — at-club vs loaned out + census counts (ready)  
+
+T088 (sync vs Active save) is ready but **not this freeze**. Do not steal T086.
 
 Wrong Squad/Loans split poisons Mentoring Group checks. There is no Suggest. Empty Squad on a non-development save is `ft-club-squad-join-miss`. Do not custom-fit a local `.fm`. Never commit saves. T082 cancelled (loans = T086). T087 (Progress GK layout) after T086.
 
-**Next:** T085 ready. Blind: synthetic/object joins; optional smoke on untracked `data/saves/*.fm`; never git add `*.fm`; never mmap live `games/`.
+**Next:** T086 ready. Blind: synthetic/object joins; optional smoke on untracked `data/saves/*.fm`; never git add `*.fm`; never mmap live `games/`.
 
 | Area | State | Need-to-have? |
 |------|--------|---------------|
@@ -84,7 +86,7 @@ Wrong Squad/Loans split poisons Mentoring Group checks. There is no Suggest. Emp
 | Buy Me a Coffee | **T070 done** | Tip only |
 | One extract Python (no 5×2GB on start) | **T072 done** | **Yes** |
 | Extract this club only (not world) | **T076 done** | **Yes** |
-| Extract four steps, any Career Save | **T083+T084 done**; T085–T086 | **Yes** |
+| Extract four steps, any Career Save | **T083–T085 done**; T086 | **Yes** |
 | Favoured-club / scout extract | **T080 blocked** (on T086) | No |
 | Loan scan speed | **T081 blocked** (on T086) | later |
 | Loans as König counts | **T082 cancelled** (absorbed: T086) | — |
@@ -92,14 +94,15 @@ Wrong Squad/Loans split poisons Mentoring Group checks. There is no Suggest. Emp
 | Ranker / checker / compare chrome | **T075 done** | Yes |
 | Progress default chip + FM columns | **T078 done** | Yes |
 | Progress GK abilities + outfield GK rating | **T087 blocked** (on T086) | after freeze |
+| Sync steals Active save when extract finishes | **T088 ready** (after freeze) | **Yes** |
 | II/U19 Progress CA strip | **T079 done** | **Yes** |
 
 ## Board
 
 | ID | Title | Status | Owner |
 |----|-------|--------|-------|
-| T085 | HA and CA for listed players on any Career Save | ready | |
-| T086 | At-club vs loaned-out on any Career Save | blocked | |
+| T086 | At-club vs loaned-out on any Career Save | ready | |
+| T088 | Sync belongs to the selected save | ready | |
 | T087 | Progress GK vs outfield CA layout | blocked | |
 | T077 | Live www URL — upload save, extract, four tabs | blocked | |
 | T080 | Stop favoured-club extract on roster path | blocked | |
@@ -110,6 +113,7 @@ Wrong Squad/Loans split poisons Mentoring Group checks. There is no Suggest. Emp
 - ≥ filter without Det/Lea is dishonest for mentoring suitability.
 - Units in FMT = planning reminder for FM. Mentoring pool = at-club only. Loaned names on Loans. Same person must not be on both.
 - **Used (2026-08-14):** Clear filters → click Adrian Itu → loosen-all → Yoan Robert + Miraglia. FT-only hid this. Empty FT list was correct.
+- **Used (2026-08-16 HQ):** Start sync on save A → select save B in Manage saves → extract finishes → view jumps back to A. `upsertRoster` always sets Active to the extracted save. T088. Freeze stays T086.
 - **Used (2026-08-16 HQ):** Upload a different Career Save → Squad empty. Cause: identity can succeed, then development-save FT join misses (`BODY` 40–100MB, FT count 15–45, `{short} II` / `{short} U19` name gates) and `select_managed_ft_jobs` returns `jobs: []`. T083–T086. Worker is save-blind: no committed `.fm`, no new constants from a local file.
 - After groups exist in FM: extract on a new in-game date → Progress HA delta (pack + Det/Lea). Two different gameDates required; one extract → value, empty delta.
 - Extract is two blobs once (pack + CA card). UI: Squad HA = pack + Det/Lea from the card. Progress CA = card history; Progress HA = pack snapshots + Det/Lea from the card (T066). Do not hunt Det/Lea as a third extract.
@@ -122,16 +126,18 @@ Wrong Squad/Loans split poisons Mentoring Group checks. There is no Suggest. Emp
 
 ## Gate
 
-- **Freeze:** T083–T084 done. T085 then T086. Refuse www, scout drop, scan speed, GK Progress layout until T086. Launch waits. One ticket per worker.
+- **Freeze:** T086. Refuse www, scout drop, scan speed, GK Progress, **T088** until the human names it or T086 is done. Launch waits. One ticket per worker.
 - Refuse Suggest. Refuse CA/PA. Refuse Stripe paywall / packaging / FM27.
 - BMC is a tip. Do not gate the table.
 - Workers: one ticket, one commit on `FMT/`. If freeze, do not claim anything else.
 
 ## Blockers
 
-- **Freeze:** T085 → T086. Workers stay save-blind (no committed `.fm`, no live `games/`). Host RAM after T086.
+- **Freeze:** T086. Workers stay save-blind (no committed `.fm`, no live `games/`). Host RAM after T086.
 
 ## Recently done
+
+- **T085** — HA/CA for listed people: UniqueID / NEWGEN bands are heuristics. Employment tag + person double keep out-of-band UniqueIDs; pack + CA card once each; miss is `—`, not a dropped row. Synthetic blob tests. Optional local smoke counts to the human; no committed `.fm`.
 
 - **T084** — FT/II/U19 lists join from this club’s team object (catalog PRE_NAME → teamId/dup → job-list). Dropped MB windows, FT 15–45, `{short} II`/`{short} U19` as the only names, and subunit jobId 50k–2M as law. Identity known + miss never takes `pick_tid`. Missing II/U19 unit = empty subunit. Youth live list is before-name (after-name decoy). Synthetic blob tests. Optional local smoke counts to the human; no committed `.fm`.
 

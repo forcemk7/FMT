@@ -79,10 +79,11 @@ ZSTD_MAGIC = bytes.fromhex("28b52ffd")
 # Early-career native jobs/tids sit far below continued-save FM24 ranges.
 JOB_LO, JOB_HI = 100, 50_000_000
 TID_LO, TID_HI = 1, 50_000_000
+# Continue-career UniqueID magnitude — heuristic only. Native / other-DB
+# people sit outside this band; listed jobs are kept (T085), not dropped.
 UID_LO, UID_HI = 1_500_000_000, 2_200_000_000
-# Population split for this FM26 continue-career DB: known REAL (Seimen,
-# Paco, Assan) sit ≤ ~2.0019e9; NEWGENs start ≥ ~2.00208e9. Floor sits in
-# the observed gap — not a locked binary flag; refine if editor IDs collide.
+# Continue-career REAL vs NEWGEN split when uid is inside UID_LO..UID_HI.
+# Not a drop filter; outside the band kind is UNKNOWN.
 NEWGEN_UID_FLOOR = 2_002_000_000
 STAFF_MARK = bytes.fromhex("011802")
 # Search window before person double for CA/attr history cards.
@@ -1692,18 +1693,53 @@ def resolve_name(buf, uid: int, doubles: list[int] | None = None) -> str:
     return best or f"uid:{uid}"
 
 
+def uid_in_continue_career_band(uid: int) -> bool:
+    """True when uid sits in the continue-career magnitude band.
+
+    Heuristic for ranking employment hits — not a filter that drops listed people.
+    """
+    return UID_LO <= uid <= UID_HI
+
+
+def plausible_person_uid(uid: int, job: int | None = None) -> bool:
+    """Reject padding / self-job echoes. Not a save-specific UniqueID floor."""
+    if uid < 256 or uid == 0xFFFFFFFF:
+        return False
+    if job is not None and uid == job:
+        return False
+    return True
+
+
+def has_person_double(buf, uid: int) -> bool:
+    """Person object marker: uid||uid in the person-head span."""
+    if not uid:
+        return False
+    pat = struct.pack("<II", uid, uid)
+    end = min(len(buf), PERSON_HEAD)
+    return buf.find(pat, 0, end) >= 0
+
+
 def resolve_job_uid(buf, job: int) -> int:
-    """Employment links sit near EOF — only search the tail."""
+    """Employment links sit near EOF — rfind-shaped tail scan (last hit wins)."""
     jb = struct.pack("<I", job)
     start = max(0, len(buf) - EMPLOYMENT_TAIL)
+    band = 0
+    oob = 0
     for tag in (0x09, 0x0B, 0x0A, 0x08):
         pat = bytes([tag, 0x02]) + jb + b"\x02"
         j = buf.find(pat, start)
         while j >= 0 and j + 11 <= len(buf):
             uid = struct.unpack_from("<I", buf, j + 7)[0]
-            if UID_LO <= uid <= UID_HI:
-                return uid
+            if plausible_person_uid(uid, job):
+                if uid_in_continue_career_band(uid):
+                    band = uid
+                else:
+                    oob = uid
             j = buf.find(pat, j + 1)
+    if band:
+        return band
+    if oob and has_person_double(buf, oob):
+        return oob
     return 0
 
 
@@ -1714,6 +1750,7 @@ def resolve_job_uids_double_fallback(
     Gap-job fallback (T004C): some loaned-out squad slots have no
     `<tag> 02 <job> 02 <uid>` employment. Instead: `job || uid || uid`.
     Prefer the optional 12-byte prefix when present.
+    Continue-career band is preferred when both exist; out-of-band uid||uid is kept.
     """
     if not jobs:
         return {}
@@ -1721,10 +1758,10 @@ def resolve_job_uids_double_fallback(
     out: dict[int, int] = {}
     for job in jobs:
         jb = struct.pack("<I", job)
-        # Prefer prefixed sites (tight), then bare job+double-UID.
         for needle_prefix in (prefix + jb, jb):
             pos = 0
-            found = False
+            oob = 0
+            band = 0
             while True:
                 j = mm.find(needle_prefix, pos)
                 if j < 0:
@@ -1733,54 +1770,79 @@ def resolve_job_uids_double_fallback(
                 if uid_at + 8 <= len(mm):
                     u1 = struct.unpack_from("<I", mm, uid_at)[0]
                     u2 = struct.unpack_from("<I", mm, uid_at + 4)[0]
-                    if u1 == u2 and UID_LO <= u1 <= UID_HI:
-                        out[job] = u1
-                        found = True
-                        break
+                    if u1 == u2 and plausible_person_uid(u1, job):
+                        if uid_in_continue_career_band(u1):
+                            band = u1
+                            break
+                        oob = u1
                 pos = j + 1
-            if found:
+            if band:
+                out[job] = band
+                break
+            if oob:
+                out[job] = oob
                 break
     return out
 
 
+def _ingest_employment_uid(
+    job: int,
+    uid: int,
+    *,
+    wanted: set[int],
+    job_uid: dict[int, int],
+    oob_last: dict[int, int],
+) -> None:
+    if job not in wanted or job in job_uid:
+        return
+    if not plausible_person_uid(uid, job):
+        return
+    if uid_in_continue_career_band(uid):
+        job_uid[job] = uid
+        return
+    oob_last[job] = uid
+
+
 def resolve_job_uids_batch(mm: mmap.mmap, jobs: list[int]) -> dict[int, int]:
-    """Map jobId → person UniqueID (tail scan, then whole-file fallback)."""
+    """Map jobId → person UniqueID (tail scan, then whole-file fallback).
+
+    Continue-career UniqueID magnitude is a preference. Out-of-band people are
+    kept when the employment tag is confirmed by a person double (T085).
+    """
     job_uid: dict[int, int] = {}
+    oob_last: dict[int, int] = {}
     wanted = set(jobs)
     search_lo = max(0, len(mm) - EMPLOYMENT_TAIL)
     if len(mm) < EMPLOYMENT_TAIL * 2:
         search_lo = 0
-    for tag in (0x09, 0x0B, 0x0A, 0x08):
-        if len(job_uid) >= len(wanted):
-            break
-        prefix = bytes([tag, 0x02])
-        j = mm.find(prefix, search_lo)
-        while j >= 0 and j + 11 <= len(mm):
-            if mm[j + 6] == 0x02:
-                job = struct.unpack_from("<I", mm, j + 2)[0]
-                if job in wanted and job not in job_uid:
-                    uid = struct.unpack_from("<I", mm, j + 7)[0]
-                    if UID_LO <= uid <= UID_HI:
-                        job_uid[job] = uid
-                        if len(job_uid) >= len(wanted):
-                            break
-            j = mm.find(prefix, j + 1)
-    if len(job_uid) < len(wanted) * 0.5 and search_lo > 0:
+
+    def scan_from(start: int) -> None:
         for tag in (0x09, 0x0B, 0x0A, 0x08):
             if len(job_uid) >= len(wanted):
-                break
+                return
             prefix = bytes([tag, 0x02])
-            j = mm.find(prefix, 0)
+            j = mm.find(prefix, start)
             while j >= 0 and j + 11 <= len(mm):
                 if mm[j + 6] == 0x02:
                     job = struct.unpack_from("<I", mm, j + 2)[0]
-                    if job in wanted and job not in job_uid:
-                        uid = struct.unpack_from("<I", mm, j + 7)[0]
-                        if UID_LO <= uid <= UID_HI:
-                            job_uid[job] = uid
-                            if len(job_uid) >= len(wanted):
-                                break
+                    uid = struct.unpack_from("<I", mm, j + 7)[0]
+                    _ingest_employment_uid(
+                        job,
+                        uid,
+                        wanted=wanted,
+                        job_uid=job_uid,
+                        oob_last=oob_last,
+                    )
+                    if len(job_uid) >= len(wanted):
+                        return
                 j = mm.find(prefix, j + 1)
+
+    scan_from(search_lo)
+    if len(job_uid) < len(wanted) * 0.5 and search_lo > 0:
+        scan_from(0)
+    for job, uid in oob_last.items():
+        if job not in job_uid and has_person_double(mm, uid):
+            job_uid[job] = uid
     missing = [j for j in jobs if j not in job_uid]
     if missing:
         job_uid.update(resolve_job_uids_double_fallback(mm, missing))
@@ -2093,10 +2155,12 @@ def _nearest_capa_core(mm: mmap.mmap, dab: int) -> tuple[int, int, int] | None:
 def person_population_kind(uid: int) -> str:
     """Classify REAL vs NEWGEN for personality regen_only rules.
 
-    Empirical UID-magnitude split for this career DB era. Returns UNKNOWN
-    only when uid is missing/non-positive.
+    Continue-career UID magnitude only. Outside that band, kind is UNKNOWN —
+    do not apply NEWGEN_UID_FLOOR as law, and do not drop the person.
     """
     if not uid or uid <= 0:
+        return "UNKNOWN"
+    if not uid_in_continue_career_band(uid):
         return "UNKNOWN"
     return "NEWGEN" if uid >= NEWGEN_UID_FLOOR else "REAL"
 
@@ -2138,14 +2202,17 @@ def build_players_from_jobs(
     progress_base_pct: int = 80,
     progress_span_pct: int = 18,
 ) -> list[dict]:
-    """Resolve names + CA attrs for a squad job list."""
+    """Resolve names + CA attrs for a squad job list.
+
+    Every listed job is kept (T085). Missing UniqueID / pack / CA card → attrs
+    stay None (UI —). One pack blob + one CA card per person; no third extract.
+    """
     players: list[dict] = []
+    listed = max(1, len(jobs))
     for i, job in enumerate(jobs):
-        uid = job_uid.get(job, 0)
-        if not uid:
-            continue
-        doubles = collect_doubles(mm, uid)
-        name = resolve_name(mm, uid, doubles)
+        uid = int(job_uid.get(job) or 0)
+        doubles = collect_doubles(mm, uid) if uid else []
+        name = resolve_name(mm, uid, doubles) if uid else f"job:{job}"
         best_double = None
         attrs = None
         general = None
@@ -2291,9 +2358,9 @@ def build_players_from_jobs(
                 t0,
                 phase=phase if names_only else f"{phase}-attrs",
                 message=(
-                    f"{phase.title()} {len(players)}/{len(job_uid)}"
+                    f"{phase.title()} {len(players)}/{listed}"
                     if names_only
-                    else f"{phase.title()} attrs {len(players)}/{len(job_uid)}"
+                    else f"{phase.title()} attrs {len(players)}/{listed}"
                 ),
                 pct=progress_base_pct
                 + int(progress_span_pct * (i + 1) / max(1, len(jobs))),
