@@ -1,9 +1,9 @@
 /**
- * First Team roster (+ club identity) from an FM career .fm save.
+ * Squad lists (+ club identity) from an FM career .fm save.
  *
- * Shells out to `scripts/extract-first-team-fast.py --names-only`
- * (identity + personality attributes; Det/Lea from CA; Amb…Tem from pack;
- * CA attributeHistory change-points for Squad evolution charts).
+ * T110: shells out to `scripts/extract-squad-lists.py`
+ * (native identity namelist → FT names + unit; no HA/CA; continue = not-yet).
+ * Replaces the cancelled T108 names-only fast extract path.
  */
 
 import fs from "node:fs";
@@ -78,7 +78,7 @@ function parseProgressLine(line: string): ExtractProgress | null {
 }
 
 function formatFailure(stdout: string, stderr: string, code: number | null): Error {
-  let message = `extract-first-team-fast.py failed (exit ${code})`;
+  let message = `extract-squad-lists.py failed (exit ${code})`;
   const trimmed = stdout.trim();
   if (trimmed) {
     try {
@@ -135,9 +135,9 @@ export async function extractFirstTeam(
   if (opts?.signal?.aborted) {
     throw new Error("Extract aborted");
   }
-  const script = path.join(repoRoot(), "scripts", "extract-first-team-fast.py");
+  const script = path.join(repoRoot(), "scripts", "extract-squad-lists.py");
   const raw = await new Promise<string>((resolve, reject) => {
-    const child = spawn("python", [script, "--names-only", savePath], {
+    const child = spawn("python", [script, savePath], {
       cwd: repoRoot(),
       stdio: ["ignore", "pipe", "pipe"],
       windowsHide: true,
@@ -199,7 +199,7 @@ export async function extractFirstTeam(
       } catch {
         reject(
           new Error(
-            `extract-first-team-fast.py returned invalid JSON (exit ${code})`,
+            `extract-squad-lists.py returned invalid JSON (exit ${code})`,
           ),
         );
       }

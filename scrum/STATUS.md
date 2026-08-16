@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-08-16 (T109 done; T110 ready)
+Last updated: 2026-08-16 (T110 done)
 
 ## Now
 
@@ -20,7 +20,9 @@ Last updated: 2026-08-16 (T109 done; T110 ready)
 
 **Used (2026-08-16 HQ):** T110 prove order = **native FM26 first** (≥2 Careers). Then RE continue from that pattern; rolling continue pack only secondary (date-lock ≠ squad-lock; avoid fitting).
 
-**Next:** **T110** (native FM26 squad lists first). T087 frozen. Do not claim T077 / T080 / T081.
+**Next:** T087 frozen. Do not claim T077 / T080 / T081. Board empty of ready need-to-haves until HQ funds II/U19 / continue lists / Loans.
+
+**T110 done** — Native FM26: club identity → namelist (~+520) → FT names (+ sparse uid). ≥2 Careers (Liverpool 25 / Bournemouth 24). II/U19 empty (not in identity neighborhood). Continue = `continue-squad-lists-not-yet`. Not extract-first-team-fast.
 
 **T038 done** — II Lars Gabrielsen Det/Lea is the same T014 tip class (not a new locus). Remaining hist=0 stay `—`.
 
@@ -166,7 +168,7 @@ Last updated: 2026-08-16 (T109 done; T110 ready)
 | Standardize pane thead + identical drop well | **T107 done** | Yes |
 | Squad list after identity; stream if cheap | **T108 cancelled** (fitted MVP; owner rejected) | — |
 | Working-copy extract; delete `.fm` after | **T109 done** | **Yes** |
-| First-principles squad lists (native FM26 first) | **T110 ready** | **Yes** |
+| First-principles squad lists (native FM26 first) | **T110 done** | **Yes** |
 | Progress GK abilities + outfield GK rating | **T087 blocked** (on T094) | after native roster |
 | npm run dev from HQ | **T089 cancelled** | — |
 | Sync steals Active save when extract finishes | **T088 done** | **Yes** |
@@ -176,7 +178,6 @@ Last updated: 2026-08-16 (T109 done; T110 ready)
 
 | ID | Title | Status | Owner |
 |----|-------|--------|-------|
-| T110 | First-principles squad lists — native FM26 first | ready | |
 | T087 | Progress GK vs outfield CA layout | blocked | |
 | T077 | Live www URL — upload save, extract, four tabs | blocked | |
 | T080 | Stop favoured-club extract on roster path | blocked | |
@@ -202,7 +203,7 @@ Last updated: 2026-08-16 (T109 done; T110 ready)
 
 ## Gate
 
-- T110. T109 done — working copy + delete. T108 cancelled — do not rewire old fast extract. No HA/CA until lists honest. T087 frozen. T077 / T080 / T081 blocked. One ticket per worker.
+- Board: no ready need-to-haves. T110 done — native FT namelist locked; II/U19 + continue lists still open for HQ. T087 frozen. T077 / T080 / T081 blocked. One ticket per worker.
 - Refuse Suggest. Refuse CA/PA. Refuse Stripe paywall / packaging / FM27.
 - BMC is a tip. Do not gate the table.
 - Workers: one ticket, one commit on `FMT/`. If freeze, do not claim anything else.
@@ -212,6 +213,8 @@ Last updated: 2026-08-16 (T109 done; T110 ready)
 - Host RAM / T077 after owner says the local loop is honest (any save + Active not stolen).
 
 ## Recently done
+
+- **T110** — Native FM26 squad lists from identity neighborhood namelist (count → lp32 names → canonical FT). Liverpool + Bournemouth smoke; II/U19 honest empty; continue `continue-squad-lists-not-yet`. Product uses `extract-squad-lists.py` (not T108 fast). Unittest + vitest. Restart `npm run dev` and + a native Career. No committed `.fm`.
 
 - **T109** — + / Update extract lands in `tmp/uploads` working copy; `cleanupWorkingFm` deletes it after success or abort (never live SI `games/*.fm`). GET scout disk extract disabled. Vitest refuse + delete-after. Restart `npm run dev`. No committed `.fm`.
 

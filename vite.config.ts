@@ -912,8 +912,8 @@ function rosterApiPlugin(): Plugin {
             // T109: + / Update lands in tmp/uploads working copy; delete after extract.
             const uploadDir = resolveWorkingUploadsDir(rootDir);
             fs.mkdirSync(uploadDir, { recursive: true });
-            // T108: + / roster POST runs names-only FT/II/U19 list (T093/T094 joins).
-            // One-shot JSON result — progressive row append skipped (needs NDJSON+UI).
+            // T110: + / roster POST runs first-principles squad lists
+            // (native identity namelist; continue = not-yet). Not extract-first-team-fast.
             // Identity-only helper remains for non-roster callers.
             const runStreaming =
               url === "/api/scout/favoured-club"

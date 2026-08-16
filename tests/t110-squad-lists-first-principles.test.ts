@@ -9,16 +9,17 @@ const extractTs = fs.readFileSync(
   "utf8",
 );
 
-describe("T108 Squad list after identity — shortest path; stream if cheap", () => {
-  it("POST + / roster extract uses names-only list path (not metaOnly)", () => {
-    expect(extractTs).toMatch(/extract-first-team-fast\.py/);
-    expect(extractTs).toMatch(/--names-only/);
+describe("T110 First-principles squad lists — native FM26 first", () => {
+  it("POST + / roster extract uses extract-squad-lists (not T108 fast path)", () => {
+    expect(extractTs).toMatch(/extract-squad-lists\.py/);
+    expect(extractTs).not.toMatch(/scripts[/\\]extract-first-team-fast\.py/);
+    expect(extractTs).not.toMatch(/--names-only/);
+    expect(extractTs).toMatch(/spawn\("python", \[script, savePath\]/);
     const postIdx = vite.indexOf('url === "/api/roster/first-team" ||');
     expect(postIdx).toBeGreaterThan(0);
     const postBlock = vite.slice(postIdx, postIdx + 1200);
     expect(postBlock).toMatch(/runExtractStreaming/);
     expect(postBlock).not.toMatch(/runIdentityStreaming/);
-    expect(vite).toMatch(/T108: \+ \/ roster POST runs names-only/);
-    expect(vite).toMatch(/progressive row append skipped/);
+    expect(vite).toMatch(/T110: \+ \/ roster POST runs first-principles/);
   });
 });
