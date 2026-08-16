@@ -6654,15 +6654,6 @@ function dash(value: string | number | undefined | null): string {
   return String(value);
 }
 
-function formatClubLine(
-  clubName: string | null | undefined,
-  clubId: number | null | undefined,
-): string | null {
-  const name = (clubName ?? "").trim();
-  if (!name || clubId == null) return null;
-  return `${name} ${clubId}`;
-}
-
 function editionFromTagHex(
   tagHex: string | null | undefined,
 ): "FM26" | "FM24" | null {
@@ -6716,6 +6707,25 @@ function formatInGameDateRow(isoDate: string | null | undefined): string {
   });
 }
 
+/** Six-line hover on a Manage Saves row. Missing gameDate / edition → —. */
+function saveCardHoverTitle(parts: {
+  fileName: string;
+  edition: "FM24" | "FM26" | null;
+  clubName: string;
+  clubId: string;
+  gameDate: string;
+  uploaded: string;
+}): string {
+  return [
+    parts.fileName,
+    `Game Version: ${parts.edition ?? "—"}`,
+    `Club Name: ${parts.clubName}`,
+    `Club ID: ${parts.clubId}`,
+    `Game Date: ${parts.gameDate}`,
+    `Uploaded: ${parts.uploaded}`,
+  ].join("\n");
+}
+
 function setRosterSavesMenuOpen(open: boolean) {
   rosterSavesMenuOpen = open;
   rosterSavesMenuEl.hidden = !open;
@@ -6737,8 +6747,6 @@ function syncRosterSavesMenu() {
     const entry = rosterStore.saves[name]!;
     const club = entry.clubName || entry.clubNameShort;
     const id = entry.clubId ?? entry.teamId;
-    const clubLine =
-      club && id != null ? formatClubLine(club, id) : club || name;
     const isActive = name === rosterStore.activeSaveName;
     const isOverwrite = name === rosterAmendTarget;
 
@@ -6753,22 +6761,22 @@ function syncRosterSavesMenu() {
     const edition = editionFromTagHex(entry.tagHex);
     const clubName = (club ?? "").trim() || name;
     const idText = id != null ? String(id) : "—";
+    const hoverTitle = saveCardHoverTitle({
+      fileName: name,
+      edition,
+      clubName: (club ?? "").trim() || "—",
+      clubId: idText,
+      gameDate: inGame,
+      uploaded,
+    });
+    row.title = hoverTitle;
 
     const selectBtn = document.createElement("button");
     selectBtn.type = "button";
     selectBtn.className = "roster-saves-item";
     selectBtn.dataset.action = "select";
     selectBtn.dataset.saveName = name;
-    selectBtn.title = [
-      name,
-      clubLine ?? "",
-      edition ? edition : "",
-      `Uploaded ${uploaded}`,
-      `ID ${idText}`,
-      `Game Date ${formatInGameDate(entry.gameDate)}`,
-    ]
-      .filter(Boolean)
-      .join("\n");
+    selectBtn.title = hoverTitle;
     const pillHtml = edition
       ? `<span class="roster-saves-item-edition">${escapeHtml(edition)}</span>`
       : "";

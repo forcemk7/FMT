@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-08-16 (T101 done)
+Last updated: 2026-08-16 (T102 done)
 
 ## Now
 
@@ -66,7 +66,9 @@ Last updated: 2026-08-16 (T101 done)
 
 **T101 done** — persist tagHex FM26/FM24 pills. Tag 01 date = T099 UniqueID-tail; tag 02 = continue calendar (never T099). Cards: pill+club | Uploaded; ID + Game Date | refresh+delete. Update same filename only. Menu widened. No page shell.
 
-**Next:** no ready ticket. T087 frozen. Do not claim T077 / T080 / T081.
+**T102 done** — save-card hover is six labeled lines (filename, Game Version, Club Name, Club ID, Game Date, Uploaded). Missing gameDate → —. Card layout unchanged.
+
+**Next:** No ready tickets. T087 frozen. Do not claim T077 / T080 / T081.
 
 | Area | State | Need-to-have? |
 |------|--------|---------------|
@@ -128,6 +130,7 @@ Last updated: 2026-08-16 (T101 done)
 | Game date u16 doy + u16 year after UniqueID | **T099 done** | **Yes** |
 | Identity upload locked; last + Active; compact cards | **T100 done** | **Yes** |
 | Save cards FM24/FM26; continue date; update-same-name | **T101 done** | **Yes** |
+| Structured save-card hover tooltip | **T102 done** | Yes |
 | Progress GK abilities + outfield GK rating | **T087 blocked** (on T094) | after native roster |
 | npm run dev from HQ | **T089 cancelled** | — |
 | Sync steals Active save when extract finishes | **T088 done** | **Yes** |
@@ -162,7 +165,7 @@ Last updated: 2026-08-16 (T101 done)
 
 ## Gate
 
-- T101 done (save-card identity lock). No app shell this ticket. T087 frozen. T077 / T080 / T081 blocked. One ticket per worker. Empty ready board.
+- T102 done. Empty ready board. T087 frozen. T077 / T080 / T081 blocked. One ticket per worker.
 - Refuse Suggest. Refuse CA/PA. Refuse Stripe paywall / packaging / FM27.
 - BMC is a tip. Do not gate the table.
 - Workers: one ticket, one commit on `FMT/`. If freeze, do not claim anything else.
@@ -172,6 +175,8 @@ Last updated: 2026-08-16 (T101 done)
 - Host RAM / T077 after owner says the local loop is honest (any save + Active not stolen).
 
 ## Recently done
+
+- **T102** — Save-card hover is six labeled lines: filename; Game Version FM24/FM26 (or —); Club Name; Club ID; Game Date (Mon DD, YYYY or —); Uploaded (Mon DD, H:MM AM/PM). Native `title` on the row. Card layout unchanged. Vitest chrome guard. Restart `npm run dev`. No committed `.fm`.
 
 - **T101** — Persist `tagHex`: `00950e01` → FM26 pill, `00950e02` → FM24 pill. Tag 01 gameDate stays UniqueID+4/+6 (T099). Tag 02 uses continue calendar (`c708` / today_ptr), never T099; unsure → —. Cards: pill+club name | Uploaded: Mon DD, H:MM AM/PM; ID + Game Date | refresh update + delete. Update refuses a different `.fm` name (use +). Menu widened. Auto-sync stays dead. No page shell. Restart `npm run dev`. Owner: continue Schalke should show FM24 + a Game Date or honest `—`. No committed `.fm`.
 
