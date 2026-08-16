@@ -146,6 +146,15 @@ def match_unit_core_score(parent_short: str, core: str) -> int:
     return 0
 
 
+def match_reserve_name_score(parent_short: str, name: str) -> int:
+    """Score a reserve catalog name against the managed parent short (II / B / U21 / …)."""
+    suf = _reserve_suffix(name)
+    if suf is None:
+        return 0
+    core = name[: -len(suf)].rstrip()
+    return match_unit_core_score(parent_short, core)
+
+
 def lp32_name_ending_at(
     mm: mmap.mmap | bytes,
     suffix_abs: int,
@@ -165,11 +174,6 @@ def lp32_name_ending_at(
         if utf8_abs + n == suffix_abs + len(raw_suf) and utf8_abs <= suffix_abs:
             return utf8_abs, s
     return None
-    suf = _reserve_suffix(name)
-    if suf is None:
-        return 0
-    core = name[: -len(suf)].rstrip()
-    return match_unit_core_score(parent_short, core)
 
 
 def resolve_after_name(mm: mmap.mmap | bytes, name_abs: int, name_len: int) -> int | None:

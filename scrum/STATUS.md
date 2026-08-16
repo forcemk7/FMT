@@ -36,6 +36,10 @@ Last updated: 2026-08-16 (HQ: Squad + Loans + Mentoring + Progress)
 
 **T088 done** — Sync belongs to the selected save. Start on A → select B → A finishes into slot A; Active / Squad stay on B.
 
+**T090 done** — `match_reserve_name_score` is defined (was dead after `lp32_name_ending_at` return). Extract no longer NameErrors on the T084 reserve join.
+
+**Next:** **T087** (Progress GK vs outfield CA layout). T077 / T080 / T081 blocked. T089 cancelled — `cd FMT` then `npm run dev`.
+
 | Area | State | Need-to-have? |
 |------|--------|---------------|
 | Det/Lea for Gilson-class (≥ filter) | **T014 done** | **Yes** |
@@ -84,7 +88,9 @@ Last updated: 2026-08-16 (HQ: Squad + Loans + Mentoring + Progress)
 | Personalities label → Squad | **T073 done** | Yes |
 | Ranker / checker / compare chrome | **T075 done** | Yes |
 | Progress default chip + FM columns | **T078 done** | Yes |
-| Progress GK abilities + outfield GK rating | **T087 ready** (after T088) | after T088 |
+| Extract NameError match_reserve_name_score | **T090 done** | **Yes** |
+| Progress GK abilities + outfield GK rating | **T087 ready — NEXT** | after T090 |
+| npm run dev from HQ | **T089 cancelled** | — |
 | Sync steals Active save when extract finishes | **T088 done** | **Yes** |
 | II/U19 Progress CA strip | **T079 done** | **Yes** |
 
@@ -103,7 +109,7 @@ Last updated: 2026-08-16 (HQ: Squad + Loans + Mentoring + Progress)
 - Units in FMT = planning reminder for FM. Mentoring pool = at-club only. Loaned names on Loans. Same person must not be on both.
 - **Used (2026-08-14):** Clear filters → click Adrian Itu → loosen-all → Yoan Robert + Miraglia. FT-only hid this. Empty FT list was correct.
 - **Used (2026-08-16 HQ):** Start sync on save A → select save B in Manage saves → extract finishes → view jumped back to A. **T088 done** — persist stays on A’s slot; Active / Squad stay on B.
-- **Used (2026-08-16 HQ):** Upload a different Career Save → Squad empty. Cause: identity can succeed, then development-save FT join misses (`BODY` 40–100MB, FT count 15–45, `{short} II` / `{short} U19` name gates) and `select_managed_ft_jobs` returns `jobs: []`. T083–T086. Worker is save-blind: no committed `.fm`, no new constants from a local file.
+- **Used (2026-08-16 HQ):** Extract `NameError: name 'match_reserve_name_score' is not defined`. **T090 done** — scorer lives next to `match_unit_core_score`; dead block after `lp32_name_ending_at` removed. Restart `npm run dev` and re-extract.
 - After groups exist in FM: extract on a new in-game date → Progress HA delta (pack + Det/Lea). Two different gameDates required; one extract → value, empty delta.
 - Extract is two blobs once (pack + CA card). UI: Squad HA = pack + Det/Lea from the card. Progress CA = card history; Progress HA = pack snapshots + Det/Lea from the card (T066). Do not hunt Det/Lea as a third extract.
 - Progress plot: HA pack has no in-save strip (extract snapshots). Det/Lea use the attributes-card CA strip (T066). Pack chips stay on `fmt.ha-history.v1`.
@@ -115,7 +121,7 @@ Last updated: 2026-08-16 (HQ: Squad + Loans + Mentoring + Progress)
 
 ## Gate
 
-- T088 shipped. Remaining board: T087 ready; T077 / T080 / T081 blocked. One ticket per worker.
+- T087 next (Progress GK layout). T077 / T080 / T081 blocked. T089 cancelled. One ticket per worker.
 - Refuse Suggest. Refuse CA/PA. Refuse Stripe paywall / packaging / FM27.
 - BMC is a tip. Do not gate the table.
 - Workers: one ticket, one commit on `FMT/`. If freeze, do not claim anything else.
@@ -125,6 +131,10 @@ Last updated: 2026-08-16 (HQ: Squad + Loans + Mentoring + Progress)
 - Host RAM / T077 after owner says the local loop is honest (any save + Active not stolen).
 
 ## Recently done
+
+- **T090** — Extract NameError: `match_reserve_name_score` defined from `_reserve_suffix` + `match_unit_core_score`. Unreachable block after `lp32_name_ending_at` removed. Join recipe unchanged. Unittest II/B/U21 + T084. Restart `npm run dev` and re-extract. No committed `.fm`.
+
+- **T089 cancelled** — do not run FMT from HQ. `npm run dev` is `cd FMT`.
 
 - **T088** — Sync belongs to the selected save. `upsertRoster` no longer steals Active. Disk extract starts only for Active (one at a time); in-flight extract finishes into that slot. Selecting another save keeps Squad on that save. Syncing + progress live on that row in Manage saves. Queued auto-sync re-checks Active. Vitest ingest + T088 chrome guards.
 
