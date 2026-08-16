@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-08-16 (T102 done)
+Last updated: 2026-08-16 (T103 done)
 
 ## Now
 
@@ -68,6 +68,8 @@ Last updated: 2026-08-16 (T102 done)
 
 **T102 done** — save-card hover is six labeled lines (filename, Game Version, Club Name, Club ID, Game Date, Uploaded). Missing gameDate → —. Card layout unchanged.
 
+**T103 done** — page shell: header FMT · club · in-game date · + · saves · coffee; tabs Squad | Loans | Mentoring | Progress; one pane. No save → No save. Empty players still show tabs.
+
 **Next:** No ready tickets. T087 frozen. Do not claim T077 / T080 / T081.
 
 | Area | State | Need-to-have? |
@@ -131,6 +133,7 @@ Last updated: 2026-08-16 (T102 done)
 | Identity upload locked; last + Active; compact cards | **T100 done** | **Yes** |
 | Save cards FM24/FM26; continue date; update-same-name | **T101 done** | **Yes** |
 | Structured save-card hover tooltip | **T102 done** | Yes |
+| Page shell: header identity + four tabs + one pane | **T103 done** | **Yes** |
 | Progress GK abilities + outfield GK rating | **T087 blocked** (on T094) | after native roster |
 | npm run dev from HQ | **T089 cancelled** | — |
 | Sync steals Active save when extract finishes | **T088 done** | **Yes** |
@@ -165,7 +168,7 @@ Last updated: 2026-08-16 (T102 done)
 
 ## Gate
 
-- T102 done. Empty ready board. T087 frozen. T077 / T080 / T081 blocked. One ticket per worker.
+- T103 done. Empty ready board. T087 frozen. T077 / T080 / T081 blocked. One ticket per worker.
 - Refuse Suggest. Refuse CA/PA. Refuse Stripe paywall / packaging / FM27.
 - BMC is a tip. Do not gate the table.
 - Workers: one ticket, one commit on `FMT/`. If freeze, do not claim anything else.
@@ -175,6 +178,8 @@ Last updated: 2026-08-16 (T102 done)
 - Host RAM / T077 after owner says the local loop is honest (any save + Active not stolen).
 
 ## Recently done
+
+- **T103** — Page shell: header FMT · Active club · in-game date (Mon DD, YYYY or —) · + · saves · BMC. No save → No save. Tabs Squad | Loans | Mentoring | Progress under the header; Reserves / U19 stay hidden. Empty pane prompts +. Active save with empty `players[]` still shows tabs. Hash restore (`#roster/mentoring`) does not require a non-empty roster. Save cards / extract unchanged. Vitest chrome guard. Restart `npm run dev`. No committed `.fm`.
 
 - **T102** — Save-card hover is six labeled lines: filename; Game Version FM24/FM26 (or —); Club Name; Club ID; Game Date (Mon DD, YYYY or —); Uploaded (Mon DD, H:MM AM/PM). Native `title` on the row. Card layout unchanged. Vitest chrome guard. Restart `npm run dev`. No committed `.fm`.
 

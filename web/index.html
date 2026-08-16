@@ -20,6 +20,8 @@
 
         let rosterCount = 0;
         let rosterClub = "";
+        let rosterDate = "";
+        let hasSave = false;
         try {
           const raw = localStorage.getItem("fmt.roster.saves.v3");
           if (raw) {
@@ -29,12 +31,28 @@
             const players = save && Array.isArray(save.players) ? save.players : [];
             rosterCount = players.length;
             rosterClub = (save && save.clubName) || "";
+            hasSave = Boolean(name && save);
+            const iso = save && save.gameDate;
+            if (iso) {
+              const d = new Date(String(iso) + "T12:00:00");
+              rosterDate = Number.isNaN(d.getTime())
+                ? String(iso)
+                : d.toLocaleDateString(undefined, {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  });
+            } else {
+              rosterDate = "—";
+            }
           }
         } catch (_) {}
 
         root.dataset.bootTool = tool;
         root.dataset.bootRosterCount = String(Math.min(25, rosterCount));
+        if (hasSave) root.dataset.bootHasSave = "1";
         if (rosterClub) root.dataset.bootRosterClub = rosterClub;
+        if (rosterDate) root.dataset.bootRosterDate = rosterDate;
 
         // Match live density tiers: wide shows DET/LEA + 16% personality.
         const vw = window.innerWidth || 0;
@@ -57,22 +75,189 @@
             >
               FMT
             </button>
+            <p
+              id="app-header-club"
+              class="app-header-club is-empty"
+              aria-live="polite"
+            >
+              No save
+            </p>
+            <p
+              id="app-header-date"
+              class="app-header-date"
+              aria-label="In-game date"
+            >
+              —
+            </p>
             <nav id="tool-nav" class="tool-nav" aria-label="Tools" hidden>
               <button type="button" class="tool-nav-btn" data-tool="roster">
                 Squad
               </button>
             </nav>
-            <a
-              class="bmc-tip"
-              href="https://buymeacoffee.com/mrramirez"
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Optional thank-you — not required to use the table"
-            >
-              Buy me a coffee
-              <span class="bmc-tip-note">optional thank-you</span>
-            </a>
+            <div class="app-header-actions">
+              <div
+                class="squad-save-controller"
+                id="roster-save-controller"
+                aria-label="Career Save"
+              >
+                <p
+                  id="roster-status"
+                  class="roster-status roster-status-compact"
+                  aria-live="polite"
+                ></p>
+                <input
+                  type="file"
+                  id="roster-upload"
+                  accept=".fm,application/octet-stream"
+                  hidden
+                />
+                <button
+                  type="button"
+                  id="roster-upload-btn"
+                  class="btn-icon is-cta"
+                  title="Load a Career Save — First Team, Reserves, and Under 19s"
+                  aria-label="Load a Career Save — First Team, Reserves, and Under 19s"
+                >
+                  <svg
+                    viewBox="0 0 16 16"
+                    width="14"
+                    height="14"
+                    aria-hidden="true"
+                  >
+                    <path
+                      fill="currentColor"
+                      d="M8 2a.75.75 0 0 1 .75.75v4.5h4.5a.75.75 0 0 1 0 1.5h-4.5v4.5a.75.75 0 0 1-1.5 0v-4.5h-4.5a.75.75 0 0 1 0-1.5h4.5v-4.5A.75.75 0 0 1 8 2z"
+                    />
+                  </svg>
+                </button>
+                <div class="roster-saves-wrap">
+                  <button
+                    type="button"
+                    id="roster-saves-btn"
+                    class="btn-icon roster-saves-btn"
+                    title="Manage saves"
+                    aria-label="Manage saves"
+                    aria-haspopup="menu"
+                    aria-expanded="false"
+                    aria-controls="roster-saves-menu"
+                  >
+                    <svg
+                      viewBox="0 0 16 16"
+                      width="14"
+                      height="14"
+                      aria-hidden="true"
+                    >
+                      <path
+                        fill="currentColor"
+                        d="M2.5 3.25A.75.75 0 0 1 3.25 2.5h9.5a.75.75 0 0 1 0 1.5h-9.5a.75.75 0 0 1-.75-.75zm0 4.5A.75.75 0 0 1 3.25 7h9.5a.75.75 0 0 1 0 1.5h-9.5a.75.75 0 0 1-.75-.75zm0 4.5a.75.75 0 0 1 .75-.75h9.5a.75.75 0 0 1 0 1.5h-9.5a.75.75 0 0 1-.75-.75z"
+                      />
+                    </svg>
+                    <span
+                      id="roster-saves-count"
+                      class="roster-saves-count"
+                      aria-hidden="true"
+                      >0</span
+                    >
+                  </button>
+                  <div
+                    id="roster-saves-menu"
+                    class="roster-saves-menu"
+                    role="menu"
+                    hidden
+                  >
+                    <div
+                      id="roster-saves-list"
+                      class="roster-saves-list"
+                      role="none"
+                    ></div>
+                    <p id="roster-saves-empty" class="roster-saves-empty">
+                      No Career Saves on disk yet.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <a
+                class="bmc-tip"
+                href="https://buymeacoffee.com/mrramirez"
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Optional thank-you — not required to use the table"
+              >
+                Buy me a coffee
+                <span class="bmc-tip-note">optional thank-you</span>
+              </a>
+            </div>
           </header>
+
+          <nav
+            class="squad-view-tabs page-tabs"
+            role="tablist"
+            aria-label="Squad view"
+            hidden
+          >
+            <button
+              type="button"
+              id="squad-view-first-team"
+              class="squad-view-tab is-active"
+              role="tab"
+              aria-selected="true"
+              data-squad-view="firstTeam"
+            >
+              Squad
+            </button>
+            <button
+              type="button"
+              id="squad-view-loans"
+              class="squad-view-tab"
+              role="tab"
+              aria-selected="false"
+              data-squad-view="loans"
+            >
+              Loans
+            </button>
+            <button
+              type="button"
+              id="squad-view-mentoring"
+              class="squad-view-tab"
+              role="tab"
+              aria-selected="false"
+              data-squad-view="mentoring"
+            >
+              Mentoring
+            </button>
+            <button
+              type="button"
+              id="squad-view-progress"
+              class="squad-view-tab"
+              role="tab"
+              aria-selected="false"
+              data-squad-view="progress"
+            >
+              Progress
+            </button>
+            <button
+              type="button"
+              id="squad-view-reserves"
+              class="squad-view-tab"
+              role="tab"
+              aria-selected="false"
+              data-squad-view="reserves"
+              hidden
+            >
+              Reserves
+            </button>
+            <button
+              type="button"
+              id="squad-view-under19s"
+              class="squad-view-tab"
+              role="tab"
+              aria-selected="false"
+              data-squad-view="under19s"
+              hidden
+            >
+              Under 19s
+            </button>
+          </nav>
 
           <section id="rank" class="tool-view rank" aria-labelledby="ranker-heading" data-density="narrow" hidden>
             <script>
@@ -1079,7 +1264,7 @@
             class="tool-view roster"
             aria-labelledby="roster-heading"
           >
-            <div class="rank-header">
+            <div class="rank-header" hidden>
               <h1 id="roster-heading">
                 <span class="rank-header-kicker">Football Manager 26</span>
                 <span class="rank-header-focus">Squad Analyzer</span>
@@ -1093,185 +1278,24 @@
               class="roster-table-panel squad-grid-panel is-empty-roster"
               aria-label="Squad"
             >
-              <div class="squad-view-toolbar">
-                <div class="squad-view-toolbar-start" hidden>
-                  <p
-                    id="roster-club-line"
-                    class="squad-toolbar-club is-empty"
-                    aria-live="polite"
-                    hidden
-                  >
-                    —
-                  </p>
-                  <div
-                    class="squad-view-tabs"
-                    role="tablist"
-                    aria-label="Squad view"
-                    hidden
-                  >
-                    <button
-                      type="button"
-                      id="squad-view-first-team"
-                      class="squad-view-tab is-active"
-                      role="tab"
-                      aria-selected="true"
-                      data-squad-view="firstTeam"
-                    >
-                      Squad
-                    </button>
-                    <button
-                      type="button"
-                      id="squad-view-loans"
-                      class="squad-view-tab"
-                      role="tab"
-                      aria-selected="false"
-                      data-squad-view="loans"
-                    >
-                      Loans
-                    </button>
-                    <button
-                      type="button"
-                      id="squad-view-mentoring"
-                      class="squad-view-tab"
-                      role="tab"
-                      aria-selected="false"
-                      data-squad-view="mentoring"
-                    >
-                      Mentoring
-                    </button>
-                    <button
-                      type="button"
-                      id="squad-view-progress"
-                      class="squad-view-tab"
-                      role="tab"
-                      aria-selected="false"
-                      data-squad-view="progress"
-                    >
-                      Progress
-                    </button>
-                    <button
-                      type="button"
-                      id="squad-view-reserves"
-                      class="squad-view-tab"
-                      role="tab"
-                      aria-selected="false"
-                      data-squad-view="reserves"
-                      hidden
-                    >
-                      Reserves
-                    </button>
-                    <button
-                      type="button"
-                      id="squad-view-under19s"
-                      class="squad-view-tab"
-                      role="tab"
-                      aria-selected="false"
-                      data-squad-view="under19s"
-                      hidden
-                    >
-                      Under 19s
-                    </button>
-                  </div>
-                  <div class="ranker-filter-wrap" id="squad-filter-wrap" hidden>
-                    <button
-                      type="button"
-                      id="squad-filter-toggle"
-                      class="ranker-filter-toggle"
-                      aria-expanded="false"
-                      aria-controls="squad-filter-popover"
-                      title="Filters"
-                    >
-                      Filter
-                      <span
-                        id="squad-filter-count"
-                        class="ranker-filter-count"
-                        hidden
-                        aria-live="polite"
-                      ></span>
-                    </button>
-                  </div>
-                </div>
-
-                <div
-                  class="squad-save-controller"
-                  id="roster-save-controller"
-                  aria-label="Career Save"
-                >
-                  <p
-                    id="roster-status"
-                    class="roster-status roster-status-compact"
-                    aria-live="polite"
-                  ></p>
-                  <input
-                    type="file"
-                    id="roster-upload"
-                    accept=".fm,application/octet-stream"
-                    hidden
-                  />
+              <div class="squad-view-toolbar" hidden>
+                <div class="ranker-filter-wrap" id="squad-filter-wrap" hidden>
                   <button
                     type="button"
-                    id="roster-upload-btn"
-                    class="btn-icon is-cta"
-                    title="Load a Career Save — First Team, Reserves, and Under 19s"
-                    aria-label="Load a Career Save — First Team, Reserves, and Under 19s"
+                    id="squad-filter-toggle"
+                    class="ranker-filter-toggle"
+                    aria-expanded="false"
+                    aria-controls="squad-filter-popover"
+                    title="Filters"
                   >
-                    <svg
-                      viewBox="0 0 16 16"
-                      width="14"
-                      height="14"
-                      aria-hidden="true"
-                    >
-                      <path
-                        fill="currentColor"
-                        d="M8 2a.75.75 0 0 1 .75.75v4.5h4.5a.75.75 0 0 1 0 1.5h-4.5v4.5a.75.75 0 0 1-1.5 0v-4.5h-4.5a.75.75 0 0 1 0-1.5h4.5v-4.5A.75.75 0 0 1 8 2z"
-                      />
-                    </svg>
-                  </button>
-                  <div class="roster-saves-wrap">
-                    <button
-                      type="button"
-                      id="roster-saves-btn"
-                      class="btn-icon roster-saves-btn"
-                      title="Manage saves"
-                      aria-label="Manage saves"
-                      aria-haspopup="menu"
-                      aria-expanded="false"
-                      aria-controls="roster-saves-menu"
-                    >
-                      <svg
-                        viewBox="0 0 16 16"
-                        width="14"
-                        height="14"
-                        aria-hidden="true"
-                      >
-                        <path
-                          fill="currentColor"
-                          d="M2.5 3.25A.75.75 0 0 1 3.25 2.5h9.5a.75.75 0 0 1 0 1.5h-9.5a.75.75 0 0 1-.75-.75zm0 4.5A.75.75 0 0 1 3.25 7h9.5a.75.75 0 0 1 0 1.5h-9.5a.75.75 0 0 1-.75-.75zm0 4.5a.75.75 0 0 1 .75-.75h9.5a.75.75 0 0 1 0 1.5h-9.5a.75.75 0 0 1-.75-.75z"
-                        />
-                      </svg>
-                      <span
-                        id="roster-saves-count"
-                        class="roster-saves-count"
-                        aria-hidden="true"
-                        >0</span
-                      >
-                    </button>
-                    <div
-                      id="roster-saves-menu"
-                      class="roster-saves-menu"
-                      role="menu"
+                    Filter
+                    <span
+                      id="squad-filter-count"
+                      class="ranker-filter-count"
                       hidden
-                    >
-                      <div
-                        id="roster-saves-list"
-                        class="roster-saves-list"
-                        role="none"
-                      ></div>
-                      <p id="roster-saves-empty" class="roster-saves-empty">
-                        No Career Saves on disk yet.
-                      </p>
-                    </div>
-                  </div>
+                      aria-live="polite"
+                    ></span>
+                  </button>
                 </div>
               </div>
 
@@ -1330,7 +1354,7 @@
                   aria-label="Squad personality HA"
                 ></div>
                 <p id="roster-empty" class="roster-empty" hidden>
-                  Load a Career Save to see personality HA numbers.
+                  Load a Career Save with + to see Squad, Loans, Mentoring, and Progress.
                 </p>
               </div>
 
@@ -1795,21 +1819,31 @@
         }
 
         const count = Number(root.dataset.bootRosterCount || "0");
+        const hasSave = Boolean(root.dataset.bootHasSave);
+        const clubEl = document.getElementById("app-header-club");
+        const dateEl = document.getElementById("app-header-date");
+        const tabs = document.querySelector(".squad-view-tabs");
+        const panel = document.querySelector(".roster-table-panel");
+        if (clubEl) {
+          clubEl.textContent = hasSave
+            ? root.dataset.bootRosterClub || "—"
+            : "No save";
+          clubEl.classList.toggle(
+            "is-empty",
+            !hasSave || !root.dataset.bootRosterClub,
+          );
+        }
+        if (dateEl) {
+          dateEl.textContent = hasSave
+            ? root.dataset.bootRosterDate || "—"
+            : "—";
+        }
+        if (tabs) tabs.hidden = !hasSave;
+        if (hasSave && panel) panel.classList.remove("is-empty-roster");
+
         if (tool !== "roster" || count <= 0) return;
 
-        const panel = document.querySelector(".roster-table-panel");
         const body = document.getElementById("roster-body");
-        const start = document.querySelector(".squad-view-toolbar-start");
-        const club = document.getElementById("roster-club-line");
-        const tabs = document.querySelector(".squad-view-tabs");
-        if (panel) panel.classList.remove("is-empty-roster");
-        if (start) start.hidden = false;
-        if (tabs) tabs.hidden = false;
-        if (club) {
-          club.hidden = false;
-          club.textContent = root.dataset.bootRosterClub || "—";
-          club.classList.toggle("is-empty", !root.dataset.bootRosterClub);
-        }
         if (!body) return;
 
         const table = document.createElement("table");

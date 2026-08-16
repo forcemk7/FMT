@@ -925,11 +925,51 @@ main {
 .app-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 0.75rem 1.25rem;
   flex-shrink: 0;
   flex-wrap: nowrap;
   padding: 0.15rem 0 0;
+}
+
+.app-header-club {
+  margin: 0;
+  min-width: 0;
+  max-width: min(22rem, 36vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.95rem;
+  font-weight: 650;
+  color: var(--heading, var(--ink));
+  line-height: 1.2;
+}
+
+.app-header-club.is-empty {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.app-header-date {
+  margin: 0;
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--muted);
+  line-height: 1.2;
+}
+
+.app-header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem 0.75rem;
+  flex: 0 0 auto;
+}
+
+.app-header .squad-save-controller {
+  max-width: none;
 }
 
 .app-brand {
@@ -1001,7 +1041,7 @@ main {
 }
 
 .bmc-tip {
-  margin-left: auto;
+  margin-left: 0;
   display: inline-flex;
   flex-direction: column;
   align-items: flex-end;
@@ -4081,6 +4121,19 @@ button.regen-chip-toggle:focus-visible {
     gap: 0.5rem;
   }
 
+  .app-header-club {
+    max-width: min(12rem, 28vw);
+    font-size: 0.85rem;
+  }
+
+  .app-header-date {
+    font-size: 0.72rem;
+  }
+
+  .app-header-actions {
+    gap: 0.4rem;
+  }
+
   .app-brand {
     flex: 0 0 auto;
     font-size: 1.2rem;
@@ -6049,6 +6102,31 @@ button.mentoring-seat-card:hover {
 }
 
 /* ---- Roster: header · savegame card · First Team table ---- */
+.page-tabs.squad-view-tabs {
+  display: flex;
+  gap: 0.25rem;
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  padding: 0.1rem 0 0.2rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.page-tabs.squad-view-tabs[hidden] {
+  display: none !important;
+}
+
+#roster > .rank-header {
+  display: none !important;
+}
+
+#roster.roster {
+  padding: 0;
+  gap: 0;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+}
+
 .roster {
   flex: 1;
   min-height: 0;
@@ -6210,16 +6288,14 @@ button.mentoring-seat-card:hover {
   border-bottom: 1px solid var(--line);
 }
 
-.squad-grid-panel.is-empty-roster .squad-view-toolbar {
-  justify-content: flex-end;
-}
-
-.squad-grid-panel.is-empty-roster .squad-view-toolbar-start,
-.squad-grid-panel.is-empty-roster .squad-view-tabs,
-.squad-grid-panel.is-empty-roster .squad-toolbar-club {
+.squad-grid-panel.is-empty-roster .squad-view-toolbar,
+.squad-grid-panel.is-mentoring .squad-view-toolbar,
+.squad-grid-panel.is-loans .squad-view-toolbar,
+.squad-grid-panel.is-attributes .squad-view-toolbar {
   display: none !important;
 }
 
+.squad-view-toolbar[hidden],
 .squad-view-toolbar-start[hidden],
 .squad-view-tabs[hidden],
 .squad-toolbar-club[hidden] {
@@ -7608,6 +7684,10 @@ button.mentoring-seat-card:hover {
 
 .roster-empty[hidden] {
   display: none;
+}
+
+.squad-grid-panel.is-empty-roster .roster-empty {
+  inset: 0;
 }
 
 .roster-table tbody tr {

@@ -260,7 +260,8 @@ const rosterEl = document.querySelector<HTMLElement>("#roster")!;
 const rosterSaveControllerEl = document.querySelector<HTMLElement>(
   "#roster-save-controller",
 )!;
-const rosterClubLineEl = document.querySelector<HTMLElement>("#roster-club-line")!;
+const appHeaderClubEl = document.querySelector<HTMLElement>("#app-header-club")!;
+const appHeaderDateEl = document.querySelector<HTMLElement>("#app-header-date")!;
 const rosterTablePanelEl = document.querySelector<HTMLElement>(".roster-table-panel")!;
 const rosterBodyEl = document.querySelector<HTMLElement>("#roster-body")!;
 const squadFilterWrapEl = document.querySelector<HTMLElement>("#squad-filter-wrap")!;
@@ -276,8 +277,8 @@ const rosterStatusEl = document.querySelector<HTMLElement>("#roster-status")!;
 const rosterUploadEl = document.querySelector<HTMLInputElement>("#roster-upload")!;
 const rosterUploadBtnEl = document.querySelector<HTMLButtonElement>("#roster-upload-btn")!;
 const rosterEmptyEl = document.querySelector<HTMLElement>("#roster-empty")!;
-const squadViewToolbarStartEl = document.querySelector<HTMLElement>(
-  ".squad-view-toolbar-start",
+const squadViewToolbarEl = document.querySelector<HTMLElement>(
+  ".squad-view-toolbar",
 )!;
 const squadViewTabsEl = document.querySelector<HTMLElement>(".squad-view-tabs")!;
 const squadPersonalitiesPaneEl = document.querySelector<HTMLElement>(
@@ -603,6 +604,32 @@ function clubPlayerCount(): number {
   return clubAllPlayers().length;
 }
 
+function hasActiveSave(): boolean {
+  return rosterMeta.source === "save" && Boolean(rosterMeta.saveName);
+}
+
+/** Header identity: Active club + in-game date (Mon DD, YYYY). No save → No save. */
+function syncAppHeaderIdentity() {
+  if (!hasActiveSave()) {
+    appHeaderClubEl.textContent = "No save";
+    appHeaderClubEl.classList.add("is-empty");
+    appHeaderClubEl.removeAttribute("title");
+    appHeaderDateEl.textContent = "—";
+    return;
+  }
+  const clubName = (rosterMeta.clubName ?? "").trim();
+  if (clubName) {
+    appHeaderClubEl.textContent = clubName;
+    appHeaderClubEl.classList.remove("is-empty");
+    appHeaderClubEl.title = clubName;
+  } else {
+    appHeaderClubEl.textContent = "—";
+    appHeaderClubEl.classList.add("is-empty");
+    appHeaderClubEl.removeAttribute("title");
+  }
+  appHeaderDateEl.textContent = formatInGameDateRow(rosterMeta.gameDate);
+}
+
 function findRosterPlayer(uid: number): RosterPlayer | undefined {
   return (
     rosterPlayers.find((p) => p.uid === uid) ??
@@ -709,6 +736,13 @@ function setSquadViewMode(mode: SquadViewMode) {
   else if (mode === "firstTeam") panel?.classList.add("is-first-team");
 
   syncRosterViewHash(mode, squadUnitView);
+
+  const showFilters =
+    hasActiveSave() &&
+    clubPlayerCount() > 0 &&
+    isPersonalities;
+  squadFilterWrapEl.hidden = !showFilters;
+  squadViewToolbarEl.hidden = !showFilters;
 
   if (isAttrs) {
     squadEvolutionHover = null;
@@ -1329,7 +1363,7 @@ function applyActiveRosterFromStore(options?: {
     rosterMeta = { source: "empty" };
     scoutState = { players: [], missing: true };
     invalidateMentoringCache();
-    if (keepViewMode !== "firstTeam") setSquadViewMode(keepViewMode);
+    renderRoster();
     return;
   }
   firstTeamPlayers = (entry.players ?? []).map((p) =>
@@ -1403,6 +1437,7 @@ function applyActiveRosterFromStore(options?: {
   if (keepViewMode !== "firstTeam" || squadUnitView !== "personalities") {
     setSquadViewMode(keepViewMode);
   }
+  syncAppHeaderIdentity();
 }
 
 // Roster store is applied once at the end of module init (after DOM bindings /
@@ -8145,13 +8180,14 @@ squadFilterPopoverEl?.addEventListener("click", (event) => {
 function renderRoster() {
   rosterBodyEl.replaceChildren();
   syncRosterSavesMenu();
+  syncAppHeaderIdentity();
 
-  const hasSave = rosterMeta.source === "save" && Boolean(rosterMeta.saveName);
-  const clubName = hasSave ? (rosterMeta.clubName ?? "").trim() : "";
-  const isEmptyRoster = clubPlayerCount() === 0;
+  const hasSave = hasActiveSave();
+  const isEmptyRoster = !hasSave;
+  const emptyPlayers = clubPlayerCount() === 0;
 
-  // Empty club has no tab chrome — reset to Squad so Mentoring / Progress
-  // markup cannot linger in the empty container.
+  // No save: empty pane + prompt to +. Active save with empty players[]
+  // still shows tab chrome (T103).
   if (
     isEmptyRoster &&
     (squadViewMode !== "firstTeam" || squadUnitView !== "personalities")
@@ -8163,25 +8199,13 @@ function renderRoster() {
 
   rosterTablePanelEl.classList.toggle("is-empty-roster", isEmptyRoster);
   rosterUploadBtnEl.classList.toggle("is-cta", isEmptyRoster);
-  squadViewToolbarStartEl.hidden = isEmptyRoster;
-  rosterClubLineEl.hidden = isEmptyRoster;
-  squadViewTabsEl.hidden = isEmptyRoster;
-  // Empty copy lives on the upload “+” tooltip instead of the grid.
-  rosterEmptyEl.hidden = true;
+  squadViewTabsEl.hidden = !hasSave;
+  // Empty copy lives on the pane when there is no save (prompt to +).
+  rosterEmptyEl.hidden = hasSave;
   if (isSquadUnitMode(squadViewMode) && squadUnitView === "personalities") {
     squadPersonalitiesPaneEl.hidden = false;
     squadMentoringPaneEl.hidden = true;
     squadEvolutionEl.hidden = true;
-  }
-
-  if (clubName) {
-    rosterClubLineEl.textContent = clubName;
-    rosterClubLineEl.classList.remove("is-empty");
-    rosterClubLineEl.title = clubName;
-  } else {
-    rosterClubLineEl.textContent = "—";
-    rosterClubLineEl.classList.add("is-empty");
-    rosterClubLineEl.removeAttribute("title");
   }
 
   const tipParts: string[] = [];
@@ -8246,10 +8270,12 @@ function renderRoster() {
     liveUids.has(Number(uid)),
   );
   const showFilters =
-    !isEmptyRoster &&
+    hasSave &&
+    !emptyPlayers &&
     isSquadUnitMode(squadViewMode) &&
     squadUnitView === "personalities";
   squadFilterWrapEl.hidden = !showFilters;
+  squadViewToolbarEl.hidden = !showFilters;
   if (!showFilters) setSquadHaFilterPopoverOpen(false);
   renderSquadHaFilters();
   renderSquadHaTable();
@@ -11830,13 +11856,10 @@ function syncToolView() {
     pendingSquadViewMode = null;
     pendingSquadUnitView = null;
     if (restoreUnitView) squadUnitView = restoreUnitView;
-    // Always sync chrome + personality grid first. Side-tab restores alone
-    // left `.is-empty-roster` on the panel (display:none !important on
-    // Attributes / Mentoring).
     syncActiveSquadPlayers();
     renderRoster();
     const view =
-      restoreView && clubPlayerCount() > 0 ? restoreView : squadViewMode;
+      restoreView && hasActiveSave() ? restoreView : squadViewMode;
     if (view !== "firstTeam" || squadUnitView !== "personalities") {
       setSquadViewMode(view);
     }
