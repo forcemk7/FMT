@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-08-17 (T114 done — native +488 namelist MVP)
+Last updated: 2026-08-17 (T115 blocked — Santos club.dat 32-list, 10 outbound off-object)
 
 ## Now
 
@@ -42,7 +42,34 @@ Last updated: 2026-08-17 (T114 done — native +488 namelist MVP)
 
 **T114 done** — native tag `00950e01`: after identity, namelist at clubIdAbs+488 (u32 count + lp32 names) → Squad unit `list` (not Senior). Continue skips +488. Owner: compare names to FM.
 
-**Next:** Owner FM check on +488 names. T087 frozen. Do not claim T077 / T080 / T081.
+**Used (2026-08-17 HQ):** Eight native **dates** match FM (T099). Squad count smoke — FM `squad (squad+loans)` vs FMT +488:
+
+| Save | FM | FMT |
+|------|-----|-----|
+| gameDate1 Liverpool | 30 (39) | 35 |
+| gameDate2 Bournemouth | 23 (33) | **33** |
+| gameDate3 Leicester | 25 (32) | 34 |
+| gameDate4 Schalke | 30 (37) | 32 |
+| gameDate5 Bodø/Glimt | 22 (22) | 34 |
+| gameDate6 Legia | 23 (26) | 25 |
+| gameDate7 Melbourne Victory | 21 (21) | 34 |
+| gameDate8 Santos | 32 (42) | **26** |
+
++488 ≠ Senior-only; ≠ always Senior+loans (exact on Bournemouth; under Santos; over Bodø/Victory). Keep as named blob only.
+
+**Used (2026-08-17 HQ):** Santos name-diff. FM Senior Squad Players **(42)** = squad+loans. FMT +488 = **26**, all inside that 42 (no extras). Missing **16**.
+
+Pink/red in FM (likely out): 11 names. FMT has only **Moisés**; misses 10 (Luisão, Alexis Duarte, JP Chermont, Nathan Santos, Kevyson, Sandry, Patrick, Gustavo Caballero, Billal Brahimi, Tiquinho Soares). Blue (loan in) all in FMT: Menino, Díaz, Barbosa.
+
+White missing from FMT (6, UniqueID): Rodrigo Falcão `2000206937`, Diogenes `19399114`, Alex Nascimento `19290866`, Gustavo Henrique `2000206870`, Caio Araújo `2000256316`, Enzo Boer `2000205667`.
+
+Fits 32 vs 42 if senior ≈ whites + blues + Moisés (32) and the other 10 pink = the +loans delta. +488 still drops those 6 whites. Not a complete Senior list.
+
+**Used (2026-08-17 HQ):** Status law for generic extract — white = owned at club (Squad); pink/red = owned out on loan (Loans); blue = not-owned inbound loan (at club). Santos UniqueIDs are gold. **T115 ready.**
+
+**T115 blocked** — identity club 335 → `.dat` intern list count **32** (28 white + 3 inbound + Moisés). All 42 gold UniqueIDs exist as person doubles; 10 owned-out are not referenced from that club object. No three-status discriminator. Do not ship the 32-list as success. T116 stays blocked.
+
+**Used (2026-08-17 HQ):** Fund T117 — Bodø UniqueID hunt. Contrast Lund (Senior, not in +488) vs Haikin (Senior, in blob) vs Sunday+Hammadou (2) vs Bro Hansen (U19s). Separate unit bits. Reuse T115 `.dat` intern list as first probe; do not steal T115. T116 stays blocked. T087 frozen. Do not claim T077 / T080 / T081.
 
 **T038 done** — II Lars Gabrielsen Det/Lea is the same T014 tip class (not a new locus). Remaining hist=0 stay `—`.
 
@@ -190,9 +217,12 @@ Last updated: 2026-08-17 (T114 done — native +488 namelist MVP)
 | Working-copy extract; delete `.fm` after | **T109 done** | **Yes** |
 | First-principles squad lists (native FM26 first) | **T110 cancelled** (offset namelist; owner rejected) | — |
 | Senior Squad — club → squad object → player ids | **T111 done** (0 players; thin close) | — |
-| Club id → “squad” strings dump (plain) | **T112 ready** | Yes |
-| Senior clues — broad shallow probes | **T113 ready** | Yes |
+| Club id → “squad” strings dump (plain) | **T112 done** (race; titles absent) | — |
+| Senior clues — broad shallow probes | **T113 done** (scatter; +488 found) | — |
 | Native MVP — clubIdAbs+488 namelist → Squad | **T114 done** | **Yes** |
+| Santos three-status lock (owned / out / inbound) | **T115 blocked** (club.dat 32; 10 outbound off-object) | after second path |
+| Bodø three-status UniqueID replay | **T116 blocked** (on T115) | after T115 |
+| Bodø UniqueID unit bits (Senior vs 2 vs U19s) | **T117 ready** | Yes |
 | Progress GK abilities + outfield GK rating | **T087 blocked** (on T094) | after native roster |
 | npm run dev from HQ | **T089 cancelled** | — |
 | Sync steals Active save when extract finishes | **T088 done** | **Yes** |
@@ -202,8 +232,9 @@ Last updated: 2026-08-17 (T114 done — native +488 namelist MVP)
 
 | ID | Title | Status | Owner |
 |----|-------|--------|-------|
-| T113 | Senior clues — broad shallow probes (any hit wins) | ready | |
-| T112 | After club id — find “squad” strings linked to that club | ready | |
+| T117 | Bodø — UniqueID bit-pattern hunt Senior vs 2 vs U19s | ready | |
+| T115 | Santos — lock owned-at-club / owned-out / inbound-loan by UniqueID | blocked | cursor-worker |
+| T116 | Bodø — replay three-status UniqueID lock (gameDate5) | blocked | |
 | T087 | Progress GK vs outfield CA layout | blocked | |
 | T077 | Live www URL — upload save, extract, four tabs | blocked | |
 | T080 | Stop favoured-club extract on roster path | blocked | |
@@ -229,18 +260,19 @@ Last updated: 2026-08-17 (T114 done — native +488 namelist MVP)
 
 ## Gate
 
-- T114 done (native +488 → Squad unit `list`). Owner FM check next. T087 frozen. T077 / T080 / T081 blocked. One ticket per worker.
+- Dates: eight natives match FM (T099). **T117 ready** — Bodø Senior vs 2 vs U19s UniqueID bits (Lund miss as control). T115 blocked (Santos `.dat` 32, 10 outbound off-object) — do not steal. T116 blocked. T087 frozen. T077 / T080 / T081 blocked. One ticket per worker. Claim **T117** only.
 - Refuse Suggest. Refuse CA/PA. Refuse Stripe paywall / packaging / FM27.
 - BMC is a tip. Do not gate the table.
 - Workers: one ticket, one commit on `FMT/`. If freeze, do not claim anything else.
 
 ## Blockers
 
+- **T115:** ten Santos owned-out UniqueIDs missing from club `.dat` intern list; no three-status discriminator (Moisés in the 32). Dump `tmp/identity/t115-santos-three-status.txt`.
 - Host RAM / T077 after owner says the local loop is honest (any save + Active not stolen).
 
 ## Recently done
 
-- **T114** — Native tag `00950e01`: clubIdAbs+488 u32 count + lp32 names → Squad unit `list` (not Senior). Continue skips +488. Synthetic + smoke Liverpool 35 / Bournemouth 33. Working-copy delete (T109). Restart `npm run dev` and + a native Career. Owner: compare names to FM. No committed `.fm`.
+- **T114** — Native +488 → Squad unit `list` (not Senior). Dates ✔️ eight natives. Counts vs FM `squad (squad+loans)`: Liverpool 35 vs 30(39); Bournemouth **33=33**; Leicester 34 vs 25(32); Schalke 32 vs 30(37); Bodø 34 vs 22(22); Legia 25 vs 23(26); Victory 34 vs 21(21); Santos **26** vs 32(42). Santos name-diff: 26 ⊂ 42; miss 10 likely-out + 6 whites (Falcão, Diogenes, Alex Nascimento, Gustavo Henrique, Caio Araújo, Enzo Boer). Blob ≠ Senior. No committed `.fm`.
 
 - **T111** — Thin close: killed T110 namelist; old club→team join → **0 players** on native. Not a usable Senior list. Follow-up **T112**.
 
