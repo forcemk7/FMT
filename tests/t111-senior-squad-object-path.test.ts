@@ -8,9 +8,10 @@ const extractPy = fs.readFileSync(
   "utf8",
 );
 
-describe("T111 Senior object path — superseded by T114", () => {
-  it("extract no longer claims senior-squad-object-v1", () => {
-    expect(extractPy).toMatch(/native-clubid-plus488-v1/);
+describe("T111 Senior object path — superseded by T118", () => {
+  it("extract uses club .dat Senior UniqueIDs (not T111 object path)", () => {
+    expect(extractPy).toMatch(/native-club-dat-senior-v1/);
     expect(extractPy).not.toMatch(/senior-squad-object-v1/);
+    expect(extractPy).not.toMatch(/native-clubid-plus488-v1/);
   });
 });

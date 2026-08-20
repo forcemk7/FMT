@@ -1,19 +1,21 @@
 #!/usr/bin/env python3
 """
-T114 — Native MVP: clubIdAbs+488 namelist → Squad.
+T118 — At-club Senior UniqueIDs → Squad (mentoring pool).
 
 Native (00950e01) only, after identity:
-  club UniqueID abs → +488 → u32 count → count × (lp32 UTF-8 name)
+  club UniqueID → `.dat` (`tad.`) → u32 count + person-internal ids
+  → UniqueID via person `02 40` double
+  → drop owned-out when person-intern sits in lookback of a loan-out template
+  → resolve name via PERSON_NAME_MARK + name-table ids
 
-Unit label is `list` — not Senior / FT / II / U19. Do not claim squad type.
+Unit label is `senior` (at-club Senior / inbound). Not +488. No HA/CA. No II/U19.
 
-Continue (00950e02): honest empty list (no +488 assumption).
+Continue (00950e02): honest empty list.
 
 Refused:
-  - T108 extract-first-team-fast revival
-  - T110 fitted FT=25
-  - T111 Senior object-path claim
-  - HA / CA
+  - T114 +488 namelist as mentoring pool
+  - T115 three-status UI / Bodø races
+  - Hardcoding Santos UniqueIDs in extract law (gold = tests/fixtures)
 """
 
 from __future__ import annotations
@@ -40,11 +42,23 @@ CHUNK = 8 * 1024 * 1024
 ZSTD_MAGIC = bytes.fromhex("28b52ffd")
 TAG_NATIVE = "00950e01"
 TAG_CONTINUE = "00950e02"
-# Fixed gap after identity club UniqueID → namelist count (T113 lock, five Careers).
-CLUB_ID_NAMELIST_REL = 488
-# Structural bounds only — not a fitted squad size.
-NAME_COUNT_LO, NAME_COUNT_HI = 1, 500
-NAME_LEN_LO, NAME_LEN_HI = 1, 80
+
+# Loan-out template (same motif as T086 / extract-first-team-fast).
+LOAN_OUT_MOTIF_PREFIX = b"\x64\xff"
+LOAN_OUT_PAD = b"\x00\x00\x00\x00\xff\xff\xff\xff\xff\x00\x00\x00\x00"
+LOAN_KIND_LO, LOAN_KIND_HI = 0x20, 0x30
+LOAN_LOOKBACK_LO, LOAN_LOOKBACK_HI = 8, 73
+LOAN_TEMPLATE_LEN = 3 + 4 + 10 + 4 + 4 + 4 + 2
+LOAN_CLUB_LO = 50
+# Native host clubs can exceed the old 5e6 catalog ceiling (Moisés c1≈1.4e7).
+LOAN_CLUB_HI = 50_000_000
+
+# Native FM26 name table sits below the continue-career 100–160MB band.
+NAME_TABLE_LO = 40 * 1024 * 1024
+NAME_TABLE_HI = 90 * 1024 * 1024
+PERSON_NAME_MARK = bytes.fromhex("01006c07")
+PERSON_NAME_FIRST_OFF = 25
+PERSON_NAME_SECOND_OFF = 30
 
 _emt_spec = importlib.util.spec_from_file_location(
     "extract_managed_team", ROOT / "scripts" / "extract-managed-team.py"
@@ -53,10 +67,21 @@ _emt = importlib.util.module_from_spec(_emt_spec)
 assert _emt_spec and _emt_spec.loader
 _emt_spec.loader.exec_module(_emt)
 
+_t115_spec = importlib.util.spec_from_file_location(
+    "lock_santos_three_status", ROOT / "scripts" / "lock-santos-three-status.py"
+)
+_t115 = importlib.util.module_from_spec(_t115_spec)
+assert _t115_spec and _t115_spec.loader
+_t115_spec.loader.exec_module(_t115)
+
 refuse_live_fm_games_save = _emt.refuse_live_fm_games_save
 discover_managed_club = _emt.discover_managed_club
 pick_game_date_near_identity = _emt.pick_game_date_near_identity
 catalog_long_name = _emt.catalog_long_name
+scan_person_doubles = _t115.scan_person_doubles
+find_club_dat_intern_list = _t115.find_club_dat_intern_list
+
+_NAME_ID_HITS: dict[int, dict[int, list[str]]] = {}
 
 
 def progress(t0: float, **fields) -> None:
@@ -85,7 +110,7 @@ def decompress_to_temp(save: Path, t0: float) -> Path:
     zoff = probe_zstd_offset(save)
     if zoff is None:
         raise SystemExit("Unsupported .fm container — no zstd magic in header")
-    fd, name = tempfile.mkstemp(prefix="fmt-list-", suffix=".bin")
+    fd, name = tempfile.mkstemp(prefix="fmt-senior-", suffix=".bin")
     os.close(fd)
     tmp = Path(name)
     out_bytes = 0
@@ -115,62 +140,173 @@ def decompress_to_temp(save: Path, t0: float) -> Path:
     return tmp
 
 
-def read_lp32_name(mm: mmap.mmap | bytes, off: int) -> tuple[str, int] | None:
-    """Return (name, bytes_consumed) for one length-prefixed UTF-8 name."""
-    if off + 4 > len(mm):
+def _parse_loan_out_template(
+    mm: mmap.mmap | bytes, motif_at: int, parent_club: int
+) -> int | None:
+    if motif_at + LOAN_TEMPLATE_LEN > len(mm):
         return None
-    n = struct.unpack_from("<I", mm, off)[0]
-    if not (NAME_LEN_LO <= n <= NAME_LEN_HI) or off + 4 + n > len(mm):
+    if motif_at < len(LOAN_OUT_PAD):
         return None
-    raw = bytes(mm[off + 4 : off + 4 + n])
-    try:
-        s = raw.decode("utf-8")
-    except UnicodeDecodeError:
+    if bytes(mm[motif_at - len(LOAN_OUT_PAD) : motif_at]) != LOAN_OUT_PAD:
         return None
-    if not s or not s.isprintable() or not any(c.isalpha() for c in s):
+    if bytes(mm[motif_at : motif_at + 2]) != LOAN_OUT_MOTIF_PREFIX:
         return None
-    return s, 4 + n
+    kind = mm[motif_at + 2]
+    if not (LOAN_KIND_LO <= kind <= LOAN_KIND_HI):
+        return None
+    base = motif_at + 3
+    if bytes(mm[base + 4 : base + 14]) != b"\x00" * 10:
+        return None
+    c1 = struct.unpack_from("<I", mm, base + 18)[0]
+    c2 = struct.unpack_from("<I", mm, base + 22)[0]
+    marker = struct.unpack_from("<H", mm, base + 26)[0]
+    if (
+        c1 != c2
+        or c1 == parent_club
+        or not (LOAN_CLUB_LO <= c1 <= LOAN_CLUB_HI)
+        or marker != 0x000A
+    ):
+        return None
+    return c1
 
 
-def parse_club_id_plus488_namelist(
-    mm: mmap.mmap | bytes, club_id_abs: int
-) -> dict | None:
-    """
-    Native layout: clubIdAbs + 488 → u32 count → count × lp32 names.
-    Returns None on structural miss (wrong count / truncated / bad names).
-    """
-    count_off = int(club_id_abs) + CLUB_ID_NAMELIST_REL
-    if count_off < 0 or count_off + 4 > len(mm):
+def loaned_out_interns(
+    mm: mmap.mmap | bytes, *, parent_club: int, intern_set: set[int]
+) -> dict[int, int]:
+    """person-intern → loanClubId when intern sits in loan-out lookback."""
+    if not intern_set:
+        return {}
+    out: dict[int, int] = {}
+    pos = 0
+    while True:
+        j = mm.find(LOAN_OUT_MOTIF_PREFIX, pos)
+        if j < 0:
+            break
+        loan_club = _parse_loan_out_template(mm, j, parent_club)
+        if loan_club is None:
+            pos = j + 1
+            continue
+        for back in range(LOAN_LOOKBACK_LO, LOAN_LOOKBACK_HI + 1):
+            start = j - back
+            if start < 0:
+                continue
+            intern = struct.unpack_from("<I", mm, start)[0]
+            if intern in intern_set and intern not in out:
+                out[intern] = loan_club
+                break
+        pos = j + 1
+    return out
+
+
+def name_id_hits(buf: mmap.mmap | bytes, nid: int) -> list[str]:
+    if nid <= 0 or nid >= 2_000_000:
+        return []
+    buf_key = id(buf)
+    cache = _NAME_ID_HITS.get(buf_key)
+    if cache is None:
+        cache = {}
+        _NAME_ID_HITS[buf_key] = cache
+    cached = cache.get(nid)
+    if cached is not None:
+        return cached
+    hi = min(NAME_TABLE_HI, len(buf))
+    lo = min(NAME_TABLE_LO, hi)
+    pat = struct.pack("<I", nid)
+    hits: list[str] = []
+    j = buf.find(pat, lo, hi)
+    while j >= 0 and len(hits) < 8:
+        if j + 8 <= len(buf):
+            ln = struct.unpack_from("<I", buf, j + 4)[0]
+            if 1 <= ln <= 48 and j + 8 + ln <= len(buf):
+                raw = bytes(buf[j + 8 : j + 8 + ln])
+                if raw and raw[:1].isalpha() and all(
+                    b >= 0x20 or b == 0x09 for b in raw
+                ):
+                    try:
+                        hits.append(raw.decode("utf-8"))
+                    except UnicodeDecodeError:
+                        pass
+        j = buf.find(pat, j + 1, hi)
+    cache[nid] = hits
+    return hits
+
+
+def lookup_name_id(buf: mmap.mmap | bytes, nid: int, *, surname: bool) -> str | None:
+    hits = name_id_hits(buf, nid)
+    if not hits:
         return None
-    count = struct.unpack_from("<I", mm, count_off)[0]
-    if not (NAME_COUNT_LO <= count <= NAME_COUNT_HI):
-        return None
-    off = count_off + 4
-    names: list[str] = []
-    for _ in range(count):
-        parsed = read_lp32_name(mm, off)
-        if not parsed:
-            return None
-        name, consumed = parsed
-        names.append(name)
-        off += consumed
-    return {
-        "listAbs": count_off,
-        "countHeader": count,
-        "names": names,
-        "endAbs": off,
+    if surname:
+        return hits[1] if len(hits) > 1 else hits[0]
+    return hits[0]
+
+
+def resolve_name_from_mark(
+    buf: mmap.mmap | bytes, person_abs: int
+) -> str | None:
+    lo = max(0, person_abs - 2048)
+    region = bytes(buf[lo:person_abs])
+    marks: list[int] = []
+    start = 0
+    while True:
+        rel = region.find(PERSON_NAME_MARK, start)
+        if rel < 0:
+            break
+        marks.append(lo + rel)
+        start = rel + 1
+    for mark in sorted(marks, reverse=True):
+        if mark + PERSON_NAME_SECOND_OFF + 4 > len(buf):
+            continue
+        fid = struct.unpack_from("<I", buf, mark + PERSON_NAME_FIRST_OFF)[0]
+        sid = struct.unpack_from("<I", buf, mark + PERSON_NAME_SECOND_OFF)[0]
+        if fid == 0 or sid == 0 or fid > 2_000_000 or sid > 2_000_000:
+            continue
+        first = lookup_name_id(buf, fid, surname=False)
+        second = lookup_name_id(buf, sid, surname=True)
+        if first and second:
+            return f"{first} {second}"
+        if second or first:
+            return second or first
+    return None
+
+
+def players_from_club_dat(
+    mm: mmap.mmap | bytes,
+    *,
+    club_id: int,
+) -> tuple[list[dict], dict]:
+    """Club `.dat` intern list → at-club Senior rows (UniqueID + name)."""
+    persons = scan_person_doubles(mm)
+    club_list = find_club_dat_intern_list(mm, club_id, persons)
+    diag: dict = {
+        "personDoubles": len(persons),
+        "clubDatList": None,
+        "loanedOutDropped": [],
+    }
+    if not club_list:
+        return [], {**diag, "missReason": "club-dat-intern-list-miss"}
+
+    intern_set = {int(row["intern"]) for row in club_list["players"]}
+    outbound = loaned_out_interns(mm, parent_club=club_id, intern_set=intern_set)
+    diag["clubDatList"] = {
+        "tadAbs": club_list.get("tadAbs"),
+        "countAbs": club_list.get("countAbs"),
+        "count": club_list["count"],
     }
 
-
-def players_from_names(names: list[str]) -> list[dict]:
-    """Name rows only — synthetic jobId/uid for table merge; not real UniqueIDs."""
     players: list[dict] = []
-    for i, name in enumerate(names):
-        synth = i + 1
+    for row in club_list["players"]:
+        intern = int(row["intern"])
+        uid = int(row["uid"])
+        if intern in outbound:
+            diag["loanedOutDropped"].append(
+                {"uid": uid, "intern": intern, "loanClubId": outbound[intern]}
+            )
+            continue
+        name = resolve_name_from_mark(mm, int(row["personAbs"])) or f"uid:{uid}"
         players.append(
             {
-                "jobId": synth,
-                "uid": synth,
+                "jobId": uid,
+                "uid": uid,
                 "name": name,
                 "kind": None,
                 "ca": None,
@@ -180,13 +316,14 @@ def players_from_names(names: list[str]) -> list[dict]:
                 "attributeHistory": None,
                 "loan": None,
                 "_extract": {
-                    "unit": "list",
-                    "source": "native-clubid-plus488-v1",
-                    "uidResolved": False,
+                    "unit": "senior",
+                    "source": "native-club-dat-senior-v1",
+                    "uidResolved": True,
+                    "intern": intern,
                 },
             }
         )
-    return players
+    return players, diag
 
 
 def extract_from_mmap(mm: mmap.mmap | bytes, *, save: Path, t0: float) -> dict:
@@ -215,21 +352,20 @@ def extract_from_mmap(mm: mmap.mmap | bytes, *, save: Path, t0: float) -> dict:
     )
 
     discovery: dict = {
-        "method": "native-clubid-plus488-v1",
+        "method": "native-club-dat-senior-v1",
         "tagHex": tag_hex,
         "identityAbs": identity["identityAbs"],
         "clubIdAbs": club_id_abs,
         "clubId": club_id,
         "layout": layout,
-        "namelistRel": CLUB_ID_NAMELIST_REL,
-        "unitLabel": "list",
+        "unitLabel": "senior",
         "refused": [
-            "Senior / FT / II / U19 squad-type claim",
-            "T108 extract-first-team-fast revival",
-            "T110 fitted FT=25",
-            "T111 Senior object-path claim",
+            "T114 +488 namelist as mentoring pool",
+            "T115 three-status UI",
+            "II/U19 lists",
             "HA/CA",
-            "continue +488 assumption",
+            "continue club-dat assumption",
+            "hardcoded Santos UniqueIDs in extract law",
         ],
         **catalog_diag,
     }
@@ -239,40 +375,43 @@ def extract_from_mmap(mm: mmap.mmap | bytes, *, save: Path, t0: float) -> dict:
         progress(
             t0,
             phase="resolve",
-            message=f"Native namelist at clubIdAbs+{CLUB_ID_NAMELIST_REL}…",
+            message="Native club .dat Senior UniqueIDs…",
             pct=80,
         )
-        hit = parse_club_id_plus488_namelist(mm, club_id_abs)
-        if hit:
-            players = players_from_names(hit["names"])
-            discovery["listAbs"] = hit["listAbs"]
-            discovery["countHeader"] = hit["countHeader"]
+        players, list_diag = players_from_club_dat(mm, club_id=club_id)
+        discovery.update(list_diag)
+        if players:
             discovery["playersResolved"] = len(players)
-            discovery["unitStatus"] = {"list": "clubIdAbs+488"}
+            discovery["unitStatus"] = {"senior": "club-dat-at-club"}
             progress(
                 t0,
                 phase="players",
-                message=f"list {len(players)} (count={hit['countHeader']})",
+                message=(
+                    f"senior {len(players)} "
+                    f"(dropped outbound {len(discovery.get('loanedOutDropped') or [])})"
+                ),
                 pct=95,
                 playersDone=len(players),
             )
         else:
-            discovery["missReason"] = "native-clubid-plus488-miss"
-            discovery["unitStatus"] = {"list": "miss"}
+            discovery["missReason"] = list_diag.get(
+                "missReason", "native-club-dat-senior-empty"
+            )
+            discovery["unitStatus"] = {"senior": "miss"}
             progress(
                 t0,
                 phase="resolve",
-                message="Native +488 namelist miss",
+                message="Native club .dat Senior miss",
                 pct=90,
                 missReason=discovery["missReason"],
             )
     else:
-        discovery["missReason"] = "continue-skip-native-plus488"
-        discovery["unitStatus"] = {"list": "skipped-continue"}
+        discovery["missReason"] = "continue-skip-native-club-dat"
+        discovery["unitStatus"] = {"senior": "skipped-continue"}
         progress(
             t0,
             phase="resolve",
-            message="Continue: skip +488 namelist",
+            message="Continue: skip native club .dat Senior",
             pct=90,
             missReason=discovery["missReason"],
         )
@@ -294,7 +433,7 @@ def extract_from_mmap(mm: mmap.mmap | bytes, *, save: Path, t0: float) -> dict:
             "listAbs": None,
             "countHeader": 0,
             "players": [],
-            "discovery": {"unitStatus": "out-of-scope-t114"},
+            "discovery": {"unitStatus": "out-of-scope-t118"},
         },
         "u19": {
             "u19Name": "U19",
@@ -303,10 +442,10 @@ def extract_from_mmap(mm: mmap.mmap | bytes, *, save: Path, t0: float) -> dict:
             "listAbs": None,
             "countHeader": 0,
             "players": [],
-            "discovery": {"unitStatus": "out-of-scope-t114"},
+            "discovery": {"unitStatus": "out-of-scope-t118"},
         },
-        "listAbs": discovery.get("listAbs"),
-        "countHeader": discovery.get("countHeader"),
+        "listAbs": (discovery.get("clubDatList") or {}).get("countAbs"),
+        "countHeader": len(players) if players else discovery.get("clubDatList", {}).get("count"),
         "metaOnly": False,
         "discovery": discovery,
         "elapsedMs": int((time.perf_counter() - t0) * 1000),
@@ -331,7 +470,7 @@ def main() -> int:
             t0,
             phase="done",
             message=(
-                f"{len(result['players'])} list, "
+                f"{len(result['players'])} senior, "
                 f"gameDate={result.get('gameDate')}, "
                 f"miss={result.get('discovery', {}).get('missReason')}"
             ),

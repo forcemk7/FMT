@@ -1,6 +1,6 @@
 # Status
 
-Last updated: 2026-08-17 (T115 blocked — Santos club.dat 32-list, 10 outbound off-object)
+Last updated: 2026-08-20 (T118 done: at-club Senior UniqueIDs → Squad)
 
 ## Now
 
@@ -69,7 +69,7 @@ Fits 32 vs 42 if senior ≈ whites + blues + Moisés (32) and the other 10 pink 
 
 **T115 blocked** — identity club 335 → `.dat` intern list count **32** (28 white + 3 inbound + Moisés). All 42 gold UniqueIDs exist as person doubles; 10 owned-out are not referenced from that club object. No three-status discriminator. Do not ship the 32-list as success. T116 stays blocked.
 
-**Used (2026-08-17 HQ):** Fund T117 — Bodø UniqueID hunt. Contrast Lund (Senior, not in +488) vs Haikin (Senior, in blob) vs Sunday+Hammadou (2) vs Bro Hansen (U19s). Separate unit bits. Reuse T115 `.dat` intern list as first probe; do not steal T115. T116 stays blocked. T087 frozen. Do not claim T077 / T080 / T081.
+**Used (2026-08-20 HQ):** Tighten. Shell + identity + gameDate = done. Next = **at-club Senior UniqueIDs** for mentoring pool only. Freeze T115–T117 (three-status / unit-bit RE). **T118 done** — club `.dat` → UniqueIDs+names; Moisés dropped via loan template; not +488. No parallel races.
 
 **T038 done** — II Lars Gabrielsen Det/Lea is the same T014 tip class (not a new locus). Remaining hist=0 stay `—`.
 
@@ -220,10 +220,11 @@ Fits 32 vs 42 if senior ≈ whites + blues + Moisés (32) and the other 10 pink 
 | Club id → “squad” strings dump (plain) | **T112 done** (race; titles absent) | — |
 | Senior clues — broad shallow probes | **T113 done** (scatter; +488 found) | — |
 | Native MVP — clubIdAbs+488 namelist → Squad | **T114 done** | **Yes** |
-| Santos three-status lock (owned / out / inbound) | **T115 blocked** (club.dat 32; 10 outbound off-object) | after second path |
-| Bodø three-status UniqueID replay | **T116 blocked** (on T115) | after T115 |
-| Bodø UniqueID unit bits (Senior vs 2 vs U19s) | **T117 ready** | Yes |
-| Progress GK abilities + outfield GK rating | **T087 blocked** (on T094) | after native roster |
+| Santos three-status lock | **T115 frozen** | — |
+| Bodø three-status replay | **T116 frozen** | — |
+| Bodø unit bit-pattern | **T117 frozen** | — |
+| At-club Senior UniqueIDs (mentoring pool) | **T118 done** | **Yes** |
+| Progress GK abilities + outfield GK rating | **T087 frozen** | — |
 | npm run dev from HQ | **T089 cancelled** | — |
 | Sync steals Active save when extract finishes | **T088 done** | **Yes** |
 | II/U19 Progress CA strip | **T079 done** | **Yes** |
@@ -232,13 +233,9 @@ Fits 32 vs 42 if senior ≈ whites + blues + Moisés (32) and the other 10 pink 
 
 | ID | Title | Status | Owner |
 |----|-------|--------|-------|
-| T117 | Bodø — UniqueID bit-pattern hunt Senior vs 2 vs U19s | ready | |
-| T115 | Santos — lock owned-at-club / owned-out / inbound-loan by UniqueID | blocked | cursor-worker |
-| T116 | Bodø — replay three-status UniqueID lock (gameDate5) | blocked | |
-| T087 | Progress GK vs outfield CA layout | blocked | |
-| T077 | Live www URL — upload save, extract, four tabs | blocked | |
-| T080 | Stop favoured-club extract on roster path | blocked | |
-| T081 | Faster loan motif search — same loan flags | blocked | |
+| T077 | Live www URL — upload save, extract, four tabs | frozen | |
+| T080 | Stop favoured-club extract on roster path | frozen | |
+| T081 | Faster loan motif search — same loan flags | frozen | |
 
 ## Behavior
 
@@ -260,17 +257,18 @@ Fits 32 vs 42 if senior ≈ whites + blues + Moisés (32) and the other 10 pink 
 
 ## Gate
 
-- Dates: eight natives match FM (T099). **T117 ready** — Bodø Senior vs 2 vs U19s UniqueID bits (Lund miss as control). T115 blocked (Santos `.dat` 32, 10 outbound off-object) — do not steal. T116 blocked. T087 frozen. T077 / T080 / T081 blocked. One ticket per worker. Claim **T117** only.
+- Shell + identity + gameDate done. **T118 done** — at-club Senior UniqueIDs → Squad (mentoring pool). T115–T117 / T087 / T077 / T080 / T081 frozen. Empty board for workers until HQ funds next.
 - Refuse Suggest. Refuse CA/PA. Refuse Stripe paywall / packaging / FM27.
 - BMC is a tip. Do not gate the table.
 - Workers: one ticket, one commit on `FMT/`. If freeze, do not claim anything else.
 
 ## Blockers
 
-- **T115:** ten Santos owned-out UniqueIDs missing from club `.dat` intern list; no three-status discriminator (Moisés in the 32). Dump `tmp/identity/t115-santos-three-status.txt`.
-- Host RAM / T077 after owner says the local loop is honest (any save + Active not stolen).
+- Mentoring pool = at-club Senior only; outbound must not appear on Squad.
 
 ## Recently done
+
+- **T118** — Native club `.dat` intern list → UniqueID + name → Squad unit `senior` (mentoring pool). Drop owned-out via loan-out template lookback (Moisés out; LOAN_CLUB_HI raised for host id). Santos gameDate8: **31** = 28 white + 3 inbound; outbound absent. Replaces +488. Continue skips. Gold in fixtures only. Unittest + vitest. Restart `npm run dev`. No committed `.fm`.
 
 - **T114** — Native +488 → Squad unit `list` (not Senior). Dates ✔️ eight natives. Counts vs FM `squad (squad+loans)`: Liverpool 35 vs 30(39); Bournemouth **33=33**; Leicester 34 vs 25(32); Schalke 32 vs 30(37); Bodø 34 vs 22(22); Legia 25 vs 23(26); Victory 34 vs 21(21); Santos **26** vs 32(42). Santos name-diff: 26 ⊂ 42; miss 10 likely-out + 6 whites (Falcão, Diogenes, Alex Nascimento, Gustavo Henrique, Caio Araújo, Enzo Boer). Blob ≠ Senior. No committed `.fm`.
 

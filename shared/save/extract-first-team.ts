@@ -1,9 +1,9 @@
 /**
  * Squad lists (+ club identity) from an FM career .fm save.
  *
- * T114: shells out to `scripts/extract-squad-lists.py`
- * (native 00950e01: clubIdAbs+488 u32 count + lp32 names → unit `list`;
- * continue skips +488; no Senior claim; no HA/CA; Reserve/U19 out of scope).
+ * T118: shells out to `scripts/extract-squad-lists.py`
+ * (native 00950e01: club `.dat` intern list → UniqueID + name, drop owned-out
+ * via loan-out template → unit `senior`; continue skips; no HA/CA; no II/U19).
  */
 
 import fs from "node:fs";

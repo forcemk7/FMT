@@ -67,9 +67,10 @@ export type SquadHaFilter = {
 };
 
 /** Squad unit label shown on the club-wide HA table. */
-export type SquadHaUnit = "list" | "Senior" | "FT" | "II" | "U19";
+export type SquadHaUnit = "list" | "senior" | "Senior" | "FT" | "II" | "U19";
 
 export const SQUAD_HA_UNIT_ORDER: readonly SquadHaUnit[] = [
+  "senior",
   "list",
   "Senior",
   "FT",
