@@ -1,30 +1,33 @@
 # Status
 
-Last updated: 2026-08-25 (T122 done — CA/PA/HA on attributes desk)
+Last updated: 2026-08-25 (T125 done; next T126 full load)
 
 ## Now
 
-**Next funded:** **T123** mentor desk (unblocked by T122) — only if usage says so; otherwise hygiene.
+**Funded order:** **T126** → **T127** → **T128**. Then pack installer (lightness test).
 
-**Hygiene (later / anytime):** T119 rename folder, T124 quiet launch.  
-**Defer as skin:** T120/T121 squad chrome (not the bet).
-
-**Ignore:** old extract tickets. **Frozen:** `.fm` RE, BepInEx.
+**Defer:** T120/T121 skin, T123 mentor until history is in daily use.  
+**Hygiene:** T119, T124.  
+**Ignore:** old extract tickets. **Frozen:** `.fm` RE, BepInEx, premature perf on `desktop:dev`.
 
 ## Board
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
-| T123 | Mentor desk | ready | 2 | needs live CA/PA/HA — now available |
+| T126 | Restore full-save index | ready | 2 | **Next** |
+| T127 | Attribute history plot | ready | 3 | desk plot + deltas |
+| T128 | Attribute tone colors | ready | 4 | OG good/bad |
+| T123 | Mentor desk | deferred | — | after history in use |
 | T119 | Rename glassscout → desktop | ready | 8 | hygiene |
-| T124 | Quiet dev launch | ready | 9 | hygiene |
-| T120 | Club-first shell | deferred | — | skin-adjacent |
-| T121 | Squad table v1 | deferred | — | skin-adjacent |
+| T124 | Quiet dev launch | ready | 9 | may overlap T125 |
+| T120 | Club-first shell | deferred | — | skin |
+| T121 | Squad table v1 | deferred | — | skin |
 
 ## Recently done
 
-- **T122** — CA/PA/HA on player attributes desk (live reader + desk UI; LE side-by-side still recommended)
+- **T125** — stable shell (`desktop:stable` / `--no-watch`)
+- **T122** — CA/PA/HA on attributes desk (`a2bd4d8`)
 
 ## Loop
 
-FM for play → FMT for **hidden** CA/PA/HA on the attributes desk → later desks that *use* those numbers.
+FM → FMT full load → attributes desk (hidden + history) → installer for daily light use.
