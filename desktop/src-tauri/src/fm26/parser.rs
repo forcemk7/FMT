@@ -13,8 +13,11 @@ pub(crate) const PERSONALITY_ATTRIBUTE_NAMES: [&str; 8] = [
     "Controversy",
 ];
 
+/// Convert FM internal attribute storage (0–100, typically ×5) to the 1–20 UI value.
+/// Matches in-game / FMLE / FMSuperScout: `floor(raw/5 + 0.5)` ≡ integer `(raw + 2) / 5`.
+/// The old `(raw + 4) / 5` rounded up too aggressively and showed +1 vs FM on some values.
 pub(crate) fn display_attribute(raw: u8) -> u8 {
-    ((raw.saturating_add(4)) / 5).clamp(1, 20)
+    (((u16::from(raw) + 2) / 5) as u8).clamp(1, 20)
 }
 
 pub(crate) fn visible_attribute_map(raw: &[u8]) -> HashMap<String, u8> {
@@ -66,5 +69,21 @@ pub(crate) fn preferred_foot_label(left: u8, right: u8) -> &'static str {
         "Right"
     } else {
         "Both"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::display_attribute;
+
+    #[test]
+    fn display_attribute_matches_fm_and_fss_rounding() {
+        // Floor(raw/5 + 0.5). Old (raw+4)/5 returned 17 for raw=81.
+        assert_eq!(display_attribute(81), 16);
+        assert_eq!(display_attribute(82), 16);
+        assert_eq!(display_attribute(83), 17);
+        assert_eq!(display_attribute(50), 10);
+        assert_eq!(display_attribute(0), 1);
+        assert_eq!(display_attribute(100), 20);
     }
 }

@@ -1,14 +1,14 @@
 # Status
 
-Last updated: 2026-08-25 (T119: app lives under `desktop/`)
+Last updated: 2026-08-25 (T132: attr rounding matches FM/FMLE)
 
 ## Now
 
-**App path:** `desktop/` (FMT-native). Root `Start FMT.cmd` → `desktop/Start FMT.cmd`.
+**App path:** `desktop/`. Root `Start FMT.cmd` → `desktop/Start FMT.cmd`.
 
-If an empty `glassscout/` folder remains on disk, delete it after closing Cursor (Windows handle).
+**Just fixed:** attribute display was +1 vs FM/FMLE on some values (rounding). Reload save to pick up.
 
-**Next when ready:** installer; or profile remaining load time after T131.
+**Next when ready:** installer; or clear empty `glassscout/` folder after Cursor restart if it remains.
 
 **Defer:** T120/T121 skin, T123 mentor. **Hygiene:** T124.
 
