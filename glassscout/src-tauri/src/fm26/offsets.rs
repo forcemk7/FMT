@@ -116,8 +116,8 @@ pub(crate) fn find_entity_map(
     if index.schema_version != 2 {
         return None;
     }
-    index.profiles.iter().find(|profile| {
-        let declared_shape_is_valid = !profile.module.is_empty()
+    let shape_ok = |profile: &EntityMapProfile| {
+        !profile.module.is_empty()
             && profile.build_fingerprint.executable_sha256 == profile.executable_sha256
             && profile.build_fingerprint.file_version == profile.file_version
             && profile.build_fingerprint.product_version == profile.product_version
@@ -129,13 +129,37 @@ pub(crate) fn find_entity_map(
                 .all(|signature| !signature.name.is_empty() && !signature.pattern.is_empty())
             && profile.pointer_chains.iter().all(|chain| {
                 !chain.name.is_empty() && !chain.root.is_empty() && !chain.offsets.is_empty()
-            });
-        declared_shape_is_valid
-            && file_version == Some(profile.file_version.as_str())
-            && product_version == Some(profile.product_version.as_str())
-            && executable_sha256 == Some(profile.executable_sha256.as_str())
-            && architecture == Some(profile.architecture.as_str())
-    })
+            })
+    };
+
+    if let Some(sha) = executable_sha256 {
+        if let Some(profile) = index.profiles.iter().find(|profile| {
+            shape_ok(profile)
+                && file_version == Some(profile.file_version.as_str())
+                && product_version == Some(profile.product_version.as_str())
+                && sha == profile.executable_sha256.as_str()
+                && architecture == Some(profile.architecture.as_str())
+        }) {
+            return Some(profile);
+        }
+    }
+
+    // Cold-start / LE-shaped: unique fileVersion+arch match without hashing all of fm.exe.
+    let version_hits: Vec<_> = index
+        .profiles
+        .iter()
+        .filter(|profile| {
+            shape_ok(profile)
+                && file_version == Some(profile.file_version.as_str())
+                && architecture == Some(profile.architecture.as_str())
+                && (product_version.is_none()
+                    || product_version == Some(profile.product_version.as_str()))
+        })
+        .collect();
+    if version_hits.len() == 1 {
+        return Some(version_hits[0]);
+    }
+    None
 }
 
 pub(crate) fn mapping_coverage(profile: &EntityMapProfile) -> Vec<MappingCoverage> {

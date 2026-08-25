@@ -6,7 +6,8 @@ use std::{
     fs::File,
     io::Read,
     path::Path,
-    sync::{OnceLock, RwLock},
+    sync::{Mutex, OnceLock, RwLock},
+    time::SystemTime,
 };
 use tauri::Emitter;
 
@@ -22,7 +23,7 @@ use crate::{
         permissions::{can_write_memory, READ_ONLY_PROCESS_ACCESS_LABEL},
         process::find_fm26_process,
         roles::{
-            decode_role_duty_mask, duty_definition_for_mask, evaluate_player_roles,
+            decode_role_duty_mask, duty_definition_for_mask,
             role_catalogue_status, role_definition_for_mask, role_supports_slot,
         },
         scanner::{parse_pattern, scan_module, scan_private_memory_for_pointers},
@@ -107,12 +108,36 @@ pub struct ConnectorSnapshot {
     data_warnings: Vec<String>,
 }
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 struct ExecutableIdentity {
     file_version: Option<String>,
     product_version: Option<String>,
     sha256: Option<String>,
     architecture: Option<String>,
+}
+
+struct CachedExecutableIdentity {
+    path: String,
+    len: u64,
+    modified: SystemTime,
+    identity: ExecutableIdentity,
+}
+
+fn identity_cache() -> &'static Mutex<Option<CachedExecutableIdentity>> {
+    static CACHE: OnceLock<Mutex<Option<CachedExecutableIdentity>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(None))
+}
+
+#[derive(Clone, Copy)]
+struct CachedManagerSignature {
+    process_id: u32,
+    module_base: u64,
+    signature_address: u64,
+}
+
+fn manager_signature_cache() -> &'static Mutex<Option<CachedManagerSignature>> {
+    static CACHE: OnceLock<Mutex<Option<CachedManagerSignature>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(None))
 }
 
 #[derive(Default)]
@@ -667,7 +692,7 @@ fn collect_snapshot(
             status.windows_error_code = Some(code);
             status.failure_stage = Some("open_read_only_process".to_string());
             status.message =
-                "FM26 is running, but GlassScout could not open its read-only connection."
+                "FM26 is running, but FMT could not open its read-only connection."
                     .to_string();
             return empty_snapshot(status.clone(), status.message);
         }
@@ -922,18 +947,41 @@ fn extract_live_data(
     let pattern = parse_pattern(&signature.pattern).map_err(|_| {
         ExtractionFailure::new("entity_map", "The embedded signature pattern is invalid.")
     })?;
-    let hits = scan_module(reader, module, &pattern)
-        .map_err(|error| ExtractionFailure::new("manager_signature", error.to_string()))?;
-    if hits.len() != 1 {
-        return Err(ExtractionFailure::new(
-            "manager_signature",
-            format!(
-                "The FM26 manager root did not validate uniquely ({} matches). No game data was shown.",
-                hits.len()
-            ),
-        ));
-    }
-    let signature_address = hits[0];
+    let signature_address = {
+        let cached = manager_signature_cache()
+            .lock()
+            .ok()
+            .and_then(|guard| {
+                guard.as_ref().copied().filter(|hit| {
+                    hit.process_id == process_id && hit.module_base == module.base
+                })
+            })
+            .map(|hit| hit.signature_address);
+        if let Some(address) = cached {
+            address
+        } else {
+            let hits = scan_module(reader, module, &pattern)
+                .map_err(|error| ExtractionFailure::new("manager_signature", error.to_string()))?;
+            if hits.len() != 1 {
+                return Err(ExtractionFailure::new(
+                    "manager_signature",
+                    format!(
+                        "The FM26 manager root did not validate uniquely ({} matches). No game data was shown.",
+                        hits.len()
+                    ),
+                ));
+            }
+            let address = hits[0];
+            if let Ok(mut guard) = manager_signature_cache().lock() {
+                *guard = Some(CachedManagerSignature {
+                    process_id,
+                    module_base: module.base,
+                    signature_address: address,
+                });
+            }
+            address
+        }
+    };
     let displacement = reader.read_i32(signature_address + 3).ok_or_else(|| {
         ExtractionFailure::new(
             "manager_signature",
@@ -1173,20 +1221,17 @@ fn extract_live_data(
             .read_u16(raw_player + profile.constants.player_pa_offset)
             .filter(|value| (1..=200).contains(value));
         let preferred_foot = preferred_foot_label(attribute_bytes[24], attribute_bytes[25]);
-        let role_evaluation = evaluate_player_roles(&position_bytes, &visible_attributes);
-        let best_role = role_evaluation
-            .best
-            .as_ref()
-            .map(|fit| fit.role.to_string());
-        let ability_score = role_evaluation
-            .best
-            .as_ref()
-            .map(|fit| fit.score)
-            .or_else(|| {
-                calculated_position
-                    .as_deref()
-                    .and_then(|position| visible_ability_score(position, &visible_attributes))
-            });
+        // Full IP/OOP role catalogue scoring is deferred off the load path (LE-speed).
+        // Cheap position-based ability score remains for desk sorting.
+        let ability_score = calculated_position
+            .as_deref()
+            .and_then(|position| visible_ability_score(position, &visible_attributes));
+        let best_role: Option<String> = None;
+        let playable_roles: Vec<Value> = Vec::new();
+        let other_roles: Vec<Value> = Vec::new();
+        let role_reasoning = vec![
+            "Role catalogue scoring is deferred on load for speed; open the player after roles are re-enabled or use attributes/CA/PA/HA.".to_string(),
+        ];
         let (strengths, weaknesses) = attribute_evidence(&visible_attributes);
         let validated_at = unix_milliseconds();
         let attribute_knowledge: serde_json::Map<String, Value> = visible_attributes
@@ -1204,9 +1249,6 @@ fn extract_live_data(
                 )
             })
             .collect();
-        let playable_roles = role_evaluation.playable;
-        let other_roles = role_evaluation.secondary;
-        let role_reasoning = role_evaluation.reasoning;
         let player_id = uid.to_string();
         let contract_address = reader
             .read_pointer(person + profile.constants.person_contract_offset)
@@ -1406,7 +1448,7 @@ fn extract_live_data(
         } else {
             "The live FM26 tactic manager is detected with read-only access, but the selected-slot block did not validate for this read. No tactic is guessed.".to_string()
         },
-        "The FM26 shortlist collection is not mapped safely. GlassScout Favorites remains a local list resolved against live players.".to_string(),
+            "The FM26 shortlist collection is not mapped safely. FMT Favorites remains a local list resolved against live players.".to_string(),
     ];
     if let Some(warning) = skipped_squad_warning {
         warnings.push(warning);
@@ -2222,8 +2264,23 @@ fn validated_enum<'a>(raw: usize, values: &'a [&'a str]) -> Option<&'a str> {
 }
 
 fn read_executable_identity(path: &str) -> ExecutableIdentity {
+    let metadata = std::fs::metadata(path).ok();
+    let len = metadata.as_ref().map(|meta| meta.len()).unwrap_or(0);
+    let modified = metadata
+        .as_ref()
+        .and_then(|meta| meta.modified().ok())
+        .unwrap_or(SystemTime::UNIX_EPOCH);
+    if let Ok(cache) = identity_cache().lock() {
+        if let Some(hit) = cache.as_ref() {
+            if hit.path == path && hit.len == len && hit.modified == modified {
+                return hit.identity.clone();
+            }
+        }
+    }
+
+    // Fast path: PE arch + Windows version strings. Skip full-file SHA-256 unless needed.
     let mut identity = ExecutableIdentity {
-        sha256: hash_file(path),
+        sha256: None,
         architecture: read_pe_architecture(path),
         ..ExecutableIdentity::default()
     };
@@ -2253,6 +2310,27 @@ fn read_executable_identity(path: &str) -> ExecutableIdentity {
                     .map(str::to_string);
             }
         }
+    }
+
+    // Only hash when version+arch does not uniquely select an entity map (or cache wants it).
+    let mapped_without_hash = find_entity_map(
+        identity.file_version.as_deref(),
+        identity.product_version.as_deref(),
+        None,
+        identity.architecture.as_deref(),
+    )
+    .is_some();
+    if !mapped_without_hash {
+        identity.sha256 = hash_file(path);
+    }
+
+    if let Ok(mut cache) = identity_cache().lock() {
+        *cache = Some(CachedExecutableIdentity {
+            path: path.to_string(),
+            len,
+            modified,
+            identity: identity.clone(),
+        });
     }
     identity
 }
