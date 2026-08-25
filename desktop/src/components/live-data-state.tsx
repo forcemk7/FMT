@@ -27,8 +27,12 @@ export function LiveDataState({
       <div className="live-data-state-icon"><AlertTriangle /></div>
       <div>
         <span className="section-kicker">Waiting for FM26 live connection</span>
-        <h1>{snapshot.status.processDetected ? `${title} is not ready` : "Open FM26 and load your save to begin"}</h1>
-        <p>{snapshot.status.processDetected ? snapshot.status.message : "FMT will connect automatically when the active game becomes available."}</p>
+        <h1>{snapshot.status.processDetected ? `${title} is not ready` : "Open FM26 and load your save"}</h1>
+        <p>
+          {snapshot.status.processDetected
+            ? snapshot.status.message
+            : "Use Load Data in the header when your save is open in FM26."}
+        </p>
       </div>
       <dl>
         <div><dt>Failed stage</dt><dd>{readable(snapshot.status.failureStage)}</dd></div>
@@ -49,9 +53,9 @@ export function LiveDataState({
       <div className="live-data-state-actions">
         <Button onClick={onRefresh} disabled={checking}>
           <RefreshCw data-icon="inline-start" className={checking ? "spin" : undefined} />
-          {checking ? "Checking…" : "Run live check"}
+          {checking ? "Loading…" : "Load Data"}
         </Button>
-        <span>Technical details are available under Settings → Advanced diagnostics.</span>
+        <span>Same action as the highlighted Load Data control in the header.</span>
       </div>
     </section>
   );

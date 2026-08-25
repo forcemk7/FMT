@@ -1,26 +1,28 @@
 # Status
 
-Last updated: 2026-08-25 (T141–T143 shell + desk loops)
+Last updated: 2026-08-25 (T144 done)
 
 ## Now
 
-**Shipped this turn:** single-row header; role roadmap nav (Dashboard+Squad live); Dashboard = squad glance; profile defaults to Attributes & history with presets + teaching line.
+**Shipped:** T144 — cold start opens Dashboard; unified header **Load Data** control (highlighted when not synced).
 
-**Verify:** `desktop:dev` or rebuild installer → one header row; muted Later tabs; Squad → player → history presets; Dashboard movers.
+**Next:** T145 roadmap icon → T146 faces cache.
 
-**Next when ready:** T139 theme polish (deferred until you use the desk).
+**Deferred:** T139 theme until desk is daily habit.
 
 ## Board
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
+| T145 | Roadmap stubs = TBD icon (no Later text) | ready | 2 | |
+| T146 | Faces via settings + local cache | ready | 3 | |
 | T139 | FMT visual theme | deferred | — | after daily use |
 | T124 | Quiet dev launch | ready | 9 | |
 
 ## Recently done
 
+- **T144** open Dashboard + Load Data header
 - **T141** single-row header · **T142** role nav · **T140** history desk · **T143** dashboard glance
-- **T138** first strip · **T136/T137** console + squad load
 
 ## Loop
 

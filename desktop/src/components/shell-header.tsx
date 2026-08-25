@@ -50,7 +50,7 @@ function connectionDetail(snapshot: LiveFootballSnapshot) {
   return "Not synced";
 }
 
-/** Single-row shell: brand · nav · search · sync (T141/T142). */
+/** Single-row shell: brand · nav · search · Load Data / sync (T141/T144). */
 export function ShellHeader({
   screen,
   onNavigate,
@@ -80,10 +80,13 @@ export function ShellHeader({
   const club = snapshot.clubs.find((item) => item.id === snapshot.managedClubId);
   const activeNav =
     screen === "Player Profile" || screen === "Club Profile" ? "Squad" : screen;
+  const needsLoad = !connected;
+  const loadLabel = checking ? "Loading…" : needsLoad ? "Load Data" : club?.name ?? "Synced";
+  const loadDetail = checking ? "Reading FM…" : needsLoad ? "FM26 live" : connectionDetail(snapshot);
 
   return (
     <header className="shell-header">
-      <button type="button" className="brand" onClick={() => onNavigate("Squad")} aria-label="FMT home">
+      <button type="button" className="brand" onClick={() => onNavigate("Dashboard")} aria-label="FMT home">
         <span className="brand-mark" aria-hidden="true">
           <span />
         </span>
@@ -134,15 +137,20 @@ export function ShellHeader({
           />
         </div>
 
-        <div className="shell-context" title={club?.name ?? undefined}>
+        <button
+          type="button"
+          className={cn("shell-load", needsLoad && "is-needs-load", checking && "is-loading")}
+          onClick={() => void onRefresh()}
+          disabled={checking}
+          title={needsLoad ? "Load active FM26 save" : "Reload live squad data"}
+          aria-label={needsLoad ? "Load Data" : "Reload live data"}
+        >
           <span className={connected ? "live-dot" : "neutral-dot"} />
-          <strong>{club?.name ?? "No club"}</strong>
-          <span>{connectionDetail(snapshot)}</span>
-        </div>
+          <strong>{loadLabel}</strong>
+          <span>{loadDetail}</span>
+          <RefreshCw aria-hidden="true" className={cn("shell-load-icon", checking && "spin")} />
+        </button>
 
-        <Button variant="outline" size="icon" aria-label="Reload" onClick={onRefresh} disabled={checking}>
-          <RefreshCw className={checking ? "spin" : undefined} />
-        </Button>
         <Button
           variant="ghost"
           size="icon"

@@ -2400,7 +2400,7 @@ html,body{
 .roadmap-later { border-color: #e5d4a8; background: linear-gradient(180deg, #fffbf2, #fff); }
 .roadmap-not { border-color: #e2e8ee; opacity: 0.92; }
 
-/* T141/T142 — single-row shell header */
+/* T141/T142 - single-row shell header */
 .app-canvas.shell-single-header{
   display:grid;
   grid-template-columns:1fr;
@@ -2495,28 +2495,39 @@ html,body{
 .shell-search svg{width:14px;height:14px}
 .shell-search input{height:34px;font-size:12px}
 .shell-search .keyboard-hint{display:none}
-.shell-context{
+.shell-load{
   display:flex;
   align-items:center;
   gap:7px;
-  max-width:200px;
+  max-width:240px;
   height:34px;
   padding:0 10px;
   border:1px solid var(--border);
   border-radius:8px;
   background:#fff;
+  font:inherit;
   font-size:11px;
   color:var(--slate);
   overflow:hidden;
+  cursor:pointer;
 }
-.shell-context strong{
+.shell-load strong{
   color:var(--navy);
   font-size:11px;
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
 }
-.shell-context span:last-child{white-space:nowrap}
+.shell-load>span:nth-of-type(2){white-space:nowrap}
+.shell-load-icon{width:14px;height:14px;flex:0 0 auto;opacity:.7}
+.shell-load.is-needs-load{
+  border-color:#9bd0c8;
+  background:#e8f7f3;
+  color:#076b62;
+}
+.shell-load.is-needs-load strong{color:#076b62}
+.shell-load.is-needs-load .shell-load-icon{opacity:1;color:#076b62}
+.shell-load:disabled{opacity:.75;cursor:wait}
 .shell-tools>button{width:34px;height:34px;border-radius:8px}
 .shell-tools>button.is-active{background:var(--accent);color:var(--accent-foreground)}
 .app-canvas.shell-single-header .global-search-results{top:56px}

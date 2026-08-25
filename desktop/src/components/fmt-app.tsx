@@ -6,7 +6,6 @@ import { ShellHeader, type Screen } from "@/components/shell-header";
 import { MyTeamScreen } from "@/components/my-team-screen";
 import { LaterRoleScreen } from "@/components/later-role-screen";
 import { PlayerProfileScreen } from "@/components/player-profile-screen";
-import { StartupScreen } from "@/components/startup-screen";
 import { SettingsScreen } from "@/components/settings-screen";
 import { ClubProfileScreen } from "@/components/club-profile-screen";
 import { DashboardScreen } from "@/components/dashboard-screen";
@@ -88,15 +87,14 @@ const LATER_ROLES: Screen[] = [
 ];
 
 export function FMTApp() {
-  const [mode, setMode] = useState<"fm26" | null>(null);
-  const [screen, setScreenState] = useState<Screen>("Squad");
-  const [screenHistory, setScreenHistory] = useState<Screen[]>(["Squad"]);
+  const [screen, setScreenState] = useState<Screen>("Dashboard");
+  const [screenHistory, setScreenHistory] = useState<Screen[]>(["Dashboard"]);
   const [historyIndex, setHistoryIndex] = useState(0);
   const [search, setSearch] = useState("");
   const [snapshot, setSnapshot] = useState<LiveFootballSnapshot>(initialSnapshot);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [selectedClubId, setSelectedClubId] = useState<string | null>(null);
-  const [returnScreen, setReturnScreen] = useState<Screen>("Squad");
+  const [returnScreen, setReturnScreen] = useState<Screen>("Dashboard");
   const [favorites, setFavorites] = useState<FavoriteRecord[]>(() => {
     if (typeof window === "undefined") return [];
     const stored =
@@ -156,13 +154,6 @@ export function FMTApp() {
     }
   }, []);
 
-  const enterWorkspace = useCallback(() => {
-    setScreenState("Squad");
-    setScreenHistory(["Squad"]);
-    setHistoryIndex(0);
-    setMode("fm26");
-  }, []);
-
   const togglePlayerFavorite = (playerId: string) =>
     setFavorites((current) => toggleFavorite(current, playerId));
 
@@ -201,14 +192,6 @@ export function FMTApp() {
     if (!q) return [] as LivePlayer[];
     return snapshot.players.filter((player) => player.name.toLowerCase().includes(q)).slice(0, 8);
   }, [search, snapshot.players]);
-
-  if (mode === null) {
-    return (
-      <TooltipProvider>
-        <StartupScreen onConnect={checkConnection} onEnter={enterWorkspace} />
-      </TooltipProvider>
-    );
-  }
 
   const content =
     screen === "Dashboard" ? (
