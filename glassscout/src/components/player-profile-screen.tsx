@@ -16,6 +16,7 @@ import {
   UserRound,
 } from "lucide-react";
 import type { LiveFootballSnapshot, LivePlayer } from "@/domain/adapters";
+import { attributeTone } from "@/domain/attribute-tone";
 import { AttributeHistoryPanel } from "@/components/attribute-history-panel";
 import { Button } from "@/components/ui/button";
 import { ConfidenceRing } from "@/components/confidence-ring";
@@ -65,9 +66,16 @@ function AttributeGroup({
   return (
     <section className="attribute-column">
       <h3>{title}</h3>
-      {names.map((name) => (
-        <span key={name}><small>{name}</small><strong>{evidenceValue(values, name)}</strong></span>
-      ))}
+      {names.map((name) => {
+        const raw = values?.[name];
+        const tone = typeof raw === "number" ? attributeTone(name, raw) : "neutral";
+        return (
+          <span key={name}>
+            <small>{name}</small>
+            <strong className={`attr-tone attr-tone-${tone}`}>{evidenceValue(values, name)}</strong>
+          </span>
+        );
+      })}
     </section>
   );
 }
