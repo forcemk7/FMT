@@ -88,8 +88,7 @@ export function ShellHeader({
   return (
     <header className="shell-header">
       <button type="button" className="brand" onClick={() => onNavigate("Dashboard")} aria-label="FMT home">
-        <img className="brand-logo" src="/fmt-mark.svg" alt="" width={28} height={28} />
-        <strong className="brand-wordmark">FMT</strong>
+        <img className="brand-logo" src="/fmt-mark.svg" alt="FMT" width={28} height={28} />
       </button>
 
       <nav className="shell-nav" aria-label="Main">

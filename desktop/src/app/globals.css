@@ -2448,12 +2448,7 @@ html,body{
   border-radius:6px;
   display:block;
 }
-.shell-header .brand-wordmark{
-  font-size:15px;
-  font-weight:750;
-  letter-spacing:-.03em;
-  color:var(--navy);
-}
+.shell-header .brand-wordmark{display:none}
 .shell-header .brand-mark{display:none}
 .shell-header .brand-copy{display:none}
 .shell-nav{

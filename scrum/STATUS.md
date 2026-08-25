@@ -1,12 +1,12 @@
 ﻿# Status
 
-Last updated: 2026-08-25 (T148 FMT mark + multi-root faces)
+Last updated: 2026-08-25 (T149 app icons)
 
 ## Now
 
-**Shipped:** T148 — FMT mark in header; multi-folder face roots + portrait-first resolve.
+**Shipped:** T149 — FMT mark for window/taskbar icons; header mark-only.
 
-**Verify:** restart `desktop:stable` → gold FMT mark (no crosshair/club desk). Settings → add Cutout + NewGAN paths (or parent graphics) → Update faces after Load Data.
+**Verify:** fully quit FMT → `npm run desktop:stable` from `desktop/` (rebuild embeds new `icon.ico`). Taskbar + title bar should show dark gold **FMT**, not GlassScout G.
 
 **Deferred:** T139 theme until desk is daily habit.
 
@@ -19,8 +19,7 @@ Last updated: 2026-08-25 (T148 FMT mark + multi-root faces)
 
 ## Recently done
 
-- **T148** FMT mark + multi-root faces
-- **T147** quiet empty + Load Data · **T146** faces · **T145** icon · **T144** Dashboard load
+- **T149** FMT app icons · **T148** mark + multi-root faces · **T147** quiet empty
 
 ## Loop
 
