@@ -172,9 +172,9 @@ pub fn load_active_save(app: tauri::AppHandle) -> ConnectorSnapshot {
     let progress = |stage: &'static str| {
         let _ = app.emit("fmt-load-progress", stage);
     };
-    // Fast path: managed club + squad only. Full-save indexing is the slow path
-    // (tens of thousands of players) and is not required to enter the workspace.
-    collect_snapshot(false, Some(&progress))
+    // Full-save index (original GlassScout path). Managed squad still loads first;
+    // wider DB index enables LE-shaped search/browse beyond the club list.
+    collect_snapshot(true, Some(&progress))
 }
 
 #[tauri::command]
