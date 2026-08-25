@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   colorForSeries,
   fieldDeltas,
@@ -41,18 +41,14 @@ function availableFields(points: AttrHistoryPoint[]): string[] {
 export function AttributeHistoryPanel({ playerId }: { playerId: string }) {
   const points = getPlayerAttrHistory(playerId);
   const fields = availableFields(points);
-  const [active, setActive] = useState<string[]>([]);
+  // null = use defaults; remount via key={playerId} resets. No useEffect → no update loops.
+  const [active, setActive] = useState<string[] | null>(null);
+  const selected =
+    active === null
+      ? DEFAULT_FIELDS.filter((field) => fields.includes(field)).slice(0, 3)
+      : active.filter((field) => fields.includes(field));
 
-  useEffect(() => {
-    setActive((current) => {
-      const stillValid = current.filter((field) => fields.includes(field));
-      if (stillValid.length) return stillValid;
-      return DEFAULT_FIELDS.filter((field) => fields.includes(field)).slice(0, 3);
-    });
-  }, [fields, playerId]);
-
-  const selected = active.filter((field) => fields.includes(field));
-
+  const selectedKey = selected.join("\0");
   const chart = useMemo(() => {
     if (points.length === 0 || selected.length === 0) return null;
     const width = 640;
@@ -89,12 +85,14 @@ export function AttributeHistoryPanel({ playerId }: { playerId: string }) {
     });
 
     return { width, height, pad, yMin, yMax, series };
-  }, [points, selected]);
+  }, [playerId, points.length, selectedKey]);
 
   const toggle = (field: string) => {
-    setActive((current) =>
-      current.includes(field) ? current.filter((item) => item !== field) : [...current, field],
-    );
+    setActive((current) => {
+      const base =
+        current ?? DEFAULT_FIELDS.filter((item) => fields.includes(item)).slice(0, 3);
+      return base.includes(field) ? base.filter((item) => item !== field) : [...base, field];
+    });
   };
 
   if (points.length === 0) {

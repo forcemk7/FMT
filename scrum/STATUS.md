@@ -1,16 +1,14 @@
 # Status
 
-Last updated: 2026-08-25 (T129 non-blocking load — stop-the-line)
+Last updated: 2026-08-25 (T130: kill RAM world scan; fix attr plot)
 
 ## Now
 
-**Stop-the-line fixed:** load returns club squad first; world index backgrounds (T129).
+**Bar:** match Live Editor feel (~2s interactive). No multi-GB process scan on load.
 
-**Next when ready:** pack **installer** (lightness / continuous-use test).  
-**Defer:** T120/T121 skin, T123 mentor until history is in daily use.  
+**Next when ready:** pack **installer**; if load still slow, profile squad-only path (dossier augment / manager resolve) only.  
+**Defer:** T120/T121 skin, T123 mentor.  
 **Hygiene:** T119, T124.
-
-**Ignore:** old extract tickets. **Frozen:** `.fm` RE, BepInEx.
 
 ## Board
 
@@ -24,13 +22,14 @@ Last updated: 2026-08-25 (T129 non-blocking load — stop-the-line)
 
 ## Recently done
 
-- **T129** — non-blocking load (squad first, full index background)
-- **T128** — attribute good/bad/neutral colors
-- **T127** — attribute history plot on desk
-- **T126** — full-save index (now backgrounded by T129)
-- **T125** — stable shell (`desktop:stable` / `--no-watch`)
-- **T122** — CA/PA/HA on attributes desk
+- **T130** — drop RAM world scan; fix attribute plot loop
+- **T129** — non-blocking load (superseded scan path by T130)
+- **T128** — attribute tones
+- **T127** — attribute history plot
+- **T126** — full-save intent (now Dossier, not RAM scan)
+- **T125** — stable shell
+- **T122** — CA/PA/HA on desk
 
 ## Loop
 
-FM → FMT fast club desk → background world index → attributes + history → installer later.
+FM → FMT fast club desk (live) + Dossier world search → attributes + history → installer.

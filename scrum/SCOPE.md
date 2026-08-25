@@ -9,14 +9,15 @@ FMT is a **Football Manager 26** desktop companion: live read of the loaded save
 ## Livelihood loop (target)
 
 ```
-Load save in FM → FMT Load Active Save (club desk fast; world index background)
-  → attributes desk (CA/PA/HA + history) → installer for daily use
+Load save in FM → FMT Load Active Save (~LE-fast: live club desk, no RAM world scan)
+  → world search via FM Dossier index → attributes desk (CA/PA/HA + history)
+  → installer for daily use
 ```
 
 ## Need-to-have (do)
 
 - Stable shell (T125)
-- Full-save reach without freezing UI (T126 + T129: squad first, index background)
+- Load that stays interactive like Live Editor — **no multi-GB private-memory scan** (T129/T130); world reach via Dossier
 - Attribute history plot (T127) + tone colors (T128)
 - Then **installer** as the lightness test (not `desktop:dev`)
 

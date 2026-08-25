@@ -6,10 +6,7 @@ use std::{
     fs::File,
     io::Read,
     path::Path,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        OnceLock, RwLock,
-    },
+    sync::{OnceLock, RwLock},
 };
 use tauri::Emitter;
 
@@ -175,64 +172,10 @@ pub fn load_active_save(app: tauri::AppHandle) -> ConnectorSnapshot {
     let progress = |stage: &'static str| {
         let _ = app.emit("fmt-load-progress", stage);
     };
-    // Squad-first: never block the UI on the multi-GB private-memory world index.
-    // Wider index runs in a background thread (LE-shaped: interactive immediately).
-    let mut snapshot = collect_snapshot(false, Some(&progress));
-    if snapshot.status.state == "connected" {
-        snapshot.status.database_index_status = "partial";
-        snapshot.status.warnings.push(
-            "Wider player index running in the background — club desk is ready now.".to_string(),
-        );
-        snapshot.data_warnings.push(
-            "Wider player index running in the background — club desk is ready now.".to_string(),
-        );
-        spawn_background_full_index(app.clone());
-    }
-    snapshot
-}
-
-static FULL_INDEX_RUNNING: AtomicBool = AtomicBool::new(false);
-
-#[cfg(target_os = "windows")]
-fn spawn_background_full_index(app: tauri::AppHandle) {
-    if FULL_INDEX_RUNNING
-        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
-        .is_err()
-    {
-        return;
-    }
-    if let Err(_) = std::thread::Builder::new()
-        .name("fmt-full-index".into())
-        .spawn(move || {
-            let emit_stage = |stage: &'static str| {
-                let _ = app.emit("fmt-load-progress", stage);
-            };
-            emit_stage("indexing_player_database");
-            let indexed = collect_snapshot(true, Some(&emit_stage));
-            let payload = json!({
-                "ok": indexed.status.state == "connected"
-                    && indexed.status.database_scope == "full-save-index",
-                "databaseScope": indexed.status.database_scope,
-                "databaseIndexStatus": indexed.status.database_index_status,
-                "databasePlayersIndexed": indexed.status.database_players_indexed,
-                "backgroundPlayersIndexed": indexed.status.background_players_indexed,
-                "message": indexed.status.message,
-                "warnings": indexed.status.warnings,
-            });
-            let _ = app.emit("fmt-index-ready", payload);
-            if indexed.status.database_scope == "full-save-index" {
-                emit_stage("ready");
-            }
-            FULL_INDEX_RUNNING.store(false, Ordering::SeqCst);
-        })
-    {
-        FULL_INDEX_RUNNING.store(false, Ordering::SeqCst);
-    }
-}
-
-#[cfg(not(target_os = "windows"))]
-fn spawn_background_full_index(_app: tauri::AppHandle) {
-    FULL_INDEX_RUNNING.store(false, Ordering::SeqCst);
+    // Club desk only on the load path. World reach uses the FM Dossier local SQLite
+    // index (search/profile already prefer it). Do NOT scan multi-GB private memory
+    // here — that path is what made FMT feel nothing like Live Editor.
+    collect_snapshot(false, Some(&progress))
 }
 
 #[tauri::command]
@@ -1454,10 +1397,10 @@ fn extract_live_data(
     let tactic = tactic_manager_pointer
         .and_then(|pointer| extract_live_tactic(reader, pointer, &managed_tactic_records));
     let mut warnings = vec![
-        "Managed-squad IDs, names, dates of birth, ages, nationality, positions, preferred foot and visible attributes are validated for this FM26 build. Hidden CA/PA is never read or scored.".to_string(),
+        "Managed-squad IDs, names, dates of birth, ages, nationality, positions, preferred foot, visible attributes, and mapped CA/PA/hidden/personality are validated for this FM26 build.".to_string(),
         "FM26 role, duty and out-of-possession role catalogues are mapped from the current build metadata. Player playable-role scoring now uses mapped role metadata plus live attributes and position familiarity.".to_string(),
         "Form, match ratings, contract, wage, valuation, fitness and squad-status relationships are not yet validated for this build and remain Unknown.".to_string(),
-        "Own-squad players are fully known. Wider-save world index is deferred on first load for speed; Scout Room can expand later.".to_string(),
+        "Wider-world search uses the FM Dossier local save index when present — not a full process memory scan (Live Editor–shaped load).".to_string(),
         if tactic.is_some() {
             "Live FM26 tactic formation and selected XI slots are mapped from the active tactic manager. Role/duty slot packets are published only if their FM26 masks validate against the live formation.".to_string()
         } else {
