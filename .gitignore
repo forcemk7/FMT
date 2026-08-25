@@ -1,17 +1,35 @@
-node_modules/
-dist/
-web/dist/
-tmp/
-*.tsbuildinfo
+# FMT
+.cursor/
 .DS_Store
-data/history.json
-data/history.json.bak
-# Local career saves for import / reverse-engineering (large binaries)
+Thumbs.db
+*.log
+*.tsbuildinfo
+tmp/
+
+# App (desktop/)
+desktop/node_modules/
+desktop/.next/
+desktop/out/
+desktop/src-tauri/target/
+desktop/src-tauri/gen/
+node_modules/
+.next/
+out/
+src-tauri/target/
+
+# Local FM data (never commit)
 data/saves/
 data/faces/
 data/logos/
+data/history.json
+data/history.json.bak
 *.fm
 
-__pycache__/
-*.pyc
-.cursor/
+.env
+.env.*
+!.env.example
+coverage/
+test-results/
+playwright-report/
+.idea/
+.vscode/

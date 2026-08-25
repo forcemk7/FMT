@@ -1,63 +1,38 @@
-# FMT — Football Manager 26 companion
+# FMT
 
-Read-only **personality HA** from a Career Save. You make mentoring groups in FM; this is the borrowed look-up so you do not seat a worse senior. Not an editor. Not Genie Scout. Not a mentoring oracle.
+Football Manager 26 **club companion** (live `fm.exe` reader). Product name: **FMT**.
 
-## Product wedge
+## Origin
 
-```
-Squad (HA, at-club)   Loans (honesty / youth out)   Mentoring   Progress (CA + HA)
-```
-
-**Loop:** Squad → Loans → Progress → store unit → create the group in FM.
-
-**Not in scope:** Suggest, editor, full-save GS extract, exe, Stripe, FM27.
-
-## Status
-
-Living backlog, roadmap, and agent handoff: **[`scrum/`](./scrum/)** (start at `scrum/README.md`).
-
-| Area | State |
-|------|--------|
-| HAS ranker / checker / compare | Not the ship — strip from chrome (T075) |
-| Squad HA table (was Personalities) | **Ship** — T073 rename |
-| Loans tab | **Ship** — honesty + youth out (T074 cancelled) |
-| Mentoring | **Ship** — no Suggest (T071) |
-| Progress (CA + HA points) | **Ship** — who to mentor / influence |
+Desktop app forked from [TobiasTest22/GlassScout](https://github.com/TobiasTest22/GlassScout) (see `NOTICE-GlassScout.md`). Legacy offline `.fm` extract and FMSuperScout dump paths were removed from this repo.
 
 ## Layout
 
 ```
-data/raw/          spreadsheet CSV source for catalog
-data/fixtures/     binary layout locks + Dynamics ground truth
-data/saves/        Career .fm copies FMT extracts (copied from SI games/; never extract the live file)
-src/domain/        attributes, ranges, HAS scoring
-src/data/          personality / media / case tables
-src/inference/     estimate, rank, mentoring, match-combo
-shared/save/       extract wrappers + types
-scripts/           Python extractors + RE spikes
-web/               Vite UI (ranker + Squad Analyzer)
+desktop/        # Next.js + Tauri app (FMT native path)
+scrum/          # board + SCOPE
+Start FMT.cmd   # double-click launcher (calls desktop/Start FMT.cmd)
 ```
 
-## Usage (library)
+## Run (dev)
 
-```ts
-import { loadCatalog, estimatePlayer } from "@fmt/ha-core";
+1. Close any previous FMT window.  
+2. Double-click **`Start FMT.cmd`** at the repo root.  
+3. Wait for the **desktop window** titled **FMT** (ignore `localhost:3000` in the browser).  
+4. Load a save in FM26 → **Load Active Save**.
 
-const catalog = loadCatalog();
-const result = estimatePlayer(catalog, {
-  personality: "Spirited",
-  mediaHandling: "MF, Unf",
-  determination: 15,
-  isRegen: true,
-});
+Needs: VS Build Tools 2022 + Windows SDK, Rust (`cargo`).
 
-console.log(result.attributes.pressure);
+Prefer `npm run desktop:stable` (via the launcher) over raw `desktop:dev` for daily use.
+
+## Build installer later
+
+```bat
+cd desktop
+call vcvars64.bat
+npm run desktop:build
 ```
 
-## Scripts
+## Scrum
 
-- `npm run dev` — UI + local Career Save APIs
-- `npm test` — vitest
-- `npm run build` — emit `dist/`
-- `npm run build:web` — static Pages build (ranker/checker only)
-- `npm run typecheck`
+[`scrum/SCOPE.md`](./scrum/SCOPE.md) · [`scrum/STATUS.md`](./scrum/STATUS.md)

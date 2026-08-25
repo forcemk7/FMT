@@ -2,7 +2,7 @@
 
 FMT is a **Football Manager 26** desktop companion: live read of the loaded save (no BepInEx), branded **FMT**.
 
-**Stack:** Next.js + Tauri app in `glassscout/` (GlassScout fork). Not an offline `.fm` parser. Not FMSuperScout.
+**Stack:** Next.js + Tauri app in `desktop/` (FMT native path; GlassScout-derived — see `NOTICE-GlassScout.md`). Not an offline `.fm` parser. Not FMSuperScout.
 
 **Career saves:** never extract/mmap live SI `games/*.fm`. Live path attaches read-only to `fm.exe` after the user loads a save.
 

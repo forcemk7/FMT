@@ -1,0 +1,44 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "FMT",
+  "version": "0.1.19",
+  "identifier": "com.fmt.fm26",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:3000",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../out"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "FMT",
+        "width": 1800,
+        "height": 960,
+        "minWidth": 1100,
+        "minHeight": 720,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: data:; connect-src 'self' ipc: http://ipc.localhost"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "windows": {
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      }
+    },
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ]
+  }
+}
