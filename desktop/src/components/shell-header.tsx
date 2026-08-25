@@ -83,7 +83,7 @@ export function ShellHeader({
     screen === "Player Profile" || screen === "Club Profile" ? "Squad" : screen;
   const needsLoad = !connected;
   const loadLabel = checking ? "Loading…" : needsLoad ? "Load Data" : club?.name ?? "Synced";
-  const loadDetail = checking ? "Reading FM…" : needsLoad ? "FM26 live" : connectionDetail(snapshot);
+  const loadDetail = connected ? connectionDetail(snapshot) : null;
 
   return (
     <header className="shell-header">
@@ -147,9 +147,9 @@ export function ShellHeader({
           title={needsLoad ? "Load active FM26 save" : "Reload live squad data"}
           aria-label={needsLoad ? "Load Data" : "Reload live data"}
         >
-          <span className={connected ? "live-dot" : "neutral-dot"} />
+          <span className={connected ? "live-dot" : "neutral-dot"} aria-hidden="true" />
           <strong>{loadLabel}</strong>
-          <span>{loadDetail}</span>
+          {loadDetail ? <span>{loadDetail}</span> : null}
           <RefreshCw aria-hidden="true" className={cn("shell-load-icon", checking && "spin")} />
         </button>
 

@@ -2489,29 +2489,34 @@ html,body{
 .shell-search input{height:34px;font-size:12px}
 .shell-search .keyboard-hint{display:none}
 .shell-load{
-  display:flex;
+  display:inline-flex;
   align-items:center;
   gap:7px;
-  max-width:240px;
+  flex:0 0 auto;
+  width:auto;
+  min-width:7.5rem;
+  max-width:min(260px,32vw);
   height:34px;
-  padding:0 10px;
+  padding:0 12px;
   border:1px solid var(--border);
   border-radius:8px;
   background:#fff;
   font:inherit;
-  font-size:11px;
+  font-size:12px;
   color:var(--slate);
   overflow:hidden;
   cursor:pointer;
+  white-space:nowrap;
 }
 .shell-load strong{
   color:var(--navy);
-  font-size:11px;
+  font-size:12px;
+  font-weight:700;
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
 }
-.shell-load>span:nth-of-type(2){white-space:nowrap}
+.shell-load>span:not(.live-dot):not(.neutral-dot){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .shell-load-icon{width:14px;height:14px;flex:0 0 auto;opacity:.7}
 .shell-load.is-needs-load{
   border-color:#9bd0c8;
@@ -2521,9 +2526,19 @@ html,body{
 .shell-load.is-needs-load strong{color:#076b62}
 .shell-load.is-needs-load .shell-load-icon{opacity:1;color:#076b62}
 .shell-load:disabled{opacity:.75;cursor:wait}
-.shell-tools>button{width:34px;height:34px;border-radius:8px}
+.shell-tools>.shell-load{width:auto;height:34px}
+.shell-tools>button:not(.shell-load){width:34px;height:34px;border-radius:8px}
 .shell-tools>button.is-active{background:var(--accent);color:var(--accent-foreground)}
 .app-canvas.shell-single-header .global-search-results{top:56px}
+
+.live-data-state.is-empty{
+  min-height:min(52vh,420px);
+  border:0;
+  background:transparent;
+  box-shadow:none;
+  padding:0;
+}
+.live-data-state.is-empty:empty{display:block}
 
 .later-role-screen{max-width:560px;padding:28px 32px}
 .later-role-screen h1{font-size:26px;letter-spacing:-.03em;margin:6px 0 10px}

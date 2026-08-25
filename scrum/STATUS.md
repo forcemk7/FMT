@@ -1,12 +1,12 @@
 ﻿# Status
 
-Last updated: 2026-08-25 (T144–T146 done)
+Last updated: 2026-08-25 (T147 quiet empty + Load Data fix)
 
 ## Now
 
-**Shipped:** T144 Load Data header · T145 roadmap icon · T146 faces pack discovery + cache + Settings.
+**Shipped:** T147 — header Load Data readable; empty desk stays blank unless FM/failure signal exists.
 
-**Verify:** `desktop:stable` → open Dashboard (no intro) → Load Data → faces appear (or Settings → Update faces). Muted tabs show CircleDashed.
+**Verify:** cold open → blank Dashboard + visible **Load Data** in header; with FM open (before load) → “FM26 is running”.
 
 **Deferred:** T139 theme until desk is daily habit.
 
@@ -19,8 +19,8 @@ Last updated: 2026-08-25 (T144–T146 done)
 
 ## Recently done
 
-- **T146** faces settings/cache · **T145** CircleDashed · **T144** Dashboard + Load Data
-- **T141–T143** shell + desk loops
+- **T147** quiet empty + fix truncated Load Data
+- **T146** faces · **T145** CircleDashed · **T144** Dashboard + Load Data
 
 ## Loop
 

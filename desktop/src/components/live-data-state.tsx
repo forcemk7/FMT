@@ -1,14 +1,10 @@
 "use client";
 
-import { AlertTriangle, RefreshCw } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { LiveFootballSnapshot } from "@/domain/adapters";
 
-function readable(value: string | null | undefined) {
-  if (!value) return "None";
-  return value.replaceAll("_", " ").replaceAll("-", " ");
-}
-
+/** Empty / not-ready desk — show only real signals; prefer blank over filler. */
 export function LiveDataState({
   snapshot,
   title,
@@ -20,42 +16,55 @@ export function LiveDataState({
   checking: boolean;
   onRefresh: () => Promise<unknown>;
 }) {
-  const pipeline = snapshot.status.readPipeline ?? [];
-  const visiblePipeline = pipeline.filter((stage) => stage.state !== "pending").slice(0, 4);
+  const status = snapshot.status;
+  const fmRunning = status.processDetected;
+  const failure =
+    status.failureStage && status.failureStage !== "none"
+      ? status.failureStage.replaceAll("_", " ")
+      : null;
+  const usefulMessage =
+    status.message &&
+    status.message !== "Diagnostics have not run yet." &&
+    !status.message.toLowerCase().includes("have not run")
+      ? status.message
+      : null;
+
+  const hasSignal = checking || fmRunning || Boolean(failure) || Boolean(usefulMessage);
+
+  if (!hasSignal) {
+    return <section className="live-data-state is-empty" aria-label={`${title} empty`} />;
+  }
+
   return (
     <section className="live-data-state" role="status" aria-live="polite">
-      <div className="live-data-state-icon"><AlertTriangle /></div>
       <div>
-        <span className="section-kicker">Waiting for FM26 live connection</span>
-        <h1>{snapshot.status.processDetected ? `${title} is not ready` : "Open FM26 and load your save"}</h1>
-        <p>
-          {snapshot.status.processDetected
-            ? snapshot.status.message
-            : "Use Load Data in the header when your save is open in FM26."}
-        </p>
+        {checking ? (
+          <>
+            <h1>Loading…</h1>
+            <p>Reading the active FM26 save.</p>
+          </>
+        ) : fmRunning && !failure ? (
+          <>
+            <h1>FM26 is running</h1>
+            <p>{usefulMessage ?? "Save is open — load when you want the squad desk."}</p>
+          </>
+        ) : failure ? (
+          <>
+            <h1>{title} could not load</h1>
+            <p>{usefulMessage ?? failure}</p>
+          </>
+        ) : (
+          <>
+            <h1>{title}</h1>
+            {usefulMessage ? <p>{usefulMessage}</p> : null}
+          </>
+        )}
       </div>
-      <dl>
-        <div><dt>Failed stage</dt><dd>{readable(snapshot.status.failureStage)}</dd></div>
-        <div><dt>Last good read</dt><dd>{readable(snapshot.status.lastSuccessfulRead)}</dd></div>
-        <div><dt>Memory access</dt><dd>{readable(snapshot.status.memoryAccess)}</dd></div>
-        <div><dt>Build map</dt><dd>{snapshot.status.entityMapProfileId ?? readable(snapshot.status.entityMapStatus)}</dd></div>
-      </dl>
-      {visiblePipeline.length ? (
-        <div className="pipeline-mini-list">
-          {visiblePipeline.map((stage) => (
-            <span key={stage.key} data-state={stage.state}>
-              <b>{stage.label}</b>
-              <small>{stage.detail}</small>
-            </span>
-          ))}
-        </div>
-      ) : null}
       <div className="live-data-state-actions">
         <Button onClick={onRefresh} disabled={checking}>
           <RefreshCw data-icon="inline-start" className={checking ? "spin" : undefined} />
           {checking ? "Loading…" : "Load Data"}
         </Button>
-        <span>Same action as the highlighted Load Data control in the header.</span>
       </div>
     </section>
   );
