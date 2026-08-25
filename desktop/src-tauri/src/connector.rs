@@ -197,10 +197,10 @@ pub fn load_active_save(app: tauri::AppHandle) -> ConnectorSnapshot {
     let progress = |stage: &'static str| {
         let _ = app.emit("fmt-load-progress", stage);
     };
-    // Club desk only on the load path. World reach uses the FM Dossier local SQLite
-    // index (search/profile already prefer it). Do NOT scan multi-GB private memory
-    // here — that path is what made FMT feel nothing like Live Editor.
-    collect_snapshot(false, Some(&progress))
+    // Native GlassScout path (owner eval / T133): full private-memory player index
+    // also discovers the tactic manager. Slow / heavy vs Live Editor — intentional
+    // until the owner decides the permanent load shape.
+    collect_snapshot(true, Some(&progress))
 }
 
 #[tauri::command]
