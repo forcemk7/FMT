@@ -9,17 +9,16 @@ FMT is a **Football Manager 26** desktop companion: live read of the loaded save
 ## Livelihood loop (target)
 
 ```
-Load save in FM → FMT Load Active Save (full index) → attributes desk (CA/PA/HA + history)
-  → installer for daily use → later desks that consume history
+Load save in FM → FMT Load Active Save (club desk fast; world index background)
+  → attributes desk (CA/PA/HA + history) → installer for daily use
 ```
 
-## Need-to-have (do) — current order
+## Need-to-have (do)
 
-1. **Stable shell** (T125) — stays open until user closes it
-2. **Full-save load** (T126) — LE-shaped reach, not squad-only
-3. **Attribute history plot** (T127) — append-only; desk toggles + deltas
-4. **Attribute tone colors** (T128) — OG good/mid/bad
-5. Then **installer** as the lightness test (not `desktop:dev`)
+- Stable shell (T125)
+- Full-save reach without freezing UI (T126 + T129: squad first, index background)
+- Attribute history plot (T127) + tone colors (T128)
+- Then **installer** as the lightness test (not `desktop:dev`)
 
 ## Optional (fund only if usage demands)
 

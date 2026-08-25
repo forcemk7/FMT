@@ -6,7 +6,10 @@ use std::{
     fs::File,
     io::Read,
     path::Path,
-    sync::{OnceLock, RwLock},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        OnceLock, RwLock,
+    },
 };
 use tauri::Emitter;
 
@@ -172,9 +175,64 @@ pub fn load_active_save(app: tauri::AppHandle) -> ConnectorSnapshot {
     let progress = |stage: &'static str| {
         let _ = app.emit("fmt-load-progress", stage);
     };
-    // Full-save index (original GlassScout path). Managed squad still loads first;
-    // wider DB index enables LE-shaped search/browse beyond the club list.
-    collect_snapshot(true, Some(&progress))
+    // Squad-first: never block the UI on the multi-GB private-memory world index.
+    // Wider index runs in a background thread (LE-shaped: interactive immediately).
+    let mut snapshot = collect_snapshot(false, Some(&progress));
+    if snapshot.status.state == "connected" {
+        snapshot.status.database_index_status = "partial";
+        snapshot.status.warnings.push(
+            "Wider player index running in the background — club desk is ready now.".to_string(),
+        );
+        snapshot.data_warnings.push(
+            "Wider player index running in the background — club desk is ready now.".to_string(),
+        );
+        spawn_background_full_index(app.clone());
+    }
+    snapshot
+}
+
+static FULL_INDEX_RUNNING: AtomicBool = AtomicBool::new(false);
+
+#[cfg(target_os = "windows")]
+fn spawn_background_full_index(app: tauri::AppHandle) {
+    if FULL_INDEX_RUNNING
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return;
+    }
+    if let Err(_) = std::thread::Builder::new()
+        .name("fmt-full-index".into())
+        .spawn(move || {
+            let emit_stage = |stage: &'static str| {
+                let _ = app.emit("fmt-load-progress", stage);
+            };
+            emit_stage("indexing_player_database");
+            let indexed = collect_snapshot(true, Some(&emit_stage));
+            let payload = json!({
+                "ok": indexed.status.state == "connected"
+                    && indexed.status.database_scope == "full-save-index",
+                "databaseScope": indexed.status.database_scope,
+                "databaseIndexStatus": indexed.status.database_index_status,
+                "databasePlayersIndexed": indexed.status.database_players_indexed,
+                "backgroundPlayersIndexed": indexed.status.background_players_indexed,
+                "message": indexed.status.message,
+                "warnings": indexed.status.warnings,
+            });
+            let _ = app.emit("fmt-index-ready", payload);
+            if indexed.status.database_scope == "full-save-index" {
+                emit_stage("ready");
+            }
+            FULL_INDEX_RUNNING.store(false, Ordering::SeqCst);
+        })
+    {
+        FULL_INDEX_RUNNING.store(false, Ordering::SeqCst);
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn spawn_background_full_index(_app: tauri::AppHandle) {
+    FULL_INDEX_RUNNING.store(false, Ordering::SeqCst);
 }
 
 #[tauri::command]

@@ -187,6 +187,42 @@ export function FMTApp() {
     }
   }, []);
 
+  useEffect(() => {
+    if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return;
+    let remove: (() => void) | null = null;
+    void import("@tauri-apps/api/event")
+      .then(({ listen }) =>
+        listen<{
+          ok: boolean;
+          databaseScope: LiveConnectorStatus["databaseScope"];
+          databaseIndexStatus: LiveConnectorStatus["databaseIndexStatus"];
+          databasePlayersIndexed: number;
+          backgroundPlayersIndexed: number;
+          message: string;
+          warnings: string[];
+        }>("fmt-index-ready", (event) => {
+          const payload = event.payload;
+          setSnapshot((current) => ({
+            ...current,
+            status: {
+              ...current.status,
+              databaseScope: payload.databaseScope,
+              databaseIndexStatus: payload.databaseIndexStatus,
+              databasePlayersIndexed: payload.databasePlayersIndexed,
+              backgroundPlayersIndexed: payload.backgroundPlayersIndexed,
+              message: payload.message || current.status.message,
+              warnings: payload.warnings?.length ? payload.warnings : current.status.warnings,
+            },
+            dataWarnings: payload.warnings?.length ? payload.warnings : current.dataWarnings,
+          }));
+        }),
+      )
+      .then((unlisten) => {
+        remove = unlisten;
+      });
+    return () => remove?.();
+  }, []);
+
   const enterWorkspace = useCallback(() => {
     setScreenState("Dashboard");
     setScreenHistory(["Dashboard"]);
