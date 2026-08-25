@@ -27,7 +27,8 @@ export function PlayerFace({ playerId, name, size = "md", highResolution = false
   size?: "sm" | "md" | "lg";
   highResolution?: boolean;
 }) {
-  const useIcon = size === "sm" && !highResolution;
+  // Prefer portraits everywhere — icon packs are incomplete; backend still accepts icon=false.
+  const useIcon = false;
   const cacheKey = `${playerId}:${useIcon ? "icon" : "portrait"}`;
   const [source, setSource] = useState<string | null | undefined>(() => faceCache.get(cacheKey));
 

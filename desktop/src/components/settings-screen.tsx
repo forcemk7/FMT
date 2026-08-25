@@ -21,10 +21,11 @@ function stageLabel(state: string) {
   return "Pending";
 }
 
-type GraphicsSettings = { graphicsRoot?: string | null };
+type GraphicsSettings = { graphicsRoots?: string[]; graphicsRoot?: string | null };
 type FacesCacheStatus = {
-  graphicsRoot: string;
-  graphicsRootExists: boolean;
+  graphicsRoots?: Array<{ path: string; exists: boolean }>;
+  graphicsRoot?: string;
+  graphicsRootExists?: boolean;
   cacheDir: string;
   cachedFiles: number;
 };
@@ -33,7 +34,8 @@ type FaceWarmResult = {
   cached: number;
   copied: number;
   missing: number;
-  graphicsRoot: string;
+  graphicsRoots?: string[];
+  graphicsRoot?: string;
   cacheDir: string;
 };
 
@@ -56,7 +58,7 @@ export function SettingsScreen({
   const [firstSnapshot, setFirstSnapshot] = useState("");
   const [secondSnapshot, setSecondSnapshot] = useState("");
   const [comparison, setComparison] = useState<MappingLabComparisonResult | null>(null);
-  const [graphicsRoot, setGraphicsRoot] = useState("");
+  const [graphicsRootsText, setGraphicsRootsText] = useState("");
   const [faceStatus, setFaceStatus] = useState<FacesCacheStatus | null>(null);
   const [faceBusy, setFaceBusy] = useState(false);
   const [faceMessage, setFaceMessage] = useState<string | null>(null);
@@ -68,7 +70,10 @@ export function SettingsScreen({
         invoke<GraphicsSettings>("graphics_settings_get"),
         invoke<FacesCacheStatus>("faces_cache_status"),
       ]);
-      setGraphicsRoot(settings.graphicsRoot ?? "");
+      const roots =
+        settings.graphicsRoots?.filter(Boolean) ??
+        (settings.graphicsRoot ? [settings.graphicsRoot] : []);
+      setGraphicsRootsText(roots.join("\n"));
       setFaceStatus(cache);
     } catch {
       setFaceStatus(null);
@@ -97,14 +102,20 @@ export function SettingsScreen({
     }
   };
 
+  const parseRoots = () =>
+    graphicsRootsText
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
   const saveGraphicsPath = async () => {
     if (!("__TAURI_INTERNALS__" in window)) return;
     setFaceBusy(true);
     setFaceMessage(null);
     try {
-      await invoke("graphics_settings_set", { graphicsRoot });
+      await invoke("graphics_settings_set", { graphicsRoots: parseRoots() });
       await refreshFaceStatus();
-      setFaceMessage("Graphics path saved.");
+      setFaceMessage("Graphics folders saved.");
     } catch (error) {
       setFaceMessage(error instanceof Error ? error.message : String(error));
     } finally {
@@ -117,7 +128,7 @@ export function SettingsScreen({
     setFaceBusy(true);
     setFaceMessage(null);
     try {
-      await invoke("graphics_settings_set", { graphicsRoot });
+      await invoke("graphics_settings_set", { graphicsRoots: parseRoots() });
       const ids = snapshot.players.map((player) => player.id);
       const result = await invoke<FaceWarmResult>("faces_update_cache", { playerIds: ids });
       clearPlayerFaceMemoryCache();
@@ -125,7 +136,7 @@ export function SettingsScreen({
       setFaceMessage(
         ids.length
           ? `Faces: ${result.copied} copied, ${result.cached} already cached, ${result.missing} missing (of ${result.requested}).`
-          : "Path saved. Load a save first so Update can warm the squad; faces also copy on first view.",
+          : "Folders saved. Load a save first so Update can warm the squad; faces also copy on first view.",
       );
     } catch (error) {
       setFaceMessage(error instanceof Error ? error.message : String(error));
@@ -151,23 +162,25 @@ export function SettingsScreen({
             <span className="section-kicker">Player faces</span>
             <h2>Cutout graphics</h2>
             <p>
-              Point at your FM26 <code>graphics</code> folder (packs like Cutout / NewGAN). FMT copies
-              missing faces into a local cache so paint stays fast.
+              One folder per line — parent <code>graphics</code> and/or individual packs (Cutout,
+              NewGAN). FMT checks all of them, then caches hits locally.
             </p>
           </div>
         </header>
         <label className="settings-faces-path">
-          <span>Graphics folder</span>
-          <Input
-            aria-label="FM26 graphics folder"
-            value={graphicsRoot}
-            onChange={(event) => setGraphicsRoot(event.target.value)}
-            placeholder="…\Sports Interactive\Football Manager 26\graphics"
+          <span>Graphics folders</span>
+          <textarea
+            aria-label="FM26 graphics folders"
+            className="settings-faces-roots"
+            rows={3}
+            value={graphicsRootsText}
+            onChange={(event) => setGraphicsRootsText(event.target.value)}
+            placeholder={"…\\Football Manager 26\\graphics\n…\\My NewGAN pack"}
           />
         </label>
         <div className="settings-faces-actions">
           <Button variant="outline" onClick={() => void saveGraphicsPath()} disabled={faceBusy}>
-            Save path
+            Save folders
           </Button>
           <Button onClick={() => void updateFaces()} disabled={faceBusy}>
             <RefreshCw data-icon="inline-start" className={faceBusy ? "spin" : undefined} />
@@ -176,8 +189,10 @@ export function SettingsScreen({
         </div>
         {faceStatus ? (
           <p className="evidence-caption">
-            Root {faceStatus.graphicsRootExists ? "found" : "missing"} · cache {faceStatus.cachedFiles} files
-            · {faceStatus.cacheDir}
+            {(faceStatus.graphicsRoots ?? [])
+              .map((root) => `${root.exists ? "ok" : "missing"}: ${root.path}`)
+              .join(" · ") || "No roots"}{" "}
+            · cache {faceStatus.cachedFiles} files
           </p>
         ) : (
           <p className="evidence-caption">Face settings available in the desktop app.</p>

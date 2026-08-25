@@ -1,12 +1,12 @@
 ﻿# Status
 
-Last updated: 2026-08-25 (T147 quiet empty + Load Data fix)
+Last updated: 2026-08-25 (T148 FMT mark + multi-root faces)
 
 ## Now
 
-**Shipped:** T147 — header Load Data readable; empty desk stays blank unless FM/failure signal exists.
+**Shipped:** T148 — FMT mark in header; multi-folder face roots + portrait-first resolve.
 
-**Verify:** cold open → blank Dashboard + visible **Load Data** in header; with FM open (before load) → “FM26 is running”.
+**Verify:** restart `desktop:stable` → gold FMT mark (no crosshair/club desk). Settings → add Cutout + NewGAN paths (or parent graphics) → Update faces after Load Data.
 
 **Deferred:** T139 theme until desk is daily habit.
 
@@ -19,8 +19,8 @@ Last updated: 2026-08-25 (T147 quiet empty + Load Data fix)
 
 ## Recently done
 
-- **T147** quiet empty + fix truncated Load Data
-- **T146** faces · **T145** CircleDashed · **T144** Dashboard + Load Data
+- **T148** FMT mark + multi-root faces
+- **T147** quiet empty + Load Data · **T146** faces · **T145** icon · **T144** Dashboard load
 
 ## Loop
 

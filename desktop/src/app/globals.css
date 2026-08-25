@@ -2432,12 +2432,30 @@ html,body{
   background:rgba(251,253,253,.97);
   backdrop-filter:blur(14px);
 }
-.shell-header .brand{flex:0 0 auto;padding:0;gap:8px}
-.shell-header .brand-mark{width:28px;height:28px}
-.shell-header .brand-mark:before{width:34px}
-.shell-header .brand-mark:after{height:34px}
-.shell-header .brand-copy strong{font-size:14px}
-.shell-header .brand-copy small{font-size:10px;margin-top:2px}
+.shell-header .brand{
+  flex:0 0 auto;
+  padding:0;
+  gap:8px;
+  display:inline-flex;
+  align-items:center;
+  border:0;
+  background:transparent;
+  cursor:pointer;
+}
+.shell-header .brand-logo{
+  width:28px;
+  height:28px;
+  border-radius:6px;
+  display:block;
+}
+.shell-header .brand-wordmark{
+  font-size:15px;
+  font-weight:750;
+  letter-spacing:-.03em;
+  color:var(--navy);
+}
+.shell-header .brand-mark{display:none}
+.shell-header .brand-copy{display:none}
 .shell-nav{
   display:flex;
   align-items:center;
@@ -2602,4 +2620,8 @@ html,body{
 .settings-faces-panel h2{margin:4px 0 6px;font-size:18px}
 .settings-faces-panel p{margin:0;color:var(--slate);line-height:1.45;font-size:13px}
 .settings-faces-path{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;font-size:12px;color:var(--slate)}
+.settings-faces-roots{
+  width:100%;min-height:72px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;
+  font:inherit;font-size:12px;line-height:1.4;resize:vertical;background:#fff;color:var(--navy);
+}
 .settings-faces-actions{display:flex;gap:8px;flex-wrap:wrap}
