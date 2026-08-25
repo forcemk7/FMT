@@ -33,6 +33,7 @@ Full-save index at usable speed. Hard RE. Parked until Loop A is daily habit.
 ## Optional
 
 - Theme polish after header + nav + desk usable
+- Player cutout faces: Settings path + local cache (never hot-path stream live SI `graphics/` after copy)
 - Mentoring / loans as real Loop C desks only after Loop A sticks
 
 ## Not need-to-have (discard)

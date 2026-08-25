@@ -18,6 +18,8 @@ import {
 } from "@/domain/adapters";
 import { recordPlayersFromSnapshot } from "@/domain/attribute-history";
 import { toggleFavorite, type FavoriteRecord } from "@/domain/live-data";
+import { clearPlayerFaceMemoryCache } from "@/components/player-face";
+import { invoke } from "@tauri-apps/api/core";
 
 const initialStatus: LiveConnectorStatus = {
   processDetected: false,
@@ -146,6 +148,13 @@ export function FMTApp() {
       const nextSnapshot = await fm26LiveAdapter.getSnapshot();
       if (nextSnapshot.status.state === "connected" && nextSnapshot.players.length) {
         recordPlayersFromSnapshot(nextSnapshot.players, nextSnapshot.season);
+        // Cosmetic: warm face cache in background; never block load UX.
+        if ("__TAURI_INTERNALS__" in window) {
+          const playerIds = nextSnapshot.players.map((player) => player.id);
+          void invoke("faces_update_cache", { playerIds })
+            .then(() => clearPlayerFaceMemoryCache())
+            .catch(() => undefined);
+        }
       }
       setSnapshot(nextSnapshot);
       return nextSnapshot.status;

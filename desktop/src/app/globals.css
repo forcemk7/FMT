@@ -807,7 +807,7 @@ body{background:#f8fbfc;color:var(--navy);font-size:14px}
   .recruitment-pulse{min-height:468px}.dossier-layout{grid-template-columns:minmax(620px,2fr) 290px}.player-facts{grid-template-columns:repeat(5,1fr)}
 }
 
-/* 0.1.5 — flat controls and dossier-consistent live-data views */
+/* 0.1.5 ? flat controls and dossier-consistent live-data views */
 button,
 [data-slot="button"]{
   box-shadow:none!important;
@@ -2071,7 +2071,7 @@ html,body{
   margin:0 0 8px!important;
 }
 
-/* 0.1.13 — two-floor top command bar with real history controls */
+/* 0.1.13 ? two-floor top command bar with real history controls */
 .app-sidebar,
 .app-canvas:has(.scout-room-reference) .app-sidebar{
   border-bottom:0;
@@ -2205,7 +2205,7 @@ html,body{
   top:82px;
 }
 
-/* 0.1.15 — compact unified sticky header shell */
+/* 0.1.15 ? compact unified sticky header shell */
 .app-canvas,
 .app-canvas:has(.scout-room-reference){
   grid-template-rows:112px minmax(0,1fr);
@@ -2340,7 +2340,7 @@ html,body{
   padding-top:16px;
 }
 
-/* FMT identity — clear product chrome over upstream GlassScout look */
+/* FMT identity ? clear product chrome over upstream GlassScout look */
 .fmt-shell {
   --primary: #0b3d2e;
   --primary-foreground: #f4f7f5;
@@ -2464,20 +2464,13 @@ html,body{
   cursor:pointer;
 }
 .shell-nav-item svg{width:14px;height:14px;opacity:.85}
-.shell-nav-item small{
-  font-size:9px;
-  font-weight:800;
-  letter-spacing:.04em;
-  text-transform:uppercase;
-  color:var(--slate);
-  opacity:.75;
-}
+.shell-nav-item .shell-nav-tbd{width:12px;height:12px;opacity:.55;color:var(--slate)}
 .shell-nav-item.is-later{opacity:.72;font-weight:550}
 .shell-nav-item.is-active{
   background:linear-gradient(90deg,#e4f5f2,#eef8f6);
   color:#076b62;
 }
-.shell-nav-item.is-active small{color:#076b62}
+.shell-nav-item.is-active .shell-nav-tbd{color:#076b62;opacity:.7}
 .shell-tools{
   display:flex;
   align-items:center;
@@ -2585,3 +2578,13 @@ html,body{
   background:#f3faf8;border:1px solid #d7ebe6;color:#1d4f48;
   font-size:12px;line-height:1.45;
 }
+
+.settings-faces-panel{
+  margin:0 0 22px;padding:18px 20px;border:1px solid var(--border);border-radius:12px;background:#fff;
+}
+.settings-faces-panel>header{display:flex;gap:12px;align-items:flex-start;margin-bottom:14px}
+.settings-faces-panel>header>svg{width:22px;height:22px;margin-top:4px;color:#076b62}
+.settings-faces-panel h2{margin:4px 0 6px;font-size:18px}
+.settings-faces-panel p{margin:0;color:var(--slate);line-height:1.45;font-size:13px}
+.settings-faces-path{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;font-size:12px;color:var(--slate)}
+.settings-faces-actions{display:flex;gap:8px;flex-wrap:wrap}

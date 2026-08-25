@@ -3,7 +3,11 @@ use serde::Serialize;
 use std::fs;
 
 use crate::graphics::{
-    faces::{image_mime, resolve_face_path, MAX_IMAGE_BYTES},
+    faces::{
+        image_mime, load_graphics_settings, resolve_face_path, save_graphics_settings,
+        warm_faces_for_players, FaceWarmResult, GraphicsSettings, MAX_IMAGE_BYTES,
+        active_graphics_root, default_graphics_root, face_cache_dir,
+    },
     logos::resolve_logo_path,
 };
 
@@ -88,6 +92,49 @@ fn missing(player_id: String) -> PlayerFaceResult {
         data_url: None,
         source: "fallback",
     }
+}
+
+#[tauri::command]
+pub fn graphics_settings_get() -> GraphicsSettings {
+    let mut settings = load_graphics_settings();
+    if settings.graphics_root.as_ref().map(|s| s.trim().is_empty()).unwrap_or(true) {
+        settings.graphics_root = Some(default_graphics_root().display().to_string());
+    }
+    settings
+}
+
+#[tauri::command]
+pub fn graphics_settings_set(graphics_root: String) -> Result<GraphicsSettings, String> {
+    let trimmed = graphics_root.trim().to_string();
+    let settings = GraphicsSettings {
+        graphics_root: if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed)
+        },
+    };
+    save_graphics_settings(&settings)?;
+    Ok(graphics_settings_get())
+}
+
+#[tauri::command]
+pub fn faces_update_cache(player_ids: Vec<String>) -> FaceWarmResult {
+    warm_faces_for_players(&player_ids, false)
+}
+
+#[tauri::command]
+pub fn faces_cache_status() -> serde_json::Value {
+    let root = active_graphics_root();
+    let cache = face_cache_dir();
+    let cached_files = fs::read_dir(&cache)
+        .map(|entries| entries.filter_map(|e| e.ok()).count())
+        .unwrap_or(0);
+    serde_json::json!({
+        "graphicsRoot": root.display().to_string(),
+        "graphicsRootExists": root.is_dir(),
+        "cacheDir": cache.display().to_string(),
+        "cachedFiles": cached_files,
+    })
 }
 
 #[cfg(test)]

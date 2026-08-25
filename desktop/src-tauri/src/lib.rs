@@ -40,6 +40,10 @@ pub fn run() {
             mapping_lab::mapping_lab_compare,
             player_face::club_logo_data,
             player_face::player_face_data,
+            player_face::graphics_settings_get,
+            player_face::graphics_settings_set,
+            player_face::faces_update_cache,
+            player_face::faces_cache_status,
             visibility::filter_observations
         ])
         .run(tauri::generate_context!())

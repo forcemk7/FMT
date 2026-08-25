@@ -14,6 +14,13 @@ type PlayerFaceResult = {
 
 const faceCache = new Map<string, string | null>();
 
+export function clearPlayerFaceMemoryCache() {
+  faceCache.clear();
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("fmt-faces-updated"));
+  }
+}
+
 export function PlayerFace({ playerId, name, size = "md", highResolution = false }: {
   playerId: string;
   name: string;
@@ -25,19 +32,35 @@ export function PlayerFace({ playerId, name, size = "md", highResolution = false
   const [source, setSource] = useState<string | null | undefined>(() => faceCache.get(cacheKey));
 
   useEffect(() => {
-    if (faceCache.has(cacheKey) || !("__TAURI_INTERNALS__" in window)) return;
     let active = true;
-    invoke<PlayerFaceResult>("player_face_data", { playerId, icon: useIcon })
-      .then((result) => {
-        const next = result.found ? result.dataUrl : null;
-        faceCache.set(cacheKey, next);
-        if (active) setSource(next);
-      })
-      .catch(() => {
-        faceCache.set(cacheKey, null);
-        if (active) setSource(null);
-      });
-    return () => { active = false; };
+    const load = () => {
+      if (!("__TAURI_INTERNALS__" in window)) return;
+      if (faceCache.has(cacheKey)) {
+        if (active) setSource(faceCache.get(cacheKey));
+        return;
+      }
+      invoke<PlayerFaceResult>("player_face_data", { playerId, icon: useIcon })
+        .then((result) => {
+          const next = result.found ? result.dataUrl : null;
+          faceCache.set(cacheKey, next);
+          if (active) setSource(next);
+        })
+        .catch(() => {
+          faceCache.set(cacheKey, null);
+          if (active) setSource(null);
+        });
+    };
+    load();
+    const onUpdate = () => {
+      faceCache.delete(cacheKey);
+      setSource(undefined);
+      load();
+    };
+    window.addEventListener("fmt-faces-updated", onUpdate);
+    return () => {
+      active = false;
+      window.removeEventListener("fmt-faces-updated", onUpdate);
+    };
   }, [cacheKey, playerId, useIcon]);
 
   return (

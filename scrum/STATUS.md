@@ -1,12 +1,12 @@
 ﻿# Status
 
-Last updated: 2026-08-25 (T145 done)
+Last updated: 2026-08-25 (T144–T146 done)
 
 ## Now
 
-**Shipped:** T144 Load Data header; T145 roadmap CircleDashed icon.
+**Shipped:** T144 Load Data header · T145 roadmap icon · T146 faces pack discovery + cache + Settings.
 
-**Next:** T146 faces settings + local cache.
+**Verify:** `desktop:stable` → open Dashboard (no intro) → Load Data → faces appear (or Settings → Update faces). Muted tabs show CircleDashed.
 
 **Deferred:** T139 theme until desk is daily habit.
 
@@ -14,13 +14,12 @@ Last updated: 2026-08-25 (T145 done)
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
-| T146 | Faces via settings + local cache | ready | 3 | |
 | T139 | FMT visual theme | deferred | — | after daily use |
 | T124 | Quiet dev launch | ready | 9 | |
 
 ## Recently done
 
-- **T145** roadmap stub icon · **T144** open Dashboard + Load Data
+- **T146** faces settings/cache · **T145** CircleDashed · **T144** Dashboard + Load Data
 - **T141–T143** shell + desk loops
 
 ## Loop

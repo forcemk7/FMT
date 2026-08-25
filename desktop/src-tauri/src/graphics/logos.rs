@@ -5,25 +5,41 @@ use std::{
 
 use super::{
     config_xml::{attribute_value, safe_relative_asset_path, MAX_GRAPHICS_CONFIG_BYTES},
-    faces::{graphics_roots, image_mime, MAX_IMAGE_BYTES},
+    faces::{active_graphics_root, image_mime, MAX_IMAGE_BYTES},
 };
 
 const MAX_LOGO_CONFIGS_SCANNED: usize = 256;
 const MAX_LOGO_CONFIG_DEPTH: usize = 10;
 
 pub(crate) fn resolve_logo_path(club_id: &str) -> Option<std::path::PathBuf> {
-    for root in graphics_roots() {
-        for directory in [
-            root.join("logos"),
-            root.join("clubs"),
-            root.join("badges"),
-            root.join("pictures").join("club"),
-        ] {
-            if let Some(path) = resolve_logo_direct(&directory, club_id) {
-                return Some(path);
+    let root = active_graphics_root();
+    for directory in [
+        root.join("logos"),
+        root.join("clubs"),
+        root.join("badges"),
+        root.join("pictures").join("club"),
+    ] {
+        if let Some(path) = resolve_logo_direct(&directory, club_id) {
+            return Some(path);
+        }
+        if let Some(path) = resolve_logo_from_configs(&directory, club_id) {
+            return Some(path);
+        }
+    }
+    // Shallow pack scan for logo megapacks
+    if let Ok(entries) = fs::read_dir(&root) {
+        for entry in entries.flatten() {
+            if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                continue;
             }
-            if let Some(path) = resolve_logo_from_configs(&directory, club_id) {
-                return Some(path);
+            let pack = entry.path();
+            for directory in [pack.join("logos"), pack.join("clubs"), pack.clone()] {
+                if let Some(path) = resolve_logo_direct(&directory, club_id) {
+                    return Some(path);
+                }
+                if let Some(path) = resolve_logo_from_configs(&directory, club_id) {
+                    return Some(path);
+                }
             }
         }
     }

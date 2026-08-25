@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown, Cpu, Database, LockKeyhole, RefreshCw } from "lucide-react";
+import { ChevronDown, Cpu, Database, Image, LockKeyhole, RefreshCw } from "lucide-react";
+import { invoke } from "@tauri-apps/api/core";
 import type { LiveFootballSnapshot } from "@/domain/adapters";
 import { captureMappingEvidence, compareMappingEvidence, getMappingLabStatus, type MappingLabCaptureResult, type MappingLabComparisonResult, type MappingLabStatus } from "@/domain/adapters";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { clearPlayerFaceMemoryCache } from "@/components/player-face";
 
 function readable(value: string | null | undefined) {
   if (!value) return "None";
@@ -18,6 +20,22 @@ function stageLabel(state: string) {
   if (state === "blocked") return "Blocked";
   return "Pending";
 }
+
+type GraphicsSettings = { graphicsRoot?: string | null };
+type FacesCacheStatus = {
+  graphicsRoot: string;
+  graphicsRootExists: boolean;
+  cacheDir: string;
+  cachedFiles: number;
+};
+type FaceWarmResult = {
+  requested: number;
+  cached: number;
+  copied: number;
+  missing: number;
+  graphicsRoot: string;
+  cacheDir: string;
+};
 
 export function SettingsScreen({
   snapshot,
@@ -38,7 +56,30 @@ export function SettingsScreen({
   const [firstSnapshot, setFirstSnapshot] = useState("");
   const [secondSnapshot, setSecondSnapshot] = useState("");
   const [comparison, setComparison] = useState<MappingLabComparisonResult | null>(null);
-  useEffect(() => { getMappingLabStatus().then(setMappingLab).catch(() => setMappingLab(null)); }, []);
+  const [graphicsRoot, setGraphicsRoot] = useState("");
+  const [faceStatus, setFaceStatus] = useState<FacesCacheStatus | null>(null);
+  const [faceBusy, setFaceBusy] = useState(false);
+  const [faceMessage, setFaceMessage] = useState<string | null>(null);
+
+  const refreshFaceStatus = async () => {
+    if (!("__TAURI_INTERNALS__" in window)) return;
+    try {
+      const [settings, cache] = await Promise.all([
+        invoke<GraphicsSettings>("graphics_settings_get"),
+        invoke<FacesCacheStatus>("faces_cache_status"),
+      ]);
+      setGraphicsRoot(settings.graphicsRoot ?? "");
+      setFaceStatus(cache);
+    } catch {
+      setFaceStatus(null);
+    }
+  };
+
+  useEffect(() => {
+    getMappingLabStatus().then(setMappingLab).catch(() => setMappingLab(null));
+    void refreshFaceStatus();
+  }, []);
+
   const captureEvidence = async () => {
     setCaptureError(null);
     try {
@@ -55,6 +96,44 @@ export function SettingsScreen({
       setCaptureError(error instanceof Error ? error.message : String(error));
     }
   };
+
+  const saveGraphicsPath = async () => {
+    if (!("__TAURI_INTERNALS__" in window)) return;
+    setFaceBusy(true);
+    setFaceMessage(null);
+    try {
+      await invoke("graphics_settings_set", { graphicsRoot });
+      await refreshFaceStatus();
+      setFaceMessage("Graphics path saved.");
+    } catch (error) {
+      setFaceMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setFaceBusy(false);
+    }
+  };
+
+  const updateFaces = async () => {
+    if (!("__TAURI_INTERNALS__" in window)) return;
+    setFaceBusy(true);
+    setFaceMessage(null);
+    try {
+      await invoke("graphics_settings_set", { graphicsRoot });
+      const ids = snapshot.players.map((player) => player.id);
+      const result = await invoke<FaceWarmResult>("faces_update_cache", { playerIds: ids });
+      clearPlayerFaceMemoryCache();
+      await refreshFaceStatus();
+      setFaceMessage(
+        ids.length
+          ? `Faces: ${result.copied} copied, ${result.cached} already cached, ${result.missing} missing (of ${result.requested}).`
+          : "Path saved. Load a save first so Update can warm the squad; faces also copy on first view.",
+      );
+    } catch (error) {
+      setFaceMessage(error instanceof Error ? error.message : String(error));
+    } finally {
+      setFaceBusy(false);
+    }
+  };
+
   return (
     <main className="screen settings-screen">
       <div className="planner-heading">
@@ -63,6 +142,47 @@ export function SettingsScreen({
       <section className="settings-list">
         <article><Database /><div><strong>Active FM26 game</strong><span>{status.processDetected ? "Football Manager 26 detected" : "Waiting for FM26"}</span></div><Button variant="outline" onClick={onRefresh} disabled={checking}><RefreshCw data-icon="inline-start" className={checking ? "spin" : undefined} />Load Active Save</Button></article>
         <article><LockKeyhole /><div><strong>Memory safety</strong><span>Query and read access only. FMT cannot write to FM26.</span></div><b>{status.memoryAccess.replaceAll("_", " ")}</b></article>
+      </section>
+
+      <section className="settings-faces-panel">
+        <header>
+          <Image aria-hidden="true" />
+          <div>
+            <span className="section-kicker">Player faces</span>
+            <h2>Cutout graphics</h2>
+            <p>
+              Point at your FM26 <code>graphics</code> folder (packs like Cutout / NewGAN). FMT copies
+              missing faces into a local cache so paint stays fast.
+            </p>
+          </div>
+        </header>
+        <label className="settings-faces-path">
+          <span>Graphics folder</span>
+          <Input
+            aria-label="FM26 graphics folder"
+            value={graphicsRoot}
+            onChange={(event) => setGraphicsRoot(event.target.value)}
+            placeholder="…\Sports Interactive\Football Manager 26\graphics"
+          />
+        </label>
+        <div className="settings-faces-actions">
+          <Button variant="outline" onClick={() => void saveGraphicsPath()} disabled={faceBusy}>
+            Save path
+          </Button>
+          <Button onClick={() => void updateFaces()} disabled={faceBusy}>
+            <RefreshCw data-icon="inline-start" className={faceBusy ? "spin" : undefined} />
+            Update faces
+          </Button>
+        </div>
+        {faceStatus ? (
+          <p className="evidence-caption">
+            Root {faceStatus.graphicsRootExists ? "found" : "missing"} · cache {faceStatus.cachedFiles} files
+            · {faceStatus.cacheDir}
+          </p>
+        ) : (
+          <p className="evidence-caption">Face settings available in the desktop app.</p>
+        )}
+        {faceMessage ? <p className="evidence-caption">{faceMessage}</p> : null}
       </section>
 
       <section className="read-pipeline-panel">
