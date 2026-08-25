@@ -198,8 +198,9 @@ pub fn load_active_save(app: tauri::AppHandle) -> ConnectorSnapshot {
     let progress = |stage: &'static str| {
         let _ = app.emit("fmt-load-progress", stage);
     };
-    // Stock GlassScout parity (T134): full private-memory player index on load.
-    collect_snapshot(true, Some(&progress))
+    // Club desk (T137): managed squad only. No private-heap world spray on load —
+    // world/outward search stays deferred (use FMLE until a later step).
+    collect_snapshot(false, Some(&progress))
 }
 
 #[tauri::command]

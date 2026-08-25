@@ -9,35 +9,34 @@ FMT is a **Football Manager 26** desktop companion: live read of the loaded save
 ## Livelihood loop (target)
 
 ```
-Load save in FM → FMT Load Active Save (stock GS full memory index)
-  → native ~16k parity; multi-human → pick active by largest squad
-  → then decide speed / continue 400k indexing strategy
-  → attributes desk (CA/PA/HA + history) → installer for daily use
+Load save in FM → FMT Load Active Save (managed squad only, fast)
+  → club attributes desk (CA/PA/HA) + attribute history that replaces sheets
+  → then (later) limited outward/world — only after squad desk is useful daily
 ```
 
 ## Need-to-have (do)
 
-- Stable shell (T125)
-- **Stock GS load parity (T134)** + **active manager pick (T135)** — verify on native save before speed work
-- Attribute history plot (T127) + tone colors (T128)
-- Then speed / continue indexing decision; then **installer**
+- **Step 1 — Club desk:** squad-only load (no world spray); correct attrs; history that works for daily use
+- No empty console on installed Windows launch
+- Stable installer as the daily driver (not `desktop:dev`)
+- Strip GS superficial chrome only when it blocks the desk (not a skin rewrite)
 
 ## Optional (fund only if usage demands)
 
 - Mentor / loan / youth desks
-- Folder rename, quiet launch polish
-- Squad chrome cleanup / strip GlassScout noise
+- Quiet launch polish beyond console
+- World / continue full index (explicit later step — not funded now)
 
 ## Not need-to-have (discard)
 
+- Blind player-table RE / “beat FMLE at 2s” as current bet
 - Offline `.fm` RE / cloud upload extract
 - BepInEx
-- World scout clone / tactics invention
-- Premature performance work on `desktop:dev`
+- World scout clone / tactics invention as product surface
 - Greenfield “new squad desk” rewrite
 
 ## Gate
 
-1. Will the owner open this every session beside FM?
+1. Will the owner open this every session beside FM for the **club** desk?
 2. Smallest change that unlocks that habit?
-3. If we never ship the next feature, does load + desk still work?
+3. If we never ship world, does squad + history still beat sheets?

@@ -93,7 +93,7 @@ export function StartupScreen({
             <h1>{desktopRuntime ? "Load your active FM26 save" : "Install FMT for Windows"}</h1>
             <p>
               {desktopRuntime
-                ? "Open FM26 and load your save, then start a read-only scan. Club squad loads from live memory; world search uses the local FM Dossier index when available."
+                ? "Open FM26 and load your save, then connect read-only. FMT loads your managed squad from live memory for the club attributes desk."
                 : "FMT reads the active FM26 game through its Windows desktop connector."}
             </p>
             {desktopRuntime ? (
