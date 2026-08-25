@@ -160,6 +160,7 @@ struct LiveData {
     background_players_indexed: u32,
     database_index_status: &'static str,
     database_scope: &'static str,
+    database_index_error: Option<String>,
     warnings: Vec<String>,
     tactic_manager_pointer: Option<u64>,
 }
@@ -197,9 +198,7 @@ pub fn load_active_save(app: tauri::AppHandle) -> ConnectorSnapshot {
     let progress = |stage: &'static str| {
         let _ = app.emit("fmt-load-progress", stage);
     };
-    // Native GlassScout path (owner eval / T133): full private-memory player index
-    // also discovers the tactic manager. Slow / heavy vs Live Editor — intentional
-    // until the owner decides the permanent load shape.
+    // Stock GlassScout parity (T134): full private-memory player index on load.
     collect_snapshot(true, Some(&progress))
 }
 
@@ -598,7 +597,7 @@ fn build_read_pipeline(status: &ConnectorStatus) -> Vec<ReadPipelineStage> {
         match status.database_index_status {
             "ready" => "passed",
             "partial" => "warning",
-            "failed" => "warning",
+            "failed" => "failed",
             _ => "pending",
         },
         format!(
@@ -829,7 +828,7 @@ fn collect_snapshot(
                     "none"
                 },
                 tactic: data.tactic,
-                data_error: None,
+                data_error: data.database_index_error,
                 data_source: "live-memory",
                 data_warnings: data.warnings,
             }
@@ -865,6 +864,7 @@ struct ResolvedHumanManager {
     club: u64,
     club_uid: u32,
     club_name: String,
+    squad_len: u64,
 }
 
 /// Validate one human-manager pointer from the registry vector.
@@ -916,6 +916,7 @@ fn try_resolve_human_manager(
     {
         return None;
     }
+    let squad_len = (players_end - players_start) / 8;
 
     Some(ResolvedHumanManager {
         human,
@@ -924,6 +925,7 @@ fn try_resolve_human_manager(
         club,
         club_uid,
         club_name,
+        squad_len,
     })
 }
 
@@ -1029,9 +1031,9 @@ fn extract_live_data(
         ));
     }
 
-    // Continue / holiday saves can keep dormant managers in the same registry vector.
-    // Upstream assumed exactly one pointer (8 bytes). Resolve every slot and keep managers
-    // that still validate to a named human + contract + club (dormant slots usually fail).
+    // Continue / NewGAN saves can keep an inactive past manager in the same registry
+    // vector. Stock GlassScout requires exactly one slot (size == 8) and fails otherwise.
+    // FMT validates every slot and picks the active career by largest squad (T135).
     let mut resolved = Vec::new();
     for index in 0..registry_count {
         let human = match reader
@@ -1045,6 +1047,7 @@ fn extract_live_data(
             resolved.push(candidate);
         }
     }
+    let mut manager_pick_warning: Option<String> = None;
     let selected = match resolved.len() {
         0 => {
             return Err(ExtractionFailure::new(
@@ -1057,9 +1060,28 @@ fn extract_live_data(
         }
         1 => resolved.remove(0),
         _ => {
-            // Prefer the first fully validated manager. Multi-active careers are rare;
-            // dormant extras should already have been filtered out above.
-            resolved.remove(0)
+            let candidates = resolved
+                .iter()
+                .map(|item| {
+                    format!(
+                        "{} @ {} ({} squad)",
+                        item.manager_name, item.club_name, item.squad_len
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("; ");
+            let best_index = resolved
+                .iter()
+                .enumerate()
+                .max_by_key(|(_, item)| item.squad_len)
+                .map(|(index, _)| index)
+                .unwrap_or(0);
+            let selected = resolved.swap_remove(best_index);
+            manager_pick_warning = Some(format!(
+                "Multiple human managers validated [{candidates}]. Selected {} @ {} ({} squad) as the active career.",
+                selected.manager_name, selected.club_name, selected.squad_len
+            ));
+            selected
         }
     };
     let human = selected.human;
@@ -1358,6 +1380,7 @@ fn extract_live_data(
         database_index_status,
         database_scope,
         tactic_manager_pointer,
+        database_index_error,
     ) = if include_database_index {
         if let Some(progress) = progress {
             progress("indexing_player_database");
@@ -1389,9 +1412,17 @@ fn extract_live_data(
                     "ready",
                     "full-save-index",
                     indexed.tactic_manager_pointer,
+                    None,
                 )
             }
-            Err(_) => (player_count as u32, 0, "partial", "managed-squad", None),
+            Err(failure) => (
+                player_count as u32,
+                0,
+                "failed",
+                "managed-squad",
+                None,
+                Some(format!("{}: {}", failure.stage, failure.message)),
+            ),
         }
     } else {
         store_player_index(
@@ -1399,7 +1430,14 @@ fn extract_live_data(
             diagnostics.save_pointer.unwrap_or_default(),
             managed_index_records,
         );
-        (player_count as u32, 0, "not_run", "managed-squad", None)
+        (
+            player_count as u32,
+            0,
+            "not_run",
+            "managed-squad",
+            None,
+            None,
+        )
     };
 
     let season = players
@@ -1413,28 +1451,27 @@ fn extract_live_data(
         }
     }
     let dossier_reference = fm_dossier::augment_live_players(&mut players);
-    let database_players_indexed = dossier_reference
-        .as_ref()
-        .map(|reference| database_players_indexed.max(reference.player_count))
-        .unwrap_or(database_players_indexed);
-    let background_players_indexed = dossier_reference
-        .as_ref()
-        .map(|reference| {
-            reference
-                .player_count
-                .saturating_sub(players.len().try_into().unwrap_or_default())
-                .max(background_players_indexed)
-        })
-        .unwrap_or(background_players_indexed);
-    let database_index_status = if dossier_reference.is_some() {
-        "ready"
+    // Do not let Dossier mask a failed/missing memory world index (stock GS load truth).
+    let database_players_indexed = if database_index_status == "ready" {
+        dossier_reference
+            .as_ref()
+            .map(|reference| database_players_indexed.max(reference.player_count))
+            .unwrap_or(database_players_indexed)
     } else {
-        database_index_status
+        database_players_indexed
     };
-    let database_scope = if dossier_reference.is_some() {
-        "full-save-index"
+    let background_players_indexed = if database_index_status == "ready" {
+        dossier_reference
+            .as_ref()
+            .map(|reference| {
+                reference
+                    .player_count
+                    .saturating_sub(players.len().try_into().unwrap_or_default())
+                    .max(background_players_indexed)
+            })
+            .unwrap_or(background_players_indexed)
     } else {
-        database_scope
+        background_players_indexed
     };
     let tactic = tactic_manager_pointer
         .and_then(|pointer| extract_live_tactic(reader, pointer, &managed_tactic_records));
@@ -1442,7 +1479,6 @@ fn extract_live_data(
         "Managed-squad IDs, names, dates of birth, ages, nationality, positions, preferred foot, visible attributes, and mapped CA/PA/hidden/personality are validated for this FM26 build.".to_string(),
         "FM26 role, duty and out-of-possession role catalogues are mapped from the current build metadata. Player playable-role scoring now uses mapped role metadata plus live attributes and position familiarity.".to_string(),
         "Form, match ratings, contract, wage, valuation, fitness and squad-status relationships are not yet validated for this build and remain Unknown.".to_string(),
-        "Wider-world search uses the FM Dossier local save index when present — not a full process memory scan (Live Editor–shaped load).".to_string(),
         if tactic.is_some() {
             "Live FM26 tactic formation and selected XI slots are mapped from the active tactic manager. Role/duty slot packets are published only if their FM26 masks validate against the live formation.".to_string()
         } else {
@@ -1453,14 +1489,21 @@ fn extract_live_data(
     if let Some(warning) = skipped_squad_warning {
         warnings.push(warning);
     }
-    if include_database_index && database_index_status == "ready" {
+    if let Some(warning) = manager_pick_warning {
+        warnings.push(warning);
+    }
+    if let Some(error) = &database_index_error {
+        warnings.push(format!(
+            "Wider player database index failed ({error}). Only the managed squad is available — same fallback as stock GlassScout, but the failure reason is now visible."
+        ));
+    } else if include_database_index && database_index_status == "ready" {
         if dossier_reference.is_some() {
             warnings.push(format!(
-                "{background_players_indexed} wider-save player records are available through the FM Dossier local save index. Scout-knowledge gates still decide what profile detail is shown."
+                "{background_players_indexed} wider-save player records were indexed in memory; FM Dossier also enriched contract/search fields from a local save index."
             ));
         } else {
             warnings.push(format!(
-                "{background_players_indexed} wider-save player records were indexed in memory. They remain hidden from the UI until FM scout-knowledge visibility can be validated."
+                "{background_players_indexed} wider-save player records were indexed in memory (stock GlassScout full-save path). They remain hidden from the UI until FM scout-knowledge visibility can be validated."
             ));
         }
     } else if include_database_index {
@@ -1492,6 +1535,7 @@ fn extract_live_data(
         background_players_indexed,
         database_index_status,
         database_scope,
+        database_index_error,
         warnings,
         tactic_manager_pointer,
     })
@@ -2278,9 +2322,9 @@ fn read_executable_identity(path: &str) -> ExecutableIdentity {
         }
     }
 
-    // Fast path: PE arch + Windows version strings. Skip full-file SHA-256 unless needed.
+    // Stock GlassScout parity (T134): always SHA-256 the executable for exact map match.
     let mut identity = ExecutableIdentity {
-        sha256: None,
+        sha256: hash_file(path),
         architecture: read_pe_architecture(path),
         ..ExecutableIdentity::default()
     };
@@ -2310,18 +2354,6 @@ fn read_executable_identity(path: &str) -> ExecutableIdentity {
                     .map(str::to_string);
             }
         }
-    }
-
-    // Only hash when version+arch does not uniquely select an entity map (or cache wants it).
-    let mapped_without_hash = find_entity_map(
-        identity.file_version.as_deref(),
-        identity.product_version.as_deref(),
-        None,
-        identity.architecture.as_deref(),
-    )
-    .is_some();
-    if !mapped_without_hash {
-        identity.sha256 = hash_file(path);
     }
 
     if let Ok(mut cache) = identity_cache().lock() {
@@ -2386,6 +2418,16 @@ mod tests {
         offsets::{embedded_entity_map_index, field_is_publishable, FieldDefinition},
         permissions::READ_ONLY_PROCESS_ACCESS,
     };
+
+    #[test]
+    fn active_manager_pick_prefers_largest_squad() {
+        let candidates = [(12u64, "ghost"), (34u64, "active"), (8u64, "tiny")];
+        let best = candidates
+            .iter()
+            .max_by_key(|(squad_len, _)| *squad_len)
+            .map(|(_, name)| *name);
+        assert_eq!(best, Some("active"));
+    }
 
     #[test]
     fn manager_registry_accepts_multi_slot_byte_lengths() {

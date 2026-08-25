@@ -1,12 +1,16 @@
 # Status
 
-Last updated: 2026-08-25 (T133: restore GS native full scan for owner eval)
+Last updated: 2026-08-25 (T134/T135: stock GS load + active manager)
 
 ## Now
 
 **App path:** `desktop/`. Root `Start FMT.cmd` → `desktop/Start FMT.cmd`.
 
-**Owner eval:** Load Active Save again runs GlassScout’s **full private-memory player index** (T133). Expect long load / high RAM; world players + tactic discovery come from that scan. Decide permanent load shape after you see native GS.
+**Verify on native FM26 save:** Load Active Save should index ~16k like stock GS (full SHA map match + full memory index). If index fails, warnings/`dataError` show the real reason — not silent ~34.
+
+**Continue / NewGAN (2 humans):** FMT picks the validated manager with the **largest squad** as active (T135). Stock GS still dies on “exactly one.”
+
+**Next:** owner confirms native ~16k; then decide speed / continue 400k indexing strategy.
 
 **Defer:** T120/T121 skin, T123 mentor. **Hygiene:** T124.
 
@@ -21,11 +25,11 @@ Last updated: 2026-08-25 (T133: restore GS native full scan for owner eval)
 
 ## Recently done
 
-- **T133** — restore GS `collect_snapshot(true)` on load (eval)
-- **T119** — app tree → `desktop/`
-- **T131** — LE-speed load caches
-- **T130–T122** — prior desk/load work
+- **T134** — stock GS load parity (hash + full index + visible index errors)
+- **T135** — active manager = largest validated squad
+- **T133** — restore GS full scan (eval)
+- **T119 / T131 / T130–T122** — prior
 
 ## Loop
 
-FM → FMT Load Active Save (**GS full scan**) → inspect world index + tactics → owner decides next load shape.
+FM → FMT Load Active Save (**stock GS full index**) → ~16k native / active manager on multi-human → then speed decision.

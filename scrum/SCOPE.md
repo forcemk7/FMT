@@ -9,18 +9,18 @@ FMT is a **Football Manager 26** desktop companion: live read of the loaded save
 ## Livelihood loop (target)
 
 ```
-Load save in FM → FMT Load Active Save
-  → (T133 owner eval) GlassScout native full RAM index + tactic discovery
-  → then decide permanent load shape vs LE-fast / Dossier
+Load save in FM → FMT Load Active Save (stock GS full memory index)
+  → native ~16k parity; multi-human → pick active by largest squad
+  → then decide speed / continue 400k indexing strategy
   → attributes desk (CA/PA/HA + history) → installer for daily use
 ```
 
 ## Need-to-have (do)
 
 - Stable shell (T125)
-- **Owner eval (T133):** restore GS full private-memory index on load so native GS reach/tactics can be judged; permanent load shape TBD after that
+- **Stock GS load parity (T134)** + **active manager pick (T135)** — verify on native save before speed work
 - Attribute history plot (T127) + tone colors (T128)
-- Then **installer** as the lightness test (not `desktop:dev`) — after load shape is chosen
+- Then speed / continue indexing decision; then **installer**
 
 ## Optional (fund only if usage demands)
 
