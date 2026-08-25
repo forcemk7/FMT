@@ -3,6 +3,7 @@
 import {
   ChevronLeft,
   ChevronRight,
+  CircleDashed,
   LayoutDashboard,
   RefreshCw,
   Search,
@@ -108,10 +109,11 @@ export function ShellHeader({
             )}
             onClick={() => onNavigate(label)}
             title={live ? label : `${label} — later (roadmap)`}
+            aria-label={live ? label : `${label}, later roadmap`}
           >
             {Icon ? <Icon aria-hidden="true" /> : null}
             <span>{short}</span>
-            {!live ? <small>Later</small> : null}
+            {!live ? <CircleDashed className="shell-nav-tbd" aria-hidden="true" /> : null}
           </button>
         ))}
       </nav>
