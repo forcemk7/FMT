@@ -2,14 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { AppSidebar, type Screen } from "@/components/app-sidebar";
-import { Topbar } from "@/components/topbar";
+import { ShellHeader, type Screen } from "@/components/shell-header";
 import { MyTeamScreen } from "@/components/my-team-screen";
-import { RoadmapScreen } from "@/components/roadmap-screen";
+import { LaterRoleScreen } from "@/components/later-role-screen";
 import { PlayerProfileScreen } from "@/components/player-profile-screen";
 import { StartupScreen } from "@/components/startup-screen";
 import { SettingsScreen } from "@/components/settings-screen";
 import { ClubProfileScreen } from "@/components/club-profile-screen";
+import { DashboardScreen } from "@/components/dashboard-screen";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
   fm26LiveAdapter,
@@ -78,6 +78,14 @@ const initialSnapshot: LiveFootballSnapshot = {
   dataSource: "none",
   dataWarnings: [],
 };
+
+const LATER_ROLES: Screen[] = [
+  "Tactic",
+  "HoYD",
+  "General Manager",
+  "Loan Manager",
+  "Technical Director",
+];
 
 export function FMTApp() {
   const [mode, setMode] = useState<"fm26" | null>(null);
@@ -203,15 +211,17 @@ export function FMTApp() {
   }
 
   const content =
-    screen === "Squad" ? (
+    screen === "Dashboard" ? (
+      <DashboardScreen snapshot={snapshot} checking={checking} onRefresh={checkConnection} onOpenPlayer={openPlayer} />
+    ) : screen === "Squad" ? (
       <MyTeamScreen
         snapshot={snapshot}
         checking={checking}
         onRefresh={checkConnection}
         onOpenPlayer={openPlayer}
       />
-    ) : screen === "Roadmap" ? (
-      <RoadmapScreen />
+    ) : LATER_ROLES.includes(screen) ? (
+      <LaterRoleScreen role={screen} />
     ) : screen === "Player Profile" ? (
       <PlayerProfileScreen
         player={snapshot.players.find((player) => player.id === selectedPlayerId) ?? null}
@@ -234,51 +244,49 @@ export function FMTApp() {
 
   return (
     <TooltipProvider>
-      <div className="app-canvas">
-        <div className="app-top-shell">
-          <AppSidebar screen={screen} onNavigate={navigate} />
-          <Topbar
-            search={search}
-            onSearch={setSearch}
-            snapshot={snapshot}
-            screen={screen}
-            checking={checking}
-            onRefresh={checkConnection}
-            canGoBack={historyIndex > 0}
-            canGoForward={historyIndex < screenHistory.length - 1}
-            onGoBack={goBack}
-            onGoForward={goForward}
-          />
-          {search ? (
-            <motion.div
-              className="global-search-results"
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <header>
-                <strong>Squad search</strong>
-                <button type="button" onClick={() => setSearch("")}>
-                  Clear
-                </button>
-              </header>
-              {squadSearchHits.map((player) => (
-                <button
-                  key={player.id}
-                  type="button"
-                  onClick={() => {
-                    openPlayer(player.id);
-                    setSearch("");
-                  }}
-                >
-                  <span>Player</span>
-                  <strong>{player.name}</strong>
-                  <small>{player.positions?.join(" / ") || "Position unknown"}</small>
-                </button>
-              ))}
-              {!squadSearchHits.length ? <p>No squad player matches “{search}”.</p> : null}
-            </motion.div>
-          ) : null}
-        </div>
+      <div className="app-canvas shell-single-header">
+        <ShellHeader
+          screen={screen}
+          onNavigate={navigate}
+          search={search}
+          onSearch={setSearch}
+          snapshot={snapshot}
+          checking={checking}
+          onRefresh={checkConnection}
+          canGoBack={historyIndex > 0}
+          canGoForward={historyIndex < screenHistory.length - 1}
+          onGoBack={goBack}
+          onGoForward={goForward}
+        />
+        {search ? (
+          <motion.div
+            className="global-search-results"
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <header>
+              <strong>Squad search</strong>
+              <button type="button" onClick={() => setSearch("")}>
+                Clear
+              </button>
+            </header>
+            {squadSearchHits.map((player) => (
+              <button
+                key={player.id}
+                type="button"
+                onClick={() => {
+                  openPlayer(player.id);
+                  setSearch("");
+                }}
+              >
+                <span>Player</span>
+                <strong>{player.name}</strong>
+                <small>{player.positions?.join(" / ") || "Position unknown"}</small>
+              </button>
+            ))}
+            {!squadSearchHits.length ? <p>No squad player matches “{search}”.</p> : null}
+          </motion.div>
+        ) : null}
         <section className="app-main">
           <AnimatePresence mode="wait">
             <div key={screen} className="screen-slot">

@@ -1,7 +1,7 @@
 ---
 id: T115
 title: Santos — lock owned-at-club / owned-out / inbound-loan by UniqueID
-status: blocked
+status: frozen
 priority: 1
 owner: cursor-worker
 claimed_at: 2026-08-17T15:05:00Z

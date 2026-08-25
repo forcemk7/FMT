@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { ExternalLink, ShieldCheck, Target, UsersRound } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import type { LiveFootballSnapshot, LivePlayer } from "@/domain/adapters";
 import { groupSquad, positionGroups } from "@/domain/live-data";
 import { LiveDataState } from "@/components/live-data-state";
@@ -54,7 +54,6 @@ export function MyTeamScreen({ snapshot, checking, onRefresh, onOpenPlayer }: {
   const squad = useMemo(() => snapshot.players.filter((player) => player.clubId === snapshot.managedClubId), [snapshot.managedClubId, snapshot.players]);
   const groups = useMemo(() => groupSquad(squad), [squad]);
   const managedClub = snapshot.clubs.find((club) => club.id === snapshot.managedClubId);
-  const mappedAttributes = squad.reduce((sum, player) => sum + Object.keys(player.attributes ?? {}).length, 0);
 
   if (snapshot.status.state !== "connected" || !snapshot.managedClubId || squad.length === 0) {
     return <main className="screen"><LiveDataState snapshot={snapshot} title="Squad" checking={checking} onRefresh={onRefresh} /></main>;
@@ -63,14 +62,9 @@ export function MyTeamScreen({ snapshot, checking, onRefresh, onOpenPlayer }: {
   return (
     <main className="screen my-team-screen">
       <div className="planner-heading">
-        <div><h1>Squad</h1><p>{managedClub?.name} · {snapshot.season ?? "Active FM26 save"} · {squad.length} current players</p></div>
-        <div className="live-source-label"><span className="live-dot" />Live FM26</div>
+        <div><h1>Squad</h1><p>{managedClub?.name} · {squad.length} players</p></div>
+        <div className="live-source-label"><span className="live-dot" />Live</div>
       </div>
-      <section className="squad-summary-grid squad-summary-grid-verified">
-        <article><UsersRound /><span><small>Current squad</small><strong>{squad.length}</strong></span></article>
-        <article><ShieldCheck /><span><small>Fully known</small><strong>{squad.filter((player) => player.scoutKnowledge === "fully_known").length}</strong></span></article>
-        <article><Target /><span><small>Visible attributes read</small><strong>{mappedAttributes}</strong></span></article>
-      </section>
       <section className="squad-live-table squad-live-table-rich">
         <header><span>Player</span><span>Position</span><span>Best role</span><span>Rating</span><span>Form</span><span>Contract / wage</span><span>Value</span><span>Condition</span><span>Status</span><span>Details</span></header>
         {positionGroups.map((group) => {

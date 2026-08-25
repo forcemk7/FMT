@@ -1,32 +1,27 @@
 # Status
 
-Last updated: 2026-08-25 (T138: modest nav roadmap)
+Last updated: 2026-08-25 (T141–T143 shell + desk loops)
 
 ## Now
 
-**Stance:** Step 1 club desk. Visual roadmap only for Step 2+.
+**Shipped this turn:** single-row header; role roadmap nav (Dashboard+Squad live); Dashboard = squad glance; profile defaults to Attributes & history with presets + teaching line.
 
-**Session:** T138 roadmap strip → T139 theme → T140 history desk.
+**Verify:** `desktop:dev` or rebuild installer → one header row; muted Later tabs; Squad → player → history presets; Dashboard movers.
 
-**Just shipped T138:** Nav = Squad · Roadmap · Settings. Home = Squad. GS desks (Dashboard / Tactics / Scout / Shortlist) unrouted. Search = squad only.
-
-**Next:** T139 FMT colors/type; T140 full attr history + CA/HA teaching on profile.
+**Next when ready:** T139 theme polish (deferred until you use the desk).
 
 ## Board
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
-| T139 | FMT visual theme | ready | 2 | |
-| T140 | Attr history desk | ready | 2 | |
+| T139 | FMT visual theme | deferred | — | after daily use |
 | T124 | Quiet dev launch | ready | 9 | |
-| T123 | Mentor desk | deferred | — | |
 
 ## Recently done
 
-- **T138** — modest nav / roadmap screen
-- **T136/T137** — no console; squad-only load
-- **T134/T135** — prior load experiments
+- **T141** single-row header · **T142** role nav · **T140** history desk · **T143** dashboard glance
+- **T138** first strip · **T136/T137** console + squad load
 
 ## Loop
 
-FM → FMT Squad → player desk + history → (later) world.
+FM → FMT Dashboard/Squad → player Attributes & history → (later) role desks / world.

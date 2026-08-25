@@ -165,14 +165,12 @@ export function PlayerProfileScreen({
     <main className="player-dossier">
       <header className="dossier-header">
         <div className="dossier-heading">
-          <Button variant="ghost" size="icon" aria-label="Back to players" onClick={onBack}><ArrowLeft /></Button>
+          <Button variant="ghost" size="icon" aria-label="Back to squad" onClick={onBack}><ArrowLeft /></Button>
           <PlayerFace playerId={player.id} name={player.name} size="lg" />
-          <div><h1>{player.name}</h1><p>Live FM26 player dossier</p></div>
+          <div><h1>{player.name}</h1><p>{clubName ?? "Club unknown"} · CA {abilityLabel(player.currentAbility)} · PA {abilityLabel(player.potentialAbility)}</p></div>
         </div>
         <div className="dossier-actions">
-          <Button variant="outline" disabled><GitCompareArrows data-icon="inline-start" />Compare</Button>
-          <Button variant="outline" className={favorite ? "shortlist-active" : ""} onClick={onToggleFavorite}><Star data-icon="inline-start" fill={favorite ? "currentColor" : "none"} />{favorite ? "Shortlisted" : "Shortlist"}</Button>
-          <Button disabled><ClipboardList data-icon="inline-start" />Request full report</Button>
+          <Button variant="outline" className={favorite ? "shortlist-active" : ""} onClick={onToggleFavorite}><Star data-icon="inline-start" fill={favorite ? "currentColor" : "none"} />{favorite ? "Saved" : "Save"}</Button>
         </div>
       </header>
 
@@ -190,11 +188,11 @@ export function PlayerProfileScreen({
         <span className="fact-confidence"><b>Knowledge</b>{player.scoutConfidence == null ? <strong>Unknown</strong> : <ConfidenceRing value={player.scoutConfidence} size="sm" />}</span>
       </section>
 
-      <Tabs defaultValue="overview" className="dossier-tabs">
+      <Tabs defaultValue="attributes" className="dossier-tabs">
         <TabsList variant="line">
-          {["overview", "tactical", "attributes", "performance", "career"].map((value) => (
+          {["attributes", "overview", "tactical", "performance", "career"].map((value) => (
             <TabsTrigger key={value} value={value}>
-              {value === "tactical" ? "Tactical fit" : value[0].toUpperCase() + value.slice(1)}
+              {value === "tactical" ? "Tactical fit" : value === "attributes" ? "Attributes & history" : value[0].toUpperCase() + value.slice(1)}
             </TabsTrigger>
           ))}
         </TabsList>

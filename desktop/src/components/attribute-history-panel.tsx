@@ -9,7 +9,19 @@ import {
   type AttrHistoryPoint,
 } from "@/domain/attribute-history";
 
-const DEFAULT_FIELDS = ["CA", "PA", "Determination", "Professionalism", "Consistency"];
+const PRESETS: Record<string, string[]> = {
+  Ability: ["CA", "PA"],
+  Hidden: ["Consistency", "Dirtiness", "Important Matches", "Injury Proneness", "Versatility"],
+  Personality: [
+    "Determination",
+    "Professionalism",
+    "Ambition",
+    "Pressure",
+    "Loyalty",
+    "Temperament",
+  ],
+  Development: ["CA", "Determination", "Professionalism", "Consistency", "Natural Fitness"],
+};
 
 function smoothLinePath(pts: Array<{ x: number; y: number }>): string {
   if (pts.length === 0) return "";
@@ -38,21 +50,51 @@ function availableFields(points: AttrHistoryPoint[]): string[] {
   return [...keys].sort((a, b) => a.localeCompare(b));
 }
 
+function developmentNote(points: AttrHistoryPoint[]): string | null {
+  if (points.length < 2) return null;
+  const ca = fieldDeltas(points, "CA");
+  const det = fieldDeltas(points, "Determination");
+  const pro = fieldDeltas(points, "Professionalism");
+  const cons = fieldDeltas(points, "Consistency");
+  if (ca.allTime == null) return null;
+  const haBits = [
+    det.latest != null ? `DET ${det.latest}` : null,
+    pro.latest != null ? `PRO ${pro.latest}` : null,
+    cons.latest != null ? `CON ${cons.latest}` : null,
+  ].filter(Boolean);
+  const direction =
+    ca.allTime > 0 ? "up" : ca.allTime < 0 ? "down" : "flat";
+  const pace =
+    points.length >= 3 && ca.allTime != null
+      ? `≈ ${(ca.allTime / (points.length - 1)).toFixed(1)} CA / change-point`
+      : null;
+  return [
+    `CA ${formatDelta(ca.allTime)} since first point (${direction}).`,
+    haBits.length ? `Personality/HA snapshot: ${haBits.join(" · ")}.` : null,
+    pace,
+    "Compare high-DET/PRO players over the same span to see who develops faster — reload after training weeks.",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 export function AttributeHistoryPanel({ playerId }: { playerId: string }) {
   const points = getPlayerAttrHistory(playerId);
   const fields = availableFields(points);
-  // null = use defaults; remount via key={playerId} resets. No useEffect → no update loops.
+  const [preset, setPreset] = useState<keyof typeof PRESETS | "Custom">("Development");
   const [active, setActive] = useState<string[] | null>(null);
+
   const selected =
-    active === null
-      ? DEFAULT_FIELDS.filter((field) => fields.includes(field)).slice(0, 3)
-      : active.filter((field) => fields.includes(field));
+    active ??
+    (PRESETS[preset as keyof typeof PRESETS] ?? PRESETS.Development).filter((field) =>
+      fields.includes(field),
+    );
 
   const selectedKey = selected.join("\0");
   const chart = useMemo(() => {
     if (points.length === 0 || selected.length === 0) return null;
-    const width = 640;
-    const height = 220;
+    const width = 720;
+    const height = 240;
     const pad = { left: 36, right: 12, top: 16, bottom: 28 };
     const innerW = width - pad.left - pad.right;
     const innerH = height - pad.top - pad.bottom;
@@ -85,12 +127,21 @@ export function AttributeHistoryPanel({ playerId }: { playerId: string }) {
     });
 
     return { width, height, pad, yMin, yMax, series };
-  }, [playerId, points.length, selectedKey]);
+  }, [playerId, points, selectedKey]);
+
+  const teaching = developmentNote(points);
+
+  const applyPreset = (name: keyof typeof PRESETS) => {
+    setPreset(name);
+    setActive(null);
+  };
 
   const toggle = (field: string) => {
+    setPreset("Custom");
     setActive((current) => {
       const base =
-        current ?? DEFAULT_FIELDS.filter((item) => fields.includes(item)).slice(0, 3);
+        current ??
+        (PRESETS.Development.filter((item) => fields.includes(item)) as string[]);
       return base.includes(field) ? base.filter((item) => item !== field) : [...base, field];
     });
   };
@@ -98,9 +149,13 @@ export function AttributeHistoryPanel({ playerId }: { playerId: string }) {
   if (points.length === 0) {
     return (
       <section className="dossier-panel tab-evidence-panel attr-history-panel">
-        <header><h2>Attribute history</h2><span>No change-points yet</span></header>
+        <header>
+          <h2>Attribute history</h2>
+          <span>No change-points yet</span>
+        </header>
         <p className="evidence-caption">
-          History appends on each Load Active Save when values change. Reload after development days to build the plot.
+          History appends on each Load when values change. Reload after development days to
+          replace the spreadsheet.
         </p>
       </section>
     );
@@ -110,8 +165,26 @@ export function AttributeHistoryPanel({ playerId }: { playerId: string }) {
     <section className="dossier-panel tab-evidence-panel attr-history-panel">
       <header>
         <h2>Attribute history</h2>
-        <span>{points.length} change-point{points.length === 1 ? "" : "s"} · append-only</span>
+        <span>
+          {points.length} change-point{points.length === 1 ? "" : "s"} · append-only
+        </span>
       </header>
+
+      {teaching ? <p className="attr-history-teach">{teaching}</p> : null}
+
+      <div className="attr-history-presets" role="group" aria-label="History presets">
+        {(Object.keys(PRESETS) as Array<keyof typeof PRESETS>).map((name) => (
+          <button
+            key={name}
+            type="button"
+            className={preset === name ? "is-on" : undefined}
+            onClick={() => applyPreset(name)}
+          >
+            {name}
+          </button>
+        ))}
+      </div>
+
       <div className="attr-history-layout">
         <div className="attr-history-toggles">
           {fields.map((field) => {
@@ -126,7 +199,8 @@ export function AttributeHistoryPanel({ playerId }: { playerId: string }) {
               >
                 <strong>{field}</strong>
                 <small>
-                  {deltas.latest ?? "—"} · Δr {formatDelta(deltas.recent)} · Δ∞ {formatDelta(deltas.allTime)}
+                  {deltas.latest ?? "—"} · Δr {formatDelta(deltas.recent)} · Δ∞{" "}
+                  {formatDelta(deltas.allTime)}
                 </small>
               </button>
             );
@@ -135,8 +209,12 @@ export function AttributeHistoryPanel({ playerId }: { playerId: string }) {
         <div className="attr-history-chart">
           {chart ? (
             <svg viewBox={`0 0 ${chart.width} ${chart.height}`} role="img" aria-label="Attribute history plot">
-              <text x={8} y={chart.pad.top + 4} className="attr-history-axis">{Math.round(chart.yMax)}</text>
-              <text x={8} y={chart.height - chart.pad.bottom} className="attr-history-axis">{Math.round(chart.yMin)}</text>
+              <text x={8} y={chart.pad.top + 4} className="attr-history-axis">
+                {Math.round(chart.yMax)}
+              </text>
+              <text x={8} y={chart.height - chart.pad.bottom} className="attr-history-axis">
+                {Math.round(chart.yMin)}
+              </text>
               {chart.series.map((series) => (
                 <g key={series.field}>
                   <path d={series.path} fill="none" stroke={series.color} strokeWidth={2} />
@@ -146,11 +224,11 @@ export function AttributeHistoryPanel({ playerId }: { playerId: string }) {
                 </g>
               ))}
               <text x={chart.width / 2} y={chart.height - 6} textAnchor="middle" className="attr-history-axis">
-                change-points (not calendar)
+                change-points (reload after in-game days)
               </text>
             </svg>
           ) : (
-            <p className="evidence-caption">Toggle one or more fields to plot.</p>
+            <p className="evidence-caption">Toggle fields or pick a preset to plot.</p>
           )}
         </div>
       </div>
