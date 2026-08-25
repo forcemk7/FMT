@@ -4,11 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AppSidebar, type Screen } from "@/components/app-sidebar";
 import { Topbar } from "@/components/topbar";
-import { DashboardScreen } from "@/components/dashboard-screen";
 import { MyTeamScreen } from "@/components/my-team-screen";
-import { TacticsScreen } from "@/components/tactics-screen";
-import { ScoutRoomScreen } from "@/components/recruitment-screen";
-import { FavoritedPlayersScreen } from "@/components/favorited-players-screen";
+import { RoadmapScreen } from "@/components/roadmap-screen";
 import { PlayerProfileScreen } from "@/components/player-profile-screen";
 import { StartupScreen } from "@/components/startup-screen";
 import { SettingsScreen } from "@/components/settings-screen";
@@ -16,15 +13,12 @@ import { ClubProfileScreen } from "@/components/club-profile-screen";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
   fm26LiveAdapter,
-  indexedPlayerProfile,
-  searchIndexedPlayers,
-  type IndexedPlayerSearchResult,
   type LiveConnectorStatus,
   type LiveFootballSnapshot,
   type LivePlayer,
 } from "@/domain/adapters";
 import { recordPlayersFromSnapshot } from "@/domain/attribute-history";
-import { toggleFavorite, updateFavoriteNote, type FavoriteRecord } from "@/domain/live-data";
+import { toggleFavorite, type FavoriteRecord } from "@/domain/live-data";
 
 const initialStatus: LiveConnectorStatus = {
   processDetected: false,
@@ -80,47 +74,21 @@ const initialSnapshot: LiveFootballSnapshot = {
   players: [],
   tactic: null,
   tacticSource: "none",
-  dataError: "Diagnostics have not run yet.",
+  dataError: null,
   dataSource: "none",
   dataWarnings: [],
 };
 
-function meaningfulEntries(player: LivePlayer) {
-  return Object.fromEntries(
-    Object.entries(player).filter(([, value]) => {
-      if (value == null) return false;
-      if (Array.isArray(value)) return value.length > 0;
-      if (typeof value === "object") return Object.keys(value).length > 0;
-      return true;
-    }),
-  ) as Partial<LivePlayer>;
-}
-
-function mergeIndexedProfile(existing: LivePlayer | undefined, profile: LivePlayer): LivePlayer {
-  if (!existing) return profile;
-  return {
-    ...existing,
-    ...meaningfulEntries(profile),
-    attributes: Object.keys(profile.attributes ?? {}).length ? profile.attributes : existing.attributes,
-    per90: Object.keys(profile.per90 ?? {}).length ? profile.per90 : existing.per90,
-    strengths: profile.strengths?.length ? profile.strengths : existing.strengths,
-    weaknesses: profile.weaknesses?.length ? profile.weaknesses : existing.weaknesses,
-    playableRoles: profile.playableRoles?.length ? profile.playableRoles : existing.playableRoles,
-    otherRoles: profile.otherRoles?.length ? profile.otherRoles : existing.otherRoles,
-  };
-}
-
 export function FMTApp() {
   const [mode, setMode] = useState<"fm26" | null>(null);
-  const [screen, setScreenState] = useState<Screen>("Dashboard");
-  const [screenHistory, setScreenHistory] = useState<Screen[]>(["Dashboard"]);
+  const [screen, setScreenState] = useState<Screen>("Squad");
+  const [screenHistory, setScreenHistory] = useState<Screen[]>(["Squad"]);
   const [historyIndex, setHistoryIndex] = useState(0);
   const [search, setSearch] = useState("");
   const [snapshot, setSnapshot] = useState<LiveFootballSnapshot>(initialSnapshot);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [selectedClubId, setSelectedClubId] = useState<string | null>(null);
-  const [returnScreen, setReturnScreen] = useState<Screen>("Scout Room");
-  const [globalIndexed, setGlobalIndexed] = useState<IndexedPlayerSearchResult[]>([]);
+  const [returnScreen, setReturnScreen] = useState<Screen>("Squad");
   const [favorites, setFavorites] = useState<FavoriteRecord[]>(() => {
     if (typeof window === "undefined") return [];
     const stored =
@@ -141,26 +109,16 @@ export function FMTApp() {
     window.localStorage.setItem("fmt-favorites-v1", JSON.stringify(favorites));
   }, [favorites]);
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      if (!search.trim()) {
-        setGlobalIndexed([]);
-        return;
-      }
-      searchIndexedPlayers(search)
-        .then((items) => setGlobalIndexed(items.slice(0, 8)))
-        .catch(() => setGlobalIndexed([]));
-    }, search.trim() ? 160 : 0);
-    return () => window.clearTimeout(timer);
-  }, [search]);
-
-  const navigate = useCallback((nextScreen: Screen) => {
-    if (nextScreen === screen) return;
-    const nextIndex = historyIndex + 1;
-    setScreenHistory((current) => [...current.slice(0, nextIndex), nextScreen]);
-    setHistoryIndex(nextIndex);
-    setScreenState(nextScreen);
-  }, [historyIndex, screen]);
+  const navigate = useCallback(
+    (nextScreen: Screen) => {
+      if (nextScreen === screen) return;
+      const nextIndex = historyIndex + 1;
+      setScreenHistory((current) => [...current.slice(0, nextIndex), nextScreen]);
+      setHistoryIndex(nextIndex);
+      setScreenState(nextScreen);
+    },
+    [historyIndex, screen],
+  );
 
   const goBack = useCallback(() => {
     if (historyIndex <= 0) return;
@@ -191,44 +149,36 @@ export function FMTApp() {
   }, []);
 
   const enterWorkspace = useCallback(() => {
-    setScreenState("Dashboard");
-    setScreenHistory(["Dashboard"]);
+    setScreenState("Squad");
+    setScreenHistory(["Squad"]);
     setHistoryIndex(0);
     setMode("fm26");
   }, []);
 
-  const togglePlayerFavorite = (playerId: string) => setFavorites((current) => toggleFavorite(current, playerId));
-  const updatePlayerNote = (playerId: string, note: string) => setFavorites((current) => updateFavoriteNote(current, playerId, note));
+  const togglePlayerFavorite = (playerId: string) =>
+    setFavorites((current) => toggleFavorite(current, playerId));
 
-  const loadIndexedPlayerProfile = useCallback(async (playerId: string) => {
-    try {
-      const profile = await indexedPlayerProfile(playerId);
-      if (!profile) return;
-      recordPlayersFromSnapshot([profile], snapshot.season);
-      setSnapshot((current) => {
-        const existingIndex = current.players.findIndex((player) => player.id === profile.id);
-        if (existingIndex === -1) return { ...current, players: [...current.players, profile] };
-        const players = [...current.players];
-        players[existingIndex] = mergeIndexedProfile(players[existingIndex], profile);
-        return { ...current, players };
-      });
-    } catch {
-      // The profile screen will keep its clean unavailable state if the local save index cannot resolve this player.
-    }
-  }, [snapshot.season]);
+  const openPlayer = useCallback(
+    (playerId: string) => {
+      setReturnScreen((current) =>
+        screen === "Player Profile" || screen === "Club Profile" ? current : screen,
+      );
+      setSelectedPlayerId(playerId);
+      navigate("Player Profile");
+    },
+    [navigate, screen],
+  );
 
-  const openPlayer = useCallback((playerId: string) => {
-    setReturnScreen((current) => screen === "Player Profile" || screen === "Club Profile" ? current : screen);
-    setSelectedPlayerId(playerId);
-    navigate("Player Profile");
-    void loadIndexedPlayerProfile(playerId);
-  }, [loadIndexedPlayerProfile, navigate, screen]);
-
-  const openClub = useCallback((clubId: string) => {
-    setReturnScreen((current) => screen === "Player Profile" || screen === "Club Profile" ? current : screen);
-    setSelectedClubId(clubId);
-    navigate("Club Profile");
-  }, [navigate, screen]);
+  const openClub = useCallback(
+    (clubId: string) => {
+      setReturnScreen((current) =>
+        screen === "Player Profile" || screen === "Club Profile" ? current : screen,
+      );
+      setSelectedClubId(clubId);
+      navigate("Club Profile");
+    },
+    [navigate, screen],
+  );
 
   const goBackOrReturn = useCallback(() => {
     if (historyIndex > 0) {
@@ -238,12 +188,11 @@ export function FMTApp() {
     navigate(returnScreen);
   }, [goBack, historyIndex, navigate, returnScreen]);
 
-  const globalClubs = useMemo(
-    () => search.trim()
-      ? snapshot.clubs.filter((club) => club.name.toLowerCase().includes(search.trim().toLowerCase())).slice(0, 4)
-      : [],
-    [search, snapshot.clubs],
-  );
+  const squadSearchHits = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return [] as LivePlayer[];
+    return snapshot.players.filter((player) => player.name.toLowerCase().includes(q)).slice(0, 8);
+  }, [search, snapshot.players]);
 
   if (mode === null) {
     return (
@@ -254,12 +203,16 @@ export function FMTApp() {
   }
 
   const content =
-    screen === "Dashboard" ? <DashboardScreen snapshot={snapshot} checking={checking} onRefresh={checkConnection} onNavigate={navigate} /> :
-    screen === "Squad" ? <MyTeamScreen snapshot={snapshot} checking={checking} onRefresh={checkConnection} onOpenPlayer={openPlayer} /> :
-    screen === "Tactical Board" ? <TacticsScreen snapshot={snapshot} onOpenPlayer={openPlayer} /> :
-    screen === "Scout Room" ? <ScoutRoomScreen snapshot={snapshot} favorites={favorites} checking={checking} onRefresh={checkConnection} onToggleFavorite={togglePlayerFavorite} onOpenPlayer={openPlayer} /> :
-    screen === "Shortlist" ? <FavoritedPlayersScreen snapshot={snapshot} favorites={favorites} checking={checking} onRefresh={checkConnection} onToggleFavorite={togglePlayerFavorite} onUpdateNote={updatePlayerNote} onOpenPlayer={openPlayer} /> :
-    screen === "Player Profile" ? (
+    screen === "Squad" ? (
+      <MyTeamScreen
+        snapshot={snapshot}
+        checking={checking}
+        onRefresh={checkConnection}
+        onOpenPlayer={openPlayer}
+      />
+    ) : screen === "Roadmap" ? (
+      <RoadmapScreen />
+    ) : screen === "Player Profile" ? (
       <PlayerProfileScreen
         player={snapshot.players.find((player) => player.id === selectedPlayerId) ?? null}
         snapshot={snapshot}
@@ -269,7 +222,12 @@ export function FMTApp() {
         onOpenClub={openClub}
       />
     ) : screen === "Club Profile" ? (
-      <ClubProfileScreen clubId={selectedClubId} snapshot={snapshot} onBack={goBackOrReturn} onOpenPlayer={openPlayer} />
+      <ClubProfileScreen
+        clubId={selectedClubId}
+        snapshot={snapshot}
+        onBack={goBackOrReturn}
+        onOpenPlayer={openPlayer}
+      />
     ) : (
       <SettingsScreen snapshot={snapshot} checking={checking} onRefresh={checkConnection} />
     );
@@ -292,29 +250,40 @@ export function FMTApp() {
             onGoForward={goForward}
           />
           {search ? (
-            <motion.div className="global-search-results" initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}>
-              <header><strong>Search results</strong><button onClick={() => setSearch("")}>Clear</button></header>
-              {globalClubs.map((club) => (
-                <button key={club.id} onClick={() => { openClub(club.id); setSearch(""); }}>
-                  <span>Team</span>
-                  <strong>{club.name}</strong>
-                  <small>{club.league ?? "Competition unknown"}</small>
+            <motion.div
+              className="global-search-results"
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              <header>
+                <strong>Squad search</strong>
+                <button type="button" onClick={() => setSearch("")}>
+                  Clear
                 </button>
-              ))}
-              {globalIndexed.map((result) => (
-                <button key={result.id} onClick={() => { openPlayer(result.id); setSearch(""); }}>
+              </header>
+              {squadSearchHits.map((player) => (
+                <button
+                  key={player.id}
+                  type="button"
+                  onClick={() => {
+                    openPlayer(player.id);
+                    setSearch("");
+                  }}
+                >
                   <span>Player</span>
-                  <strong>{result.name}</strong>
-                  <small>{result.positions.join(" / ") || "Position unknown"} · {result.visibility}</small>
+                  <strong>{player.name}</strong>
+                  <small>{player.positions?.join(" / ") || "Position unknown"}</small>
                 </button>
               ))}
-              {!globalClubs.length && !globalIndexed.length ? <p>No indexed player or mapped team matches “{search}”.</p> : null}
+              {!squadSearchHits.length ? <p>No squad player matches “{search}”.</p> : null}
             </motion.div>
           ) : null}
         </div>
         <section className="app-main">
           <AnimatePresence mode="wait">
-            <div key={screen} className="screen-slot">{content}</div>
+            <div key={screen} className="screen-slot">
+              {content}
+            </div>
           </AnimatePresence>
         </section>
       </div>

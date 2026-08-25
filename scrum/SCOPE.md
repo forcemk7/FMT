@@ -16,16 +16,16 @@ Load save in FM → FMT Load Active Save (managed squad only, fast)
 
 ## Need-to-have (do)
 
-- **Step 1 — Club desk:** squad-only load (no world spray); correct attrs; history that works for daily use
+- **Step 1 — Club desk:** squad-only load; correct attrs; history that replaces sheets
+- **Today’s UI session:** modest nav roadmap (T138) → FMT theme (T139) → history desk / teaching (T140)
 - No empty console on installed Windows launch
 - Stable installer as the daily driver (not `desktop:dev`)
-- Strip GS superficial chrome only when it blocks the desk (not a skin rewrite)
 
 ## Optional (fund only if usage demands)
 
 - Mentor / loan / youth desks
 - Quiet launch polish beyond console
-- World / continue full index (explicit later step — not funded now)
+- World / continue full index (Step 2 — after Step 1 is habit)
 
 ## Not need-to-have (discard)
 

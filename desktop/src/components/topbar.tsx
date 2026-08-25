@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, ChevronLeft, ChevronRight, Command, HelpCircle, RefreshCw, Search } from "lucide-react";
+import { ChevronLeft, ChevronRight, Command, RefreshCw, Search } from "lucide-react";
 import type { Screen } from "@/components/app-sidebar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ function connectionLabel(snapshot: LiveFootballSnapshot) {
 function connectionDetail(snapshot: LiveFootballSnapshot) {
   const status = snapshot.status;
   if (status.state === "connected") {
-    return `${status.managedSquadPlayers} squad · ${status.databasePlayersIndexed} indexed`;
+    return `${status.managedSquadPlayers} squad`;
   }
   if (status.failureStage) return status.failureStage.replaceAll("_", " ");
   return syncLabel(status.lastSync);
@@ -54,10 +54,9 @@ export function Topbar({
 }) {
   const connected = snapshot.status.state === "connected";
   const club = snapshot.clubs.find((item) => item.id === snapshot.managedClubId);
-  const dashboard = screen === "Dashboard";
 
   return (
-    <header className={dashboard ? "topbar topbar-dashboard" : "topbar"}>
+    <header className="topbar">
       <div className="topbar-left-cluster">
         <div className="topbar-history-controls" aria-label="Navigation history">
           <Button variant="ghost" size="icon" aria-label="Go back" onClick={onGoBack} disabled={!canGoBack}>
@@ -68,29 +67,26 @@ export function Topbar({
           </Button>
         </div>
 
-        {dashboard ? (
-          <div className="dashboard-greeting">
-            <strong>Morning, {snapshot.managerName?.split(" ")[0] ?? "Manager"}</strong>
-            <span>{club?.name ?? "Active club"} <i /> {snapshot.season ?? "Active save"}</span>
-          </div>
-        ) : (
-          <div className="screen-context">
-            <strong>{screen}</strong>
-            <span>{club?.name ?? "Active club"} <i /> {snapshot.season ?? "Active save"}</span>
-          </div>
-        )}
+        <div className="screen-context">
+          <strong>{screen}</strong>
+          <span>
+            {club?.name ?? "Active club"} <i /> {snapshot.season ?? "Active save"}
+          </span>
+        </div>
       </div>
 
       <div className="search-wrap">
         <Search aria-hidden="true" />
         <Input
-          aria-label="Search players, clubs and attributes"
-          placeholder={connected ? "Search players, clubs, attributes…" : "Load the active FM26 save to search"}
+          aria-label="Search squad players"
+          placeholder={connected ? "Search squad…" : "Load the active FM26 save to search"}
           value={search}
           onChange={(event) => onSearch(event.target.value)}
           disabled={!connected}
         />
-        <span className="keyboard-hint"><Command aria-hidden="true" /> K</span>
+        <span className="keyboard-hint">
+          <Command aria-hidden="true" /> K
+        </span>
       </div>
 
       <div className="topbar-actions">
@@ -103,12 +99,6 @@ export function Topbar({
         <Button variant="outline" size="icon" aria-label="Reload active save" onClick={onRefresh} disabled={checking}>
           <RefreshCw className={checking ? "spin" : undefined} aria-hidden="true" />
         </Button>
-        {!dashboard ? (
-          <>
-            <Button variant="ghost" size="icon" aria-label="Notifications"><Bell aria-hidden="true" /></Button>
-            <Button variant="ghost" size="icon" aria-label="Help"><HelpCircle aria-hidden="true" /></Button>
-          </>
-        ) : null}
       </div>
     </header>
   );

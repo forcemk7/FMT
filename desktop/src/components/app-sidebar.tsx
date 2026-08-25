@@ -1,35 +1,25 @@
 "use client";
 
 import {
-  Binoculars,
-  CalendarDays,
   ChevronLeft,
-  LayoutDashboard,
-  PanelsTopLeft,
+  Map,
   Settings,
-  Star,
   UsersRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export type Screen =
-  | "Dashboard"
   | "Squad"
-  | "Tactical Board"
-  | "Scout Room"
-  | "Shortlist"
+  | "Roadmap"
   | "Player Profile"
   | "Club Profile"
   | "Settings";
 
 const navigation = [
-  { label: "Dashboard", icon: LayoutDashboard },
-  { label: "Squad", icon: UsersRound },
-  { label: "Tactical Board", icon: PanelsTopLeft },
-  { label: "Scout Room", icon: Binoculars },
-  { label: "Shortlist", icon: Star },
-] satisfies { label: Screen; icon: typeof LayoutDashboard }[];
+  { label: "Squad", icon: UsersRound, hint: "Live" },
+  { label: "Roadmap", icon: Map, hint: "Later" },
+] satisfies { label: Screen; icon: typeof UsersRound; hint: string }[];
 
 export function AppSidebar({
   screen,
@@ -40,13 +30,13 @@ export function AppSidebar({
 }) {
   return (
     <aside className="app-sidebar">
-      <button className="brand" onClick={() => onNavigate("Dashboard")} aria-label="Go to dashboard">
+      <button className="brand" onClick={() => onNavigate("Squad")} aria-label="Go to squad">
         <span className="brand-mark" aria-hidden="true"><span /></span>
-        <span className="brand-copy"><strong>FMT</strong><small>FM26</small></span>
+        <span className="brand-copy"><strong>FMT</strong><small>club desk</small></span>
       </button>
 
       <nav className="nav-list" aria-label="Main navigation">
-        {navigation.map(({ label, icon: Icon }) => (
+        {navigation.map(({ label, icon: Icon, hint }) => (
           <Button
             key={label}
             variant="ghost"
@@ -55,6 +45,7 @@ export function AppSidebar({
           >
             <Icon data-icon="inline-start" />
             <span>{label}</span>
+            <small className="nav-hint">{hint}</small>
           </Button>
         ))}
       </nav>
@@ -69,10 +60,11 @@ export function AppSidebar({
         <span>Settings</span>
       </Button>
       <div className="sidebar-footer">
-        <span><strong>Club desk</strong><small>Live FM26 · FMT</small></span>
-        <CalendarDays aria-hidden="true" />
+        <span><strong>Step 1</strong><small>Squad · attrs · history</small></span>
       </div>
-      <button className="sidebar-collapse" aria-label="Collapse sidebar"><ChevronLeft /></button>
+      <button className="sidebar-collapse" aria-label="Collapse sidebar" type="button">
+        <ChevronLeft />
+      </button>
     </aside>
   );
 }
