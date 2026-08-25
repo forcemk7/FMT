@@ -906,6 +906,15 @@ button:active,
 .ability-strip small{color:var(--slate);font-size:8px;text-transform:uppercase;letter-spacing:.03em}
 .ability-strip strong{font-size:20px;letter-spacing:.02em}
 .player-facts{grid-template-columns:repeat(auto-fill,minmax(108px,1fr))}
+.attr-history-layout{display:grid;grid-template-columns:minmax(220px,.9fr) minmax(280px,1.4fr);gap:12px;padding:0 13px 8px}
+.attr-history-toggles{display:flex;flex-direction:column;gap:4px;max-height:260px;overflow:auto;padding-right:4px}
+.attr-history-toggles>button{display:flex;flex-direction:column;gap:2px;align-items:flex-start;padding:7px 9px;border:1px solid var(--border);border-radius:7px;background:#fff;text-align:left}
+.attr-history-toggles>button.is-on{border-color:#19a98f;background:#f3fbf9}
+.attr-history-toggles strong{font-size:10px}.attr-history-toggles small{color:var(--slate);font-size:8px}
+.attr-history-chart{border:1px solid var(--border);border-radius:8px;background:#f8fbfb;min-height:220px}
+.attr-history-chart svg{width:100%;height:auto;display:block}
+.attr-history-axis{fill:#66778c;font-size:8px}
+@media(max-width:1100px){.attr-history-layout{grid-template-columns:1fr}}
 .favorites-table>header,.favorites-table>article{grid-template-columns:55px minmax(260px,1.45fr) 170px 145px minmax(210px,1fr) minmax(220px,1fr) 55px;min-width:1200px}.favorites-table>article{min-height:96px}.favorite-player,.favorite-knowledge{display:flex!important;flex-direction:row!important;align-items:center;gap:10px}.favorite-player>span,.favorite-knowledge>span:last-child{display:flex;min-width:0;flex-direction:column;gap:4px}.favorite-player .player-face{width:52px;height:58px;border-radius:9px}.favorite-knowledge .confidence-ring{flex:0 0 auto}
 .performance-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:0 14px 14px}.evidence-caption{padding:0 14px 14px;color:var(--slate);font-size:9px}
 .polygram-panel svg{display:block;width:100%;max-height:220px;padding:4px 16px}.polygram-grid{fill:none;stroke:#dce6ea;stroke-width:1}.polygram-shape{fill:rgba(25,169,143,.22);stroke:#19a98f;stroke-width:2}.polygram-panel text{fill:#66778c;font-size:7px}.polygram-panel>p{padding:0 14px 12px;color:var(--slate);font-size:8px}

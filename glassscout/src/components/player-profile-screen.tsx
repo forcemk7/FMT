@@ -16,6 +16,7 @@ import {
   UserRound,
 } from "lucide-react";
 import type { LiveFootballSnapshot, LivePlayer } from "@/domain/adapters";
+import { AttributeHistoryPanel } from "@/components/attribute-history-panel";
 import { Button } from "@/components/ui/button";
 import { ConfidenceRing } from "@/components/confidence-ring";
 import { PlayerFace } from "@/components/player-face";
@@ -325,6 +326,7 @@ export function PlayerProfileScreen({
             </div>
             <p className="evidence-caption">CA, PA, hidden, and personality show only when the live map returns in-range values; otherwise —.</p>
           </section>
+          <AttributeHistoryPanel key={player.id} playerId={player.id} />
         </TabsContent>
         <TabsContent value="performance">
           <section className="dossier-panel tab-evidence-panel">
