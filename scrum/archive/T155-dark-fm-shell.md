@@ -31,4 +31,4 @@ FM mid-band attr color (#e6e6fa) fails on the light shell. Match FM’s dark nav
 
 - Shell tokens → FM navy/teal gradient (`#0b1a27` → `#0e2a2a`)
 - Loop A panels + top shell darkened; mid wash removed
-- Commit: _(filled after git)_
+- Commit: `ba2ffe5`
