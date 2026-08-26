@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { LiveFootballSnapshot } from "@/domain/adapters";
 import { clearClubLogoMemoryCache } from "@/components/club-logo";
 import { clearNationFlagMemoryCache } from "@/components/nation-flag";
+import { clearPlayerFaceMemoryCache } from "@/components/player-face";
 
 function uniqueNumericIds(values: Array<string | null | undefined>): string[] {
   const seen = new Set<string>();
@@ -15,11 +16,12 @@ function uniqueNumericIds(values: Array<string | null | undefined>): string[] {
   return out;
 }
 
-/** Fire-and-forget: queue squad club/nation UIDs for background XML→cache fill. */
+/** Fire-and-forget: queue squad player/club/nation UIDs for background cache fill. */
 export function warmSquadGraphics(snapshot: LiveFootballSnapshot) {
   if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return;
   if (snapshot.status.state !== "connected" || !snapshot.players.length) return;
 
+  const playerIds = uniqueNumericIds(snapshot.players.map((player) => player.id));
   const clubIds = uniqueNumericIds([
     snapshot.managedClubId,
     ...snapshot.players.map((player) => player.clubId),
@@ -27,10 +29,18 @@ export function warmSquadGraphics(snapshot: LiveFootballSnapshot) {
   ]);
   const nationIds = uniqueNumericIds(snapshot.players.map((player) => player.nationalityId));
 
+  if (playerIds.length) {
+    void invoke("faces_update_cache", { playerIds })
+      .then(() => {
+        // Copy runs in the background; nudge UI after a beat so soft misses refill.
+        window.setTimeout(() => clearPlayerFaceMemoryCache(), 800);
+        window.setTimeout(() => clearPlayerFaceMemoryCache(), 2500);
+      })
+      .catch(() => undefined);
+  }
   if (clubIds.length) {
     void invoke("logos_update_cache", { clubIds })
       .then(() => {
-        // Index runs in the background; nudge UI after a beat so soft misses refill.
         window.setTimeout(() => clearClubLogoMemoryCache(), 800);
         window.setTimeout(() => clearClubLogoMemoryCache(), 2500);
       })

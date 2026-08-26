@@ -13,6 +13,7 @@ type PlayerFaceResult = {
 };
 
 const faceCache = new Map<string, string | null>();
+const RETRY_MS = [400, 1200, 2800, 5000];
 
 export function clearPlayerFaceMemoryCache() {
   faceCache.clear();
@@ -30,36 +31,69 @@ export function PlayerFace({ playerId, name, size = "md", highResolution = false
   // Prefer portraits everywhere — icon packs are incomplete; backend still accepts icon=false.
   const useIcon = false;
   const cacheKey = `${playerId}:${useIcon ? "icon" : "portrait"}`;
-  const [source, setSource] = useState<string | null | undefined>(() => faceCache.get(cacheKey));
+  const [source, setSource] = useState<string | null | undefined>(() => {
+    if (faceCache.has(cacheKey)) return faceCache.get(cacheKey);
+    if (typeof window !== "undefined" && !("__TAURI_INTERNALS__" in window)) return null;
+    return undefined;
+  });
 
   useEffect(() => {
+    if (!("__TAURI_INTERNALS__" in window)) {
+      faceCache.set(cacheKey, null);
+      setSource(null);
+      return;
+    }
+
     let active = true;
-    const load = () => {
-      if (!("__TAURI_INTERNALS__" in window)) return;
-      if (faceCache.has(cacheKey)) {
-        if (active) setSource(faceCache.get(cacheKey));
+    const timers: number[] = [];
+
+    const apply = (next: string | null) => {
+      faceCache.set(cacheKey, next);
+      if (active) setSource(next);
+    };
+
+    const load = (attempt: number) => {
+      const hit = faceCache.get(cacheKey);
+      if (hit) {
+        if (active) setSource(hit);
         return;
       }
       invoke<PlayerFaceResult>("player_face_data", { playerId, icon: useIcon })
         .then((result) => {
-          const next = result.found ? result.dataUrl : null;
-          faceCache.set(cacheKey, next);
-          if (active) setSource(next);
+          if (!active) return;
+          const next = result.found && result.dataUrl ? result.dataUrl : null;
+          if (next) {
+            apply(next);
+            return;
+          }
+          // Soft miss while background warm copies into face-cache — retry a few times.
+          if (attempt < RETRY_MS.length) {
+            timers.push(
+              window.setTimeout(() => {
+                faceCache.delete(cacheKey);
+                load(attempt + 1);
+              }, RETRY_MS[attempt]),
+            );
+          } else {
+            apply(null);
+          }
         })
         .catch(() => {
-          faceCache.set(cacheKey, null);
-          if (active) setSource(null);
+          if (!active) return;
+          apply(null);
         });
     };
-    load();
+
+    load(0);
     const onUpdate = () => {
       faceCache.delete(cacheKey);
-      setSource(undefined);
-      load();
+      if (active) setSource(undefined);
+      load(0);
     };
     window.addEventListener("fmt-faces-updated", onUpdate);
     return () => {
       active = false;
+      timers.forEach((id) => window.clearTimeout(id));
       window.removeEventListener("fmt-faces-updated", onUpdate);
     };
   }, [cacheKey, playerId, useIcon]);
