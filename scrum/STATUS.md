@@ -1,12 +1,10 @@
 ﻿# Status
 
-Last updated: 2026-08-26 (T164 trim badges)
+Last updated: 2026-08-26 (T167 search autofill)
 
 ## Now
 
 _(empty — pick next ready ticket)_
-
-**Verify:** quit FMT → rebuild → Load Active Save (fills `logo-cache-trim` / `flag-cache-trim`) → profile nation vs club should fill frames more evenly.
 
 **Deferred:** T139 theme (chrome/shell covered by T158/T159). T162 trophy cabinet (marketing visual; no RE until Loop A sticks).
 
@@ -20,11 +18,11 @@ _(empty — pick next ready ticket)_
 
 ## Recently done
 
+- **T167** Kill Chromium “Saved info” overlay on header squad search
 - **T166** Personality/Media in profile header; General = CA/PA only
 - **T164** Trim badge PNGs on cache for equal fill
 - **T165** Header squad search fills gap + readable hits → desk
 - **T163** General Personality + Media Handling labels
-- **T161** Squad Personality column
 
 ## Loop
 
