@@ -219,6 +219,14 @@ export const FRONTEND_CALCULATION_CARDS: FrontendCalculationCard[] = [
     title: "Hidden attribute score (HAS)",
     detail: hasCalculationDetail(),
   },
+  {
+    key: "personality-media",
+    badge: "Live",
+    state: "passed",
+    title: "Personality × Media Handling labels",
+    detail:
+      "Catalog band match on HA pack + Det/Lea (FM HA Calculator). Priority + tightness; incomplete pack → —.",
+  },
 ];
 
 export type HasTone = "high" | "upper" | "mid" | "low";

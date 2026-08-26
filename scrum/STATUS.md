@@ -1,22 +1,26 @@
 ﻿# Status
 
-Last updated: 2026-08-26 (T161 done)
+Last updated: 2026-08-26 (T165 header search)
 
 ## Now
 
-_(empty — pick next ready ticket)_
+**T164** Trim badge PNGs on cache (in_progress — cursor-agent)
 
-**Deferred:** T139 theme (chrome/shell covered by T158/T159).
+**Deferred:** T139 theme (chrome/shell covered by T158/T159). T162 trophy cabinet (marketing visual; no RE until Loop A sticks).
 
 ## Board
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
+| T164 | Trim badge PNGs on cache | in_progress | 2 | cursor-agent |
 | T139 | FMT visual theme | deferred | — | overlapped |
+| T162 | Player trophy cabinet | deferred | — | backlog |
 | T124 | Quiet dev launch | ready | 9 | |
 
 ## Recently done
 
+- **T165** Header squad search fills gap + readable hits → desk
+- **T163** General Personality + Media Handling labels (HA pack combo match)
 - **T161** Squad Personality column (HAS ring, attr bands)
 - **T160** Identical nation/club badge frames
 - **T159** Standardize chrome tokens + blue-led shell

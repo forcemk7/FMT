@@ -18,7 +18,6 @@ import {
 import type { LiveFootballSnapshot, LivePlayer } from "@/domain/adapters";
 import {
   GK_TECHNICAL_ATTRIBUTES,
-  GOALKEEPING_ATTRIBUTES,
   HIDDEN_ATTRIBUTES,
   MENTAL_ATTRIBUTES,
   PERSONALITY_ATTRIBUTES,
@@ -32,6 +31,7 @@ import {
   sortedAttributeEntries,
 } from "@/domain/attribute-desk";
 import { abilityToneFromScore, attributeTone } from "@/domain/attribute-tone";
+import { livePersonalityLabels } from "@/domain/personality-labels";
 import { AttributeHistoryPanel } from "@/components/attribute-history-panel";
 import { Button } from "@/components/ui/button";
 import { ConfidenceRing } from "@/components/confidence-ring";
@@ -82,7 +82,7 @@ function AttributeRows({
         const raw = values?.[name];
         const tone = typeof raw === "number" ? attributeTone(name, raw) : "mid";
         return (
-          <span key={name}>
+          <span key={name} className="attr-desk-row-item">
             <small>{name}</small>
             <strong className={`attr-tone attr-tone-${tone}`}>{evidenceValue(values, name)}</strong>
           </span>
@@ -101,13 +101,42 @@ function AttributeTooltipList({
 }) {
   return (
     <ul className="attribute-tooltip-list">
-      {sortedAttributeEntries(names, values).map(({ name, value }) => (
-        <li key={name}>
-          <span>{name}</span>
-          <strong>{value == null ? "—" : String(value)}</strong>
-        </li>
-      ))}
+      {sortedAttributeEntries(names, values).map(({ name, value }) => {
+        const tone = typeof value === "number" ? attributeTone(name, value) : "mid";
+        return (
+          <li key={name}>
+            <span>{name}</span>
+            <strong className={`attr-tone attr-tone-${tone}`}>
+              {value == null ? "—" : String(value)}
+            </strong>
+          </li>
+        );
+      })}
     </ul>
+  );
+}
+
+function AttributeHeading({
+  title,
+  tooltipNames,
+  values,
+}: {
+  title: string;
+  tooltipNames?: readonly string[];
+  values?: Record<string, number | null> | undefined;
+}) {
+  if (!tooltipNames?.length) {
+    return <h3 className="attr-desk-heading">{title}</h3>;
+  }
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={<h3 className="attr-desk-heading attr-desk-heading-tip">{title}</h3>}
+      />
+      <TooltipContent side="bottom" align="start" className="attribute-tooltip">
+        <AttributeTooltipList names={tooltipNames} values={values} />
+      </TooltipContent>
+    </Tooltip>
   );
 }
 
@@ -123,26 +152,12 @@ function AttributeGroup({
   names: readonly string[];
   values: Record<string, number | null> | undefined;
   col?: 1 | 2 | 3;
-  /** When set, header hover shows these attrs A–Z (with values). */
   headerTooltipNames?: readonly string[];
   footer?: ReactNode;
 }) {
-  const heading = headerTooltipNames?.length ? (
-    <Tooltip>
-      <TooltipTrigger
-        render={<h3 className="attribute-column-heading attribute-column-heading-tip">{title}</h3>}
-      />
-      <TooltipContent side="bottom" align="start" className="attribute-tooltip">
-        <AttributeTooltipList names={headerTooltipNames} values={values} />
-      </TooltipContent>
-    </Tooltip>
-  ) : (
-    <h3>{title}</h3>
-  );
-
   return (
-    <section className="attribute-column" data-col={col}>
-      {heading}
+    <section className="attr-desk-group" data-col={col}>
+      <AttributeHeading title={title} tooltipNames={headerTooltipNames} values={values} />
       <AttributeRows names={names} values={values} />
       {footer}
     </section>
@@ -151,29 +166,24 @@ function AttributeGroup({
 
 function GoalkeeperRatingBlock({
   values,
-  col = 3,
 }: {
   values: Record<string, number | null> | undefined;
-  col?: 1 | 2 | 3;
 }) {
   const rating = goalkeeperRating(values);
   return (
-    <section className="attribute-column attribute-gk-rating" data-col={col}>
-      <Tooltip>
-        <TooltipTrigger
-          render={<h3 className="attribute-column-heading attribute-column-heading-tip">Goalkeeping</h3>}
-        />
-        <TooltipContent side="bottom" align="start" className="attribute-tooltip">
-          <AttributeTooltipList names={GOALKEEPING_ATTRIBUTES} values={values} />
-        </TooltipContent>
-      </Tooltip>
-      <p className="attribute-gk-rating-value">
-        Goalkeeper Rating{" "}
+    <div className="attr-desk-sub">
+      <AttributeHeading
+        title="Goalkeeping"
+        tooltipNames={gkGoalkeepingAttributeNames()}
+        values={values}
+      />
+      <span className="attr-desk-row-item">
+        <small>Goalkeeper Rating</small>
         <strong className={rating == null ? "attr-tone-mid" : `attr-tone attr-tone-${attributeTone("Ability", rating * 2)}`}>
           {rating == null ? "—" : `${rating} / 10`}
         </strong>
-      </p>
-    </section>
+      </span>
+    </div>
   );
 }
 
@@ -194,71 +204,118 @@ function formatGeneralText(value: string | null | undefined) {
   return trimmed;
 }
 
-function GeneralColumn({ player, col = 3 }: { player: LivePlayer; col?: 1 | 2 | 3 }) {
+function GeneralColumn({ player }: { player: LivePlayer }) {
+  const inferred = livePersonalityLabels(player);
+  const personalityLabel = player.personality ?? inferred?.personality ?? null;
+  const mediaLabel = player.mediaHandling ?? inferred?.mediaHandling ?? null;
   const rows = [
-    { label: "Personality", value: formatGeneralText(player.personality) },
-    { label: "Media Handling", value: formatGeneralText(player.mediaHandling) },
-    { label: "Traits", value: formatGeneralText(player.traits) },
-  ];
+    {
+      label: "Ability",
+      value: abilityLabel(player.currentAbility),
+      toneClass: abilityToneClass(player.currentAbility),
+    },
+    {
+      label: "Media Handling",
+      value: formatGeneralText(mediaLabel),
+    },
+    {
+      label: "Personality",
+      value: formatGeneralText(personalityLabel),
+    },
+    {
+      label: "Potential",
+      value: abilityLabel(player.potentialAbility),
+      toneClass: abilityToneClass(player.potentialAbility),
+    },
+    {
+      label: "Traits",
+      value: formatGeneralText(player.traits),
+    },
+  ].sort((a, b) => a.label.localeCompare(b.label));
+
   return (
-    <section className="attribute-column attribute-general" data-col={col}>
-      <h3>General</h3>
+    <section className="attr-desk-group">
+      <AttributeHeading title="General" />
       {rows.map((row) => (
-        <span key={row.label} className="attribute-general-row">
+        <span key={row.label} className="attr-desk-row-item attr-desk-general-row">
           <small>{row.label}</small>
-          <strong title={row.value === "—" ? undefined : row.value}>{row.value}</strong>
+          <strong
+            className={row.toneClass}
+            title={row.value === "—" ? undefined : row.value}
+          >
+            {row.value}
+          </strong>
         </span>
       ))}
     </section>
   );
 }
 
-/** Fixed 3-column FM-style attribute desk (outfield vs GK). */
+function DeskCol({ children }: { children: ReactNode }) {
+  return <div className="attr-desk-col">{children}</div>;
+}
+
+/** Two-row FM desk: playing attrs then Hidden | Personality | General. */
 function AttributeDesk({ player }: { player: LivePlayer }) {
   const gk = isGoalkeeperPosition(player.positions);
   const attrs = player.attributes;
 
   return (
     <div className={`attribute-desk ${gk ? "attribute-desk-gk" : "attribute-desk-outfield"}`}>
-      {gk ? (
-        <>
-          <div className="attribute-desk-row attribute-desk-primary">
-            <AttributeGroup
-              title="Goalkeeping"
-              names={gkGoalkeepingAttributeNames()}
-              values={attrs}
-              col={1}
-            />
-            <AttributeGroup title="Mental" names={MENTAL_ATTRIBUTES} values={attrs} col={2} />
-            <AttributeGroup title="Physical" names={PHYSICAL_ATTRIBUTES} values={attrs} col={3} />
-          </div>
-          <div className="attribute-desk-row attribute-desk-secondary">
-            <AttributeGroup
-              title="Technical"
-              names={GK_TECHNICAL_ATTRIBUTES}
-              values={attrs}
-              col={3}
-              headerTooltipNames={gkTechnicalTooltipNames()}
-            />
-          </div>
-        </>
-      ) : (
-        <>
-          <div className="attribute-desk-row attribute-desk-primary">
-            <AttributeGroup title="Technical" names={TECHNICAL_ATTRIBUTES} values={attrs} col={1} />
-            <AttributeGroup title="Mental" names={MENTAL_ATTRIBUTES} values={attrs} col={2} />
-            <AttributeGroup title="Physical" names={PHYSICAL_ATTRIBUTES} values={attrs} col={3} />
-          </div>
-          <div className="attribute-desk-row attribute-desk-secondary">
-            <AttributeGroup title="Set pieces" names={SET_PIECE_ATTRIBUTES} values={attrs} col={1} />
-            <GoalkeeperRatingBlock values={attrs} col={3} />
-          </div>
-        </>
-      )}
-      <div className="attribute-desk-row attribute-desk-footer">
-        <AttributeGroup title="Hidden" names={HIDDEN_ATTRIBUTES} values={player.hiddenAttributes} col={1} />
-        <AttributeGroup title="Personality" names={PERSONALITY_ATTRIBUTES} values={player.personalityAttributes} col={2} />
-        <GeneralColumn player={player} col={3} />
+      <div className="attr-desk-band attr-desk-play">
+        {gk ? (
+          <>
+            <DeskCol>
+              <AttributeGroup
+                title="Goalkeeping"
+                names={gkGoalkeepingAttributeNames()}
+                values={attrs}
+              />
+            </DeskCol>
+            <DeskCol>
+              <AttributeGroup title="Mental" names={MENTAL_ATTRIBUTES} values={attrs} />
+            </DeskCol>
+            <DeskCol>
+              <AttributeGroup title="Physical" names={PHYSICAL_ATTRIBUTES} values={attrs} />
+              <div className="attr-desk-sub">
+                <AttributeGroup
+                  title="Technical"
+                  names={GK_TECHNICAL_ATTRIBUTES}
+                  values={attrs}
+                  headerTooltipNames={gkTechnicalTooltipNames()}
+                />
+              </div>
+            </DeskCol>
+          </>
+        ) : (
+          <>
+            <DeskCol>
+              <AttributeGroup title="Technical" names={TECHNICAL_ATTRIBUTES} values={attrs} />
+              <div className="attr-desk-sub">
+                <AttributeHeading title="Set pieces" />
+                <AttributeRows names={SET_PIECE_ATTRIBUTES} values={attrs} />
+              </div>
+            </DeskCol>
+            <DeskCol>
+              <AttributeGroup title="Mental" names={MENTAL_ATTRIBUTES} values={attrs} />
+            </DeskCol>
+            <DeskCol>
+              <AttributeGroup title="Physical" names={PHYSICAL_ATTRIBUTES} values={attrs} />
+              <GoalkeeperRatingBlock values={attrs} />
+            </DeskCol>
+          </>
+        )}
+      </div>
+      <div className="attr-desk-band attr-desk-meta">
+        <DeskCol>
+          <AttributeGroup title="Hidden" names={HIDDEN_ATTRIBUTES} values={player.hiddenAttributes} />
+        </DeskCol>
+        <DeskCol>
+          <AttributeGroup title="Personality" names={PERSONALITY_ATTRIBUTES} values={player.personalityAttributes} />
+        </DeskCol>
+        <DeskCol>
+          <GeneralColumn player={player} />
+        </DeskCol>
       </div>
     </div>
   );
@@ -472,10 +529,6 @@ export function PlayerProfileScreen({
 
               <section className="dossier-panel attribute-evidence-panel">
                 <header><BarChart3 /><h2>Attribute evidence</h2><span>Visible + hidden when mapped</span></header>
-                <div className="ability-strip">
-                  <span><small>Current ability</small><strong className={abilityToneClass(player.currentAbility)}>{abilityLabel(player.currentAbility)}</strong></span>
-                  <span><small>Potential ability</small><strong className={abilityToneClass(player.potentialAbility)}>{abilityLabel(player.potentialAbility)}</strong></span>
-                </div>
                 <AttributeDesk player={player} />
               </section>
             </div>
@@ -541,12 +594,8 @@ export function PlayerProfileScreen({
         <TabsContent value="attributes">
           <section className="dossier-panel tab-evidence-panel">
             <header><BarChart3 /><h2>Attribute desk</h2><span>{mappedAttributeCount} visible · CA/PA/HA when mapped</span></header>
-            <div className="ability-strip">
-              <span><small>Current ability</small><strong className={abilityToneClass(player.currentAbility)}>{abilityLabel(player.currentAbility)}</strong></span>
-              <span><small>Potential ability</small><strong className={abilityToneClass(player.potentialAbility)}>{abilityLabel(player.potentialAbility)}</strong></span>
-            </div>
             <AttributeDesk player={player} />
-            <p className="evidence-caption">CA, PA, hidden, and personality show only when the live map returns in-range values; otherwise —.</p>
+            <p className="evidence-caption">Ability, potential, hidden, and personality show only when the live map returns in-range values; otherwise —.</p>
           </section>
         </TabsContent>
         <TabsContent value="development">
