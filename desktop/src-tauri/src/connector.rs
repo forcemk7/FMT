@@ -17,7 +17,7 @@ use crate::{
         memory::{ModuleInfo, ProcessReader},
         offsets::{find_entity_map, mapping_coverage, EntityMapProfile, MappingCoverage},
         parser::{
-            hidden_attribute_map, personality_attribute_map, preferred_foot_label,
+            display_attribute, hidden_attribute_map, personality_attribute_map, preferred_foot_label,
             visible_attribute_map,
         },
         permissions::{can_write_memory, READ_ONLY_PROCESS_ACCESS_LABEL},
@@ -1221,6 +1221,7 @@ fn extract_live_data(
             format!("{}/{}", date.year, next_year % 100)
         });
         let nationality = read_nationality(reader, person, profile);
+        let nationality_id = read_nation_id(reader, person, profile);
         let attribute_bytes = match reader.read_bytes(
             raw_player + profile.constants.player_attributes_offset,
             PLAYER_ATTRIBUTE_NAMES.len(),
@@ -1243,7 +1244,9 @@ fn extract_live_data(
         let potential_ability = reader
             .read_u16(raw_player + profile.constants.player_pa_offset)
             .filter(|value| (1..=200).contains(value));
-        let preferred_foot = preferred_foot_label(attribute_bytes[24], attribute_bytes[25]);
+        let left_foot = display_attribute(attribute_bytes[24]);
+        let right_foot = display_attribute(attribute_bytes[25]);
+        let preferred_foot = preferred_foot_label(left_foot, right_foot);
         // Full IP/OOP role catalogue scoring is deferred off the load path (LE-speed).
         // Cheap position-based ability score remains for desk sorting.
         let ability_score = calculated_position
@@ -1294,6 +1297,7 @@ fn extract_live_data(
             "age": age,
             "dateOfBirth": date_of_birth,
             "nationality": nationality.clone(),
+            "nationalityId": nationality_id.clone(),
             "secondNationality": null,
             "positions": positions.clone(),
             "bestRole": best_role,
@@ -1315,6 +1319,8 @@ fn extract_live_data(
             "playableRoles": playable_roles,
             "otherRoles": other_roles,
             "preferredFoot": preferred_foot,
+            "leftFoot": left_foot,
+            "rightFoot": right_foot,
             "strengths": strengths,
             "weaknesses": weaknesses,
             "clubId": club_id,
@@ -2265,6 +2271,22 @@ fn read_nationality(
     (name != 0)
         .then(|| reader.read_length_prefixed_string(name))
         .flatten()
+}
+
+#[cfg(target_os = "windows")]
+fn read_nation_id(
+    reader: &mut ProcessReader,
+    person: u64,
+    profile: &EntityMapProfile,
+) -> Option<String> {
+    let nation = reader.read_pointer(person + profile.constants.person_nationality_offset)?;
+    if nation == 0 {
+        return None;
+    }
+    reader
+        .read_u32(nation + profile.constants.entity_uid_offset)
+        .filter(|id| *id > 0)
+        .map(|id| id.to_string())
 }
 
 fn display_name(

@@ -64,6 +64,7 @@ export type LivePlayer = {
   age: number | null;
   dateOfBirth?: string | null;
   nationality: string | null;
+  nationalityId?: string | null;
   secondNationality?: string | null;
   positions: string[];
   bestRole: string | null;
@@ -85,6 +86,10 @@ export type LivePlayer = {
   tacticalFit: number | null;
   roleFit: number | null;
   preferredFoot?: string | null;
+  /** Display 1–20 left-foot strength from the attribute blob */
+  leftFoot?: number | null;
+  /** Display 1–20 right-foot strength from the attribute blob */
+  rightFoot?: number | null;
   strengths: string[];
   weaknesses: string[];
   clubId: string | null;

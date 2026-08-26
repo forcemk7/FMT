@@ -1,12 +1,10 @@
 ﻿# Status
 
-Last updated: 2026-08-26 (T150 logos/flags)
+Last updated: 2026-08-26 (T151 done)
 
 ## Now
 
-**Shipped:** T150 — club/nation UID → background XML index → logo-cache / flag-cache; soft UI retry.
-
-**Verify:** quit FMT → rebuild desktop → Load Active Save → Squad flags + player desk club/nation badges appear within a few seconds (first run indexes TCM once).
+_(empty — pick next ready ticket)_
 
 **Deferred:** T139 theme until desk is daily habit.
 
@@ -19,8 +17,10 @@ Last updated: 2026-08-26 (T150 logos/flags)
 
 ## Recently done
 
-- **T150** logos + flags cache warm · **T149** FMT app icons · **T148** mark + multi-root faces
+- **T151** Squad mapped columns + foot + CA/PA rings
+- **T150** Logos + flags cache warm
+- **T149** FMT app icons · **T148** mark + multi-root faces · **T147** quiet empty
 
 ## Loop
 
-FM → FMT Dashboard/Squad → player Attributes & history → (later) role desks / world.
+FM → FMT Dashboard/Squad → player Attributes / Development → (later) role desks / world.

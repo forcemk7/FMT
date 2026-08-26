@@ -64,7 +64,7 @@
           "currentAbility": { "offset": 612, "source": "player", "valueType": "u16", "transform": "1-200 or omit", "status": "candidate", "confidence": 0.8, "validations": ["aligned FMSuperScout Fields.cs 26.3.x / Cheat Engine tables"] },
           "potentialAbility": { "offset": 614, "source": "player", "valueType": "u16", "transform": "1-200 or omit", "status": "candidate", "confidence": 0.8, "validations": ["aligned FMSuperScout Fields.cs 26.3.x / Cheat Engine tables"] },
           "personalityAttributes": { "offset": 112, "source": "person", "valueType": "u8[8]", "transform": "1-20 or omit per byte", "status": "candidate", "confidence": 0.8, "validations": ["person+0x70..0x77 personality pack; live LE compare pending"] },
-          "preferredFoot": { "offset": 375, "source": "player", "valueType": "u8[2]", "transform": "qualitative-foot-label", "status": "validated", "confidence": 0.97, "validations": ["left/right foot evidence matches managed profiles"] },
+          "preferredFoot": { "offset": 375, "source": "player", "valueType": "u8[2]", "transform": "display 1-20 each; Either if equal else stronger side Left/Right", "status": "validated", "confidence": 0.97, "validations": ["left/right foot evidence matches managed profiles"] },
           "form": { "offset": null, "source": "player", "valueType": "unknown", "transform": null, "status": "unmapped", "confidence": 0.0, "validations": [] }
         },
         "contract": {

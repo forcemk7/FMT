@@ -61,20 +61,21 @@ pub(crate) fn personality_attribute_map(raw: &[u8]) -> HashMap<String, u8> {
         .collect()
 }
 
+/// Prefer foot label from **display** left/right strengths (1–20).
+/// Equal → Either; otherwise the stronger side.
 pub(crate) fn preferred_foot_label(left: u8, right: u8) -> &'static str {
-    let difference = i16::from(left) - i16::from(right);
-    if difference >= 20 {
+    if left == right {
+        "Either"
+    } else if left > right {
         "Left"
-    } else if difference <= -20 {
-        "Right"
     } else {
-        "Both"
+        "Right"
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::display_attribute;
+    use super::{display_attribute, preferred_foot_label};
 
     #[test]
     fn display_attribute_matches_fm_and_fss_rounding() {
@@ -85,5 +86,13 @@ mod tests {
         assert_eq!(display_attribute(50), 10);
         assert_eq!(display_attribute(0), 1);
         assert_eq!(display_attribute(100), 20);
+    }
+
+    #[test]
+    fn preferred_foot_label_uses_equality_not_threshold() {
+        assert_eq!(preferred_foot_label(15, 15), "Either");
+        assert_eq!(preferred_foot_label(18, 12), "Left");
+        assert_eq!(preferred_foot_label(10, 14), "Right");
+        assert_eq!(preferred_foot_label(20, 19), "Left");
     }
 }

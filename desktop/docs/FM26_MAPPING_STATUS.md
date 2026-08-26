@@ -12,7 +12,7 @@ Validated against FM26 build `6000.0.52.8888375` (`6000.0.52f1-fm26-05f1`) and t
 | Nationality | Person-to-nation relationship | Lars Sveingard resolves to Norway, matching FM |
 | Position familiarity | 15-byte player position map | Corrected order includes ML and MR; matched FM positions |
 | Visible attributes | 54-byte player attribute map | 1–100 storage converted to FM's displayed 1–20 values and checked against FM |
-| Preferred foot | Left/right-foot storage | Exposed only as Left, Right or Both |
+| Preferred foot | Left/right-foot storage (1–20) | Equal → Either; otherwise stronger side Left/Right |
 | Player portrait | FM unique ID | Resolves standard FM26 face/icon packs by UID; clean fallback when absent |
 | FM26 role catalogue | Current-build `RoleID` metadata bitmasks | In-possession role masks, duties and out-of-possession role masks extracted from FM26 metadata |
 | Player playable-role fit | Position familiarity plus visible attributes | Best/playable/secondary roles are scored from mapped FM26 role metadata, not default position labels |

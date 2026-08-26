@@ -29,6 +29,7 @@ struct DossierPlayer {
     foot_right: Option<i64>,
     height_cm: Option<i64>,
     nationality: Option<String>,
+    nation_id: Option<String>,
     club_id: Option<String>,
     club_name: Option<String>,
     positions: Vec<String>,
@@ -230,6 +231,7 @@ fn read_player(connection: &Connection, uid: &str) -> rusqlite::Result<Option<Do
           p.age, p.dob_year, p.dob_doy, p.foot_left, p.foot_right, p.height_cm,
           p.native_club_id,
           c.name as club_name,
+          p.native_nation_id,
           n.name as nation_name,
           p.knowledge_level,
           p.is_ours,
@@ -343,6 +345,9 @@ fn row_to_player(row: &Row<'_>) -> rusqlite::Result<DossierPlayer> {
         foot_right: row.get("foot_right")?,
         height_cm: row.get("height_cm")?,
         nationality: row.get("nation_name")?,
+        nation_id: row
+            .get::<_, Option<i64>>("native_nation_id")?
+            .map(|value| value.to_string()),
         club_id: row
             .get::<_, Option<i64>>("native_club_id")?
             .map(|value| value.to_string()),
@@ -508,6 +513,7 @@ fn indexed_player_json(player: &DossierPlayer) -> Value {
         "name": player.name,
         "age": player.age,
         "nationality": player.nationality,
+        "nationalityId": player.nation_id,
         "clubId": player.club_id,
         "clubName": player.club_name,
         "positions": player.positions,
@@ -567,6 +573,7 @@ fn player_json(player: &DossierPlayer) -> Value {
         "age": player.age,
         "dateOfBirth": fm_date_label(player.dob_year, player.dob_doy),
         "nationality": player.nationality,
+        "nationalityId": player.nation_id,
         "secondNationality": null,
         "positions": player.positions,
         "bestRole": role.0,
@@ -588,6 +595,8 @@ fn player_json(player: &DossierPlayer) -> Value {
         "playableRoles": playable,
         "otherRoles": other_roles,
         "preferredFoot": preferred_foot_label(player),
+        "leftFoot": player.foot_left,
+        "rightFoot": player.foot_right,
         "heightCm": player.height_cm,
         "strengths": attribute_extremes(&player.attributes, true),
         "weaknesses": attribute_extremes(&player.attributes, false),
@@ -706,6 +715,8 @@ fn merge_player(player: &mut Value, dossier: &DossierPlayer) {
         "preferredFoot".to_string(),
         json!(preferred_foot_label(dossier)),
     );
+    object.insert("leftFoot".to_string(), json!(dossier.foot_left));
+    object.insert("rightFoot".to_string(), json!(dossier.foot_right));
     object.insert("heightCm".to_string(), json!(dossier.height_cm));
     object.insert("matchSharpness".to_string(), json!(dossier.match_sharpness));
     object.insert("fatigue".to_string(), json!(dossier.fatigue));
@@ -954,8 +965,8 @@ fn preferred_foot_label(player: &DossierPlayer) -> Option<&'static str> {
     if left <= 0 && right <= 0 {
         return None;
     }
-    if (left - right).abs() <= 3 && left >= 10 && right >= 10 {
-        Some("Both")
+    if left == right {
+        Some("Either")
     } else if left > right {
         Some("Left")
     } else {
