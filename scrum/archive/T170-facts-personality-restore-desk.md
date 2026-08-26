@@ -32,4 +32,4 @@ Personality / Media Handling belong in the player facts strip (own headers), not
 
 - Restored `attribute-desk-row` / `attribute-column` markup (CSS already present)
 - Facts cells after CA/PA; removed name subtitle
-- Commit: _(filled after git)_
+- Commit: `6a48a21`
