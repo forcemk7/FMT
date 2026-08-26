@@ -151,15 +151,17 @@ function AttributeGroup({
 
 function GoalkeeperRatingBlock({
   values,
+  col = 3,
 }: {
   values: Record<string, number | null> | undefined;
+  col?: 1 | 2 | 3;
 }) {
   const rating = goalkeeperRating(values);
   return (
-    <div className="attribute-gk-rating">
+    <section className="attribute-column attribute-gk-rating" data-col={col}>
       <Tooltip>
         <TooltipTrigger
-          render={<h4 className="attribute-column-heading attribute-column-heading-tip">Goalkeeping</h4>}
+          render={<h3 className="attribute-column-heading attribute-column-heading-tip">Goalkeeping</h3>}
         />
         <TooltipContent side="bottom" align="start" className="attribute-tooltip">
           <AttributeTooltipList names={GOALKEEPING_ATTRIBUTES} values={values} />
@@ -171,11 +173,47 @@ function GoalkeeperRatingBlock({
           {rating == null ? "—" : `${rating} / 10`}
         </strong>
       </p>
-    </div>
+    </section>
   );
 }
 
-/** Fixed FM-style attribute desk: outfield vs GK column order. */
+function formatGeneralText(value: string | null | undefined) {
+  if (!value?.trim()) return "—";
+  const trimmed = value.trim();
+  if (trimmed.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(trimmed) as unknown;
+      if (Array.isArray(parsed)) {
+        const parts = parsed.map((item) => String(item ?? "").trim()).filter(Boolean);
+        return parts.length ? parts.join(", ") : "—";
+      }
+    } catch {
+      /* show raw */
+    }
+  }
+  return trimmed;
+}
+
+function GeneralColumn({ player, col = 3 }: { player: LivePlayer; col?: 1 | 2 | 3 }) {
+  const rows = [
+    { label: "Personality", value: formatGeneralText(player.personality) },
+    { label: "Media Handling", value: formatGeneralText(player.mediaHandling) },
+    { label: "Traits", value: formatGeneralText(player.traits) },
+  ];
+  return (
+    <section className="attribute-column attribute-general" data-col={col}>
+      <h3>General</h3>
+      {rows.map((row) => (
+        <span key={row.label} className="attribute-general-row">
+          <small>{row.label}</small>
+          <strong title={row.value === "—" ? undefined : row.value}>{row.value}</strong>
+        </span>
+      ))}
+    </section>
+  );
+}
+
+/** Fixed 3-column FM-style attribute desk (outfield vs GK). */
 function AttributeDesk({ player }: { player: LivePlayer }) {
   const gk = isGoalkeeperPosition(player.positions);
   const attrs = player.attributes;
@@ -183,48 +221,44 @@ function AttributeDesk({ player }: { player: LivePlayer }) {
   return (
     <div className={`attribute-desk ${gk ? "attribute-desk-gk" : "attribute-desk-outfield"}`}>
       {gk ? (
-        <div className="attribute-desk-row attribute-desk-primary">
-          <AttributeGroup
-            title="Goalkeeping"
-            names={gkGoalkeepingAttributeNames()}
-            values={attrs}
-            col={1}
-          />
-          <AttributeGroup title="Mental" names={MENTAL_ATTRIBUTES} values={attrs} col={2} />
-          <div className="attribute-column-stack" data-col={3}>
-            <AttributeGroup title="Physical" names={PHYSICAL_ATTRIBUTES} values={attrs} />
+        <>
+          <div className="attribute-desk-row attribute-desk-primary">
+            <AttributeGroup
+              title="Goalkeeping"
+              names={gkGoalkeepingAttributeNames()}
+              values={attrs}
+              col={1}
+            />
+            <AttributeGroup title="Mental" names={MENTAL_ATTRIBUTES} values={attrs} col={2} />
+            <AttributeGroup title="Physical" names={PHYSICAL_ATTRIBUTES} values={attrs} col={3} />
+          </div>
+          <div className="attribute-desk-row attribute-desk-secondary">
             <AttributeGroup
               title="Technical"
               names={GK_TECHNICAL_ATTRIBUTES}
               values={attrs}
+              col={3}
               headerTooltipNames={gkTechnicalTooltipNames()}
             />
           </div>
-        </div>
+        </>
       ) : (
-        <div className="attribute-desk-row attribute-desk-primary">
-          <AttributeGroup
-            title="Technical"
-            names={TECHNICAL_ATTRIBUTES}
-            values={attrs}
-            col={1}
-            footer={
-              <div className="attribute-set-pieces">
-                <h4>Set pieces</h4>
-                <AttributeRows names={SET_PIECE_ATTRIBUTES} values={attrs} />
-              </div>
-            }
-          />
-          <AttributeGroup title="Mental" names={MENTAL_ATTRIBUTES} values={attrs} col={2} />
-          <div className="attribute-column-stack" data-col={3}>
-            <AttributeGroup title="Physical" names={PHYSICAL_ATTRIBUTES} values={attrs} />
-            <GoalkeeperRatingBlock values={attrs} />
+        <>
+          <div className="attribute-desk-row attribute-desk-primary">
+            <AttributeGroup title="Technical" names={TECHNICAL_ATTRIBUTES} values={attrs} col={1} />
+            <AttributeGroup title="Mental" names={MENTAL_ATTRIBUTES} values={attrs} col={2} />
+            <AttributeGroup title="Physical" names={PHYSICAL_ATTRIBUTES} values={attrs} col={3} />
           </div>
-        </div>
+          <div className="attribute-desk-row attribute-desk-secondary">
+            <AttributeGroup title="Set pieces" names={SET_PIECE_ATTRIBUTES} values={attrs} col={1} />
+            <GoalkeeperRatingBlock values={attrs} col={3} />
+          </div>
+        </>
       )}
-      <div className="attribute-desk-row attribute-desk-hidden">
+      <div className="attribute-desk-row attribute-desk-footer">
         <AttributeGroup title="Hidden" names={HIDDEN_ATTRIBUTES} values={player.hiddenAttributes} col={1} />
         <AttributeGroup title="Personality" names={PERSONALITY_ATTRIBUTES} values={player.personalityAttributes} col={2} />
+        <GeneralColumn player={player} col={3} />
       </div>
     </div>
   );
@@ -311,6 +345,23 @@ export function PlayerProfileScreen({
   const knownEvidence = player.scoutConfidence ?? Math.min(100, Math.round((mappedAttributeCount / 47) * 100));
   const unknownEvidence = 100 - knownEvidence;
 
+  const ageDob =
+    player.age != null || player.dateOfBirth
+      ? `${player.age ?? "—"}${player.dateOfBirth ? ` · ${player.dateOfBirth}` : ""}`
+      : null;
+  const position = player.positions.length ? player.positions.join(" / ") : null;
+  const foot =
+    player.preferredFoot || (player.leftFoot != null && player.rightFoot != null)
+      ? `${player.preferredFoot ?? "—"}${
+          player.leftFoot != null && player.rightFoot != null ? ` · ${player.leftFoot} / ${player.rightFoot}` : ""
+        }`
+      : null;
+  const ca = abilityLabel(player.currentAbility);
+  const pa = abilityLabel(player.potentialAbility);
+  const value = player.value?.trim() || null;
+  const wage = player.wage?.trim() || null;
+  const contract = player.contractStatus?.trim() || null;
+
   return (
     <main className="player-dossier">
       <header className="dossier-header">
@@ -325,37 +376,48 @@ export function PlayerProfileScreen({
       </header>
 
       <section className="player-facts">
-        <span className="player-nation-fact">
-          {player.nationalityId ? (
-            <NationFlag nationId={player.nationalityId} name={player.nationality ?? "Nation"} size="md" />
-          ) : (
-            <span className="nation-flag nation-flag-md nation-flag-empty" aria-hidden="true" />
-          )}
-          <span>
+        {(player.nationality || player.nationalityId) ? (
+          <span className="player-nation-fact">
             <b>Nationality</b>
-            <strong>{player.nationality ?? "Unknown"}</strong>
+            <span className="player-fact-identity">
+              {player.nationalityId ? (
+                <NationFlag nationId={player.nationalityId} name={player.nationality ?? "Nation"} size="md" />
+              ) : (
+                <span className="nation-flag nation-flag-md nation-flag-empty" aria-hidden="true" />
+              )}
+              <strong>{player.nationality ?? "—"}</strong>
+            </span>
           </span>
-        </span>
-        <button className="player-club-fact" disabled={!club} onClick={() => club && onOpenClub?.(club.id)}>
-          {club ? (
-            <ClubLogo clubId={club.id} name={club.name} size="md" />
-          ) : (
-            <span className="club-logo club-logo-md club-logo-empty" aria-hidden="true" />
-          )}
-          <span>
+        ) : null}
+        {clubName ? (
+          <button
+            type="button"
+            className="player-club-fact"
+            disabled={!club}
+            onClick={() => club && onOpenClub?.(club.id)}
+          >
             <b>Club</b>
-            <strong>{clubName ?? "Unknown"}</strong>
-          </span>
-        </button>
-        <span><b>Age / DOB</b><strong>{player.age ?? "Unknown"}{player.dateOfBirth ? ` · ${player.dateOfBirth}` : ""}</strong></span>
-        <span><b>Position</b><strong>{player.positions.join(" / ") || "Unknown"}</strong></span>
-        <span><b>Preferred foot</b><strong>{player.preferredFoot ?? "Unknown"}{player.leftFoot != null && player.rightFoot != null ? ` · ${player.leftFoot} / ${player.rightFoot}` : ""}</strong></span>
-        <span><b>CA</b><strong>{abilityLabel(player.currentAbility)}</strong></span>
-        <span><b>PA</b><strong>{abilityLabel(player.potentialAbility)}</strong></span>
-        <span><b>Value</b><strong>{player.value ?? "Unknown"}</strong></span>
-        <span><b>Wage</b><strong>{player.wage ?? "Unknown"}</strong></span>
-        <span><b>Contract</b><strong>{player.contractStatus ?? "Unknown"}</strong></span>
-        <span className="fact-confidence"><b>Knowledge</b>{player.scoutConfidence == null ? <strong>Unknown</strong> : <ConfidenceRing value={player.scoutConfidence} size="sm" />}</span>
+            <span className="player-fact-identity">
+              {club ? (
+                <ClubLogo clubId={club.id} name={club.name} size="md" />
+              ) : (
+                <span className="club-logo club-logo-md club-logo-empty" aria-hidden="true" />
+              )}
+              <strong>{clubName}</strong>
+            </span>
+          </button>
+        ) : null}
+        {ageDob ? <span><b>Age / DOB</b><strong>{ageDob}</strong></span> : null}
+        {position ? <span><b>Position</b><strong>{position}</strong></span> : null}
+        {foot ? <span><b>Preferred foot</b><strong>{foot}</strong></span> : null}
+        {ca !== "—" ? <span><b>CA</b><strong>{ca}</strong></span> : null}
+        {pa !== "—" ? <span><b>PA</b><strong>{pa}</strong></span> : null}
+        {value ? <span><b>Value</b><strong>{value}</strong></span> : null}
+        {wage ? <span><b>Wage</b><strong>{wage}</strong></span> : null}
+        {contract ? <span><b>Contract</b><strong>{contract}</strong></span> : null}
+        {player.scoutConfidence != null ? (
+          <span className="fact-confidence"><b>Knowledge</b><ConfidenceRing value={player.scoutConfidence} size="sm" /></span>
+        ) : null}
       </section>
 
       <Tabs defaultValue="attributes" className="dossier-tabs">
