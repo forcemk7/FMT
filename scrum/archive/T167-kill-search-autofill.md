@@ -32,4 +32,4 @@ T165 search works, but Chromium “Saved info” autofill covers the hit list �
 
 ## Progress
 
-Shipped: `type="search"`, `autoComplete/spellCheck` off, plus PM-ignore attrs on shell squad search so WebView “Saved info” / red underline stop covering hits. Reload app to verify.
+Shipped: `type="search"`, `autoComplete/spellCheck` off, plus PM-ignore attrs on shell squad search so WebView “Saved info” / red underline stop covering hits. Commit: `69efde9`.
