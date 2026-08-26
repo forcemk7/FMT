@@ -1,14 +1,12 @@
 ﻿# Status
 
-Last updated: 2026-08-26 (T154 fact layout)
+Last updated: 2026-08-26 (T155 done)
 
 ## Now
 
-**Shipped:** T154 — nation badge beside Nationality label (not above it).
+_(empty — pick next ready ticket)_
 
-**Verify:** player profile facts — Nationality matches Club (badge left, label/value right).
-
-**Deferred:** T139 theme until desk is daily habit.
+**Deferred:** T139 theme until desk is daily habit (partially overlapped by T155 dark shell).
 
 ## Board
 
@@ -19,11 +17,10 @@ Last updated: 2026-08-26 (T154 fact layout)
 
 ## Recently done
 
+- **T155** Dark FM shell for attr contrast
 - **T154** Nation/club fact-row layout
 - **T153** FM attr color bands + Settings pickers
-- **T152** Warm squad faces on load (mirror logos)
-- **T151** Squad mapped columns + foot + CA/PA rings
-- **T150** Logos + flags cache warm
+- **T152** Warm squad faces on load
 
 ## Loop
 
