@@ -32,9 +32,10 @@ export function warmSquadGraphics(snapshot: LiveFootballSnapshot) {
   if (playerIds.length) {
     void invoke("faces_update_cache", { playerIds })
       .then(() => {
-        // Copy runs in the background; nudge UI after a beat so soft misses refill.
+        // Cutout is fast; newgen XML scan can take several seconds.
         window.setTimeout(() => clearPlayerFaceMemoryCache(), 800);
         window.setTimeout(() => clearPlayerFaceMemoryCache(), 2500);
+        window.setTimeout(() => clearPlayerFaceMemoryCache(), 8000);
       })
       .catch(() => undefined);
   }

@@ -1,13 +1,13 @@
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     env, fs,
+    io::{BufRead, BufReader},
     path::{Path, PathBuf},
     sync::OnceLock,
     thread,
 };
 
-#[cfg(test)]
-use super::config_xml::attribute_value;
+use super::config_xml::{attribute_value, safe_relative_asset_path};
 
 pub(crate) const MAX_IMAGE_BYTES: u64 = 8 * 1024 * 1024;
 
@@ -101,7 +101,6 @@ fn should_skip_pack(name: &str) -> bool {
         || lower.contains("icon")
 }
 
-#[cfg(test)]
 fn is_portrait_config(config_path: &Path) -> bool {
     let lower = config_path.to_string_lossy().to_ascii_lowercase();
     !lower.contains("/iconfaces/") && !lower.contains("/icons/")
@@ -134,6 +133,7 @@ pub fn find_facepack_configs(graphics_root: &Path) -> Vec<PathBuf> {
         let pack_path = pack.path();
         add(pack_path.join("faces").join("config.xml"));
         add(pack_path.join("config.xml"));
+        add(pack_path.join("_config.xml"));
 
         let Ok(subs) = fs::read_dir(&pack_path) else {
             continue;
@@ -179,6 +179,35 @@ pub fn discover_face_dirs(graphics_root: &Path) -> Vec<PathBuf> {
     dirs
 }
 
+/// Pack-root configs for newgen/regen maps (`_config.xml`), not Cutout `faces/config.xml`.
+fn discover_mapped_face_configs(graphics_root: &Path) -> Vec<(PathBuf, PathBuf)> {
+    let mut out = Vec::new();
+    let Ok(packs) = fs::read_dir(graphics_root) else {
+        return out;
+    };
+    for pack in packs.flatten() {
+        if !pack.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+            continue;
+        }
+        if should_skip_pack(&pack.file_name().to_string_lossy()) {
+            continue;
+        }
+        let pack_root = pack.path();
+        for name in ["_config.xml", "config.xml"] {
+            let config = pack_root.join(name);
+            if !config.is_file() || !is_portrait_config(&config) {
+                continue;
+            }
+            // Skip empty; allow large newgen maps (scanned once off UI thread for squad UIDs only).
+            if config.metadata().map(|meta| meta.len() == 0).unwrap_or(true) {
+                continue;
+            }
+            out.push((config, pack_root.clone()));
+        }
+    }
+    out
+}
+
 pub fn discover_face_packs() -> Vec<String> {
     let root = default_graphics_root();
     if !root.is_dir() {
@@ -188,6 +217,11 @@ pub fn discover_face_packs() -> Vec<String> {
     let mut packs = HashSet::new();
     for faces_dir in discover_face_dirs(&root) {
         if let Some(pack) = faces_dir.parent().and_then(|p| p.file_name()) {
+            packs.insert(pack.to_string_lossy().into_owned());
+        }
+    }
+    for (_, pack_root) in discover_mapped_face_configs(&root) {
+        if let Some(pack) = pack_root.file_name() {
             packs.insert(pack.to_string_lossy().into_owned());
         }
     }
@@ -282,6 +316,84 @@ fn cached_face_dirs() -> Vec<PathBuf> {
         .clone()
 }
 
+fn parse_person_portrait_record(line: &str) -> Option<(String, String)> {
+    if !line.contains("from=\"") || !line.contains("to=\"") {
+        return None;
+    }
+    if !line.contains("graphics/pictures/person/") || !line.contains("/portrait") {
+        return None;
+    }
+    let from = attribute_value(line, "from")?;
+    let to = attribute_value(line, "to")?;
+    let marker = "graphics/pictures/person/";
+    let start = to.find(marker)? + marker.len();
+    let rest = &to[start..];
+    let end = rest.find("/portrait")?;
+    let uid = rest[..end].trim_start_matches("r-").to_string();
+    if uid.is_empty() || !uid.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    Some((from.to_string(), uid))
+}
+
+fn resolve_mapped_image(pack_root: &Path, relative: &Path) -> Option<PathBuf> {
+    let direct = pack_root.join(relative);
+    if valid_image_file(&direct) {
+        return Some(direct);
+    }
+    if relative.extension().is_some() {
+        return None;
+    }
+    for extension in ["png", "jpg", "jpeg", "webp"] {
+        let path = pack_root.join(relative.with_extension(extension));
+        if valid_image_file(&path) {
+            return Some(path);
+        }
+    }
+    None
+}
+
+fn valid_image_file(path: &Path) -> bool {
+    image_mime(path).is_some()
+        && path.metadata().is_ok_and(|metadata| {
+            metadata.is_file() && metadata.len() > 0 && metadata.len() <= MAX_IMAGE_BYTES
+        })
+}
+
+/// One-pass scan of pack-root maps for the requested UIDs only (background warm).
+fn scan_mapped_face_configs(wanted: &HashSet<String>) -> HashMap<String, PathBuf> {
+    let mut found = HashMap::new();
+    if wanted.is_empty() {
+        return found;
+    }
+    for (config, pack_root) in discover_mapped_face_configs(&default_graphics_root()) {
+        if found.len() == wanted.len() {
+            break;
+        }
+        let Ok(file) = fs::File::open(&config) else {
+            continue;
+        };
+        for line in BufReader::new(file).lines().map_while(Result::ok) {
+            if found.len() == wanted.len() {
+                break;
+            }
+            let Some((from, uid)) = parse_person_portrait_record(&line) else {
+                continue;
+            };
+            if !wanted.contains(&uid) || found.contains_key(&uid) {
+                continue;
+            }
+            let Some(relative) = safe_relative_asset_path(&from) else {
+                continue;
+            };
+            if let Some(path) = resolve_mapped_image(&pack_root, &relative) {
+                found.insert(uid, path);
+            }
+        }
+    }
+    found
+}
+
 pub fn warm_faces_for_players(player_ids: &[String], icon: bool) -> FaceWarmResult {
     let cache = face_cache_dir();
     let _ = fs::create_dir_all(&cache);
@@ -295,12 +407,25 @@ pub fn warm_faces_for_players(player_ids: &[String], icon: bool) -> FaceWarmResu
     let icon_flag = icon;
     if !ids.is_empty() {
         thread::spawn(move || {
+            let mut pending = Vec::new();
             for id in ids {
                 if resolve_cached_face(&id, icon_flag).is_some() {
                     continue;
                 }
                 if let Some(source) = resolve_live_face_path(&id, icon_flag) {
                     let _ = copy_into_cache(&id, icon_flag, &source);
+                } else if !icon_flag {
+                    pending.push(id);
+                }
+            }
+            if pending.is_empty() {
+                return;
+            }
+            let wanted: HashSet<String> = pending.iter().cloned().collect();
+            let mapped = scan_mapped_face_configs(&wanted);
+            for id in pending {
+                if let Some(source) = mapped.get(&id) {
+                    let _ = copy_into_cache(&id, false, source);
                 }
             }
         });
@@ -324,27 +449,6 @@ pub(crate) fn image_mime(path: &Path) -> Option<&'static str> {
 }
 
 #[cfg(test)]
-fn parse_person_portrait_record(line: &str) -> Option<(String, String)> {
-    if !line.contains("from=\"") || !line.contains("to=\"") {
-        return None;
-    }
-    if !line.contains("graphics/pictures/person/") || !line.contains("/portrait") {
-        return None;
-    }
-    let from = attribute_value(line, "from")?;
-    let to = attribute_value(line, "to")?;
-    let marker = "graphics/pictures/person/";
-    let start = to.find(marker)? + marker.len();
-    let rest = &to[start..];
-    let end = rest.find("/portrait")?;
-    let uid = rest[..end].trim_start_matches("r-").to_string();
-    if uid.is_empty() || !uid.bytes().all(|b| b.is_ascii_digit()) {
-        return None;
-    }
-    Some((from.to_string(), uid))
-}
-
-#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -357,14 +461,14 @@ mod tests {
     #[test]
     fn parse_person_portrait_record_handles_cutout_and_regen_ids() {
         let cutout = r#"<record from="face_2000370823" to="graphics/pictures/person/2000370823/portrait"/>"#;
-        let regen = r#"<record from="PP12CentralEurope0853" to="graphics/pictures/person/r-100679936/portrait"/>"#;
+        let regen = r#"<record from="CentralEurope/PP12CentralEurope0853" to="graphics/pictures/person/r-100679936/portrait"/>"#;
         assert_eq!(
             parse_person_portrait_record(cutout),
             Some(("face_2000370823".into(), "2000370823".into()))
         );
         assert_eq!(
             parse_person_portrait_record(regen),
-            Some(("PP12CentralEurope0853".into(), "100679936".into()))
+            Some(("CentralEurope/PP12CentralEurope0853".into(), "100679936".into()))
         );
     }
 
@@ -375,12 +479,32 @@ mod tests {
             return;
         }
         let configs = find_facepack_configs(&root);
+        let mapped = discover_mapped_face_configs(&root);
         let newgan = root.join("NGRegens_Newgens_Megapack");
         if newgan.is_dir() {
-            assert!(configs.iter().any(|path| {
-                path.to_string_lossy().contains("NGRegens_Newgens_Megapack")
-                    && path.ends_with("config.xml")
-            }));
+            assert!(
+                configs.iter().any(|path| {
+                    path.to_string_lossy().contains("NGRegens_Newgens_Megapack")
+                        && (path.ends_with("config.xml") || path.ends_with("_config.xml"))
+                }) || mapped.iter().any(|(path, _)| {
+                    path.to_string_lossy().contains("NGRegens_Newgens_Megapack")
+                })
+            );
         }
+    }
+
+    #[test]
+    fn mapped_scan_resolves_known_regen_uid_when_pack_present() {
+        let root = default_graphics_root();
+        let sample = root
+            .join("NGRegens_Newgens_Megapack")
+            .join("CentralEurope")
+            .join("PP12CentralEurope0853.png");
+        if !sample.is_file() {
+            return;
+        }
+        let wanted = HashSet::from(["100679936".to_string()]);
+        let found = scan_mapped_face_configs(&wanted);
+        assert_eq!(found.get("100679936"), Some(&sample));
     }
 }

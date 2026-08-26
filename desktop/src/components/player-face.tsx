@@ -13,7 +13,7 @@ type PlayerFaceResult = {
 };
 
 const faceCache = new Map<string, string | null>();
-const RETRY_MS = [400, 1200, 2800, 5000];
+const RETRY_MS = [400, 1200, 2800, 5000, 9000];
 
 export function clearPlayerFaceMemoryCache() {
   faceCache.clear();

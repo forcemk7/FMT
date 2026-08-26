@@ -1,12 +1,10 @@
 ﻿# Status
 
-Last updated: 2026-08-26 (T156 badge slots)
+Last updated: 2026-08-26 (T157 done)
 
 ## Now
 
-**Shipped:** T156 — equal 36×36 PNG badge slots on profile facts (no label jump).
-
-**Verify:** player profile — Nationality and Club badges same size; text stays put while images load.
+_(empty — pick next ready ticket)_
 
 **Deferred:** T139 theme until desk is daily habit (partially overlapped by T155 dark shell).
 
@@ -19,10 +17,12 @@ Last updated: 2026-08-26 (T156 badge slots)
 
 ## Recently done
 
+- **T157** Newgen faces via mapped NG `_config.xml` warm
 - **T156** Equal fixed badge slots
 - **T155** Dark FM shell for attr contrast
 - **T154** Nation/club fact-row layout
 - **T153** FM attr color bands + Settings pickers
+- **T152** Warm squad faces on load (Cutout only)
 
 ## Loop
 
