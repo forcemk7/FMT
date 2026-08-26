@@ -859,7 +859,7 @@ body{background:linear-gradient(180deg,var(--shell-top) 0%,var(--shell-bottom) 1
 .recruitment-board{border:1px solid var(--border);border-radius:10px;background:#fff;overflow:auto;box-shadow:var(--panel-shadow)}.recruitment-board>header,.recruitment-board>article{display:grid;grid-template-columns:minmax(190px,1.35fr) 112px 92px 118px 96px 86px 105px 62px;gap:10px;align-items:center;min-width:1000px;padding:0 14px}.recruitment-board>header{height:38px;background:#f3f7f8;color:#6e7d92;font-size:8px;text-transform:uppercase}.recruitment-board>article{min-height:72px;border-top:1px solid var(--border)}.recruitment-board article>div:not(.target-identity):not(.target-actions){display:flex;flex-direction:column;gap:4px}.recruitment-board article strong{font-size:10px}.recruitment-board article small{color:var(--slate);font-size:8px;line-height:1.35}.target-identity{display:flex;align-items:center;gap:10px}.target-identity>span{display:grid;place-items:center;width:38px;height:38px;border:1px solid #cce1e4;border-radius:50%;background:#f5faf9;font-size:10px}.target-identity>div{display:flex;flex-direction:column;gap:3px}.target-identity b{color:#567087;font-size:8px}.target-actions{display:flex;gap:5px}.recruitment-zero-state{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:350px;padding:50px;text-align:center}.recruitment-zero-state svg{width:34px;color:var(--mint)}.recruitment-zero-state h2{margin:13px 0 7px;font-size:17px}.recruitment-zero-state p{max-width:540px;margin:0;color:var(--slate);font-size:11px;line-height:1.6}
 
 .player-dossier{padding:18px 28px 32px;background:#fff}.dossier-header{display:flex;align-items:center;justify-content:space-between;gap:22px}.dossier-heading{display:flex;align-items:center;gap:10px}.dossier-heading h1{margin:0;font-size:29px;letter-spacing:-.04em}.dossier-heading p{margin:3px 0 0;color:var(--slate);font-size:10px}.dossier-actions{display:flex;gap:10px}.dossier-actions button{height:38px;font-size:10px}
-.player-facts{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));align-items:stretch;margin-top:10px;border-bottom:1px solid var(--border)}.player-facts>span,.player-facts>.player-club-fact{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:6px;min-height:64px;min-width:0;overflow:hidden;padding:10px 12px;border-left:1px solid var(--border);box-sizing:border-box}.player-facts>span:first-child,.player-facts>.player-club-fact:first-child{border-left:0}.player-facts b{color:var(--slate);font-size:8px;font-weight:500;line-height:1.2}.player-facts strong{font-size:11px;line-height:1.25;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.fact-confidence{align-items:flex-start!important}
+.player-facts{display:flex;flex-direction:column;margin-top:10px;border-bottom:1px solid var(--border)}.player-facts-row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-items:stretch;border-top:1px solid var(--border)}.player-facts-row:first-child{border-top:0}.player-facts-row>span,.player-facts-row>.player-club-fact{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:6px;min-height:64px;min-width:0;overflow:hidden;padding:10px 12px;border-left:1px solid var(--border);box-sizing:border-box}.player-facts-row>span:first-child,.player-facts-row>.player-club-fact:first-child{border-left:0}.player-facts b{color:var(--slate);font-size:8px;font-weight:500;line-height:1.2}.player-facts strong{font-size:11px;line-height:1.25;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .unknown-confidence-ring{display:grid;place-items:center;width:45px;height:45px;border:4px solid #dbe5eb;border-radius:50%;line-height:1}.unknown-confidence-ring strong{font-size:12px}.unknown-confidence-ring small{font-size:6px;color:var(--slate)}
 .dossier-tabs{gap:0}.dossier-tabs>[data-slot=tabs-list]{height:44px;padding:0;border-bottom:1px solid var(--border)}.dossier-tabs [data-slot=tabs-trigger]{flex:none;min-width:90px;height:44px;padding:0 14px;font-size:10px}.dossier-tabs [data-slot=tabs-trigger]:after{bottom:-1px;background:var(--mint)}
 .dossier-layout{display:grid;grid-template-columns:minmax(660px,2.35fr) minmax(300px,.82fr);gap:14px;padding-top:14px}.dossier-main-column,.dossier-side-column{display:flex;flex-direction:column;gap:10px}.dossier-panel{border:1px solid var(--border);border-radius:8px;background:#fff;overflow:hidden}.dossier-panel>header{display:flex;align-items:center;gap:9px;height:42px;padding:0 13px}.dossier-panel>header svg{width:15px;color:#324d70}.dossier-panel>header h2{margin:0;font-size:11px;text-transform:uppercase;letter-spacing:.02em}.dossier-panel>header>span{margin-left:auto;color:var(--slate);font-size:8px}
@@ -885,7 +885,7 @@ body{background:linear-gradient(180deg,var(--shell-top) 0%,var(--shell-bottom) 1
   .topbar-dashboard{grid-template-columns:250px minmax(330px,1fr) auto;padding-inline:24px}
   .dashboard-command-grid{grid-template-columns:minmax(610px,1.7fr) minmax(300px,1fr)}
   .phase-toggle{min-width:320px}.tactical-board-compact .pitch-canvas{height:380px}
-  .recruitment-pulse{min-height:468px}.dossier-layout{grid-template-columns:minmax(620px,2fr) 290px}.player-facts{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+  .recruitment-pulse{min-height:468px}.dossier-layout{grid-template-columns:minmax(620px,2fr) 290px}.player-facts-row{grid-template-columns:repeat(5,minmax(0,1fr))}
 }
 
 /* 0.1.5 ? flat controls and dossier-consistent live-data views */
@@ -1037,7 +1037,8 @@ button:active,
   --attr-row-pad-y: 3px;
   --attr-label-size: 10px;
   --attr-value-size: 10px;
-  --attr-heading-size: 10px; /* match label/value size */
+  /* Caps read smaller than mixed-case at the same px ? bump past labels */
+  --attr-heading-size: 12px;
   --attr-col-pad-x: 18px;
   --attr-col-pad-end: 14px; /* space before vertical separators */
   --attr-band-pad-x: 13px;
@@ -1060,7 +1061,11 @@ button:active,
   padding-right:0;
 }
 .attribute-desk-row .attribute-column,
-.attribute-desk-row .attribute-column-stack{min-width:0;padding-right:var(--attr-col-pad-end)}
+.attribute-desk-row .attribute-column-stack{
+  min-width:0;
+  box-sizing:border-box;
+  padding-right:var(--attr-col-pad-end);
+}
 .attribute-desk-row .attribute-column[data-col="1"],
 .attribute-desk-row .attribute-column-stack[data-col="1"]{
   grid-column:1;
@@ -1077,15 +1082,20 @@ button:active,
 .attribute-desk-row .attribute-column-stack[data-col="3"]{
   grid-column:3;
   padding-left:var(--attr-col-pad-x);
-  padding-right:0;
+  /* keep end pad so values clear the panel edge too */
   border-left:1px solid var(--border);
 }
+/* Do NOT use padding:0 here ? it wiped padding-right from the rules above */
 .attribute-desk .attribute-column{
-  padding:0;
+  padding-left:0;
   border-left:0;
 }
 .attribute-column-stack{display:flex;flex-direction:column;gap:0;height:100%}
-.attribute-column-stack>.attribute-column{padding:0;border-left:0}
+.attribute-column-stack>.attribute-column{
+  padding-left:0;
+  padding-right:0; /* pad lives on the stack, not nested sections */
+  border-left:0;
+}
 .attribute-column-stack>.attribute-column+.attribute-column,
 .attribute-column-stack>.attribute-extension{
   margin-top:10px;
@@ -1125,6 +1135,7 @@ button:active,
   column-gap:var(--attr-row-gap);
   padding:var(--attr-row-pad-y) 0;
   min-width:0;
+  box-sizing:border-box;
 }
 .attribute-desk .attr-row-label{
   min-width:0;
@@ -1172,7 +1183,7 @@ button:active,
 .ability-strip>span{display:flex;flex-direction:column;gap:4px;padding:12px 14px;border:1px solid var(--border);border-radius:8px;background:#f8fbfb}
 .ability-strip small{color:var(--slate);font-size:8px;text-transform:uppercase;letter-spacing:.03em}
 .ability-strip strong{font-size:20px;letter-spacing:.02em}
-.player-facts{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+.player-facts-row{grid-template-columns:repeat(5,minmax(0,1fr))}
 .attr-history-layout{display:grid;grid-template-columns:minmax(220px,.9fr) minmax(280px,1.4fr);gap:12px;padding:0 13px 8px}
 .attr-history-toggles{display:flex;flex-direction:column;gap:4px;max-height:260px;overflow:auto;padding-right:4px}
 .attr-history-toggles>button{display:flex;flex-direction:column;gap:2px;align-items:flex-start;padding:7px 9px;border:1px solid var(--border);border-radius:7px;background:#fff;text-align:left}
