@@ -13,26 +13,24 @@ function shown(value: string | number | null | undefined) {
   return value == null || value === "" ? "—" : value;
 }
 
-function abilityRingTone(value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value)) return "unknown";
-  const tone = attributeTone("Ability", value / 10);
-  if (tone === "good") return "strong";
-  if (tone === "bad") return "poor";
-  return "medium";
+function abilityTone(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) return "unknown" as const;
+  // Same 1–20 attribute bands on tenths: >140 green, 60–140 blue, 1–59 red
+  return attributeTone("Ability", value / 10);
 }
 
 function AbilityRing({ value, label }: { value: number | null | undefined; label: string }) {
   const safeValue = value == null ? 0 : Math.max(0, Math.min(200, value));
-  const tone = abilityRingTone(value);
-  const attrClass =
-    value == null ? "attr-tone-neutral" : `attr-tone-${attributeTone("Ability", value / 10)}`;
+  const tone = abilityTone(value);
   return (
     <span className="squad-ability-cell">
       <span
-        className={`fit-score-ring fit-score-${tone}`}
+        className={`fit-score-ring ability-ring ability-ring-${tone}`}
         style={{ "--fit-score": `${safeValue * 1.8}deg` } as React.CSSProperties}
       >
-        <strong className={attrClass}>{value ?? "—"}</strong>
+        <strong className={tone === "unknown" ? "attr-tone-neutral" : `attr-tone-${tone}`}>
+          {value ?? "—"}
+        </strong>
       </span>
       <small>{label}</small>
     </span>
