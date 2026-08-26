@@ -375,3 +375,56 @@ body.fmt-shell .startup-brand strong {
 body.fmt-shell .startup-brand small {
   color: var(--gold);
 }
+
+/* Header squad search results — panel tokens (not light GS chrome) */
+body.fmt-shell .global-search-results {
+  left: 18px;
+  right: 18px;
+  width: auto;
+  max-width: none;
+  transform: none;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 12px;
+  background: var(--panel-2);
+  box-shadow: var(--panel-shadow);
+  color: var(--text);
+}
+body.fmt-shell .global-search-results header {
+  border-bottom-color: var(--hairline);
+}
+body.fmt-shell .global-search-results header strong {
+  color: var(--text);
+  font-size: 12px;
+}
+body.fmt-shell .global-search-results header button {
+  color: var(--gold);
+}
+body.fmt-shell .global-search-results > button {
+  background: transparent;
+  border-bottom-color: var(--hairline);
+  color: var(--text);
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+body.fmt-shell .global-search-results > button:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+body.fmt-shell .global-search-results > button span {
+  color: var(--text-dim);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+}
+body.fmt-shell .global-search-results > button strong {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 650;
+}
+body.fmt-shell .global-search-results > button small {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+body.fmt-shell .global-search-results > p {
+  color: var(--text-muted);
+  font-size: 13px;
+}
