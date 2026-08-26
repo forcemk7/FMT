@@ -3,8 +3,8 @@
 import { useMemo } from "react";
 import { ExternalLink } from "lucide-react";
 import type { LiveFootballSnapshot, LivePlayer } from "@/domain/adapters";
-import { abilityToneFromScore, attributeBand } from "@/domain/attribute-tone";
-import { formatHasScore, liveHasScore } from "@/domain/has-score";
+import { abilityToneFromScore } from "@/domain/attribute-tone";
+import { formatHasScore, hasBand, liveHasScore } from "@/domain/has-score";
 import { groupSquad, positionGroups } from "@/domain/live-data";
 import { LiveDataState } from "@/components/live-data-state";
 import { PlayerFace } from "@/components/player-face";
@@ -32,10 +32,10 @@ function AbilityRing({ value, label }: { value: number | null | undefined; label
   );
 }
 
-/** HAS is ~1–20 — same FM bands as attributes (not squad percentiles). */
+/** HAS ring — absolute practical range + gold above practical ceiling. */
 function PersonalityRing({ value }: { value: number | null }) {
   const safeValue = value == null ? 0 : Math.max(0, Math.min(20, value));
-  const tone = value == null || !Number.isFinite(value) ? "unknown" : attributeBand(value);
+  const tone = value == null || !Number.isFinite(value) ? "unknown" : hasBand(value);
   return (
     <span className="squad-ability-cell">
       <span

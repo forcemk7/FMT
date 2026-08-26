@@ -1,5 +1,5 @@
 import type { LivePlayer } from "./adapters";
-import { attributeTone } from "./attribute-tone";
+import { attributeTone, type AttributeTone } from "./attribute-tone";
 
 /**
  * HAS weights — development + squad-impact hierarchy (FM Dossier / FM Stats).
@@ -229,13 +229,26 @@ export const FRONTEND_CALCULATION_CARDS: FrontendCalculationCard[] = [
   },
 ];
 
-export type HasTone = "high" | "upper" | "mid" | "low";
+export type HasTone = "super" | "high" | "upper" | "mid" | "low";
+
+/**
+ * Theoretical HAS bounds under current weights:
+ * ceiling = all 20s + Controversy 1 (Det/Amb diminish to 12.5) → 495/27
+ * floor = all 1s + Controversy 20 → 1
+ */
+export const HAS_SCORE_CEILING = 495 / 27;
+export const HAS_SCORE_FLOOR = 1;
+/** Pulls practical range inward from edit-only extremes (same offset both ends). */
+export const HAS_PRACTICAL_OFFSET = 2.5;
+
+export const HAS_PRACTICAL_CEILING = HAS_SCORE_CEILING - HAS_PRACTICAL_OFFSET;
+export const HAS_PRACTICAL_FLOOR = HAS_SCORE_FLOOR + HAS_PRACTICAL_OFFSET;
 
 export type HasBreakdownRow = {
   abbr: string;
   label: string;
   value: number;
-  tone: HasTone;
+  tone: AttributeTone;
 };
 
 function readAttr(value: number | null | undefined) {
@@ -301,10 +314,27 @@ export function formatHasScore(score: number | null) {
   return score == null || !Number.isFinite(score) ? "—" : score.toFixed(1);
 }
 
-export function hasTone(score: number, eliteFloor = 14, poorCeiling = 6): HasTone {
-  if (score >= eliteFloor) return "high";
-  if (score <= poorCeiling) return "low";
-  return "mid";
+/**
+ * Absolute HAS color band.
+ * Above practical ceiling → super (gold). Inside [floor_p, ceil_p] → four equal attr-like bands.
+ * Below practical floor → low.
+ */
+export function hasBand(score: number): HasTone {
+  if (!Number.isFinite(score)) return "mid";
+  if (score > HAS_PRACTICAL_CEILING) return "super";
+  if (score < HAS_PRACTICAL_FLOOR) return "low";
+  const span = HAS_PRACTICAL_CEILING - HAS_PRACTICAL_FLOOR;
+  if (span <= 0) return "mid";
+  const t = (score - HAS_PRACTICAL_FLOOR) / span;
+  if (t >= 0.75) return "high";
+  if (t >= 0.5) return "upper";
+  if (t >= 0.25) return "mid";
+  return "low";
+}
+
+/** @deprecated Use {@link hasBand} — kept as alias for call sites. */
+export function hasTone(score: number): HasTone {
+  return hasBand(score);
 }
 
 export function squadHasRankings(players: LivePlayer[]) {

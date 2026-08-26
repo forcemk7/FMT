@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { ArrowRight } from "lucide-react";
 import type { LiveFootballSnapshot, LivePlayer } from "@/domain/adapters";
-import { formatHasScore, hasTone, liveHasBreakdown, squadHasRankings, type HasTone } from "@/domain/has-score";
+import { formatHasScore, hasBand, liveHasBreakdown, squadHasRankings, type HasTone } from "@/domain/has-score";
 import { LiveDataState } from "@/components/live-data-state";
 import { PlayerFace } from "@/components/player-face";
 import { Button } from "@/components/ui/button";
@@ -120,7 +120,7 @@ export function DashboardScreen({
                       key={player.id}
                       player={player}
                       score={score}
-                      tone={hasTone(score, has.eliteFloor, has.poorCeiling)}
+                      tone={hasBand(score)}
                       onOpen={onOpenPlayer}
                     />
                   ))}
@@ -134,7 +134,7 @@ export function DashboardScreen({
                       key={player.id}
                       player={player}
                       score={score}
-                      tone={hasTone(score, has.eliteFloor, has.poorCeiling)}
+                      tone={hasBand(score)}
                       onOpen={onOpenPlayer}
                     />
                   ))}

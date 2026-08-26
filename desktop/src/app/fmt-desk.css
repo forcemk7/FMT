@@ -287,6 +287,7 @@ body.fmt-shell .attr-tone-high { color: var(--attr-tone-high); }
 body.fmt-shell .attr-tone-upper { color: var(--attr-tone-upper); }
 body.fmt-shell .attr-tone-mid { color: var(--attr-tone-mid); background: transparent; padding: 0; }
 body.fmt-shell .attr-tone-low { color: var(--attr-tone-low); }
+body.fmt-shell .attr-tone-super { color: var(--gold); }
 
 body.fmt-shell .fit-score-ring {
   background: conic-gradient(var(--fit-color) var(--fit-score), rgba(255, 255, 255, 0.08) 0);
@@ -298,6 +299,7 @@ body.fmt-shell .ability-ring-high { --fit-color: var(--attr-tone-high); }
 body.fmt-shell .ability-ring-upper { --fit-color: var(--attr-tone-upper); }
 body.fmt-shell .ability-ring-mid { --fit-color: var(--attr-tone-mid); }
 body.fmt-shell .ability-ring-low { --fit-color: var(--attr-tone-low); }
+body.fmt-shell .ability-ring-super { --fit-color: var(--gold); }
 
 body.fmt-shell .dash-has-columns h3 {
   color: var(--text-dim);
@@ -334,6 +336,10 @@ body.fmt-shell .dash-has-score.tone-mid {
 body.fmt-shell .dash-has-score.tone-low {
   background: rgba(189, 78, 78, 0.14);
   color: var(--attr-tone-low);
+}
+body.fmt-shell .dash-has-score.tone-super {
+  background: var(--gold-soft);
+  color: var(--gold);
 }
 
 body.fmt-shell .dash-has-tooltip {
