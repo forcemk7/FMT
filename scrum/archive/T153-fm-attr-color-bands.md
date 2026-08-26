@@ -34,4 +34,4 @@ Loop A desk/squad should match FM’s 4-band attribute colors. Owner can tweak b
 - Bands: high/upper/mid/low with FM hex defaults
 - Settings AttrColorsPanel + localStorage + CSS vars on launch
 - Verified: vitest attribute-tone + has-score; tsc
-- Commit: _(filled after git)_
+- Commit: `f69e0f6`
