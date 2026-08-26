@@ -30,4 +30,4 @@ Loop A glance: Ability/Potential alone miss development personality. HAS already
 ## Progress
 
 - Color = `attributeBand(has)` — HAS is already ~1–20; percentiles reserved for Dashboard Top/Bottom lists
-- Commit: _(filled after git)_
+- Commit: `ad340ef`
