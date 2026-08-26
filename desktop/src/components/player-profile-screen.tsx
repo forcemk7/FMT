@@ -153,16 +153,10 @@ function AttributeGroup({
   );
 }
 
-function GoalkeeperRatingBlock({
-  player,
-  col = 3,
-}: {
-  player: LivePlayer;
-  col?: 1 | 2 | 3;
-}) {
+function GoalkeeperRatingBlock({ player }: { player: LivePlayer }) {
   const rating = resolveGoalkeeperRating(player.goalkeeperRating, player.attributes);
   return (
-    <section className="attribute-column attribute-gk-rating" data-col={col}>
+    <div className="attribute-extension attribute-gk-rating">
       <Tooltip>
         <TooltipTrigger
           render={<h3 className="attribute-column-heading attribute-column-heading-tip">Goalkeeping</h3>}
@@ -171,13 +165,13 @@ function GoalkeeperRatingBlock({
           <AttributeTooltipList names={gkGoalkeepingAttributeNames()} values={player.attributes} />
         </TooltipContent>
       </Tooltip>
-      <p className="attribute-gk-rating-value">
-        Goalkeeper Rating{" "}
+      <span>
+        <small>Goalkeeper Rating</small>
         <strong className={rating == null ? "attr-tone-mid" : `attr-tone attr-tone-${attributeTone("Ability", rating * 2)}`}>
           {rating == null ? "—" : `${rating} / 10`}
         </strong>
-      </p>
-    </section>
+      </span>
+    </div>
   );
 }
 
@@ -230,7 +224,7 @@ function GeneralColumn({ player, col = 3 }: { player: LivePlayer; col?: 1 | 2 | 
   );
 }
 
-/** Fixed 3-column FM-style attribute desk (outfield vs GK). */
+/** Fixed 3-column FM desk: stacked Set Pieces / GK Technical under play attrs (matches in-game). */
 function AttributeDesk({ player }: { player: LivePlayer }) {
   const gk = isGoalkeeperPosition(player.positions);
   const attrs = player.attributes;
@@ -238,39 +232,36 @@ function AttributeDesk({ player }: { player: LivePlayer }) {
   return (
     <div className={`attribute-desk ${gk ? "attribute-desk-gk" : "attribute-desk-outfield"}`}>
       {gk ? (
-        <>
-          <div className="attribute-desk-row attribute-desk-primary">
-            <AttributeGroup
-              title="Goalkeeping"
-              names={gkGoalkeepingAttributeNames()}
-              values={attrs}
-              col={1}
-            />
-            <AttributeGroup title="Mental" names={MENTAL_ATTRIBUTES} values={attrs} col={2} />
-            <AttributeGroup title="Physical" names={PHYSICAL_ATTRIBUTES} values={attrs} col={3} />
-          </div>
-          <div className="attribute-desk-row attribute-desk-secondary">
+        <div className="attribute-desk-row attribute-desk-primary">
+          <AttributeGroup
+            title="Goalkeeping"
+            names={gkGoalkeepingAttributeNames()}
+            values={attrs}
+            col={1}
+          />
+          <AttributeGroup title="Mental" names={MENTAL_ATTRIBUTES} values={attrs} col={2} />
+          <div className="attribute-column-stack" data-col={3}>
+            <AttributeGroup title="Physical" names={PHYSICAL_ATTRIBUTES} values={attrs} />
             <AttributeGroup
               title="Technical"
               names={GK_TECHNICAL_ATTRIBUTES}
               values={attrs}
-              col={3}
               headerTooltipNames={gkTechnicalTooltipNames()}
             />
           </div>
-        </>
+        </div>
       ) : (
-        <>
-          <div className="attribute-desk-row attribute-desk-primary">
-            <AttributeGroup title="Technical" names={TECHNICAL_ATTRIBUTES} values={attrs} col={1} />
-            <AttributeGroup title="Mental" names={MENTAL_ATTRIBUTES} values={attrs} col={2} />
-            <AttributeGroup title="Physical" names={PHYSICAL_ATTRIBUTES} values={attrs} col={3} />
+        <div className="attribute-desk-row attribute-desk-primary">
+          <div className="attribute-column-stack" data-col={1}>
+            <AttributeGroup title="Technical" names={TECHNICAL_ATTRIBUTES} values={attrs} />
+            <AttributeGroup title="Set Pieces" names={SET_PIECE_ATTRIBUTES} values={attrs} />
           </div>
-          <div className="attribute-desk-row attribute-desk-secondary">
-            <AttributeGroup title="Set pieces" names={SET_PIECE_ATTRIBUTES} values={attrs} col={1} />
-            <GoalkeeperRatingBlock player={player} col={3} />
+          <AttributeGroup title="Mental" names={MENTAL_ATTRIBUTES} values={attrs} col={2} />
+          <div className="attribute-column-stack attribute-column-stack-anchor" data-col={3}>
+            <AttributeGroup title="Physical" names={PHYSICAL_ATTRIBUTES} values={attrs} />
+            <GoalkeeperRatingBlock player={player} />
           </div>
-        </>
+        </div>
       )}
       <div className="attribute-desk-row attribute-desk-footer">
         <AttributeGroup title="Hidden" names={HIDDEN_ATTRIBUTES} values={player.hiddenAttributes} col={1} />

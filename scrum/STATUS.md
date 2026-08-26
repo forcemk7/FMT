@@ -20,6 +20,7 @@ _(empty — pick next ready ticket)_
 
 ## Recently done
 
+- **T171** FM stacked attribute desk top row (outfield/GK)
 - **T170** Personality/Media in facts grid; restore attribute desk layout
 - **T169** HAS practical band colors on all HAS score displays
 - **T168** Badge inset so trimmed crests don't overflow
