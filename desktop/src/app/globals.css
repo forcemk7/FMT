@@ -772,8 +772,12 @@ h1, h2, h3, [data-slot="card-title"] { font-family: "Inter Variable", Inter, "Se
 .advanced-diagnostics{margin-top:14px;border:1px solid var(--border);border-radius:13px;background:rgba(255,255,255,.72)}.advanced-diagnostics summary{display:flex;align-items:center;justify-content:space-between;padding:15px 16px;cursor:pointer;list-style:none}.advanced-diagnostics summary span{display:flex;align-items:center;gap:8px;font-size:10px;font-weight:700}.advanced-diagnostics summary svg{width:17px;color:var(--mint)}.advanced-diagnostics[open] summary>svg{transform:rotate(180deg)}.advanced-diagnostics>p{margin:0;padding:0 16px 13px;color:var(--slate);font-size:8px}.advanced-diagnostics dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin:0;border-top:1px solid var(--border)}.advanced-diagnostics dl div{display:flex;flex-direction:column;gap:5px;min-width:0;padding:12px 16px;border-right:1px solid var(--border);border-bottom:1px solid var(--border)}.advanced-diagnostics dt{color:var(--slate);font-size:7px}.advanced-diagnostics dd{overflow:hidden;margin:0;text-overflow:ellipsis;font-size:9px}.advanced-diagnostics .diagnostic-hash{grid-column:1/-1}.advanced-diagnostic-message{display:flex;flex-direction:column;gap:5px;padding:14px 16px}.advanced-diagnostic-message strong{font-size:9px}.advanced-diagnostic-message span{color:var(--slate);font-size:8px;line-height:1.5}
 .squad-live-table-rich{overflow-x:auto}.squad-live-table-rich>header,.squad-live-table-rich .squad-player-row-rich{grid-template-columns:minmax(170px,1.2fr) 125px 135px 70px 125px 130px 100px 100px minmax(210px,1.3fr) 82px;min-width:min(1280px,100%)}.squad-player-row-rich>span:nth-last-child(2){font-size:7px;line-height:1.3}.knowledge-fully_known{color:var(--mint)}.knowledge-partly_known{color:#49798a}.knowledge-needs_scouting,.knowledge-missing_data{color:#a96f18}
 .squad-live-table-mapped>header,.squad-live-table-mapped .squad-player-row-mapped{grid-template-columns:minmax(200px,1.3fr) minmax(120px,.9fr) 68px 68px 72px 84px;min-width:min(780px,100%)}
-.squad-ability-cell{display:flex!important;flex-direction:column!important;align-items:center;gap:4px;text-align:center}
-.squad-ability-cell .fit-score-ring strong{font-size:9px}
+.squad-ability-cell{display:grid!important;place-items:center;width:40px;height:40px;justify-self:center;position:relative}
+.squad-metric-ring{--fit-color:#b9c4cc}
+.squad-metric-ring svg{position:absolute;inset:0;display:block}
+.squad-metric-ring strong{position:relative;z-index:1;font-size:9px;line-height:1}
+.squad-metric-ring-track{stroke:#e4ebef}
+.squad-metric-ring-value{stroke:var(--fit-color);transition:stroke-dashoffset .2s ease}
 .squad-live-table-verified>header,.squad-live-table-verified .squad-player-row-verified{grid-template-columns:minmax(220px,1.3fr) minmax(170px,1fr) minmax(150px,.8fr) minmax(130px,.7fr) 90px}.squad-summary-grid-verified{grid-template-columns:repeat(3,1fr)}
 .player-row-actions{display:flex;gap:5px}.player-profile-hero{margin-top:12px}.profile-knowledge{text-transform:capitalize;font-size:10px;font-weight:700}.player-profile-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:12px}.profile-wide{grid-column:1/-1}.profile-detail-list{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px}.profile-detail-list span{display:flex;flex-direction:column;gap:4px;padding:10px;border:1px solid var(--border);border-radius:9px;background:rgba(248,251,251,.72)}.profile-detail-list small,.profile-evidence-grid small{color:var(--slate);font-size:8px;text-transform:uppercase;letter-spacing:.04em}.profile-detail-list strong{font-size:11px}.profile-decision{padding:16px}.profile-decision>strong{font-size:13px;color:var(--navy)}.profile-decision p{color:var(--slate);font-size:10px;line-height:1.5}.profile-decision span{display:block;margin-top:10px;padding:10px;border-radius:8px;background:#eaf6f2;color:#126b61;font-size:10px;font-weight:700}.profile-evidence-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;padding:14px}.profile-evidence-grid>div{padding:12px;border:1px solid var(--border);border-radius:9px}.profile-evidence-grid span{display:flex;justify-content:space-between;margin-top:8px;font-size:10px;text-transform:capitalize}.profile-evidence-grid p{margin:8px 0 0;color:var(--slate);font-size:9px;line-height:1.45}
 .role-dna-table{border:1px solid var(--border);border-radius:13px;overflow:hidden;background:rgba(255,255,255,.74);box-shadow:var(--panel-shadow)}.role-dna-table>header,.role-dna-table>article{display:grid;grid-template-columns:minmax(150px,1fr) 105px 130px minmax(130px,1fr) minmax(130px,1fr) 72px minmax(180px,1.25fr) minmax(240px,1.4fr);align-items:center;gap:10px;padding:0 13px}.role-dna-table>header{height:34px;background:#edf3f4;color:var(--slate);font-size:7px;text-transform:uppercase}.role-dna-table>article{min-height:66px;border-top:1px solid var(--border);font-size:8px}.role-dna-table>article span{color:#53677e;line-height:1.35}
@@ -986,39 +990,70 @@ button:active,
 .global-search-results header{display:flex;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border)}.global-search-results header button{border:0;background:transparent;color:var(--primary)}
 .global-search-results>button{display:grid;grid-template-columns:52px 1fr auto;width:100%;padding:11px 14px;border:0;border-bottom:1px solid var(--border);background:#fff;text-align:left}.global-search-results>button:hover{background:#f5faf9}.global-search-results>button span{color:var(--primary);font-size:8px;text-transform:uppercase}.global-search-results>button strong{font-size:10px}.global-search-results>button small{color:var(--slate);font-size:8px}.global-search-results>p{padding:20px;color:var(--slate);font-size:10px}
 .player-club-fact{border:0;background:transparent;text-align:left;cursor:pointer}.player-club-fact:disabled{cursor:default}.player-club-fact:not(:disabled):hover{background:color-mix(in srgb, var(--primary) 6%, transparent)}
-/* Equal square slots for PNG cutouts ? same box for nation + club. */
-.club-logo,.nation-flag{display:grid;place-items:center;overflow:hidden;flex-shrink:0;width:36px;height:36px;box-sizing:border-box;border:1px solid var(--border);border-radius:6px;padding:4px;background:color-mix(in srgb, var(--border) 35%, transparent);color:var(--primary)}
-.club-logo img,.nation-flag img{width:100%;height:100%;max-width:100%;max-height:100%;object-fit:contain;object-position:center;image-rendering:auto}
-.club-logo svg{width:55%;height:55%}
-.club-logo-sm,.nation-flag-sm{width:28px;height:28px;padding:3px}
-.club-logo-md,.nation-flag-md{width:36px;height:36px;padding:4px}
-.club-logo-lg{width:72px;height:72px;padding:6px}
+/* Equal square slots for PNG cutouts — hard clip so tall crests cannot paint outside. */
+.club-logo,.nation-flag{
+  position:relative;
+  display:block;
+  overflow:hidden;
+  overflow:clip;
+  flex-shrink:0;
+  width:36px;
+  height:36px;
+  box-sizing:border-box;
+  border:1px solid var(--border);
+  border-radius:6px;
+  padding:0;
+  background:color-mix(in srgb, var(--border) 35%, transparent);
+  color:var(--primary);
+  isolation:isolate;
+}
+.club-logo img,.nation-flag img{
+  position:absolute;
+  inset:5px;
+  width:auto;
+  height:auto;
+  max-width:calc(100% - 10px);
+  max-height:calc(100% - 10px);
+  margin:auto;
+  object-fit:contain;
+  object-position:center;
+  image-rendering:auto;
+}
+.club-logo svg{position:absolute;inset:0;margin:auto;width:55%;height:55%}
+.club-logo-sm,.nation-flag-sm{width:28px;height:28px}
+.club-logo-sm img,.nation-flag-sm img{inset:3px;max-width:calc(100% - 6px);max-height:calc(100% - 6px)}
+.club-logo-md,.nation-flag-md{width:36px;height:36px}
+.club-logo-lg{width:72px;height:72px}
+.club-logo-lg img{inset:8px;max-width:calc(100% - 16px);max-height:calc(100% - 16px)}
 .club-logo-empty,.nation-flag-empty{opacity:.55}
-/* Profile facts: identical frames; shared inset so trimmed tall crests don't kiss the border. */
+/* Profile facts: identical 32px frames, same absolute inset clip. */
 .player-fact-identity .club-logo,
 .player-fact-identity .nation-flag{
   width:32px!important;
   height:32px!important;
-  padding:4px!important;
+  padding:0!important;
   border:1px solid var(--border)!important;
   border-radius:6px!important;
   box-sizing:border-box!important;
   overflow:hidden!important;
+  overflow:clip!important;
+  position:relative!important;
 }
 .player-fact-identity .club-logo img,
 .player-fact-identity .nation-flag img{
-  width:86%!important;
-  height:86%!important;
-  max-width:86%!important;
-  max-height:86%!important;
+  position:absolute!important;
+  inset:4px!important;
+  width:auto!important;
+  height:auto!important;
+  max-width:calc(100% - 8px)!important;
+  max-height:calc(100% - 8px)!important;
+  margin:auto!important;
   object-fit:contain!important;
   object-position:center!important;
 }
-/* Wide leftover plates only ? never taller-than-wide (those overflow with cover). */
+/* Never cover inside badges — tall crests overflow with cover. */
 .club-logo img[data-fit="cover"],
-.nation-flag img[data-fit="cover"]{
-  object-fit:cover;
-}
+.nation-flag img[data-fit="cover"],
 .player-fact-identity .club-logo img[data-fit="cover"],
 .player-fact-identity .nation-flag img[data-fit="cover"]{
   object-fit:contain!important;
@@ -1082,7 +1117,8 @@ button:active,
 .attribute-desk-row .attribute-column-stack[data-col="3"]{
   grid-column:3;
   padding-left:var(--attr-col-pad-x);
-  /* keep end pad so values clear the panel edge too */
+  /* Band already has --attr-band-pad-x on the right ? don't double-pad the last column */
+  padding-right:0;
   border-left:1px solid var(--border);
 }
 /* Do NOT use padding:0 here ? it wiped padding-right from the rules above */

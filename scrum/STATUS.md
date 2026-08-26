@@ -1,12 +1,14 @@
 ﻿# Status
 
-Last updated: 2026-08-26 (T169 HAS practical bands)
+Last updated: 2026-08-26 (T174 hard-clip badges)
 
 ## Now
 
-_(empty — pick next ready ticket)_
+**T173** Best-position squad labels and groups — `cursor-agent` (in_progress)
 
-**Verify:** Squad Personality ~15.6 reads high (green); edit-god >~15.8 gold; Dashboard Top/Bottom chips use the same band (list membership stays ranked).
+**Shipped:** T174 — hard-clip badge frames so tall nation crests cannot overflow.
+
+**Verify:** Spain / Belgium / Uruguay nationality badges stay inside the square.
 
 **Deferred:** T139 theme (chrome/shell covered by T158/T159). T162 trophy cabinet (marketing visual; no RE until Loop A sticks).
 
@@ -14,12 +16,14 @@ _(empty — pick next ready ticket)_
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
+| T173 | Best-position squad labels and groups | in_progress | 3 | cursor-agent |
 | T139 | FMT visual theme | deferred | — | overlapped |
 | T162 | Player trophy cabinet | deferred | — | backlog |
 | T124 | Quiet dev launch | ready | 9 | |
 
 ## Recently done
 
+- **T174** Hard-clip badge frames (no flag overflow)
 - **T172** Attribute desk header size + separator padding
 - **T171** FM stacked attribute desk top row (outfield/GK)
 - **T170** Personality/Media in facts grid; restore attribute desk layout
