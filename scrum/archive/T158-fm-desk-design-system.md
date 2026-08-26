@@ -33,4 +33,4 @@ T155 dark patch fought light `fmt-shell` / light header tokens — surfaces clas
 - Added `fmt-desk.css` design tokens + Loop A surfaces
 - Neutralized light `body.fmt-shell`; removed T155 !important dump
 - Attr bands unchanged
-- Commit: _(filled after git)_
+- Commit: `97820ff`
