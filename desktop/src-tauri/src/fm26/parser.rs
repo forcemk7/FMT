@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use super::structs::{HIDDEN_ATTRIBUTE_INDEXES, PLAYER_ATTRIBUTE_NAMES};
+use super::structs::{HIDDEN_ATTRIBUTE_INDEXES, PLAYER_ATTRIBUTE_NAMES, POSITION_NAMES};
 
 pub(crate) const PERSONALITY_ATTRIBUTE_NAMES: [&str; 8] = [
     "Adaptability",
@@ -73,9 +73,43 @@ pub(crate) fn preferred_foot_label(left: u8, right: u8) -> &'static str {
     }
 }
 
+/// FM outfield desk "Goalkeeper Rating x / 10" — GK position familiarity (0–20), capped at 10.
+/// `POSITION_NAMES[0] == "GK"`. Returns `None` when the positions blob is missing/invalid.
+pub(crate) fn goalkeeper_rating_from_positions(position_bytes: &[u8]) -> Option<u8> {
+    let gk = *position_bytes.first()?;
+    if gk > 20 {
+        return None;
+    }
+    Some(gk.min(10))
+}
+
+/// Split the 15-byte familiarity map into primary (max score, ties kept) and
+/// secondary (familiarity ≥ 15 but below that max). Empty primary when the blob is empty.
+pub(crate) fn classify_player_positions(position_bytes: &[u8]) -> (Vec<String>, Vec<String>) {
+    let Some(max) = position_bytes.iter().copied().max().filter(|value| *value > 0) else {
+        return (Vec::new(), Vec::new());
+    };
+    let primary: Vec<String> = position_bytes
+        .iter()
+        .enumerate()
+        .filter(|(_, rating)| **rating == max)
+        .filter_map(|(index, _)| POSITION_NAMES.get(index).map(|name| (*name).to_string()))
+        .collect();
+    let secondary: Vec<String> = position_bytes
+        .iter()
+        .enumerate()
+        .filter(|(_, rating)| **rating >= 15 && **rating < max)
+        .filter_map(|(index, _)| POSITION_NAMES.get(index).map(|name| (*name).to_string()))
+        .collect();
+    (primary, secondary)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{display_attribute, preferred_foot_label};
+    use super::{
+        classify_player_positions, display_attribute, goalkeeper_rating_from_positions,
+        preferred_foot_label,
+    };
 
     #[test]
     fn display_attribute_matches_fm_and_fss_rounding() {
@@ -94,5 +128,40 @@ mod tests {
         assert_eq!(preferred_foot_label(18, 12), "Left");
         assert_eq!(preferred_foot_label(10, 14), "Right");
         assert_eq!(preferred_foot_label(20, 19), "Left");
+    }
+
+    #[test]
+    fn goalkeeper_rating_is_gk_familiarity_capped_at_10() {
+        assert_eq!(goalkeeper_rating_from_positions(&[3]), Some(3));
+        assert_eq!(goalkeeper_rating_from_positions(&[4]), Some(4));
+        assert_eq!(goalkeeper_rating_from_positions(&[1]), Some(1));
+        assert_eq!(goalkeeper_rating_from_positions(&[15]), Some(10));
+        assert_eq!(goalkeeper_rating_from_positions(&[20]), Some(10));
+        assert_eq!(goalkeeper_rating_from_positions(&[]), None);
+        assert_eq!(goalkeeper_rating_from_positions(&[21]), None);
+    }
+
+    #[test]
+    fn classify_positions_keeps_max_primary_and_strong_secondaries() {
+        // GK SW DL DC DR DM ML MC MR AML AMC AMR ST WBL WBR
+        let mut bytes = [1_u8; 15];
+        bytes[3] = 20; // DC
+        bytes[5] = 18; // DM
+        bytes[7] = 15; // MC
+        bytes[12] = 12; // ST — below secondary threshold
+        let (primary, secondary) = classify_player_positions(&bytes);
+        assert_eq!(primary, vec!["DC"]);
+        assert_eq!(secondary, vec!["DM", "MC"]);
+    }
+
+    #[test]
+    fn classify_positions_ties_for_best_are_all_primary() {
+        let mut bytes = [1_u8; 15];
+        bytes[2] = 20; // DL
+        bytes[4] = 20; // DR
+        bytes[7] = 16; // MC
+        let (primary, secondary) = classify_player_positions(&bytes);
+        assert_eq!(primary, vec!["DL", "DR"]);
+        assert_eq!(secondary, vec!["MC"]);
     }
 }

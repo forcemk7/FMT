@@ -17,7 +17,8 @@ use crate::{
         memory::{ModuleInfo, ProcessReader},
         offsets::{find_entity_map, mapping_coverage, EntityMapProfile, MappingCoverage},
         parser::{
-            display_attribute, hidden_attribute_map, personality_attribute_map, preferred_foot_label,
+            classify_player_positions, display_attribute, goalkeeper_rating_from_positions,
+            hidden_attribute_map, personality_attribute_map, preferred_foot_label,
             visible_attribute_map,
         },
         permissions::{can_write_memory, READ_ONLY_PROCESS_ACCESS_LABEL},
@@ -1187,26 +1188,17 @@ fn extract_live_data(
                 continue;
             }
         };
-        let mut positions: Vec<String> = position_bytes
-            .iter()
-            .enumerate()
-            .filter(|(_, rating)| **rating >= 15)
-            .map(|(position, _)| POSITION_NAMES[position].to_string())
-            .collect();
+        let (positions, secondary_positions) = classify_player_positions(&position_bytes);
         if positions.is_empty() {
-            if let Some((position, _)) = position_bytes
-                .iter()
-                .enumerate()
-                .max_by_key(|(_, rating)| **rating)
-            {
-                positions.push(POSITION_NAMES[position].to_string());
-            }
+            skipped_squad_slots += 1;
+            continue;
         }
         let calculated_position = position_bytes
             .iter()
             .enumerate()
             .max_by_key(|(_, rating)| **rating)
             .map(|(position, _)| POSITION_NAMES[position].to_string());
+        let goalkeeper_rating = goalkeeper_rating_from_positions(&position_bytes);
         let birth_date = read_fm_date(reader, person + profile.constants.person_birth_date_offset);
         let current_date = read_fm_date(
             reader,
@@ -1300,6 +1292,8 @@ fn extract_live_data(
             "nationalityId": nationality_id.clone(),
             "secondNationality": null,
             "positions": positions.clone(),
+            "secondaryPositions": secondary_positions.clone(),
+            "goalkeeperRating": goalkeeper_rating,
             "bestRole": best_role,
             "currentAbility": current_ability,
             "potentialAbility": potential_ability,
@@ -2070,18 +2064,9 @@ fn read_indexed_player_candidate(
     {
         return None;
     }
-    let mut positions: Vec<String> = position_bytes
-        .iter()
-        .enumerate()
-        .filter(|(_, rating)| **rating >= 15)
-        .map(|(position, _)| POSITION_NAMES[position].to_string())
-        .collect();
+    let (positions, _secondary_positions) = classify_player_positions(&position_bytes);
     if positions.is_empty() {
-        let (position, _) = position_bytes
-            .iter()
-            .enumerate()
-            .max_by_key(|(_, rating)| **rating)?;
-        positions.push(POSITION_NAMES[position].to_string());
+        return None;
     }
     Some(IndexedPlayerRecord {
         id: uid.to_string(),
@@ -3046,6 +3031,231 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore = "live FM26 height probe; needs active save + known cm labels"]
+    fn probe_height_offsets_against_known_squad_labels() {
+        use std::collections::HashMap;
+        use std::fs;
+
+        let targets: HashMap<&str, u8> = HashMap::from([
+            ("Sam Kizza", 193),
+            ("Nathan Jones", 192),
+            ("Elias Hossmang", 183),
+            ("Felix Heynke", 181),
+            ("Lorenzo Heilbrom", 198),
+        ]);
+
+        let (process_id, _) = find_fm26_process().expect("fm.exe");
+        let mut reader = ProcessReader::open(process_id).expect("OpenProcess");
+        let process_path = reader.process_path().expect("path");
+        let identity = read_executable_identity(&process_path);
+        let profile = find_entity_map(
+            identity.file_version.as_deref(),
+            identity.product_version.as_deref(),
+            identity.sha256.as_deref(),
+            identity.architecture.as_deref(),
+        )
+        .expect("entity map");
+        let module = reader.module(&profile.module).expect("game_plugin.dll");
+        let signature = profile
+            .signatures
+            .iter()
+            .find(|item| item.name == "human_manager_registry")
+            .expect("signature");
+        let pattern = parse_pattern(&signature.pattern).expect("pattern");
+        let hits = scan_module(&mut reader, module, &pattern).expect("scan");
+        assert_eq!(hits.len(), 1, "unique manager signature");
+        let signature_address = hits[0];
+        let displacement = reader.read_i32(signature_address + 3).expect("disp");
+        let registry_slot = (signature_address + 7).wrapping_add_signed(displacement as i64);
+        let registry = reader.read_pointer(registry_slot).filter(|v| *v != 0).expect("registry");
+        let vector_start = reader
+            .read_pointer(registry + profile.constants.manager_registry_vector_offset)
+            .expect("vector start");
+        let vector_end = reader
+            .read_pointer(registry + profile.constants.manager_registry_vector_offset + 8)
+            .expect("vector end");
+        let registry_count = (vector_end - vector_start) / 8;
+        let mut resolved = Vec::new();
+        for index in 0..registry_count {
+            let human = match reader
+                .read_pointer(vector_start + index * 8)
+                .filter(|value| *value != 0)
+            {
+                Some(value) => value,
+                None => continue,
+            };
+            if let Some(candidate) = try_resolve_human_manager(&mut reader, module, profile, human) {
+                resolved.push(candidate);
+            }
+        }
+        let selected = resolved
+            .into_iter()
+            .max_by_key(|item| item.squad_len)
+            .expect("human manager");
+        println!(
+            "manager={} club={} squad={}",
+            selected.manager_name, selected.club_name, selected.squad_len
+        );
+
+        let players_start = reader
+            .read_pointer(selected.team + profile.constants.team_players_start_offset)
+            .expect("players start");
+        let players_end = reader
+            .read_pointer(selected.team + profile.constants.team_players_end_offset)
+            .expect("players end");
+        let squad_len = ((players_end - players_start) / 8) as usize;
+
+        struct Cap {
+            name: String,
+            cm: u8,
+            person: Vec<u8>,
+            player: Vec<u8>,
+        }
+        let mut caps = Vec::new();
+        let mut seen = Vec::new();
+        for slot in 0..squad_len {
+            let raw_player = match reader.read_pointer(players_start + (slot as u64) * 8) {
+                Some(value) if value != 0 => value,
+                _ => continue,
+            };
+            let person = raw_player + profile.constants.player_person_offset;
+            let name = match display_name(
+                read_name_field(&mut reader, person + profile.constants.person_first_name_offset),
+                read_name_field(&mut reader, person + profile.constants.person_second_name_offset),
+                read_name_field(&mut reader, person + profile.constants.person_common_name_offset),
+            ) {
+                Some(value) => value,
+                None => continue,
+            };
+            seen.push(name.clone());
+            let Some(&cm) = targets.get(name.as_str()) else {
+                continue;
+            };
+            let person_bytes = reader.read_bytes(person, 256).expect("person window");
+            let player_bytes = reader.read_bytes(raw_player, 768).expect("player window");
+            println!("captured {name} cm={cm}");
+            caps.push(Cap {
+                name,
+                cm,
+                person: person_bytes,
+                player: player_bytes,
+            });
+        }
+
+        let missing: Vec<_> = targets
+            .keys()
+            .copied()
+            .filter(|name| !caps.iter().any(|cap| cap.name == *name))
+            .collect();
+        if !missing.is_empty() {
+            println!("MISSING {missing:?}");
+            for want in &missing {
+                let needle = want.split_whitespace().last().unwrap_or(want).to_ascii_lowercase();
+                let approx: Vec<_> = seen
+                    .iter()
+                    .filter(|name| name.to_ascii_lowercase().contains(&needle))
+                    .take(8)
+                    .collect();
+                println!("  approx for {want}: {approx:?}");
+            }
+        }
+        assert!(
+            caps.len() >= 3,
+            "need >=3 labelled captures, got {}",
+            caps.len()
+        );
+
+        println!("\n=== per-player person u8 == cm ===");
+        for cap in &caps {
+            let offs: Vec<_> = cap
+                .person
+                .iter()
+                .enumerate()
+                .filter_map(|(i, b)| (*b == cap.cm).then_some(i))
+                .collect();
+            println!("  {}: {:?}", cap.name, offs);
+        }
+        println!("=== per-player player u8 == cm ===");
+        for cap in &caps {
+            let offs: Vec<_> = cap
+                .player
+                .iter()
+                .enumerate()
+                .filter_map(|(i, b)| (*b == cap.cm).then_some(i))
+                .collect();
+            println!("  {}: {:?}", cap.name, offs);
+        }
+
+        println!("\n=== consensus (all captured labels) ===");
+        for (obj, getter) in [
+            ("person", (|c: &Cap| c.person.as_slice()) as fn(&Cap) -> &[u8]),
+            ("player", (|c: &Cap| c.player.as_slice()) as fn(&Cap) -> &[u8]),
+        ] {
+            let len = getter(&caps[0]).len();
+            let mut u8_hits = Vec::new();
+            let mut u16_cm_hits = Vec::new();
+            let mut u16_mm_hits = Vec::new();
+            for off in 0..len {
+                if caps.iter().all(|cap| {
+                    getter(cap).get(off).copied() == Some(cap.cm)
+                }) {
+                    u8_hits.push(off);
+                }
+            }
+            for off in 0..len.saturating_sub(1) {
+                let all_cm = caps.iter().all(|cap| {
+                    let bytes = getter(cap);
+                    u16::from_le_bytes([bytes[off], bytes[off + 1]]) == u16::from(cap.cm)
+                });
+                if all_cm {
+                    u16_cm_hits.push(off);
+                }
+                let all_mm = caps.iter().all(|cap| {
+                    let bytes = getter(cap);
+                    u16::from_le_bytes([bytes[off], bytes[off + 1]]) == u16::from(cap.cm) * 10
+                });
+                if all_mm {
+                    u16_mm_hits.push(off);
+                }
+            }
+            println!("{obj} u8 cm: {u8_hits:?}");
+            println!("{obj} u16 cm: {u16_cm_hits:?}");
+            println!("{obj} u16 mm: {u16_mm_hits:?}");
+        }
+
+        println!("\n=== person+0x70..0xB0 ===");
+        for cap in &caps {
+            let region = &cap.person[0x70..0xB0];
+            let hex: String = region
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect::<Vec<_>>()
+                .join(" ");
+            println!("  {:20} {hex}", cap.name);
+        }
+
+        let payload = caps
+            .iter()
+            .map(|cap| {
+                json!({
+                    "name": cap.name,
+                    "cm": cap.cm,
+                    "personHex": cap.person.iter().map(|b| format!("{b:02x}")).collect::<String>(),
+                    "playerHex": cap.player.iter().map(|b| format!("{b:02x}")).collect::<String>(),
+                })
+            })
+            .collect::<Vec<_>>();
+        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../tmp/height-probe-captures.json");
+        if let Some(parent) = path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
+        fs::write(&path, serde_json::to_string_pretty(&payload).unwrap()).unwrap();
+        println!("wrote {}", path.display());
     }
 
     #[cfg(target_os = "windows")]

@@ -5,7 +5,7 @@ import { ExternalLink } from "lucide-react";
 import type { LiveFootballSnapshot, LivePlayer } from "@/domain/adapters";
 import { abilityToneFromScore } from "@/domain/attribute-tone";
 import { formatHasScore, hasBand, liveHasScore } from "@/domain/has-score";
-import { groupSquad, positionGroups } from "@/domain/live-data";
+import { formatPlayerPositions, groupSquad, positionGroups } from "@/domain/live-data";
 import { LiveDataState } from "@/components/live-data-state";
 import { PlayerFace } from "@/components/player-face";
 import { Button } from "@/components/ui/button";
@@ -14,21 +14,67 @@ function shown(value: string | number | null | undefined) {
   return value == null || value === "" ? "—" : value;
 }
 
-function AbilityRing({ value, label }: { value: number | null | undefined; label: string }) {
+/** Same outer size as player-face-sm; hairline SVG stroke (not conic/inset donut). */
+const SQUAD_RING_SIZE = 40;
+const SQUAD_RING_STROKE = 1.25;
+
+function SquadMetricRing({
+  display,
+  progress,
+  tone,
+}: {
+  display: string | number;
+  progress: number;
+  tone: string;
+}) {
+  const r = (SQUAD_RING_SIZE - SQUAD_RING_STROKE) / 2;
+  const circumference = 2 * Math.PI * r;
+  const clamped = Math.max(0, Math.min(1, progress));
+  const dashOffset = circumference * (1 - clamped);
+  return (
+    <span className={`squad-ability-cell squad-metric-ring ability-ring-${tone}`}>
+      <svg
+        width={SQUAD_RING_SIZE}
+        height={SQUAD_RING_SIZE}
+        viewBox={`0 0 ${SQUAD_RING_SIZE} ${SQUAD_RING_SIZE}`}
+        aria-hidden
+      >
+        <circle
+          className="squad-metric-ring-track"
+          cx={SQUAD_RING_SIZE / 2}
+          cy={SQUAD_RING_SIZE / 2}
+          r={r}
+          fill="none"
+          strokeWidth={SQUAD_RING_STROKE}
+          strokeLinecap="round"
+        />
+        <circle
+          className="squad-metric-ring-value"
+          cx={SQUAD_RING_SIZE / 2}
+          cy={SQUAD_RING_SIZE / 2}
+          r={r}
+          fill="none"
+          strokeWidth={SQUAD_RING_STROKE}
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={dashOffset}
+          transform={`rotate(-90 ${SQUAD_RING_SIZE / 2} ${SQUAD_RING_SIZE / 2})`}
+        />
+      </svg>
+      <strong className={tone === "unknown" ? "attr-tone-mid" : `attr-tone-${tone}`}>{display}</strong>
+    </span>
+  );
+}
+
+function AbilityRing({ value }: { value: number | null | undefined }) {
   const safeValue = value == null ? 0 : Math.max(0, Math.min(200, value));
   const tone = value == null || !Number.isFinite(value) ? "unknown" : abilityToneFromScore(value);
   return (
-    <span className="squad-ability-cell">
-      <span
-        className={`fit-score-ring ability-ring ability-ring-${tone}`}
-        style={{ "--fit-score": `${safeValue * 1.8}deg` } as React.CSSProperties}
-      >
-        <strong className={tone === "unknown" ? "attr-tone-mid" : `attr-tone-${tone}`}>
-          {value ?? "—"}
-        </strong>
-      </span>
-      <small>{label}</small>
-    </span>
+    <SquadMetricRing
+      display={value ?? "—"}
+      progress={value == null ? 0 : safeValue / 200}
+      tone={tone}
+    />
   );
 }
 
@@ -37,17 +83,11 @@ function PersonalityRing({ value }: { value: number | null }) {
   const safeValue = value == null ? 0 : Math.max(0, Math.min(20, value));
   const tone = value == null || !Number.isFinite(value) ? "unknown" : hasBand(value);
   return (
-    <span className="squad-ability-cell">
-      <span
-        className={`fit-score-ring ability-ring ability-ring-${tone}`}
-        style={{ "--fit-score": `${safeValue * 18}deg` } as React.CSSProperties}
-      >
-        <strong className={tone === "unknown" ? "attr-tone-mid" : `attr-tone-${tone}`}>
-          {formatHasScore(value)}
-        </strong>
-      </span>
-      <small>Personality</small>
-    </span>
+    <SquadMetricRing
+      display={formatHasScore(value)}
+      progress={value == null ? 0 : safeValue / 20}
+      tone={tone}
+    />
   );
 }
 
@@ -75,11 +115,11 @@ function PlayerRow({ player, onOpenPlayer }: { player: LivePlayer; onOpenPlayer:
         </span>
       </div>
       <span>
-        <strong>{player.positions.join(" / ") || "—"}</strong>
+        <strong>{formatPlayerPositions(player)}</strong>
         <small>{footLine(player)}</small>
       </span>
-      <AbilityRing value={player.currentAbility} label="Ability" />
-      <AbilityRing value={player.potentialAbility} label="Potential" />
+      <AbilityRing value={player.currentAbility} />
+      <AbilityRing value={player.potentialAbility} />
       <PersonalityRing value={has} />
       <Button variant="outline" size="sm">
         Profile

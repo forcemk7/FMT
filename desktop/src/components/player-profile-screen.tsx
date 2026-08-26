@@ -31,10 +31,11 @@ import {
   sortedAttributeEntries,
 } from "@/domain/attribute-desk";
 import { abilityToneFromScore, attributeTone } from "@/domain/attribute-tone";
+import { formatHasScore, hasBand, liveHasScore } from "@/domain/has-score";
+import { formatPlayerPositions } from "@/domain/live-data";
 import { livePersonalityLabels } from "@/domain/personality-labels";
 import { AttributeHistoryPanel } from "@/components/attribute-history-panel";
 import { Button } from "@/components/ui/button";
-import { ConfidenceRing } from "@/components/confidence-ring";
 import { PlayerFace } from "@/components/player-face";
 import { ClubLogo } from "@/components/club-logo";
 import { NationFlag } from "@/components/nation-flag";
@@ -69,6 +70,27 @@ function metricValue(label: string, value: unknown) {
   return value.toFixed(label.toLowerCase().includes("per 90") ? 2 : 0);
 }
 
+function AttrRow({
+  label,
+  value,
+  toneClass,
+  title,
+}: {
+  label: string;
+  value: string;
+  toneClass?: string;
+  title?: string;
+}) {
+  return (
+    <div className="attr-row">
+      <span className="attr-row-label">{label}</span>
+      <strong className={`attr-row-value ${toneClass ?? ""}`.trim()} title={title}>
+        {value}
+      </strong>
+    </div>
+  );
+}
+
 function AttributeRows({
   names,
   values,
@@ -77,18 +99,20 @@ function AttributeRows({
   values: Record<string, number | null> | undefined;
 }) {
   return (
-    <>
+    <div className="attr-row-list">
       {names.map((name) => {
         const raw = values?.[name];
         const tone = typeof raw === "number" ? attributeTone(name, raw) : "mid";
         return (
-          <span key={name}>
-            <small>{name}</small>
-            <strong className={`attr-tone attr-tone-${tone}`}>{evidenceValue(values, name)}</strong>
-          </span>
+          <AttrRow
+            key={name}
+            label={name}
+            value={evidenceValue(values, name)}
+            toneClass={`attr-tone attr-tone-${tone}`}
+          />
         );
       })}
-    </>
+    </div>
   );
 }
 
@@ -116,6 +140,30 @@ function AttributeTooltipList({
   );
 }
 
+function AttributeHeading({
+  title,
+  tooltipNames,
+  values,
+}: {
+  title: string;
+  tooltipNames?: readonly string[];
+  values?: Record<string, number | null> | undefined;
+}) {
+  if (tooltipNames?.length) {
+    return (
+      <Tooltip>
+        <TooltipTrigger
+          render={<h3 className="attribute-column-heading attribute-column-heading-tip">{title}</h3>}
+        />
+        <TooltipContent side="bottom" align="start" className="attribute-tooltip">
+          <AttributeTooltipList names={tooltipNames} values={values} />
+        </TooltipContent>
+      </Tooltip>
+    );
+  }
+  return <h3 className="attribute-column-heading">{title}</h3>;
+}
+
 function AttributeGroup({
   title,
   names,
@@ -131,22 +179,9 @@ function AttributeGroup({
   headerTooltipNames?: readonly string[];
   footer?: ReactNode;
 }) {
-  const heading = headerTooltipNames?.length ? (
-    <Tooltip>
-      <TooltipTrigger
-        render={<h3 className="attribute-column-heading attribute-column-heading-tip">{title}</h3>}
-      />
-      <TooltipContent side="bottom" align="start" className="attribute-tooltip">
-        <AttributeTooltipList names={headerTooltipNames} values={values} />
-      </TooltipContent>
-    </Tooltip>
-  ) : (
-    <h3>{title}</h3>
-  );
-
   return (
     <section className="attribute-column" data-col={col}>
-      {heading}
+      <AttributeHeading title={title} tooltipNames={headerTooltipNames} values={values} />
       <AttributeRows names={names} values={values} />
       {footer}
     </section>
@@ -157,20 +192,22 @@ function GoalkeeperRatingBlock({ player }: { player: LivePlayer }) {
   const rating = resolveGoalkeeperRating(player.goalkeeperRating, player.attributes);
   return (
     <div className="attribute-extension attribute-gk-rating">
-      <Tooltip>
-        <TooltipTrigger
-          render={<h3 className="attribute-column-heading attribute-column-heading-tip">Goalkeeping</h3>}
+      <AttributeHeading
+        title="Goalkeeping"
+        tooltipNames={gkGoalkeepingAttributeNames()}
+        values={player.attributes}
+      />
+      <div className="attr-row-list">
+        <AttrRow
+          label="Goalkeeper Rating"
+          value={rating == null ? "—" : `${rating} / 10`}
+          toneClass={
+            rating == null
+              ? "attr-tone attr-tone-mid"
+              : `attr-tone attr-tone-${attributeTone("Ability", rating * 2)}`
+          }
         />
-        <TooltipContent side="bottom" align="start" className="attribute-tooltip">
-          <AttributeTooltipList names={gkGoalkeepingAttributeNames()} values={player.attributes} />
-        </TooltipContent>
-      </Tooltip>
-      <span>
-        <small>Goalkeeper Rating</small>
-        <strong className={rating == null ? "attr-tone-mid" : `attr-tone attr-tone-${attributeTone("Ability", rating * 2)}`}>
-          {rating == null ? "—" : `${rating} / 10`}
-        </strong>
-      </span>
+      </div>
     </div>
   );
 }
@@ -208,18 +245,18 @@ function GeneralColumn({ player, col = 3 }: { player: LivePlayer; col?: 1 | 2 | 
 
   return (
     <section className="attribute-column attribute-general" data-col={col}>
-      <h3>General</h3>
-      {rows.map((row) => (
-        <span key={row.label} className="attribute-general-row">
-          <small>{row.label}</small>
-          <strong
-            className={row.toneClass}
+      <AttributeHeading title="General" />
+      <div className="attr-row-list">
+        {rows.map((row) => (
+          <AttrRow
+            key={row.label}
+            label={row.label}
+            value={row.value}
+            toneClass={row.toneClass}
             title={row.value === "—" ? undefined : row.value}
-          >
-            {row.value}
-          </strong>
-        </span>
-      ))}
+          />
+        ))}
+      </div>
     </section>
   );
 }
@@ -354,24 +391,28 @@ export function PlayerProfileScreen({
   const unknownEvidence = 100 - knownEvidence;
 
   const ageDob =
-    player.age != null || player.dateOfBirth
-      ? `${player.age ?? "—"}${player.dateOfBirth ? ` · ${player.dateOfBirth}` : ""}`
-      : null;
-  const position = player.positions.length ? player.positions.join(" / ") : null;
+    [
+      player.age != null ? `${player.age} years old` : null,
+      player.dateOfBirth ? `(${player.dateOfBirth})` : null,
+    ]
+      .filter(Boolean)
+      .join(" ") || "—";
+  const position = formatPlayerPositions(player);
   const foot =
     player.preferredFoot || (player.leftFoot != null && player.rightFoot != null)
       ? `${player.preferredFoot ?? "—"}${
           player.leftFoot != null && player.rightFoot != null ? ` · ${player.leftFoot} / ${player.rightFoot}` : ""
         }`
-      : null;
+      : "—";
   const ca = abilityLabel(player.currentAbility);
   const pa = abilityLabel(player.potentialAbility);
-  const value = player.value?.trim() || null;
-  const wage = player.wage?.trim() || null;
-  const contract = player.contractStatus?.trim() || null;
+  const hasScore = liveHasScore(player);
+  const hasLabel = formatHasScore(hasScore);
+  const hasTone = hasScore == null ? "attr-tone-mid" : `attr-tone-${hasBand(hasScore)}`;
   const inferredLabels = livePersonalityLabels(player);
   const personalityLabel = formatGeneralText(player.personality ?? inferredLabels?.personality ?? null);
   const mediaLabel = formatGeneralText(player.mediaHandling ?? inferredLabels?.mediaHandling ?? null);
+  const nationLabel = player.nationality?.trim() || "—";
 
   return (
     <main className="player-dossier">
@@ -389,8 +430,8 @@ export function PlayerProfileScreen({
         </div>
       </header>
 
-      <section className="player-facts">
-        {(player.nationality || player.nationalityId) ? (
+      <section className="player-facts" aria-label="Key info">
+        <div className="player-facts-row">
           <span className="player-nation-fact">
             <b>Nationality</b>
             <span className="player-fact-identity">
@@ -399,11 +440,27 @@ export function PlayerProfileScreen({
               ) : (
                 <span className="nation-flag nation-flag-md nation-flag-empty" aria-hidden="true" />
               )}
-              <strong>{player.nationality ?? "—"}</strong>
+              <strong title={nationLabel === "—" ? undefined : nationLabel}>{nationLabel}</strong>
             </span>
           </span>
-        ) : null}
-        {clubName ? (
+          <span>
+            <b>Age</b>
+            <strong title={ageDob === "—" ? undefined : ageDob}>{ageDob}</strong>
+          </span>
+          <span title={personalityLabel === "—" ? undefined : personalityLabel}>
+            <b>Personality</b>
+            <strong>{personalityLabel}</strong>
+          </span>
+          <span>
+            <b>Preferred foot</b>
+            <strong title={foot === "—" ? undefined : foot}>{foot}</strong>
+          </span>
+          <span>
+            <b>Ability</b>
+            <strong className={abilityToneClass(player.currentAbility)}>{ca}</strong>
+          </span>
+        </div>
+        <div className="player-facts-row">
           <button
             type="button"
             className="player-club-fact"
@@ -417,29 +474,26 @@ export function PlayerProfileScreen({
               ) : (
                 <span className="club-logo club-logo-md club-logo-empty" aria-hidden="true" />
               )}
-              <strong>{clubName}</strong>
+              <strong title={clubName ?? undefined}>{clubName ?? "—"}</strong>
             </span>
           </button>
-        ) : null}
-        {ageDob ? <span><b>Age / DOB</b><strong>{ageDob}</strong></span> : null}
-        {position ? <span><b>Position</b><strong>{position}</strong></span> : null}
-        {foot ? <span><b>Preferred foot</b><strong>{foot}</strong></span> : null}
-        {ca !== "—" ? <span><b>CA</b><strong>{ca}</strong></span> : null}
-        {pa !== "—" ? <span><b>PA</b><strong>{pa}</strong></span> : null}
-        <span title={personalityLabel === "—" ? undefined : personalityLabel}>
-          <b>Personality</b>
-          <strong>{personalityLabel}</strong>
-        </span>
-        <span title={mediaLabel === "—" ? undefined : mediaLabel}>
-          <b>Media Handling</b>
-          <strong>{mediaLabel}</strong>
-        </span>
-        {value ? <span><b>Value</b><strong>{value}</strong></span> : null}
-        {wage ? <span><b>Wage</b><strong>{wage}</strong></span> : null}
-        {contract ? <span><b>Contract</b><strong>{contract}</strong></span> : null}
-        {player.scoutConfidence != null ? (
-          <span className="fact-confidence"><b>Knowledge</b><ConfidenceRing value={player.scoutConfidence} size="sm" /></span>
-        ) : null}
+          <span>
+            <b>Position</b>
+            <strong title={position === "—" ? undefined : position}>{position}</strong>
+          </span>
+          <span title={mediaLabel === "—" ? undefined : mediaLabel}>
+            <b>Media Handling</b>
+            <strong>{mediaLabel}</strong>
+          </span>
+          <span>
+            <b>HAS</b>
+            <strong className={hasTone}>{hasLabel}</strong>
+          </span>
+          <span>
+            <b>Potential</b>
+            <strong className={abilityToneClass(player.potentialAbility)}>{pa}</strong>
+          </span>
+        </div>
       </section>
 
       <Tabs defaultValue="attributes" className="dossier-tabs">
@@ -557,10 +611,8 @@ export function PlayerProfileScreen({
           </section>
         </TabsContent>
         <TabsContent value="attributes">
-          <section className="dossier-panel tab-evidence-panel">
-            <header><BarChart3 /><h2>Attribute desk</h2><span>{mappedAttributeCount} visible · CA/PA/HA when mapped</span></header>
+          <section className="dossier-panel tab-evidence-panel attribute-desk-panel">
             <AttributeDesk player={player} />
-            <p className="evidence-caption">Ability, potential, hidden, and personality show only when the live map returns in-range values; otherwise —.</p>
           </section>
         </TabsContent>
         <TabsContent value="development">

@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { ArrowRight } from "lucide-react";
 import type { LiveFootballSnapshot, LivePlayer } from "@/domain/adapters";
+import { formatPlayerPositions } from "@/domain/live-data";
 import { formatHasScore, hasBand, liveHasBreakdown, squadHasRankings, type HasTone } from "@/domain/has-score";
 import { LiveDataState } from "@/components/live-data-state";
 import { PlayerFace } from "@/components/player-face";
@@ -42,7 +43,7 @@ function HasCard({
             <PlayerFace playerId={player.id} name={player.name} size="sm" />
             <span className="dash-has-card-copy">
               <strong>{player.name}</strong>
-              <small>{player.positions?.slice(0, 2).join(" / ") || "—"}</small>
+              <small>{formatPlayerPositions(player)}</small>
             </span>
             <span className={`dash-has-score tone-${tone}`}>{formatHasScore(score)}</span>
           </button>

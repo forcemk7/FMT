@@ -1,14 +1,12 @@
 ﻿# Status
 
-Last updated: 2026-08-26 (T174 hard-clip badges)
+Last updated: 2026-08-26 (T173 best-position squad labels)
 
 ## Now
 
-**T173** Best-position squad labels and groups — `cursor-agent` (in_progress)
+_(empty — pick next ready ticket)_
 
-**Shipped:** T174 — hard-clip badge frames so tall nation crests cannot overflow.
-
-**Verify:** Spain / Belgium / Uruguay nationality badges stay inside the square.
+**Verify:** Squad Position shows best slot + secondaries in parentheses; groups follow best only.
 
 **Deferred:** T139 theme (chrome/shell covered by T158/T159). T162 trophy cabinet (marketing visual; no RE until Loop A sticks).
 
@@ -16,13 +14,13 @@ Last updated: 2026-08-26 (T174 hard-clip badges)
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
-| T173 | Best-position squad labels and groups | in_progress | 3 | cursor-agent |
 | T139 | FMT visual theme | deferred | — | overlapped |
 | T162 | Player trophy cabinet | deferred | — | backlog |
 | T124 | Quiet dev launch | ready | 9 | |
 
 ## Recently done
 
+- **T173** Best-position squad labels and groups
 - **T174** Hard-clip badge frames (no flag overflow)
 - **T172** Attribute desk header size + separator padding
 - **T171** FM stacked attribute desk top row (outfield/GK)

@@ -67,6 +67,10 @@ export type LivePlayer = {
   nationalityId?: string | null;
   secondNationality?: string | null;
   positions: string[];
+  /** Strong secondary slots (familiarity ≥15, below best). Shown in parentheses. */
+  secondaryPositions?: string[];
+  /** FM outfield desk Goalkeeper Rating (GK position familiarity, 0–10). */
+  goalkeeperRating?: number | null;
   bestRole: string | null;
   playableRoles?: PlayerRoleFit[];
   otherRoles?: PlayerRoleFit[];
@@ -127,6 +131,8 @@ export type LivePlayer = {
   riskLevel?: "low" | "medium" | "high" | "unknown";
   marketValueAmount?: number | null;
   personality?: string | null;
+  /** Coach/media handling phrase when mapped (General column). */
+  mediaHandling?: string | null;
   condition?: string | null;
   heightCm?: number | null;
   rawStats?: Record<string, number | null>;

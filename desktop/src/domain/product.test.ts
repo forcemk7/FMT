@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildKnowledgeProfile, describeField } from "./scout-knowledge";
-import { groupPlayerPosition, resolveFavorites, toggleFavorite, updateFavoriteNote } from "./live-data";
+import { groupPlayerPosition, formatPlayerPositions, resolveFavorites, toggleFavorite, updateFavoriteNote } from "./live-data";
 import type { LivePlayer } from "./adapters";
 import { estimateTruePrice, evaluateRoleDna } from "./player-evaluation";
 
@@ -54,6 +54,32 @@ describe("live squad grouping", () => {
   it("groups extracted players by their live position data", () => {
     expect(groupPlayerPosition(livePlayer)).toBe("Centre-backs");
     expect(groupPlayerPosition({ ...livePlayer, positions: ["DM", "CM"] })).toBe("Defensive midfielders");
+  });
+
+  it("groups by best position only, ignoring secondaries", () => {
+    expect(
+      groupPlayerPosition({
+        ...livePlayer,
+        positions: ["ST"],
+        secondaryPositions: ["AMC", "MC"],
+      }),
+    ).toBe("Strikers");
+  });
+});
+
+describe("player position labels", () => {
+  it("formats best slots with secondaries in parentheses", () => {
+    expect(
+      formatPlayerPositions({
+        positions: ["DC"],
+        secondaryPositions: ["DM", "MC"],
+      }),
+    ).toBe("DC (DM / MC)");
+    expect(formatPlayerPositions({ positions: ["DL", "DR"], secondaryPositions: ["MC"] })).toBe(
+      "DL / DR (MC)",
+    );
+    expect(formatPlayerPositions({ positions: ["GK"], secondaryPositions: [] })).toBe("GK");
+    expect(formatPlayerPositions({ positions: [], secondaryPositions: ["MC"] })).toBe("—");
   });
 });
 

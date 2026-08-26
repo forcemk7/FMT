@@ -14,6 +14,19 @@ export const positionGroups = [
 
 export type PositionGroup = (typeof positionGroups)[number];
 
+/** Best slot(s), with secondaries in parentheses — e.g. `DC (DM / MC)`. */
+export function formatPlayerPositions(
+  player: Pick<LivePlayer, "positions" | "secondaryPositions">,
+): string {
+  const primary = player.positions ?? [];
+  if (!primary.length) return "—";
+  const head = primary.join(" / ");
+  const secondary = player.secondaryPositions ?? [];
+  if (!secondary.length) return head;
+  return `${head} (${secondary.join(" / ")})`;
+}
+
+/** Group by best (primary) position only — not secondary slots. */
 export function groupPlayerPosition(player: LivePlayer): PositionGroup {
   const positions = player.positions.map((position) => position.toUpperCase());
   if (positions.some((position) => /\bGK\b/.test(position))) return "Goalkeepers";
