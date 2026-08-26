@@ -34,4 +34,4 @@ Loop A: find a squad player from the shell and open the desk. Today the header s
 
 ## Progress
 
-Shipped: nav no longer eats the flex gap; `.shell-search` grows between tabs and load pill; dark-shell results panel uses panel tokens so names are readable; click already opened profile (unchanged). Failure mode was light inherited `--text` on white GS results chrome. Verified by CSS/layout review against screenshot.
+Shipped: nav no longer eats the flex gap; `.shell-search` grows between tabs and load pill; dark-shell results panel uses panel tokens so names are readable; click already opened profile (unchanged). Failure mode was light inherited `--text` on white GS results chrome. Commit: `b4423c4` (results theme); layout flex also on main via shell CSS.
