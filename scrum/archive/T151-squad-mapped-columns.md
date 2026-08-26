@@ -42,4 +42,5 @@ Loop A: Squad must show only fields we actually read. Empty unmapped columns are
 - Squad: Player | Position (+ foot) | Ability | Potential | Details only
 - Ability/Potential rings: 1–200, conic fill ×1.8°, attr tones on /10
 - Verified: `cargo test preferred_foot`, `tsc --noEmit`
-- Commit: _(filled after git)_
+- Commit: `600ef01`
+- Note: Squad UI column cut + rings landed adjacent to T150 tree; this commit locks foot digits + CA/PA emit + archive.
