@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { ConfidenceRing } from "@/components/confidence-ring";
 import { PlayerFace } from "@/components/player-face";
 import { ClubLogo } from "@/components/club-logo";
+import { NationFlag } from "@/components/nation-flag";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const technicalAttributes = ["Crossing", "Dribbling", "Finishing", "First Touch", "Heading", "Long Shots", "Marking", "Passing", "Tackling", "Technique"];
@@ -30,7 +31,7 @@ const physicalAttributes = ["Acceleration", "Agility", "Balance", "Jumping Reach
 const setPieceAttributes = ["Corners", "Free Kick Taking", "Penalty Taking", "Long Throws"];
 const goalkeepingAttributes = ["Aerial Reach", "Command of Area", "Communication", "Eccentricity", "Handling", "Kicking", "One on Ones", "Punching", "Reflexes", "Rushing Out", "Throwing"];
 const hiddenAttributes = ["Consistency", "Dirtiness", "Important Matches", "Injury Proneness", "Versatility"];
-const personalityAttributes = ["Adaptability", "Ambition", "Loyalty", "Pressure", "Professionalism", "Sportsmanship", "Temperament", "Controversy"];
+const personalityAttributes = ["Adaptability", "Ambition", "Controversy", "Loyalty", "Pressure", "Professionalism", "Sportsmanship", "Temperament"];
 
 function evidenceValue(map: Record<string, number | null> | undefined, attribute: string) {
   const value = map?.[attribute];
@@ -175,11 +176,25 @@ export function PlayerProfileScreen({
       </header>
 
       <section className="player-facts">
-        <span><b>Nationality</b><strong>{player.nationality ?? "Unknown"}</strong></span>
-        <button className="player-club-fact" disabled={!club} onClick={() => club && onOpenClub?.(club.id)}>{club ? <ClubLogo clubId={club.id} name={club.name} size="sm" /> : null}<span><b>Club</b><strong>{clubName ?? "Unknown"}</strong></span></button>
+        <span className="player-nation-fact">
+          {player.nationalityId ? (
+            <NationFlag nationId={player.nationalityId} name={player.nationality ?? "Nation"} size="sm" />
+          ) : null}
+          <span>
+            <b>Nationality</b>
+            <strong>{player.nationality ?? "Unknown"}</strong>
+          </span>
+        </span>
+        <button className="player-club-fact" disabled={!club} onClick={() => club && onOpenClub?.(club.id)}>
+          {club ? <ClubLogo clubId={club.id} name={club.name} size="sm" /> : null}
+          <span>
+            <b>Club</b>
+            <strong>{clubName ?? "Unknown"}</strong>
+          </span>
+        </button>
         <span><b>Age / DOB</b><strong>{player.age ?? "Unknown"}{player.dateOfBirth ? ` · ${player.dateOfBirth}` : ""}</strong></span>
         <span><b>Position</b><strong>{player.positions.join(" / ") || "Unknown"}</strong></span>
-        <span><b>Preferred foot</b><strong>{player.preferredFoot ?? "Unknown"}</strong></span>
+        <span><b>Preferred foot</b><strong>{player.preferredFoot ?? "Unknown"}{player.leftFoot != null && player.rightFoot != null ? ` · ${player.leftFoot} / ${player.rightFoot}` : ""}</strong></span>
         <span><b>CA</b><strong>{abilityLabel(player.currentAbility)}</strong></span>
         <span><b>PA</b><strong>{abilityLabel(player.potentialAbility)}</strong></span>
         <span><b>Value</b><strong>{player.value ?? "Unknown"}</strong></span>
@@ -190,9 +205,13 @@ export function PlayerProfileScreen({
 
       <Tabs defaultValue="attributes" className="dossier-tabs">
         <TabsList variant="line">
-          {["attributes", "overview", "tactical", "performance", "career"].map((value) => (
+          {["attributes", "development", "overview", "tactical", "performance", "career"].map((value) => (
             <TabsTrigger key={value} value={value}>
-              {value === "tactical" ? "Tactical fit" : value === "attributes" ? "Attributes & history" : value[0].toUpperCase() + value.slice(1)}
+              {value === "tactical"
+                ? "Tactical fit"
+                : value === "development"
+                  ? "Development"
+                  : value[0].toUpperCase() + value.slice(1)}
             </TabsTrigger>
           ))}
         </TabsList>
@@ -332,6 +351,8 @@ export function PlayerProfileScreen({
             </div>
             <p className="evidence-caption">CA, PA, hidden, and personality show only when the live map returns in-range values; otherwise —.</p>
           </section>
+        </TabsContent>
+        <TabsContent value="development">
           <AttributeHistoryPanel key={player.id} playerId={player.id} />
         </TabsContent>
         <TabsContent value="performance">

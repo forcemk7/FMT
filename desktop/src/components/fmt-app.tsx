@@ -18,8 +18,7 @@ import {
 } from "@/domain/adapters";
 import { recordPlayersFromSnapshot } from "@/domain/attribute-history";
 import { toggleFavorite, type FavoriteRecord } from "@/domain/live-data";
-import { clearPlayerFaceMemoryCache } from "@/components/player-face";
-import { invoke } from "@tauri-apps/api/core";
+import { warmSquadGraphics } from "@/domain/warm-squad-graphics";
 
 const initialStatus: LiveConnectorStatus = {
   processDetected: false,
@@ -135,26 +134,14 @@ export function FMTApp() {
     setScreenState(screenHistory[nextIndex]);
   }, [historyIndex, screenHistory]);
 
-  const goForward = useCallback(() => {
-    if (historyIndex >= screenHistory.length - 1) return;
-    const nextIndex = historyIndex + 1;
-    setHistoryIndex(nextIndex);
-    setScreenState(screenHistory[nextIndex]);
-  }, [historyIndex, screenHistory]);
-
   const checkConnection = useCallback(async () => {
     setChecking(true);
     try {
       const nextSnapshot = await fm26LiveAdapter.getSnapshot();
       if (nextSnapshot.status.state === "connected" && nextSnapshot.players.length) {
         recordPlayersFromSnapshot(nextSnapshot.players, nextSnapshot.season);
-        // Cosmetic: warm face cache in background; never block load UX.
-        if ("__TAURI_INTERNALS__" in window) {
-          const playerIds = nextSnapshot.players.map((player) => player.id);
-          void invoke("faces_update_cache", { playerIds })
-            .then(() => clearPlayerFaceMemoryCache())
-            .catch(() => undefined);
-        }
+        // UID → background XML index → disk cache. Never block Load Active Save.
+        warmSquadGraphics(nextSnapshot);
       }
       setSnapshot(nextSnapshot);
       return nextSnapshot.status;
@@ -204,7 +191,13 @@ export function FMTApp() {
 
   const content =
     screen === "Dashboard" ? (
-      <DashboardScreen snapshot={snapshot} checking={checking} onRefresh={checkConnection} onOpenPlayer={openPlayer} />
+      <DashboardScreen
+        snapshot={snapshot}
+        checking={checking}
+        onRefresh={checkConnection}
+        onOpenPlayer={openPlayer}
+        onOpenSquad={() => navigate("Squad")}
+      />
     ) : screen === "Squad" ? (
       <MyTeamScreen
         snapshot={snapshot}
@@ -245,10 +238,6 @@ export function FMTApp() {
           snapshot={snapshot}
           checking={checking}
           onRefresh={checkConnection}
-          canGoBack={historyIndex > 0}
-          canGoForward={historyIndex < screenHistory.length - 1}
-          onGoBack={goBack}
-          onGoForward={goForward}
         />
         {search ? (
           <motion.div

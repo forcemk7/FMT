@@ -3,35 +3,35 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
-type ClubLogoResult = { found: boolean; clubId: string; dataUrl: string | null };
+type NationFlagResult = { found: boolean; nationId: string; dataUrl: string | null };
 const cache = new Map<string, string | null>();
 const RETRY_MS = [400, 1200, 2800, 5000];
 
-export function clearClubLogoMemoryCache() {
+export function clearNationFlagMemoryCache() {
   cache.clear();
   if (typeof window !== "undefined") {
-    window.dispatchEvent(new Event("fmt-logos-updated"));
+    window.dispatchEvent(new Event("fmt-flags-updated"));
   }
 }
 
-export function ClubLogo({
-  clubId,
+export function NationFlag({
+  nationId,
   name,
-  size = "md",
+  size = "sm",
 }: {
-  clubId: string;
+  nationId: string;
   name: string;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md";
 }) {
   const [source, setSource] = useState<string | null | undefined>(() => {
-    if (cache.has(clubId)) return cache.get(clubId);
+    if (cache.has(nationId)) return cache.get(nationId);
     if (typeof window !== "undefined" && !("__TAURI_INTERNALS__" in window)) return null;
     return undefined;
   });
 
   useEffect(() => {
     if (!("__TAURI_INTERNALS__" in window)) {
-      cache.set(clubId, null);
+      cache.set(nationId, null);
       setSource(null);
       return;
     }
@@ -40,17 +40,17 @@ export function ClubLogo({
     let timers: number[] = [];
 
     const apply = (next: string | null) => {
-      cache.set(clubId, next);
+      cache.set(nationId, next);
       if (active) setSource(next);
     };
 
     const load = (attempt: number) => {
-      const hit = cache.get(clubId);
+      const hit = cache.get(nationId);
       if (hit) {
         if (active) setSource(hit);
         return;
       }
-      invoke<ClubLogoResult>("club_logo_data", { clubId })
+      invoke<NationFlagResult>("nation_flag_data", { nationId })
         .then((result) => {
           if (!active) return;
           const next = result.found && result.dataUrl ? result.dataUrl : null;
@@ -58,11 +58,10 @@ export function ClubLogo({
             apply(next);
             return;
           }
-          // Soft miss while background XML index fills cache — retry a few times.
           if (attempt < RETRY_MS.length) {
             timers.push(
               window.setTimeout(() => {
-                cache.delete(clubId);
+                cache.delete(nationId);
                 load(attempt + 1);
               }, RETRY_MS[attempt]),
             );
@@ -78,22 +77,22 @@ export function ClubLogo({
 
     load(0);
     const onUpdate = () => {
-      cache.delete(clubId);
+      cache.delete(nationId);
       if (active) setSource(undefined);
       load(0);
     };
-    window.addEventListener("fmt-logos-updated", onUpdate);
+    window.addEventListener("fmt-flags-updated", onUpdate);
     return () => {
       active = false;
       timers.forEach((id) => window.clearTimeout(id));
-      window.removeEventListener("fmt-logos-updated", onUpdate);
+      window.removeEventListener("fmt-flags-updated", onUpdate);
     };
-  }, [clubId]);
+  }, [nationId]);
 
   if (!source) return null;
   return (
-    <span className={`club-logo club-logo-${size}`}>
-      <img src={source} alt={`${name} badge from FM club ID ${clubId}`} />
+    <span className={`nation-flag nation-flag-${size}`}>
+      <img src={source} alt={`${name} flag from FM nation ID ${nationId}`} />
     </span>
   );
 }

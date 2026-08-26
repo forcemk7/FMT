@@ -1,8 +1,7 @@
-//! Logo serving model (keep the shell light):
-//! 1. Serve from local logo-cache only on the hot path (O(1) disk).
-//! 2. Never walk/parse FM logo packs from UI invokes or Load Active Save.
-//! 3. Optional: `warm_logos_for_clubs` queues IDs and may start a one-shot background
-//!    index — call that only from an explicit Settings action, never on load.
+//! Nation flag / federation badge serving (keep the shell light):
+//! 1. Serve from local flag-cache only on the hot path (O(1) disk).
+//! 2. Never walk/parse FM packs from UI invokes or Load Active Save.
+//! 3. UID → one-shot background XML index → copy into cache (same model as club logos).
 
 use std::{
     collections::{HashMap, HashSet, VecDeque},
@@ -22,36 +21,34 @@ use super::{
     packs::{copy_into_asset_cache, resolve_cached_asset},
 };
 
-const LOGO_CACHE_DIR: &str = "logo-cache";
+const FLAG_CACHE_DIR: &str = "flag-cache";
 const MAX_INDEX_DEPTH: usize = 12;
 
 #[derive(Default)]
-struct LogoServeState {
-    /// club_id → source path inside a graphics pack
+struct FlagServeState {
+    /// nation_id → source path inside a graphics pack
     index: Option<HashMap<String, PathBuf>>,
     building: bool,
-    /// Needs waiting until index is ready
     pending: VecDeque<String>,
-    /// IDs already known missing after index build
     missing: HashSet<String>,
 }
 
-static STATE: OnceLock<Mutex<LogoServeState>> = OnceLock::new();
+static STATE: OnceLock<Mutex<FlagServeState>> = OnceLock::new();
 static INDEX_STARTED: AtomicBool = AtomicBool::new(false);
 
-fn state() -> &'static Mutex<LogoServeState> {
-    STATE.get_or_init(|| Mutex::new(LogoServeState::default()))
+fn state() -> &'static Mutex<FlagServeState> {
+    STATE.get_or_init(|| Mutex::new(FlagServeState::default()))
 }
 
-pub fn logo_cache_dir() -> PathBuf {
-    app_data_dir().join(LOGO_CACHE_DIR)
+pub fn flag_cache_dir() -> PathBuf {
+    app_data_dir().join(FLAG_CACHE_DIR)
 }
 
-/// Queue club IDs and start a one-shot background index. Do not call from Load Active Save.
-pub fn warm_logos_for_clubs(club_ids: &[String]) -> FaceWarmResult {
-    let cache = logo_cache_dir();
+/// Queue nation IDs and start a one-shot background index. Do not call from Load Active Save sync path.
+pub fn warm_flags_for_nations(nation_ids: &[String]) -> FaceWarmResult {
+    let cache = flag_cache_dir();
     let _ = fs::create_dir_all(&cache);
-    let ids: Vec<String> = club_ids
+    let ids: Vec<String> = nation_ids
         .iter()
         .map(|id| id.trim().to_string())
         .filter(|id| !id.is_empty() && id.bytes().all(|b| b.is_ascii_digit()))
@@ -69,13 +66,12 @@ pub fn warm_logos_for_clubs(club_ids: &[String]) -> FaceWarmResult {
     }
 }
 
-pub(crate) fn resolve_logo_path(club_id: &str) -> Option<PathBuf> {
-    let id = club_id.trim();
+pub fn resolve_flag_path(nation_id: &str) -> Option<PathBuf> {
+    let id = nation_id.trim();
     if id.is_empty() || !id.bytes().all(|b| b.is_ascii_digit()) {
         return None;
     }
-    // Hot path: local cache only. Never start pack walks from club_logo_data.
-    if let Some(cached) = resolve_cached_asset(&logo_cache_dir(), id) {
+    if let Some(cached) = resolve_cached_asset(&flag_cache_dir(), id) {
         return Some(cached);
     }
     let mut state = state().lock().ok()?;
@@ -88,7 +84,7 @@ pub(crate) fn resolve_logo_path(club_id: &str) -> Option<PathBuf> {
         let Some(source) = source else {
             return None;
         };
-        return copy_into_asset_cache(&logo_cache_dir(), id, &source, MAX_IMAGE_BYTES).or(Some(source));
+        return copy_into_asset_cache(&flag_cache_dir(), id, &source, MAX_IMAGE_BYTES).or(Some(source));
     }
     if !state.pending.iter().any(|pending| pending == id) {
         state.pending.push_back(id.to_string());
@@ -105,7 +101,7 @@ fn queue_needs(ids: &[String]) {
             if state.missing.contains(id) {
                 continue;
             }
-            if resolve_cached_asset(&logo_cache_dir(), id).is_some() {
+            if resolve_cached_asset(&flag_cache_dir(), id).is_some() {
                 continue;
             }
             if !state.pending.iter().any(|pending| pending == id) {
@@ -123,14 +119,14 @@ fn ensure_index_building() {
         guard.building = true;
     }
     thread::spawn(|| {
-        let index = build_logo_index();
+        let index = build_flag_index();
         let pending = {
             let mut guard = state().lock().unwrap_or_else(|e| e.into_inner());
             guard.index = Some(index);
             guard.building = false;
             std::mem::take(&mut guard.pending)
         };
-        let cache = logo_cache_dir();
+        let cache = flag_cache_dir();
         let _ = fs::create_dir_all(&cache);
         for id in pending {
             fill_cache_for_id(&cache, &id);
@@ -158,7 +154,7 @@ fn fill_cache_for_id(cache: &Path, id: &str) {
     }
 }
 
-fn logo_pack_roots() -> Vec<PathBuf> {
+fn flag_pack_roots() -> Vec<PathBuf> {
     let mut packs = Vec::new();
     for root in active_graphics_roots() {
         if !root.is_dir() {
@@ -178,18 +174,24 @@ fn logo_pack_roots() -> Vec<PathBuf> {
                 {
                     continue;
                 }
-                let logoish = name.contains("logo")
+                let flagish = name.contains("logo")
+                    || name.contains("flag")
+                    || name.contains("nation")
                     || name.contains("badge")
-                    || name.contains("crest")
                     || path.join("Men").is_dir()
-                    || path.join("logos").is_dir()
-                    || path.join("clubs").is_dir();
-                if logoish {
+                    || path.join("flags").is_dir()
+                    || path.join("nations").is_dir();
+                if flagish {
                     packs.push(path);
                 }
             }
         }
-        for directory in [root.join("logos"), root.join("clubs"), root.join("badges")] {
+        for directory in [
+            root.join("flags"),
+            root.join("nations"),
+            root.join("pictures").join("flags"),
+            root.join("pictures").join("nation"),
+        ] {
             if directory.is_dir() {
                 packs.push(directory);
             }
@@ -198,21 +200,21 @@ fn logo_pack_roots() -> Vec<PathBuf> {
     packs
 }
 
-fn build_logo_index() -> HashMap<String, PathBuf> {
-    let mut by_club_id = HashMap::new();
-    for pack in logo_pack_roots() {
-        index_logo_tree(&pack, 0, &mut by_club_id);
+fn build_flag_index() -> HashMap<String, PathBuf> {
+    let mut by_nation_id = HashMap::new();
+    for pack in flag_pack_roots() {
+        index_flag_tree(&pack, 0, &mut by_nation_id);
     }
-    by_club_id
+    by_nation_id
 }
 
-fn index_logo_tree(directory: &Path, depth: usize, by_club_id: &mut HashMap<String, PathBuf>) {
+fn index_flag_tree(directory: &Path, depth: usize, by_nation_id: &mut HashMap<String, PathBuf>) {
     if depth > MAX_INDEX_DEPTH || !directory.is_dir() {
         return;
     }
     let config = directory.join("config.xml");
     if config.is_file() {
-        index_logo_config(&config, directory, by_club_id);
+        index_flag_config(&config, directory, by_nation_id);
     }
     let Ok(entries) = fs::read_dir(directory) else {
         return;
@@ -226,14 +228,19 @@ fn index_logo_tree(directory: &Path, depth: usize, by_club_id: &mut HashMap<Stri
             .file_name()
             .map(|n| n.to_string_lossy().to_ascii_lowercase())
             .unwrap_or_default();
-        if name.contains("kit") || name.contains("instruction") || name.contains("comp") {
+        // Club trees are huge; nation badges live under Federations / Nations / flags.
+        if name.contains("kit")
+            || name.contains("instruction")
+            || name == "clubs"
+            || name == "competitions"
+        {
             continue;
         }
-        index_logo_tree(&path, depth + 1, by_club_id);
+        index_flag_tree(&path, depth + 1, by_nation_id);
     }
 }
 
-fn index_logo_config(config: &Path, directory: &Path, by_club_id: &mut HashMap<String, PathBuf>) {
+fn index_flag_config(config: &Path, directory: &Path, by_nation_id: &mut HashMap<String, PathBuf>) {
     let Ok(metadata) = config.metadata() else {
         return;
     };
@@ -247,16 +254,13 @@ fn index_logo_config(config: &Path, directory: &Path, by_club_id: &mut HashMap<S
         if !line.contains("from=\"") || !line.contains("to=\"") {
             continue;
         }
-        if !line.contains("/logo") && !line.contains("/icon") {
-            continue;
-        }
         let Some(to) = attribute_value(&line, "to") else {
             continue;
         };
-        let Some(club_id) = club_id_from_logo_to(to) else {
+        let Some(nation_id) = nation_id_from_flag_to(to) else {
             continue;
         };
-        if by_club_id.contains_key(&club_id) {
+        if by_nation_id.contains_key(&nation_id) {
             continue;
         }
         let Some(from) = attribute_value(&line, "from") else {
@@ -266,25 +270,31 @@ fn index_logo_config(config: &Path, directory: &Path, by_club_id: &mut HashMap<S
             continue;
         };
         if let Some(path) = resolve_image_beside(directory, &relative) {
-            by_club_id.insert(club_id, path);
+            by_nation_id.insert(nation_id, path);
         }
     }
 }
 
-fn club_id_from_logo_to(to: &str) -> Option<String> {
+/// TCM federations use `nation/{id}/logo`; classic packs use `flags/{id}/flag`.
+fn nation_id_from_flag_to(to: &str) -> Option<String> {
     for marker in [
-        "graphics/pictures/club/",
-        "graphics/pictures/team/",
-        "pictures/club/",
-        "pictures/team/",
-        "club/",
-        "team/",
+        "graphics/pictures/flags/",
+        "graphics/pictures/nation/",
+        "pictures/flags/",
+        "pictures/nation/",
+        "flags/",
+        "nation/",
     ] {
         let Some(rest) = to.strip_prefix(marker) else {
             continue;
         };
-        let id = rest.split('/').next()?.trim().trim_start_matches("r-");
-        if !id.is_empty() && id.bytes().all(|b| b.is_ascii_digit()) {
+        let mut parts = rest.split('/');
+        let id = parts.next()?.trim().trim_start_matches("r-");
+        let kind = parts.next().unwrap_or("");
+        if !id.is_empty()
+            && id.bytes().all(|b| b.is_ascii_digit())
+            && (kind.is_empty() || kind == "flag" || kind == "logo" || kind == "icon")
+        {
             return Some(id.to_string());
         }
     }
@@ -320,30 +330,43 @@ mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    fn temp_logo_dir() -> PathBuf {
+    fn temp_flag_dir() -> PathBuf {
         let stamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("system time")
             .as_nanos();
-        std::env::temp_dir().join(format!("fmt-logo-serve-test-{stamp}"))
+        std::env::temp_dir().join(format!("fmt-flag-serve-test-{stamp}"))
     }
 
     #[test]
-    fn indexes_tcm_style_club_logo_mapping() {
-        let root = temp_logo_dir();
-        let clubs = root.join("Men").join("Europe").join("Germany").join("Clubs");
-        fs::create_dir_all(&clubs).expect("dirs");
-        fs::write(clubs.join("TCM1_920.png"), b"not-empty").expect("image");
+    fn indexes_tcm_style_nation_logo_mapping() {
+        let root = temp_flag_dir();
+        let feds = root.join("Men").join("Others").join("Federations");
+        fs::create_dir_all(&feds).expect("dirs");
+        fs::write(feds.join("TCM3_794.png"), b"not-empty").expect("image");
         fs::write(
-            clubs.join("config.xml"),
-            r#"<record from="TCM1_920" to="graphics/pictures/club/920/logo"/>"#,
+            feds.join("config.xml"),
+            r#"<record from="TCM3_794" to="graphics/pictures/nation/794/logo"/>"#,
         )
         .expect("config");
 
         let mut map = HashMap::new();
-        index_logo_tree(&root, 0, &mut map);
-        assert_eq!(map.get("920"), Some(&clubs.join("TCM1_920.png")));
+        index_flag_tree(&root, 0, &mut map);
+        assert_eq!(map.get("794"), Some(&feds.join("TCM3_794.png")));
 
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn nation_id_accepts_logo_and_flag_suffix() {
+        assert_eq!(
+            nation_id_from_flag_to("graphics/pictures/nation/10/logo"),
+            Some("10".into())
+        );
+        assert_eq!(
+            nation_id_from_flag_to("graphics/pictures/flags/10/flag"),
+            Some("10".into())
+        );
+        assert_eq!(nation_id_from_flag_to("graphics/pictures/club/10/logo"), None);
     }
 }

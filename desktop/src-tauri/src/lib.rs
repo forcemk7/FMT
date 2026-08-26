@@ -39,11 +39,13 @@ pub fn run() {
             mapping_lab::mapping_lab_capture,
             mapping_lab::mapping_lab_compare,
             player_face::club_logo_data,
-            player_face::player_face_data,
-            player_face::graphics_settings_get,
-            player_face::graphics_settings_set,
+            player_face::faces_status,
             player_face::faces_update_cache,
-            player_face::faces_cache_status,
+            player_face::flags_update_cache,
+            player_face::graphics_status,
+            player_face::logos_update_cache,
+            player_face::nation_flag_data,
+            player_face::player_face_data,
             visibility::filter_observations
         ])
         .run(tauri::generate_context!())

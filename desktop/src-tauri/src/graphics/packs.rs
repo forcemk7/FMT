@@ -1,0 +1,115 @@
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
+
+use super::faces::default_graphics_root;
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GraphicsPackEntry {
+    pub name: String,
+    /// "Faces" or "Logos"
+    pub kind: &'static str,
+}
+
+fn skip_pack(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    lower.contains("kit")
+        || lower.contains("wallpaper")
+        || lower.contains("background")
+}
+
+fn is_face_pack(path: &Path, name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    path.join("faces").is_dir()
+        || lower.contains("face")
+        || lower.contains("cutout")
+        || lower.contains("newgen")
+        || lower.contains("portrait")
+}
+
+fn is_logo_pack(path: &Path, name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    lower.contains("logo")
+        || lower.contains("badge")
+        || lower.contains("crest")
+        || path.join("Men").is_dir()
+        || path.join("Women").is_dir()
+        || path.join("logos").is_dir()
+        || path.join("clubs").is_dir()
+        || path.join("badges").is_dir()
+}
+
+/// Top-level graphics folders only — no config XML reads.
+pub fn discover_graphics_packs() -> Vec<GraphicsPackEntry> {
+    let root = default_graphics_root();
+    if !root.is_dir() {
+        return Vec::new();
+    }
+
+    let mut packs = Vec::new();
+    let Ok(entries) = fs::read_dir(&root) else {
+        return packs;
+    };
+    for entry in entries.flatten() {
+        if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+            continue;
+        }
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if skip_pack(&name) {
+            continue;
+        }
+        let path = entry.path();
+        let faces = is_face_pack(&path, &name);
+        let logos = is_logo_pack(&path, &name);
+        if faces {
+            packs.push(GraphicsPackEntry {
+                name: name.clone(),
+                kind: "Faces",
+            });
+        }
+        if logos {
+            packs.push(GraphicsPackEntry {
+                name,
+                kind: "Logos",
+            });
+        }
+    }
+    packs.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.kind.cmp(b.kind)));
+    packs
+}
+
+pub(crate) fn resolve_cached_asset(cache_dir: &Path, id: &str) -> Option<PathBuf> {
+    for extension in ["png", "jpg", "jpeg", "webp"] {
+        let path = cache_dir.join(format!("{id}.{extension}"));
+        if path.is_file() {
+            return Some(path);
+        }
+    }
+    None
+}
+
+pub(crate) fn copy_into_asset_cache(
+    cache_dir: &Path,
+    id: &str,
+    source: &Path,
+    max_bytes: u64,
+) -> Option<PathBuf> {
+    let meta = source.metadata().ok()?;
+    if !meta.is_file() || meta.len() == 0 || meta.len() > max_bytes {
+        return None;
+    }
+    let ext = source
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("png")
+        .to_ascii_lowercase();
+    if !matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "webp") {
+        return None;
+    }
+    fs::create_dir_all(cache_dir).ok()?;
+    let dest = cache_dir.join(format!("{id}.{ext}"));
+    fs::copy(source, &dest).ok()?;
+    Some(dest)
+}

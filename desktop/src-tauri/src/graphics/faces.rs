@@ -1,29 +1,19 @@
 use std::{
+    collections::HashSet,
     env, fs,
-    io::{BufRead, BufReader},
     path::{Path, PathBuf},
-    sync::Mutex,
+    sync::OnceLock,
+    thread,
 };
 
-use super::config_xml::{attribute_value, safe_single_component_stem, MAX_GRAPHICS_CONFIG_BYTES};
+#[cfg(test)]
+use super::config_xml::attribute_value;
 
 pub(crate) const MAX_IMAGE_BYTES: u64 = 8 * 1024 * 1024;
 
-const SETTINGS_FILE: &str = "graphics-settings.json";
 const CACHE_DIRNAME: &str = "face-cache";
-
-static GRAPHICS_ROOTS_OVERRIDE: Mutex<Option<Vec<PathBuf>>> = Mutex::new(None);
-
-#[derive(serde::Serialize, serde::Deserialize, Clone, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct GraphicsSettings {
-    /// One or more FM graphics folders / pack parents (Cutout + NewGAN, etc.).
-    #[serde(default)]
-    pub graphics_roots: Vec<String>,
-    /// Legacy single root — migrated into `graphics_roots` on load.
-    #[serde(default)]
-    pub graphics_root: Option<String>,
-}
+/// Megapack face folders: skip XML parse, resolve `face_{uid}.png` on demand.
+const HUGE_FACE_CONFIG_BYTES: u64 = 2 * 1024 * 1024;
 
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -32,7 +22,17 @@ pub struct FaceWarmResult {
     pub cached: usize,
     pub copied: usize,
     pub missing: usize,
-    pub graphics_roots: Vec<String>,
+    pub cache_dir: String,
+}
+
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FacesStatus {
+    pub graphics_path: String,
+    pub graphics_exists: bool,
+    pub face_packs_found: usize,
+    pub face_pack_names: Vec<String>,
+    pub cached_files: usize,
     pub cache_dir: String,
 }
 
@@ -57,79 +57,153 @@ pub fn default_graphics_root() -> PathBuf {
         .join("graphics")
 }
 
-fn normalize_roots(settings: &GraphicsSettings) -> Vec<PathBuf> {
-    let mut roots: Vec<PathBuf> = settings
-        .graphics_roots
-        .iter()
-        .map(|s| s.trim())
-        .filter(|s| !s.is_empty())
-        .map(PathBuf::from)
-        .collect();
-    if let Some(legacy) = settings.graphics_root.as_ref() {
-        let trimmed = legacy.trim();
-        if !trimmed.is_empty() {
-            let path = PathBuf::from(trimmed);
-            if !roots.iter().any(|r| r == &path) {
-                roots.push(path);
+#[derive(serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GraphicsStatus {
+    pub graphics_path: String,
+    pub graphics_exists: bool,
+    pub packs: Vec<super::packs::GraphicsPackEntry>,
+}
+
+pub fn graphics_status() -> GraphicsStatus {
+    let root = default_graphics_root();
+    GraphicsStatus {
+        graphics_path: root.display().to_string(),
+        graphics_exists: root.is_dir(),
+        packs: super::packs::discover_graphics_packs(),
+    }
+}
+
+pub fn faces_status() -> FacesStatus {
+    let root = default_graphics_root();
+    let packs = discover_face_packs();
+    let cache = face_cache_dir();
+    let cached_files = fs::read_dir(&cache)
+        .map(|entries| entries.filter_map(|e| e.ok()).count())
+        .unwrap_or(0);
+    FacesStatus {
+        graphics_path: root.display().to_string(),
+        graphics_exists: root.is_dir(),
+        face_packs_found: packs.len(),
+        face_pack_names: packs,
+        cached_files,
+        cache_dir: cache.display().to_string(),
+    }
+}
+
+fn should_skip_pack(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    lower.contains("kit")
+        || lower.contains("logo")
+        || lower.contains("badge")
+        || lower.contains("wallpaper")
+        || lower.contains("background")
+        || lower.contains("icon")
+}
+
+#[cfg(test)]
+fn is_portrait_config(config_path: &Path) -> bool {
+    let lower = config_path.to_string_lossy().to_ascii_lowercase();
+    !lower.contains("/iconfaces/") && !lower.contains("/icons/")
+}
+
+/// Legacy FMT shallow config discovery (see shared/faces/face-index.ts).
+#[cfg(test)]
+pub fn find_facepack_configs(graphics_root: &Path) -> Vec<PathBuf> {
+    let mut configs = Vec::new();
+    let mut seen = HashSet::new();
+    let mut add = |path: PathBuf| {
+        if !path.is_file() || !is_portrait_config(&path) {
+            return;
+        }
+        if seen.insert(path.clone()) {
+            configs.push(path);
+        }
+    };
+
+    let Ok(packs) = fs::read_dir(graphics_root) else {
+        return configs;
+    };
+    for pack in packs.flatten() {
+        if !pack.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+            continue;
+        }
+        if should_skip_pack(&pack.file_name().to_string_lossy()) {
+            continue;
+        }
+        let pack_path = pack.path();
+        add(pack_path.join("faces").join("config.xml"));
+        add(pack_path.join("config.xml"));
+
+        let Ok(subs) = fs::read_dir(&pack_path) else {
+            continue;
+        };
+        for sub in subs.flatten() {
+            if !sub.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                continue;
             }
+            let sub_path = sub.path();
+            add(sub_path.join("config.xml"));
+            add(sub_path.join("faces").join("config.xml"));
         }
     }
-    if roots.is_empty() {
-        roots.push(default_graphics_root());
-    }
-    roots
+    configs
 }
 
-pub fn load_graphics_settings() -> GraphicsSettings {
-    let path = app_data_dir().join(SETTINGS_FILE);
-    let Ok(bytes) = fs::read(&path) else {
-        return GraphicsSettings {
-            graphics_roots: vec![default_graphics_root().display().to_string()],
-            graphics_root: None,
-        };
+/// Huge cutout megapacks: direct `face_{uid}.png` lookup, no XML parse.
+pub fn discover_face_dirs(graphics_root: &Path) -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+    let Ok(packs) = fs::read_dir(graphics_root) else {
+        return dirs;
     };
-    let mut settings: GraphicsSettings = serde_json::from_slice(&bytes).unwrap_or_default();
-    settings.graphics_roots = normalize_roots(&settings)
-        .into_iter()
-        .map(|p| p.display().to_string())
-        .collect();
-    settings.graphics_root = None;
-    settings
+    for pack in packs.flatten() {
+        if !pack.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+            continue;
+        }
+        if should_skip_pack(&pack.file_name().to_string_lossy()) {
+            continue;
+        }
+        let faces_dir = pack.path().join("faces");
+        let config = faces_dir.join("config.xml");
+        if !config.is_file() {
+            continue;
+        }
+        if config
+            .metadata()
+            .map(|meta| meta.len() > HUGE_FACE_CONFIG_BYTES)
+            .unwrap_or(false)
+        {
+            dirs.push(faces_dir);
+        }
+    }
+    dirs
 }
 
-pub fn save_graphics_settings(settings: &GraphicsSettings) -> Result<(), String> {
-    let dir = app_data_dir();
-    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let mut cleaned = settings.clone();
-    cleaned.graphics_roots = normalize_roots(&cleaned)
-        .into_iter()
-        .map(|p| p.display().to_string())
-        .collect();
-    cleaned.graphics_root = None;
-    let bytes = serde_json::to_vec_pretty(&cleaned).map_err(|e| e.to_string())?;
-    fs::write(dir.join(SETTINGS_FILE), bytes).map_err(|e| e.to_string())?;
-    if let Ok(mut guard) = GRAPHICS_ROOTS_OVERRIDE.lock() {
-        *guard = Some(normalize_roots(&cleaned));
+pub fn discover_face_packs() -> Vec<String> {
+    let root = default_graphics_root();
+    if !root.is_dir() {
+        return Vec::new();
     }
-    Ok(())
+
+    let mut packs = HashSet::new();
+    for faces_dir in discover_face_dirs(&root) {
+        if let Some(pack) = faces_dir.parent().and_then(|p| p.file_name()) {
+            packs.insert(pack.to_string_lossy().into_owned());
+        }
+    }
+    let mut out: Vec<String> = packs.into_iter().collect();
+    out.sort();
+    out
 }
 
 pub fn active_graphics_roots() -> Vec<PathBuf> {
-    if let Ok(guard) = GRAPHICS_ROOTS_OVERRIDE.lock() {
-        if let Some(roots) = guard.as_ref() {
-            if !roots.is_empty() {
-                return roots.clone();
-            }
-        }
-    }
-    normalize_roots(&load_graphics_settings())
+    vec![default_graphics_root()]
 }
 
 pub(crate) fn resolve_face_path(player_id: &str, icon: bool) -> Option<PathBuf> {
     if let Some(cached) = resolve_cached_face(player_id, icon) {
         return Some(cached);
     }
-    // Failsafe: try requested mode, then the other (icon packs often incomplete).
     let source = resolve_live_face_path(player_id, icon)
         .or_else(|| resolve_live_face_path(player_id, !icon))?;
     copy_into_cache(player_id, icon, &source).or(Some(source))
@@ -179,38 +253,19 @@ fn copy_into_cache(player_id: &str, icon: bool, source: &Path) -> Option<PathBuf
 }
 
 fn resolve_live_face_path(player_id: &str, icon: bool) -> Option<PathBuf> {
-    for root in active_graphics_roots() {
-        if !root.is_dir() {
-            continue;
-        }
-        // Fast path: direct filename hits across pack dirs (no XML).
-        if let Some(path) = resolve_direct_face(&root, player_id, icon) {
-            return Some(path);
-        }
-        // Slow path: config.xml only when direct miss.
-        for directory in face_search_dirs(&root, icon) {
-            let config = directory.join("config.xml");
-            if let Some(path) = resolve_face_from_config(&config, &directory, player_id) {
-                return Some(path);
-            }
-        }
+    // Hot path: O(1) open face_{id}.* in known megapack dirs only.
+    // Never build/parse config.xml indexes here — that froze the UI on first miss.
+    if icon {
+        return None;
     }
-    None
-}
-
-fn resolve_direct_face(graphics_root: &Path, player_id: &str, icon: bool) -> Option<PathBuf> {
-    let stems = [
-        format!("face_{player_id}"),
-        format!("iconface_{player_id}"),
-        player_id.to_string(),
-    ];
-    for directory in face_search_dirs(graphics_root, icon)
-        .into_iter()
-        .chain(face_search_dirs(graphics_root, !icon))
-    {
-        for stem in &stems {
+    for dir in cached_face_dirs() {
+        for stem in [
+            format!("face_{player_id}"),
+            format!("iconface_{player_id}"),
+            player_id.to_string(),
+        ] {
             for extension in ["png", "jpg", "jpeg", "webp"] {
-                let path = directory.join(format!("{stem}.{extension}"));
+                let path = dir.join(format!("{stem}.{extension}"));
                 if path.is_file() {
                     return Some(path);
                 }
@@ -220,94 +275,42 @@ fn resolve_direct_face(graphics_root: &Path, player_id: &str, icon: bool) -> Opt
     None
 }
 
-/// Shallow pack discovery — do not walk entire megapack trees.
-fn face_search_dirs(graphics_root: &Path, icon: bool) -> Vec<PathBuf> {
-    let folder = if icon { "iconfaces" } else { "faces" };
-    let mut dirs = Vec::new();
-    let mut push = |path: PathBuf| {
-        if path.is_dir() && !dirs.iter().any(|existing| existing == &path) {
-            dirs.push(path);
-        }
-    };
-
-    push(graphics_root.join(folder));
-    // Allow pointing Settings at a single pack folder (not only the parent graphics/).
-    push(graphics_root.to_path_buf());
-
-    let Ok(entries) = fs::read_dir(graphics_root) else {
-        return dirs;
-    };
-    for entry in entries.flatten() {
-        let Ok(file_type) = entry.file_type() else {
-            continue;
-        };
-        if !file_type.is_dir() {
-            continue;
-        }
-        let name = entry.file_name().to_string_lossy().to_ascii_lowercase();
-        if name.contains("kit")
-            || name.contains("logo")
-            || name.contains("badge")
-            || name.contains("wallpaper")
-            || name.contains("background")
-        {
-            continue;
-        }
-        let pack = entry.path();
-        push(pack.join(folder));
-        push(pack.clone());
-        if let Ok(subs) = fs::read_dir(&pack) {
-            for sub in subs.flatten() {
-                if sub.file_type().map(|t| t.is_dir()).unwrap_or(false) {
-                    let sub_path = sub.path();
-                    let sub_name = sub.file_name().to_string_lossy().to_ascii_lowercase();
-                    if sub_name == "faces" || sub_name == "iconfaces" || sub_name == folder {
-                        push(sub_path);
-                    } else {
-                        push(sub_path.join(folder));
-                    }
-                }
-            }
-        }
-    }
-    dirs
+fn cached_face_dirs() -> Vec<PathBuf> {
+    static FACE_DIRS: OnceLock<Vec<PathBuf>> = OnceLock::new();
+    FACE_DIRS
+        .get_or_init(|| discover_face_dirs(&default_graphics_root()))
+        .clone()
 }
 
 pub fn warm_faces_for_players(player_ids: &[String], icon: bool) -> FaceWarmResult {
-    let roots = active_graphics_roots();
     let cache = face_cache_dir();
     let _ = fs::create_dir_all(&cache);
-    let mut cached = 0usize;
-    let mut copied = 0usize;
-    let mut missing = 0usize;
-    for player_id in player_ids {
-        let id = player_id.trim();
-        if id.is_empty() || !id.bytes().all(|b| b.is_ascii_digit()) {
-            missing += 1;
-            continue;
-        }
-        if resolve_cached_face(id, icon).is_some() {
-            cached += 1;
-            continue;
-        }
-        match resolve_live_face_path(id, icon).or_else(|| resolve_live_face_path(id, !icon)) {
-            Some(source) => {
-                if copy_into_cache(id, icon, &source).is_some() {
-                    copied += 1;
-                } else {
-                    missing += 1;
+    let ids: Vec<String> = player_ids
+        .iter()
+        .map(|id| id.trim().to_string())
+        .filter(|id| !id.is_empty() && id.bytes().all(|b| b.is_ascii_digit()))
+        .collect();
+    let requested = ids.len();
+    let cache_dir = cache.display().to_string();
+    let icon_flag = icon;
+    if !ids.is_empty() {
+        thread::spawn(move || {
+            for id in ids {
+                if resolve_cached_face(&id, icon_flag).is_some() {
+                    continue;
+                }
+                if let Some(source) = resolve_live_face_path(&id, icon_flag) {
+                    let _ = copy_into_cache(&id, icon_flag, &source);
                 }
             }
-            None => missing += 1,
-        }
+        });
     }
     FaceWarmResult {
-        requested: player_ids.len(),
-        cached,
-        copied,
-        missing,
-        graphics_roots: roots.iter().map(|r| r.display().to_string()).collect(),
-        cache_dir: cache.display().to_string(),
+        requested,
+        cached: 0,
+        copied: 0,
+        missing: 0,
+        cache_dir,
     }
 }
 
@@ -320,28 +323,25 @@ pub(crate) fn image_mime(path: &Path) -> Option<&'static str> {
     }
 }
 
-fn resolve_face_from_config(config: &Path, directory: &Path, player_id: &str) -> Option<PathBuf> {
-    let metadata = config.metadata().ok()?;
-    // Huge megapack XML is a last resort; skip pathological sizes on the hot path.
-    if metadata.len() > MAX_GRAPHICS_CONFIG_BYTES || metadata.len() > 8 * 1024 * 1024 {
+#[cfg(test)]
+fn parse_person_portrait_record(line: &str) -> Option<(String, String)> {
+    if !line.contains("from=\"") || !line.contains("to=\"") {
         return None;
     }
-    let file = fs::File::open(config).ok()?;
-    let reader = BufReader::new(file);
-    let marker = format!("person/{player_id}/");
-    for line in reader.lines().map_while(Result::ok) {
-        if !line.contains(&marker) {
-            continue;
-        }
-        let from = safe_single_component_stem(attribute_value(&line, "from")?)?;
-        for extension in ["png", "jpg", "jpeg", "webp"] {
-            let path = directory.join(format!("{from}.{extension}"));
-            if path.is_file() {
-                return Some(path);
-            }
-        }
+    if !line.contains("graphics/pictures/person/") || !line.contains("/portrait") {
+        return None;
     }
-    None
+    let from = attribute_value(line, "from")?;
+    let to = attribute_value(line, "to")?;
+    let marker = "graphics/pictures/person/";
+    let start = to.find(marker)? + marker.len();
+    let rest = &to[start..];
+    let end = rest.find("/portrait")?;
+    let uid = rest[..end].trim_start_matches("r-").to_string();
+    if uid.is_empty() || !uid.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    Some((from.to_string(), uid))
 }
 
 #[cfg(test)]
@@ -355,12 +355,32 @@ mod tests {
     }
 
     #[test]
-    fn normalize_roots_accepts_multiple_and_legacy() {
-        let settings = GraphicsSettings {
-            graphics_roots: vec!["C:\\a".into(), "C:\\b".into()],
-            graphics_root: Some("C:\\c".into()),
-        };
-        let roots = normalize_roots(&settings);
-        assert_eq!(roots.len(), 3);
+    fn parse_person_portrait_record_handles_cutout_and_regen_ids() {
+        let cutout = r#"<record from="face_2000370823" to="graphics/pictures/person/2000370823/portrait"/>"#;
+        let regen = r#"<record from="PP12CentralEurope0853" to="graphics/pictures/person/r-100679936/portrait"/>"#;
+        assert_eq!(
+            parse_person_portrait_record(cutout),
+            Some(("face_2000370823".into(), "2000370823".into()))
+        );
+        assert_eq!(
+            parse_person_portrait_record(regen),
+            Some(("PP12CentralEurope0853".into(), "100679936".into()))
+        );
+    }
+
+    #[test]
+    fn find_facepack_configs_includes_regional_newgan_configs() {
+        let root = default_graphics_root();
+        if !root.is_dir() {
+            return;
+        }
+        let configs = find_facepack_configs(&root);
+        let newgan = root.join("NGRegens_Newgens_Megapack");
+        if newgan.is_dir() {
+            assert!(configs.iter().any(|path| {
+                path.to_string_lossy().contains("NGRegens_Newgens_Megapack")
+                    && path.ends_with("config.xml")
+            }));
+        }
     }
 }

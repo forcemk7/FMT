@@ -1,13 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ChevronDown, Cpu, Database, Image, LockKeyhole, RefreshCw } from "lucide-react";
-import { invoke } from "@tauri-apps/api/core";
+import { ChevronDown, Cpu, Database, GitBranch, LockKeyhole, RefreshCw, Sigma } from "lucide-react";
 import type { LiveFootballSnapshot } from "@/domain/adapters";
-import { captureMappingEvidence, compareMappingEvidence, getMappingLabStatus, type MappingLabCaptureResult, type MappingLabComparisonResult, type MappingLabStatus } from "@/domain/adapters";
+import {
+  captureMappingEvidence,
+  compareMappingEvidence,
+  getMappingLabStatus,
+  type MappingLabCaptureResult,
+  type MappingLabComparisonResult,
+  type MappingLabStatus,
+} from "@/domain/adapters";
+import { FRONTEND_CALCULATION_CARDS } from "@/domain/has-score";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { clearPlayerFaceMemoryCache } from "@/components/player-face";
+import { GraphicsPacksPanel } from "@/components/graphics-packs-panel";
+import { getVersion } from "@tauri-apps/api/app";
+import { useEffect, useState } from "react";
 
 function readable(value: string | null | undefined) {
   if (!value) return "None";
@@ -21,23 +29,16 @@ function stageLabel(state: string) {
   return "Pending";
 }
 
-type GraphicsSettings = { graphicsRoots?: string[]; graphicsRoot?: string | null };
-type FacesCacheStatus = {
-  graphicsRoots?: Array<{ path: string; exists: boolean }>;
-  graphicsRoot?: string;
-  graphicsRootExists?: boolean;
-  cacheDir: string;
-  cachedFiles: number;
-};
-type FaceWarmResult = {
-  requested: number;
-  cached: number;
-  copied: number;
-  missing: number;
-  graphicsRoots?: string[];
-  graphicsRoot?: string;
-  cacheDir: string;
-};
+function pipelineSummary(pipeline: NonNullable<LiveFootballSnapshot["status"]["readPipeline"]>) {
+  if (!pipeline.length) return "Not run";
+  const passed = pipeline.filter((stage) => stage.state === "passed").length;
+  return `${passed}/${pipeline.length} passed`;
+}
+
+function frontendCalculationsSummary() {
+  const live = FRONTEND_CALCULATION_CARDS.filter((card) => card.state === "passed").length;
+  return `${live} live`;
+}
 
 export function SettingsScreen({
   snapshot,
@@ -58,31 +59,15 @@ export function SettingsScreen({
   const [firstSnapshot, setFirstSnapshot] = useState("");
   const [secondSnapshot, setSecondSnapshot] = useState("");
   const [comparison, setComparison] = useState<MappingLabComparisonResult | null>(null);
-  const [graphicsRootsText, setGraphicsRootsText] = useState("");
-  const [faceStatus, setFaceStatus] = useState<FacesCacheStatus | null>(null);
-  const [faceBusy, setFaceBusy] = useState(false);
-  const [faceMessage, setFaceMessage] = useState<string | null>(null);
-
-  const refreshFaceStatus = async () => {
-    if (!("__TAURI_INTERNALS__" in window)) return;
-    try {
-      const [settings, cache] = await Promise.all([
-        invoke<GraphicsSettings>("graphics_settings_get"),
-        invoke<FacesCacheStatus>("faces_cache_status"),
-      ]);
-      const roots =
-        settings.graphicsRoots?.filter(Boolean) ??
-        (settings.graphicsRoot ? [settings.graphicsRoot] : []);
-      setGraphicsRootsText(roots.join("\n"));
-      setFaceStatus(cache);
-    } catch {
-      setFaceStatus(null);
-    }
-  };
+  const [appVersion, setAppVersion] = useState<string | null>(null);
 
   useEffect(() => {
     getMappingLabStatus().then(setMappingLab).catch(() => setMappingLab(null));
-    void refreshFaceStatus();
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return;
+    getVersion().then(setAppVersion).catch(() => setAppVersion(null));
   }, []);
 
   const captureEvidence = async () => {
@@ -102,131 +87,83 @@ export function SettingsScreen({
     }
   };
 
-  const parseRoots = () =>
-    graphicsRootsText
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean);
-
-  const saveGraphicsPath = async () => {
-    if (!("__TAURI_INTERNALS__" in window)) return;
-    setFaceBusy(true);
-    setFaceMessage(null);
-    try {
-      await invoke("graphics_settings_set", { graphicsRoots: parseRoots() });
-      await refreshFaceStatus();
-      setFaceMessage("Graphics folders saved.");
-    } catch (error) {
-      setFaceMessage(error instanceof Error ? error.message : String(error));
-    } finally {
-      setFaceBusy(false);
-    }
-  };
-
-  const updateFaces = async () => {
-    if (!("__TAURI_INTERNALS__" in window)) return;
-    setFaceBusy(true);
-    setFaceMessage(null);
-    try {
-      await invoke("graphics_settings_set", { graphicsRoots: parseRoots() });
-      const ids = snapshot.players.map((player) => player.id);
-      const result = await invoke<FaceWarmResult>("faces_update_cache", { playerIds: ids });
-      clearPlayerFaceMemoryCache();
-      await refreshFaceStatus();
-      setFaceMessage(
-        ids.length
-          ? `Faces: ${result.copied} copied, ${result.cached} already cached, ${result.missing} missing (of ${result.requested}).`
-          : "Folders saved. Load a save first so Update can warm the squad; faces also copy on first view.",
-      );
-    } catch (error) {
-      setFaceMessage(error instanceof Error ? error.message : String(error));
-    } finally {
-      setFaceBusy(false);
-    }
-  };
-
   return (
     <main className="screen settings-screen">
       <div className="planner-heading">
-        <div><h1>Settings</h1><p>Live FM26 connector and local application controls.</p></div>
+        <div>
+          <h1>Settings</h1>
+          <p>
+            Live FM26 connector and local application controls.
+            {appVersion ? ` · FMT ${appVersion}` : null}
+          </p>
+        </div>
       </div>
       <section className="settings-list">
         <article><Database /><div><strong>Active FM26 game</strong><span>{status.processDetected ? "Football Manager 26 detected" : "Waiting for FM26"}</span></div><Button variant="outline" onClick={onRefresh} disabled={checking}><RefreshCw data-icon="inline-start" className={checking ? "spin" : undefined} />Load Active Save</Button></article>
         <article><LockKeyhole /><div><strong>Memory safety</strong><span>Query and read access only. FMT cannot write to FM26.</span></div><b>{status.memoryAccess.replaceAll("_", " ")}</b></article>
-      </section>
+        <GraphicsPacksPanel />
 
-      <section className="settings-faces-panel">
-        <header>
-          <Image aria-hidden="true" />
-          <div>
-            <span className="section-kicker">Player faces</span>
-            <h2>Cutout graphics</h2>
-            <p>
-              One folder per line — parent <code>graphics</code> and/or individual packs (Cutout,
-              NewGAN). FMT checks all of them, then caches hits locally.
-            </p>
+        <details className="settings-expand" id="backend-read-pipeline">
+          <summary>
+            <GitBranch aria-hidden="true" />
+            <div>
+              <strong>Backend read pipeline</strong>
+              <span>FM26 memory read stages</span>
+            </div>
+            <span className="settings-expand-meta">
+              <b>{pipelineSummary(pipeline)}</b>
+              <ChevronDown className="settings-expand-chevron" aria-hidden="true" />
+            </span>
+          </summary>
+          <div className="settings-expand-body">
+            <div className="read-pipeline-grid">
+              {pipeline.length ? pipeline.map((stage) => (
+                <article key={stage.key} data-state={stage.state}>
+                  <span>{stageLabel(stage.state)}</span>
+                  <strong>{stage.label}</strong>
+                  <p>{stage.detail}</p>
+                </article>
+              )) : (
+                <article data-state="pending">
+                  <span>Pending</span>
+                  <strong>No pipeline yet</strong>
+                  <p>Run the active-save read to collect backend stage diagnostics.</p>
+                </article>
+              )}
+            </div>
+            <div className="settings-expand-actions">
+              <Button variant="outline" onClick={onRefresh} disabled={checking}>
+                <RefreshCw data-icon="inline-start" className={checking ? "spin" : undefined} />
+                Re-run read
+              </Button>
+            </div>
           </div>
-        </header>
-        <label className="settings-faces-path">
-          <span>Graphics folders</span>
-          <textarea
-            aria-label="FM26 graphics folders"
-            className="settings-faces-roots"
-            rows={3}
-            value={graphicsRootsText}
-            onChange={(event) => setGraphicsRootsText(event.target.value)}
-            placeholder={"…\\Football Manager 26\\graphics\n…\\My NewGAN pack"}
-          />
-        </label>
-        <div className="settings-faces-actions">
-          <Button variant="outline" onClick={() => void saveGraphicsPath()} disabled={faceBusy}>
-            Save folders
-          </Button>
-          <Button onClick={() => void updateFaces()} disabled={faceBusy}>
-            <RefreshCw data-icon="inline-start" className={faceBusy ? "spin" : undefined} />
-            Update faces
-          </Button>
-        </div>
-        {faceStatus ? (
-          <p className="evidence-caption">
-            {(faceStatus.graphicsRoots ?? [])
-              .map((root) => `${root.exists ? "ok" : "missing"}: ${root.path}`)
-              .join(" · ") || "No roots"}{" "}
-            · cache {faceStatus.cachedFiles} files
-          </p>
-        ) : (
-          <p className="evidence-caption">Face settings available in the desktop app.</p>
-        )}
-        {faceMessage ? <p className="evidence-caption">{faceMessage}</p> : null}
-      </section>
+        </details>
 
-      <section className="read-pipeline-panel">
-        <header>
-          <div>
-            <span className="section-kicker">Backend read pipeline</span>
-            <h2>What FMT actually read from FM26</h2>
-            <p>These stages come from the native connector. They separate live memory reads from still-unmapped fields and local enrichment.</p>
+        <details className="settings-expand" id="frontend-calculations">
+          <summary>
+            <Sigma aria-hidden="true" />
+            <div>
+              <strong>Frontend calculations</strong>
+              <span>FMT scores from mapped fields</span>
+            </div>
+            <span className="settings-expand-meta">
+              <b>{frontendCalculationsSummary()}</b>
+              <ChevronDown className="settings-expand-chevron" aria-hidden="true" />
+            </span>
+          </summary>
+          <div className="settings-expand-body">
+            <div className="read-pipeline-grid">
+              {FRONTEND_CALCULATION_CARDS.map((calc) => (
+                <article key={calc.key} data-state={calc.state}>
+                  <span>{calc.badge}</span>
+                  <strong>{calc.title}</strong>
+                  <p>{calc.detail}</p>
+                </article>
+              ))}
+            </div>
           </div>
-          <Button variant="outline" onClick={onRefresh} disabled={checking}>
-            <RefreshCw data-icon="inline-start" className={checking ? "spin" : undefined} />
-            Re-run read
-          </Button>
-        </header>
-        <div className="read-pipeline-grid">
-          {pipeline.length ? pipeline.map((stage) => (
-            <article key={stage.key} data-state={stage.state}>
-              <span>{stageLabel(stage.state)}</span>
-              <strong>{stage.label}</strong>
-              <p>{stage.detail}</p>
-            </article>
-          )) : (
-            <article data-state="pending">
-              <span>Pending</span>
-              <strong>No pipeline yet</strong>
-              <p>Run the active-save read to collect backend stage diagnostics.</p>
-            </article>
-          )}
-        </div>
+        </details>
       </section>
 
       <details className="advanced-diagnostics">

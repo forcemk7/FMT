@@ -4,11 +4,12 @@ use std::fs;
 
 use crate::graphics::{
     faces::{
-        active_graphics_roots, default_graphics_root, face_cache_dir, image_mime,
-        load_graphics_settings, resolve_face_path, save_graphics_settings, warm_faces_for_players,
-        FaceWarmResult, GraphicsSettings, MAX_IMAGE_BYTES,
+        faces_status as read_faces_status, graphics_status as read_graphics_status,
+        image_mime, resolve_face_path, warm_faces_for_players, FaceWarmResult, FacesStatus,
+        GraphicsStatus, MAX_IMAGE_BYTES,
     },
-    logos::resolve_logo_path,
+    flags::{resolve_flag_path, warm_flags_for_nations},
+    logos::{resolve_logo_path, warm_logos_for_clubs},
 };
 
 #[derive(Serialize)]
@@ -25,6 +26,14 @@ pub struct PlayerFaceResult {
 pub struct ClubLogoResult {
     found: bool,
     club_id: String,
+    data_url: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NationFlagResult {
+    found: bool,
+    nation_id: String,
     data_url: Option<String>,
 }
 
@@ -85,6 +94,32 @@ pub fn club_logo_data(club_id: String) -> ClubLogoResult {
     }
 }
 
+#[tauri::command]
+pub fn nation_flag_data(nation_id: String) -> NationFlagResult {
+    let nation_id = nation_id.trim().to_string();
+    if nation_id.is_empty() || !nation_id.bytes().all(|byte| byte.is_ascii_digit()) {
+        return NationFlagResult {
+            found: false,
+            nation_id,
+            data_url: None,
+        };
+    }
+    if let Some(path) = resolve_flag_path(&nation_id) {
+        if let (Some(mime), Ok(bytes)) = (image_mime(&path), fs::read(&path)) {
+            return NationFlagResult {
+                found: true,
+                nation_id,
+                data_url: Some(format!("data:{mime};base64,{}", STANDARD.encode(bytes))),
+            };
+        }
+    }
+    NationFlagResult {
+        found: false,
+        nation_id,
+        data_url: None,
+    }
+}
+
 fn missing(player_id: String) -> PlayerFaceResult {
     PlayerFaceResult {
         found: false,
@@ -95,32 +130,13 @@ fn missing(player_id: String) -> PlayerFaceResult {
 }
 
 #[tauri::command]
-pub fn graphics_settings_get() -> GraphicsSettings {
-    let mut settings = load_graphics_settings();
-    if settings.graphics_roots.is_empty() {
-        settings.graphics_roots = vec![default_graphics_root().display().to_string()];
-    }
-    settings
+pub fn faces_status() -> FacesStatus {
+    read_faces_status()
 }
 
 #[tauri::command]
-pub fn graphics_settings_set(
-    graphics_roots: Option<Vec<String>>,
-    graphics_root: Option<String>,
-) -> Result<GraphicsSettings, String> {
-    let mut roots = graphics_roots.unwrap_or_default();
-    if let Some(legacy) = graphics_root {
-        let trimmed = legacy.trim().to_string();
-        if !trimmed.is_empty() && !roots.iter().any(|r| r.trim() == trimmed) {
-            roots.push(trimmed);
-        }
-    }
-    let settings = GraphicsSettings {
-        graphics_roots: roots,
-        graphics_root: None,
-    };
-    save_graphics_settings(&settings)?;
-    Ok(graphics_settings_get())
+pub fn graphics_status() -> GraphicsStatus {
+    read_graphics_status()
 }
 
 #[tauri::command]
@@ -129,26 +145,13 @@ pub fn faces_update_cache(player_ids: Vec<String>) -> FaceWarmResult {
 }
 
 #[tauri::command]
-pub fn faces_cache_status() -> serde_json::Value {
-    let roots = active_graphics_roots();
-    let cache = face_cache_dir();
-    let cached_files = fs::read_dir(&cache)
-        .map(|entries| entries.filter_map(|e| e.ok()).count())
-        .unwrap_or(0);
-    let root_status: Vec<serde_json::Value> = roots
-        .iter()
-        .map(|root| {
-            serde_json::json!({
-                "path": root.display().to_string(),
-                "exists": root.is_dir(),
-            })
-        })
-        .collect();
-    serde_json::json!({
-        "graphicsRoots": root_status,
-        "cacheDir": cache.display().to_string(),
-        "cachedFiles": cached_files,
-    })
+pub fn logos_update_cache(club_ids: Vec<String>) -> FaceWarmResult {
+    warm_logos_for_clubs(&club_ids)
+}
+
+#[tauri::command]
+pub fn flags_update_cache(nation_ids: Vec<String>) -> FaceWarmResult {
+    warm_flags_for_nations(&nation_ids)
 }
 
 #[cfg(test)]

@@ -8,11 +8,13 @@ pub(crate) const REGISTERED_COMMANDS: &[&str] = &[
     "mapping_lab_capture",
     "mapping_lab_compare",
     "club_logo_data",
+    "nation_flag_data",
     "player_face_data",
-    "graphics_settings_get",
-    "graphics_settings_set",
+    "faces_status",
+    "graphics_status",
     "faces_update_cache",
-    "faces_cache_status",
+    "logos_update_cache",
+    "flags_update_cache",
     "filter_observations",
 ];
 

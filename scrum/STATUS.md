@@ -1,12 +1,12 @@
 ﻿# Status
 
-Last updated: 2026-08-25 (T149 app icons)
+Last updated: 2026-08-26 (T150 logos/flags)
 
 ## Now
 
-**Shipped:** T149 — FMT mark for window/taskbar icons; header mark-only.
+**Shipped:** T150 — club/nation UID → background XML index → logo-cache / flag-cache; soft UI retry.
 
-**Verify:** fully quit FMT → `npm run desktop:stable` from `desktop/` (rebuild embeds new `icon.ico`). Taskbar + title bar should show dark gold **FMT**, not GlassScout G.
+**Verify:** quit FMT → rebuild desktop → Load Active Save → Squad flags + player desk club/nation badges appear within a few seconds (first run indexes TCM once).
 
 **Deferred:** T139 theme until desk is daily habit.
 
@@ -19,7 +19,7 @@ Last updated: 2026-08-25 (T149 app icons)
 
 ## Recently done
 
-- **T149** FMT app icons · **T148** mark + multi-root faces · **T147** quiet empty
+- **T150** logos + flags cache warm · **T149** FMT app icons · **T148** mark + multi-root faces
 
 ## Loop
 
