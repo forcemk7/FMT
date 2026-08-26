@@ -42,4 +42,4 @@ T152 warm only copies Cutout `face_{uid}.png`. Squad movers like Corvin Garbe (n
 
 ## Progress
 
-Root cause: Garbe-class movers miss Cutout `face_{uid}`; NGRegens needs `_config.xml` `r-{uid}` map. Shipped background UID-targeted scan + longer UI nudges/retries. Verified: `cargo test --lib graphics::faces` 4/4 ok. Commit SHA pending.
+Root cause: Garbe-class movers miss Cutout `face_{uid}`; NGRegens needs `_config.xml` `r-{uid}` map. Shipped background UID-targeted scan + longer UI nudges/retries. Verified: `cargo test --lib graphics::faces` 4/4 ok. Commit `770cac6`.
