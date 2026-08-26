@@ -1,7 +1,11 @@
 /**
- * T158 — FMT desk design system
- * Inspired by FM Portal atmosphere + FMT mockups: unified dark navy-teal,
- * elevated panels, soft borders. Attribute band colors stay in --attr-tone-*.
+ * FMT desk design system — single source of chrome + surfaces.
+ *
+ * Contract (do not invent one-off colors for header controls):
+ *   --chrome-*     nav / menu / settings interactive states
+ *   --control-*    search, load, outline pills
+ *   --shell-*      canvas depth (blue-dominant, green only as atmosphere)
+ *   --attr-tone-*  FM attribute bands (fixed product colors)
  */
 
 body.fmt-shell {
@@ -9,21 +13,47 @@ body.fmt-shell {
   height: 100%;
   overflow: hidden;
 
-  --shell-0: #070d10;
-  --shell-1: #0a1418;
-  --shell-2: #0d1a1f;
-  --panel: #121e24;
-  --panel-2: #16252c;
-  --panel-3: #1a2b33;
-  --hairline: rgba(210, 230, 240, 0.08);
-  --hairline-strong: rgba(210, 230, 240, 0.14);
-  --text: #f3f6f8;
-  --text-muted: #8b9ba8;
-  --text-dim: #6d7f8c;
+  /* Blue-led night pitch — green only as a faint lower wash */
+  --shell-0: #060910;
+  --shell-1: #0a101a;
+  --shell-2: #0e1624;
+  --shell-bottom: #0b1522;
+  --atmosphere-blue: rgba(48, 90, 140, 0.14);
+  --atmosphere-green: rgba(36, 80, 64, 0.05);
+
+  --panel: #121a26;
+  --panel-2: #162030;
+  --panel-3: #1b2838;
+  --hairline: rgba(180, 205, 230, 0.09);
+  --hairline-strong: rgba(180, 205, 230, 0.16);
+
+  --text: #f2f5f8;
+  --text-muted: #8b9aab;
+  --text-dim: #6a7a8c;
+
   --gold: #d4b45a;
-  --gold-soft: rgba(212, 180, 90, 0.14);
-  --action: #0c5c4c;
-  --action-border: rgba(46, 160, 130, 0.45);
+  --gold-soft: rgba(212, 180, 90, 0.16);
+
+  /* Shared interactive chrome — every header control uses these */
+  --chrome-fg: var(--text-muted);
+  --chrome-fg-hover: var(--text);
+  --chrome-fg-active: var(--gold);
+  --chrome-bg: transparent;
+  --chrome-bg-hover: rgba(255, 255, 255, 0.05);
+  --chrome-bg-active: var(--gold-soft);
+  --chrome-border: transparent;
+  --chrome-border-active: rgba(212, 180, 90, 0.35);
+  --chrome-radius: 10px;
+
+  --control-bg: var(--panel);
+  --control-bg-strong: #0d4f42;
+  --control-border: var(--hairline);
+  --control-fg: var(--text);
+  --control-fg-muted: var(--text-muted);
+  --control-radius: 999px;
+
+  --action: var(--control-bg-strong);
+  --action-border: rgba(46, 160, 130, 0.4);
   --action-text: #e8fff8;
 
   --background: var(--shell-1);
@@ -58,9 +88,8 @@ body.fmt-shell {
   --slate: var(--text-muted);
   --amber: var(--gold);
   --amber-soft: var(--gold-soft);
-  --panel-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  --panel-shadow: 0 12px 40px rgba(0, 0, 0, 0.38);
   --shell-top: var(--shell-0);
-  --shell-bottom: #0b1c18;
 
   --attr-tone-high: #65e53a;
   --attr-tone-upper: #3a8acf;
@@ -69,9 +98,9 @@ body.fmt-shell {
 
   color: var(--text);
   background:
-    radial-gradient(1100px 520px at 50% -8%, rgba(40, 90, 70, 0.18), transparent 58%),
-    radial-gradient(900px 480px at 85% 108%, rgba(30, 70, 90, 0.16), transparent 55%),
-    linear-gradient(180deg, var(--shell-0) 0%, var(--shell-1) 42%, var(--shell-bottom) 100%);
+    radial-gradient(1000px 480px at 48% -12%, var(--atmosphere-blue), transparent 60%),
+    radial-gradient(800px 420px at 90% 115%, var(--atmosphere-green), transparent 55%),
+    linear-gradient(180deg, var(--shell-0) 0%, var(--shell-1) 45%, var(--shell-bottom) 100%);
 }
 
 body.fmt-shell .app-canvas,
@@ -81,41 +110,48 @@ body.fmt-shell .app-canvas.shell-single-header {
 
 /* —— Header —— */
 body.fmt-shell .shell-header {
-  background: rgba(8, 14, 18, 0.92);
+  background: rgba(6, 10, 18, 0.94);
   border-bottom: 1px solid var(--hairline);
   backdrop-filter: blur(18px);
-  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.32);
 }
 
-body.fmt-shell .shell-nav-item {
-  color: var(--text-muted);
-  background: transparent;
+/* Expanded nav + compact trigger share --chrome-* (no white pill variant) */
+body.fmt-shell .shell-nav-item,
+body.fmt-shell .shell-nav-trigger,
+body.fmt-shell .shell-nav-menu-item {
+  color: var(--chrome-fg);
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
+  border-radius: var(--chrome-radius);
 }
-body.fmt-shell .shell-nav-item:hover {
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.04);
+body.fmt-shell .shell-nav-item:hover,
+body.fmt-shell .shell-nav-trigger:hover,
+body.fmt-shell .shell-nav-menu-item:hover {
+  color: var(--chrome-fg-hover);
+  background: var(--chrome-bg-hover);
 }
-body.fmt-shell .shell-nav-item.is-active {
-  color: var(--gold);
-  background: var(--gold-soft);
+body.fmt-shell .shell-nav-item.is-active,
+body.fmt-shell .shell-nav-trigger,
+body.fmt-shell .shell-nav-menu-item.is-active {
+  color: var(--chrome-fg-active);
+  background: var(--chrome-bg-active);
+  border-color: var(--chrome-border-active);
 }
-body.fmt-shell .shell-nav-item.is-active .shell-nav-tbd {
-  color: var(--gold);
+body.fmt-shell .shell-nav-item.is-active .shell-nav-tbd,
+body.fmt-shell .shell-nav-menu-item.is-active .shell-nav-tbd {
+  color: var(--chrome-fg-active);
 }
-body.fmt-shell .shell-nav-item.is-later {
+body.fmt-shell .shell-nav-item.is-later,
+body.fmt-shell .shell-nav-menu-item.is-later {
   opacity: 0.55;
 }
-
 body.fmt-shell .shell-nav-trigger {
-  background: #e8eef1;
-  border-color: transparent;
-  color: #152028;
-  border-radius: 999px;
   font-weight: 700;
 }
 body.fmt-shell .shell-nav-trigger svg {
-  opacity: 0.7;
-  color: #152028;
+  color: inherit;
+  opacity: 0.85;
 }
 
 body.fmt-shell .shell-nav-menu {
@@ -123,23 +159,13 @@ body.fmt-shell .shell-nav-menu {
   border-color: var(--hairline-strong);
   box-shadow: var(--panel-shadow);
 }
-body.fmt-shell .shell-nav-menu-item {
-  color: var(--text-muted);
-}
-body.fmt-shell .shell-nav-menu-item:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text);
-}
-body.fmt-shell .shell-nav-menu-item.is-active {
-  background: var(--gold-soft);
-  color: var(--gold);
-}
 
+/* Search / load / settings — --control-* */
 body.fmt-shell .shell-search input {
-  background: var(--panel);
-  border: 1px solid var(--hairline);
-  color: var(--text);
-  border-radius: 999px;
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
+  color: var(--control-fg);
+  border-radius: var(--control-radius);
   box-shadow: none;
 }
 body.fmt-shell .shell-search input::placeholder {
@@ -150,22 +176,20 @@ body.fmt-shell .shell-search svg {
 }
 
 body.fmt-shell .shell-load {
-  background: var(--panel);
-  border: 1px solid var(--hairline);
-  color: var(--text-muted);
-  border-radius: 999px;
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
+  color: var(--control-fg-muted);
+  border-radius: var(--control-radius);
 }
 body.fmt-shell .shell-load strong {
-  color: var(--text);
+  color: var(--control-fg);
 }
 body.fmt-shell .shell-load.is-needs-load {
   background: var(--action);
   border-color: var(--action-border);
   color: var(--action-text);
 }
-body.fmt-shell .shell-load.is-needs-load strong {
-  color: var(--action-text);
-}
+body.fmt-shell .shell-load.is-needs-load strong,
 body.fmt-shell .shell-load.is-needs-load .shell-load-icon {
   color: var(--action-text);
 }
@@ -174,13 +198,15 @@ body.fmt-shell .shell-load .live-dot {
   box-shadow: 0 0 0 3px var(--gold-soft);
 }
 body.fmt-shell .shell-tools > button:not(.shell-load) {
-  color: var(--text-muted);
-  border-radius: 999px;
+  color: var(--chrome-fg);
+  border-radius: var(--chrome-radius);
+  background: var(--chrome-bg);
 }
 body.fmt-shell .shell-tools > button:not(.shell-load):hover,
 body.fmt-shell .shell-tools > button.is-active {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text);
+  color: var(--chrome-fg-active);
+  background: var(--chrome-bg-active);
+  border-color: var(--chrome-border-active);
 }
 
 /* —— Page chrome —— */
@@ -258,7 +284,6 @@ body.fmt-shell .attr-tone-upper { color: var(--attr-tone-upper); }
 body.fmt-shell .attr-tone-mid { color: var(--attr-tone-mid); background: transparent; padding: 0; }
 body.fmt-shell .attr-tone-low { color: var(--attr-tone-low); }
 
-/* —— Ability rings —— */
 body.fmt-shell .fit-score-ring {
   background: conic-gradient(var(--fit-color) var(--fit-score), rgba(255, 255, 255, 0.08) 0);
 }
@@ -270,7 +295,6 @@ body.fmt-shell .ability-ring-upper { --fit-color: var(--attr-tone-upper); }
 body.fmt-shell .ability-ring-mid { --fit-color: var(--attr-tone-mid); }
 body.fmt-shell .ability-ring-low { --fit-color: var(--attr-tone-low); }
 
-/* —— Dashboard HAS —— */
 body.fmt-shell .dash-has-columns h3 {
   color: var(--text-dim);
 }
@@ -330,7 +354,6 @@ body.fmt-shell .dash-has-tooltip-cell.tone-upper strong { color: var(--attr-tone
 body.fmt-shell .dash-has-tooltip-cell.tone-mid strong { color: var(--attr-tone-mid) !important; }
 body.fmt-shell .dash-has-tooltip-cell.tone-low strong { color: var(--attr-tone-low) !important; }
 
-/* —— Settings / empty / misc —— */
 body.fmt-shell .settings-expand-body,
 body.fmt-shell .attr-color-swatch {
   background: var(--panel-2) !important;
@@ -346,11 +369,6 @@ body.fmt-shell .live-data-state.is-empty {
 body.fmt-shell .live-source-label {
   color: var(--text-muted);
 }
-body.fmt-shell .Button,
-body.fmt-shell button[data-slot="button"] {
-  /* leave shadcn tokens; primary already remapped */
-}
-
 body.fmt-shell .startup-brand strong {
   color: var(--text);
 }
