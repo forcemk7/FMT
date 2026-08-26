@@ -1,10 +1,12 @@
 ﻿# Status
 
-Last updated: 2026-08-26 (T167 search autofill)
+Last updated: 2026-08-26 (T168 badge inset)
 
 ## Now
 
-_(empty — pick next ready ticket)_
+**Shipped:** T168 — profile badges share 86% inset so trimmed crests don’t overflow the frame.
+
+**Verify:** player profile — Spain/Romania crest and Schalke logo sit fully inside identical boxes with matching padding.
 
 **Deferred:** T139 theme (chrome/shell covered by T158/T159). T162 trophy cabinet (marketing visual; no RE until Loop A sticks).
 
@@ -18,11 +20,10 @@ _(empty — pick next ready ticket)_
 
 ## Recently done
 
+- **T168** Badge inset so trimmed crests don't overflow
 - **T167** Kill Chromium “Saved info” overlay on header squad search
 - **T166** Personality/Media in profile header; General = CA/PA only
 - **T164** Trim badge PNGs on cache for equal fill
-- **T165** Header squad search fills gap + readable hits → desk
-- **T163** General Personality + Media Handling labels
 
 ## Loop
 
