@@ -29,4 +29,4 @@ Values sat flush against column rules; section headers read smaller than attr na
 ## Progress
 
 - `--attr-label/value/heading-size: 10px`; `--attr-col-pad-end: 14px` on cols 1–2
-- Commit: _(filled after git)_
+- Commit: `485eab0`
