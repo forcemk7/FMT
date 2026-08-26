@@ -225,7 +225,7 @@ export const FRONTEND_CALCULATION_CARDS: FrontendCalculationCard[] = [
     state: "passed",
     title: "Personality × Media Handling labels",
     detail:
-      "Catalog band match on HA pack + Det/Lea (FM HA Calculator). Shown on the profile header. Incomplete pack → —.",
+      "Catalog band match on HA pack + Det/Lea (FM HA Calculator). Shown in the profile facts strip. Incomplete pack → —.",
   },
 ];
 

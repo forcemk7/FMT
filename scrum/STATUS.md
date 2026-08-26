@@ -4,7 +4,7 @@ Last updated: 2026-08-26 (T169 HAS practical bands)
 
 ## Now
 
-**Shipped:** T169 — absolute HAS color bands (practical offset + gold above) on Squad Personality and Dashboard HAS scores.
+_(empty — pick next ready ticket)_
 
 **Verify:** Squad Personality ~15.6 reads high (green); edit-god >~15.8 gold; Dashboard Top/Bottom chips use the same band (list membership stays ranked).
 
@@ -20,6 +20,7 @@ Last updated: 2026-08-26 (T169 HAS practical bands)
 
 ## Recently done
 
+- **T170** Personality/Media in facts grid; restore attribute desk layout
 - **T169** HAS practical band colors on all HAS score displays
 - **T168** Badge inset so trimmed crests don't overflow
 - **T167** Kill Chromium “Saved info” overlay on header squad search

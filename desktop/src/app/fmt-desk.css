@@ -221,10 +221,6 @@ body.fmt-shell .page-intro p,
 body.fmt-shell .dossier-heading p {
   color: var(--text-muted);
 }
-body.fmt-shell .dossier-heading .dossier-personality {
-  color: var(--text-muted);
-  opacity: 0.92;
-}
 body.fmt-shell .player-name-link {
   color: var(--text);
 }
