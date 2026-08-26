@@ -1,155 +1,156 @@
 "use client";
 
 import { useMemo } from "react";
+import { ArrowRight } from "lucide-react";
 import type { LiveFootballSnapshot, LivePlayer } from "@/domain/adapters";
-import {
-  fieldDeltas,
-  formatDelta,
-  getPlayerAttrHistory,
-} from "@/domain/attribute-history";
+import { formatHasScore, hasTone, liveHasBreakdown, squadHasRankings, type HasTone } from "@/domain/has-score";
 import { LiveDataState } from "@/components/live-data-state";
 import { PlayerFace } from "@/components/player-face";
+import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-function ability(value: number | null | undefined) {
-  return typeof value === "number" ? String(value) : "—";
-}
-
-function SquadGlanceRow({
-  player,
-  onOpen,
-}: {
-  player: LivePlayer;
-  onOpen: (id: string) => void;
-}) {
-  const points = getPlayerAttrHistory(player.id);
-  const ca = fieldDeltas(points, "CA");
-  const det = fieldDeltas(points, "Determination");
-  const pro = fieldDeltas(points, "Professionalism");
-
+function HasBreakdownTooltip({ player }: { player: LivePlayer }) {
+  const rows = liveHasBreakdown(player);
   return (
-    <button type="button" className="dash-player-row" onClick={() => onOpen(player.id)}>
-      <PlayerFace playerId={player.id} name={player.name} size="sm" />
-      <span className="dash-player-id">
-        <strong>{player.name}</strong>
-        <small>
-          {player.positions?.slice(0, 2).join(" / ") || "—"} · {player.age ?? "—"}y
-        </small>
-      </span>
-      <span>
-        <small>CA</small>
-        <strong>
-          {ability(player.currentAbility)}
-          {ca.recent != null ? <em> {formatDelta(ca.recent)}</em> : null}
-        </strong>
-      </span>
-      <span>
-        <small>PA</small>
-        <strong>{ability(player.potentialAbility)}</strong>
-      </span>
-      <span>
-        <small>DET</small>
-        <strong>
-          {ability(player.attributes?.Determination)}
-          {det.recent != null ? <em> {formatDelta(det.recent)}</em> : null}
-        </strong>
-      </span>
-      <span>
-        <small>PRO</small>
-        <strong>
-          {ability(player.personalityAttributes?.Professionalism)}
-          {pro.recent != null ? <em> {formatDelta(pro.recent)}</em> : null}
-        </strong>
-      </span>
-    </button>
+    <div className="dash-has-tooltip-grid" aria-label="HAS inputs">
+      {rows.map((row) => (
+        <span key={row.abbr} className={`dash-has-tooltip-cell tone-${row.tone}`} title={row.label}>
+          <small>{row.abbr}</small>
+          <strong>{row.value}</strong>
+        </span>
+      ))}
+    </div>
   );
 }
 
-/** Loop B — collective squad/profile glance; drills into player desk. */
+function HasCard({
+  player,
+  score,
+  tone,
+  onOpen,
+}: {
+  player: LivePlayer;
+  score: number;
+  tone: HasTone;
+  onOpen: (id: string) => void;
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <button type="button" className="dash-has-card" onClick={() => onOpen(player.id)}>
+            <PlayerFace playerId={player.id} name={player.name} size="sm" />
+            <span className="dash-has-card-copy">
+              <strong>{player.name}</strong>
+              <small>{player.positions?.slice(0, 2).join(" / ") || "—"}</small>
+            </span>
+            <span className={`dash-has-score tone-${tone}`}>{formatHasScore(score)}</span>
+          </button>
+        }
+      />
+      <TooltipContent side="bottom" align="start" className="dash-has-tooltip">
+        <HasBreakdownTooltip player={player} />
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 export function DashboardScreen({
   snapshot,
   checking,
   onRefresh,
   onOpenPlayer,
+  onOpenSquad,
 }: {
   snapshot: LiveFootballSnapshot;
   checking: boolean;
   onRefresh: () => Promise<unknown>;
   onOpenPlayer: (playerId: string) => void;
+  onOpenSquad: () => void;
 }) {
   const squad = useMemo(
     () => snapshot.players.filter((player) => player.clubId === snapshot.managedClubId),
     [snapshot.managedClubId, snapshot.players],
   );
   const club = snapshot.clubs.find((item) => item.id === snapshot.managedClubId);
-
-  const movers = useMemo(() => {
-    return squad
-      .map((player) => {
-        const ca = fieldDeltas(getPlayerAttrHistory(player.id), "CA");
-        return { player, move: ca.recent ?? 0, abs: Math.abs(ca.recent ?? 0) };
-      })
-      .filter((row) => row.abs > 0)
-      .sort((a, b) => b.abs - a.abs)
-      .slice(0, 5);
-  }, [squad]);
-
-  if (snapshot.status.state !== "connected" || !snapshot.managedClubId || squad.length === 0) {
-    return (
-      <main className="screen">
-        <LiveDataState snapshot={snapshot} title="Dashboard" checking={checking} onRefresh={onRefresh} />
-      </main>
-    );
-  }
+  const has = useMemo(() => squadHasRankings(squad), [squad]);
+  const ready =
+    snapshot.status.state === "connected" && Boolean(snapshot.managedClubId) && squad.length > 0;
 
   return (
-    <main className="screen dashboard-squad-screen">
-      <header className="dash-intro">
+    <main className="screen">
+      <div className="planner-heading">
         <div>
-          <p className="section-kicker">Loop B · squad at a glance</p>
-          <h1>{club?.name ?? "Squad"}</h1>
+          <h1>Dashboard</h1>
           <p>
-            Same live players as Squad — rolled up for CA/PA and recent history moves. Open a
-            row for the full desk.
+            {ready
+              ? `${club?.name ?? "Squad"} · ${squad.length} players`
+              : "Collective squad signals — load when FM26 has a save open"}
           </p>
         </div>
-        <div className="dash-stat">
-          <small>Players</small>
-          <strong>{squad.length}</strong>
+        <div className="heading-actions">
+          <Button variant="outline" onClick={onOpenSquad} disabled={!ready}>
+            Squad
+            <ArrowRight data-icon="inline-end" />
+          </Button>
         </div>
-      </header>
+      </div>
 
-      {movers.length > 0 ? (
-        <section className="dash-movers" aria-label="Recent CA movers">
-          <h2>Recent CA movers</h2>
-          <ul>
-            {movers.map(({ player, move }) => (
-              <li key={player.id}>
-                <button type="button" onClick={() => onOpenPlayer(player.id)}>
-                  <strong>{player.name}</strong>
-                  <span>{formatDelta(move)} CA</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : (
-        <p className="evidence-caption">
-          No CA change-points yet. Reload after in-game development days to feed history.
-        </p>
-      )}
-
-      <section className="dash-squad-table" aria-label="Squad glance">
-        <header>
-          <span>Player</span>
-          <span />
-          <span>CA</span>
-          <span>PA</span>
-          <span>DET</span>
-          <span>PRO</span>
+      <section className="screen-panel dash-has-widget" aria-label="Personality overview">
+        <header className="screen-panel__head">
+          <h2>Hidden attribute score</h2>
         </header>
-        {squad.map((player) => (
-          <SquadGlanceRow key={player.id} player={player} onOpen={onOpenPlayer} />
-        ))}
+
+        <div className="screen-panel__body">
+          {!ready ? (
+            <LiveDataState
+              snapshot={snapshot}
+              title="Dashboard"
+              checking={checking}
+              onRefresh={onRefresh}
+              compact
+            />
+          ) : has.ranked.length ? (
+            <div className="dash-has-columns">
+              <div>
+                <h3>Top 10</h3>
+                <div className="dash-has-list">
+                  {has.top.map(({ player, score }) => (
+                    <HasCard
+                      key={player.id}
+                      player={player}
+                      score={score}
+                      tone={hasTone(score, has.eliteFloor, has.poorCeiling)}
+                      onOpen={onOpenPlayer}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div>
+                <h3>Bottom 10</h3>
+                <div className="dash-has-list">
+                  {has.bottom.map(({ player, score }) => (
+                    <HasCard
+                      key={player.id}
+                      player={player}
+                      score={score}
+                      tone={hasTone(score, has.eliteFloor, has.poorCeiling)}
+                      onOpen={onOpenPlayer}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <p className="evidence-caption">No readable personality pack on squad players yet.</p>
+          )}
+
+          {ready && has.ranked.length > 0 && has.ranked.length < squad.length ? (
+            <p className="evidence-caption">
+              HAS shown for {has.ranked.length} of {squad.length} — others missing personality data.
+            </p>
+          ) : null}
+        </div>
       </section>
     </main>
   );

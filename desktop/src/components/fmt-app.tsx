@@ -19,6 +19,7 @@ import {
 import { recordPlayersFromSnapshot } from "@/domain/attribute-history";
 import { toggleFavorite, type FavoriteRecord } from "@/domain/live-data";
 import { warmSquadGraphics } from "@/domain/warm-squad-graphics";
+import { applyAttrColorPalette, loadAttrColorPalette } from "@/domain/attr-colors";
 
 const initialStatus: LiveConnectorStatus = {
   processDetected: false,
@@ -115,6 +116,10 @@ export function FMTApp() {
   useEffect(() => {
     window.localStorage.setItem("fmt-favorites-v1", JSON.stringify(favorites));
   }, [favorites]);
+
+  useEffect(() => {
+    applyAttrColorPalette(loadAttrColorPalette());
+  }, []);
 
   const navigate = useCallback(
     (nextScreen: Screen) => {

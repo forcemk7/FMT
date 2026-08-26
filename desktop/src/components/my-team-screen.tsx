@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { ExternalLink } from "lucide-react";
 import type { LiveFootballSnapshot, LivePlayer } from "@/domain/adapters";
-import { attributeTone } from "@/domain/attribute-tone";
+import { abilityToneFromScore } from "@/domain/attribute-tone";
 import { groupSquad, positionGroups } from "@/domain/live-data";
 import { LiveDataState } from "@/components/live-data-state";
 import { PlayerFace } from "@/components/player-face";
@@ -15,8 +15,7 @@ function shown(value: string | number | null | undefined) {
 
 function abilityTone(value: number | null | undefined) {
   if (value == null || !Number.isFinite(value)) return "unknown" as const;
-  // Same 1–20 attribute bands on tenths: >140 green, 60–140 blue, 1–59 red
-  return attributeTone("Ability", value / 10);
+  return abilityToneFromScore(value);
 }
 
 function AbilityRing({ value, label }: { value: number | null | undefined; label: string }) {
@@ -28,7 +27,7 @@ function AbilityRing({ value, label }: { value: number | null | undefined; label
         className={`fit-score-ring ability-ring ability-ring-${tone}`}
         style={{ "--fit-score": `${safeValue * 1.8}deg` } as React.CSSProperties}
       >
-        <strong className={tone === "unknown" ? "attr-tone-neutral" : `attr-tone-${tone}`}>
+        <strong className={tone === "unknown" ? "attr-tone-mid" : `attr-tone-${tone}`}>
           {value ?? "—"}
         </strong>
       </span>

@@ -14,6 +14,7 @@ import { FRONTEND_CALCULATION_CARDS } from "@/domain/has-score";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { GraphicsPacksPanel } from "@/components/graphics-packs-panel";
+import { AttrColorsPanel } from "@/components/attr-colors-panel";
 import { getVersion } from "@tauri-apps/api/app";
 import { useEffect, useState } from "react";
 
@@ -102,6 +103,7 @@ export function SettingsScreen({
         <article><Database /><div><strong>Active FM26 game</strong><span>{status.processDetected ? "Football Manager 26 detected" : "Waiting for FM26"}</span></div><Button variant="outline" onClick={onRefresh} disabled={checking}><RefreshCw data-icon="inline-start" className={checking ? "spin" : undefined} />Load Active Save</Button></article>
         <article><LockKeyhole /><div><strong>Memory safety</strong><span>Query and read access only. FMT cannot write to FM26.</span></div><b>{status.memoryAccess.replaceAll("_", " ")}</b></article>
         <GraphicsPacksPanel />
+        <AttrColorsPanel />
 
         <details className="settings-expand" id="backend-read-pipeline">
           <summary>
