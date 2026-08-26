@@ -31,4 +31,4 @@ Personality and Media Handling are labels, not attributes — they clutter Gener
 
 - Header line under club/CA/PA: `Personality · Media Handling`
 - General = Ability + Potential only
-- Commit: _(filled after git)_
+- Commit: `bc7b659`
