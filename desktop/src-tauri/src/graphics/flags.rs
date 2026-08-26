@@ -21,7 +21,7 @@ use super::{
     packs::{copy_into_asset_cache, resolve_cached_asset},
 };
 
-const FLAG_CACHE_DIR: &str = "flag-cache";
+const FLAG_CACHE_DIR: &str = "flag-cache-trim";
 const MAX_INDEX_DEPTH: usize = 12;
 
 #[derive(Default)]

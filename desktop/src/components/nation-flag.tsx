@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { badgeObjectFit } from "@/domain/badge-fit";
 
 type NationFlagResult = { found: boolean; nationId: string; dataUrl: string | null };
 const cache = new Map<string, string | null>();
@@ -28,6 +29,7 @@ export function NationFlag({
     if (typeof window !== "undefined" && !("__TAURI_INTERNALS__" in window)) return null;
     return undefined;
   });
+  const [fit, setFit] = useState<"contain" | "cover">("contain");
 
   useEffect(() => {
     if (!("__TAURI_INTERNALS__" in window)) {
@@ -41,7 +43,10 @@ export function NationFlag({
 
     const apply = (next: string | null) => {
       cache.set(nationId, next);
-      if (active) setSource(next);
+      if (active) {
+        setFit("contain");
+        setSource(next);
+      }
     };
 
     const load = (attempt: number) => {
@@ -96,7 +101,15 @@ export function NationFlag({
   }
   return (
     <span className={`nation-flag nation-flag-${size}`}>
-      <img src={source} alt={`${name} flag from FM nation ID ${nationId}`} />
+      <img
+        src={source}
+        alt={`${name} flag from FM nation ID ${nationId}`}
+        data-fit={fit}
+        onLoad={(event) => {
+          const img = event.currentTarget;
+          setFit(badgeObjectFit(img.naturalWidth, img.naturalHeight));
+        }}
+      />
     </span>
   );
 }

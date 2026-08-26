@@ -2579,6 +2579,7 @@ body.fmt-shell {
 
 /* T141/T142 - single-row shell header ? fit the webview, don't invent extra height */
 .app-canvas.shell-single-header{
+  position:relative;
   display:grid;
   grid-template-columns:minmax(0,1fr);
   grid-template-rows:56px minmax(0,1fr);
@@ -2621,7 +2622,7 @@ body.fmt-shell {
   display:flex;
   align-items:center;
   gap:2px;
-  flex:1 1 auto;
+  flex:0 1 auto;
   min-width:0;
   overflow-x:auto;
   scrollbar-width:none;
@@ -2718,16 +2719,20 @@ body.fmt-shell {
   display:flex;
   align-items:center;
   gap:8px;
-  flex:0 0 auto;
-  margin-left:auto;
+  flex:1 1 auto;
+  min-width:0;
+  margin-left:12px;
 }
 .shell-search{
-  width:min(220px,22vw);
+  flex:1 1 auto;
+  width:auto;
+  min-width:140px;
+  max-width:none;
   height:34px;
   margin:0;
 }
 .shell-search svg{width:14px;height:14px}
-.shell-search input{height:34px;font-size:12px}
+.shell-search input{width:100%;height:34px;font-size:12px;padding-right:14px}
 .shell-search .keyboard-hint{display:none}
 .shell-load{
   display:inline-flex;
@@ -2768,9 +2773,12 @@ body.fmt-shell {
 .shell-load.is-needs-load .shell-load-icon{opacity:1;color:#076b62}
 .shell-load:disabled{opacity:.75;cursor:wait}
 .shell-tools>.shell-load{width:auto;height:34px}
-.shell-tools>button:not(.shell-load){width:34px;height:34px;border-radius:8px}
+.shell-tools>button:not(.shell-load){flex:0 0 auto;width:34px;height:34px;border-radius:8px}
 .shell-tools>button.is-active{background:var(--accent);color:var(--accent-foreground)}
-.app-canvas.shell-single-header .global-search-results{top:56px}
+.app-canvas.shell-single-header .global-search-results{
+  top:56px;
+  z-index:45;
+}
 
 .live-data-state.is-empty{
   min-height:0;

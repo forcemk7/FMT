@@ -1,10 +1,12 @@
 ﻿# Status
 
-Last updated: 2026-08-26 (T165 header search)
+Last updated: 2026-08-26 (T164 trim badges)
 
 ## Now
 
-**T164** Trim badge PNGs on cache (in_progress — cursor-agent)
+**Shipped:** T164 — trim badge PNGs on cache; wide leftovers use cover.
+
+**Verify:** quit FMT → rebuild → Load Active Save (fills `logo-cache-trim` / `flag-cache-trim`) → profile nation vs club should fill frames more evenly.
 
 **Deferred:** T139 theme (chrome/shell covered by T158/T159). T162 trophy cabinet (marketing visual; no RE until Loop A sticks).
 
@@ -12,18 +14,16 @@ Last updated: 2026-08-26 (T165 header search)
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
-| T164 | Trim badge PNGs on cache | in_progress | 2 | cursor-agent |
 | T139 | FMT visual theme | deferred | — | overlapped |
 | T162 | Player trophy cabinet | deferred | — | backlog |
 | T124 | Quiet dev launch | ready | 9 | |
 
 ## Recently done
 
+- **T164** Trim badge PNGs on cache for equal fill
 - **T165** Header squad search fills gap + readable hits → desk
-- **T163** General Personality + Media Handling labels (HA pack combo match)
-- **T161** Squad Personality column (HAS ring, attr bands)
-- **T160** Identical nation/club badge frames
-- **T159** Standardize chrome tokens + blue-led shell
+- **T163** General Personality + Media Handling labels
+- **T161** Squad Personality column
 
 ## Loop
 

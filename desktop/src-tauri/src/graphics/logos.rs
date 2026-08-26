@@ -22,7 +22,7 @@ use super::{
     packs::{copy_into_asset_cache, resolve_cached_asset},
 };
 
-const LOGO_CACHE_DIR: &str = "logo-cache";
+const LOGO_CACHE_DIR: &str = "logo-cache-trim";
 const MAX_INDEX_DEPTH: usize = 12;
 
 #[derive(Default)]
