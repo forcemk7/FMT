@@ -40,4 +40,4 @@ Loop A desk General column shows Ability/Potential but Personality and Media Han
 - `matchBestPersonalityCombo` (priority + tightness) + `livePersonalityLabels` for the desk
 - General column prefers live string if ever mapped, else inferred labels
 - Verified: `npm test -- src/domain/personality-labels.test.ts` — 7/7 pass
-- Commit: _(filled after git)_
+- Commit: `724da8f`
