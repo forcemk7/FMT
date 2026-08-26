@@ -3,7 +3,8 @@
 import { useMemo } from "react";
 import { ExternalLink } from "lucide-react";
 import type { LiveFootballSnapshot, LivePlayer } from "@/domain/adapters";
-import { abilityToneFromScore } from "@/domain/attribute-tone";
+import { abilityToneFromScore, attributeBand } from "@/domain/attribute-tone";
+import { formatHasScore, liveHasScore } from "@/domain/has-score";
 import { groupSquad, positionGroups } from "@/domain/live-data";
 import { LiveDataState } from "@/components/live-data-state";
 import { PlayerFace } from "@/components/player-face";
@@ -13,14 +14,9 @@ function shown(value: string | number | null | undefined) {
   return value == null || value === "" ? "—" : value;
 }
 
-function abilityTone(value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value)) return "unknown" as const;
-  return abilityToneFromScore(value);
-}
-
 function AbilityRing({ value, label }: { value: number | null | undefined; label: string }) {
   const safeValue = value == null ? 0 : Math.max(0, Math.min(200, value));
-  const tone = abilityTone(value);
+  const tone = value == null || !Number.isFinite(value) ? "unknown" : abilityToneFromScore(value);
   return (
     <span className="squad-ability-cell">
       <span
@@ -36,6 +32,25 @@ function AbilityRing({ value, label }: { value: number | null | undefined; label
   );
 }
 
+/** HAS is ~1–20 — same FM bands as attributes (not squad percentiles). */
+function PersonalityRing({ value }: { value: number | null }) {
+  const safeValue = value == null ? 0 : Math.max(0, Math.min(20, value));
+  const tone = value == null || !Number.isFinite(value) ? "unknown" : attributeBand(value);
+  return (
+    <span className="squad-ability-cell">
+      <span
+        className={`fit-score-ring ability-ring ability-ring-${tone}`}
+        style={{ "--fit-score": `${safeValue * 18}deg` } as React.CSSProperties}
+      >
+        <strong className={tone === "unknown" ? "attr-tone-mid" : `attr-tone-${tone}`}>
+          {formatHasScore(value)}
+        </strong>
+      </span>
+      <small>Personality</small>
+    </span>
+  );
+}
+
 function footLine(player: LivePlayer) {
   const left = player.leftFoot;
   const right = player.rightFoot;
@@ -47,6 +62,7 @@ function footLine(player: LivePlayer) {
 }
 
 function PlayerRow({ player, onOpenPlayer }: { player: LivePlayer; onOpenPlayer: (id: string) => void }) {
+  const has = liveHasScore(player);
   return (
     <article className="squad-player-row squad-player-row-mapped" onClick={() => onOpenPlayer(player.id)}>
       <div className="squad-player-identity">
@@ -64,6 +80,7 @@ function PlayerRow({ player, onOpenPlayer }: { player: LivePlayer; onOpenPlayer:
       </span>
       <AbilityRing value={player.currentAbility} label="Ability" />
       <AbilityRing value={player.potentialAbility} label="Potential" />
+      <PersonalityRing value={has} />
       <Button variant="outline" size="sm">
         Profile
         <ExternalLink data-icon="inline-end" />
@@ -115,6 +132,7 @@ export function MyTeamScreen({
           <span>Position</span>
           <span>Ability</span>
           <span>Potential</span>
+          <span>Personality</span>
           <span>Details</span>
         </header>
         {!ready ? (

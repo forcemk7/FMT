@@ -1,12 +1,10 @@
 ﻿# Status
 
-Last updated: 2026-08-26 (T160 identical badges)
+Last updated: 2026-08-26 (T161 done)
 
 ## Now
 
-**Shipped:** T160 — nation + club share the same 32×32 framed badge on profile facts.
-
-**Verify:** player profile — Portugal crest and Schalke logo sit in identical boxes beside their names.
+_(empty — pick next ready ticket)_
 
 **Deferred:** T139 theme (chrome/shell covered by T158/T159).
 
@@ -19,9 +17,9 @@ Last updated: 2026-08-26 (T160 identical badges)
 
 ## Recently done
 
+- **T161** Squad Personality column (HAS ring, attr bands)
 - **T160** Identical nation/club badge frames
 - **T159** Standardize chrome tokens + blue-led shell
-- **T158** Honest profile facts + badge layout
 
 ## Loop
 
