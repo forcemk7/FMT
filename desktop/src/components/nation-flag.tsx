@@ -89,7 +89,11 @@ export function NationFlag({
     };
   }, [nationId]);
 
-  if (!source) return null;
+  if (!source) {
+    return (
+      <span className={`nation-flag nation-flag-${size} nation-flag-empty`} aria-hidden="true" />
+    );
+  }
   return (
     <span className={`nation-flag nation-flag-${size}`}>
       <img src={source} alt={`${name} flag from FM nation ID ${nationId}`} />

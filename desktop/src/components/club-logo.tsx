@@ -90,7 +90,11 @@ export function ClubLogo({
     };
   }, [clubId]);
 
-  if (!source) return null;
+  if (!source) {
+    return (
+      <span className={`club-logo club-logo-${size} club-logo-empty`} aria-hidden="true" />
+    );
+  }
   return (
     <span className={`club-logo club-logo-${size}`}>
       <img src={source} alt={`${name} badge from FM club ID ${clubId}`} />

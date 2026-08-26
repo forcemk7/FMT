@@ -328,14 +328,20 @@ export function PlayerProfileScreen({
         <span className="player-nation-fact">
           {player.nationalityId ? (
             <NationFlag nationId={player.nationalityId} name={player.nationality ?? "Nation"} size="md" />
-          ) : null}
+          ) : (
+            <span className="nation-flag nation-flag-md nation-flag-empty" aria-hidden="true" />
+          )}
           <span>
             <b>Nationality</b>
             <strong>{player.nationality ?? "Unknown"}</strong>
           </span>
         </span>
         <button className="player-club-fact" disabled={!club} onClick={() => club && onOpenClub?.(club.id)}>
-          {club ? <ClubLogo clubId={club.id} name={club.name} size="md" /> : null}
+          {club ? (
+            <ClubLogo clubId={club.id} name={club.name} size="md" />
+          ) : (
+            <span className="club-logo club-logo-md club-logo-empty" aria-hidden="true" />
+          )}
           <span>
             <b>Club</b>
             <strong>{clubName ?? "Unknown"}</strong>
