@@ -44,4 +44,4 @@ Squad desk should show the player’s **best** pitch slot at a glance (`DC (DM /
 
 - Shipped: primary/secondary split from familiarity bytes; squad/dashboard/profile labels; groups by best only.
 - Verified: `cargo test classify_positions` (2 ok); `vitest` `product.test.ts` (8 ok).
-- Commit: _(filled after git)_
+- Commit: `3a907b2ab585a1eb3f797b1a955ac42e14cab2c1`
