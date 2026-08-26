@@ -32,4 +32,4 @@ Loop A/B: HAS theoretical max (~18.3) is edit-only; attr bands on raw HAS misrea
 
 - Constants: ceiling 495/27, offset 2.5 → practical ~3.5–15.83; gold via `--gold`
 - Verified: `npm test -- --run src/domain/has-score.test.ts`
-- Commit: (pending)
+- Commit: `b0c7146`
