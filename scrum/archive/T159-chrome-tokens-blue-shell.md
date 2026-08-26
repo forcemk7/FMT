@@ -30,4 +30,4 @@ Compact nav used a white pill while expanded used gold — forced nitpicking. Sh
 ## Progress
 
 - Rewrote `fmt-desk.css` token contract
-- Commit: _(filled after git)_
+- Commit: `02884d9`
