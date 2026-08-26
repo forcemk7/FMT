@@ -44,4 +44,4 @@ Loop A/B Squad shows placeholders for players newly moved into the squad (e.g. C
 
 ## Progress
 
-Shipped: squad player IDs → `faces_update_cache` on connect; post-warm `clearPlayerFaceMemoryCache` nudges; `PlayerFace` soft-miss retries (same cadence as ClubLogo). Verified `cargo check` ok. Commit SHA pending below.
+Shipped: squad player IDs → `faces_update_cache` on connect; post-warm `clearPlayerFaceMemoryCache` nudges; `PlayerFace` soft-miss retries (same cadence as ClubLogo). Verified `cargo check` ok. Commit `8a96c57`.
