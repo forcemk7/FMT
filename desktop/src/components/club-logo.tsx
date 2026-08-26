@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { badgeObjectFit } from "@/domain/badge-fit";
 
 type ClubLogoResult = { found: boolean; clubId: string; dataUrl: string | null };
 const cache = new Map<string, string | null>();
@@ -29,7 +28,6 @@ export function ClubLogo({
     if (typeof window !== "undefined" && !("__TAURI_INTERNALS__" in window)) return null;
     return undefined;
   });
-  const [fit, setFit] = useState<"contain" | "cover">("contain");
 
   useEffect(() => {
     if (!("__TAURI_INTERNALS__" in window)) {
@@ -43,10 +41,7 @@ export function ClubLogo({
 
     const apply = (next: string | null) => {
       cache.set(clubId, next);
-      if (active) {
-        setFit("contain");
-        setSource(next);
-      }
+      if (active) setSource(next);
     };
 
     const load = (attempt: number) => {
@@ -101,15 +96,9 @@ export function ClubLogo({
   }
   return (
     <span className={`club-logo club-logo-${size}`}>
-      <img
-        src={source}
-        alt={`${name} badge from FM club ID ${clubId}`}
-        data-fit={fit}
-        onLoad={(event) => {
-          const img = event.currentTarget;
-          setFit(badgeObjectFit(img.naturalWidth, img.naturalHeight));
-        }}
-      />
+      <span className="badge-media">
+        <img src={source} alt={`${name} badge from FM club ID ${clubId}`} />
+      </span>
     </span>
   );
 }

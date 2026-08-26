@@ -1,12 +1,12 @@
 ﻿# Status
 
-Last updated: 2026-08-26 (T173 best-position squad labels)
+Last updated: 2026-08-26 (T175 badge media box clip)
 
 ## Now
 
 _(empty — pick next ready ticket)_
 
-**Verify:** Squad Position shows best slot + secondaries in parentheses; groups follow best only.
+**Verify:** Nation flags (Spain/Belgium/Uruguay) stay inside the bordered square on player profile.
 
 **Deferred:** T139 theme (chrome/shell covered by T158/T159). T162 trophy cabinet (marketing visual; no RE until Loop A sticks).
 
@@ -20,8 +20,9 @@ _(empty — pick next ready ticket)_
 
 ## Recently done
 
+- **T175** Badge media box clips tall flags (100% contain, no absolute auto)
 - **T173** Best-position squad labels and groups
-- **T174** Hard-clip badge frames (no flag overflow)
+- **T174** Hard-clip badge frames (superseded by T175)
 - **T172** Attribute desk header size + separator padding
 - **T171** FM stacked attribute desk top row (outfield/GK)
 - **T170** Personality/Media in facts grid; restore attribute desk layout
