@@ -205,9 +205,6 @@ function formatGeneralText(value: string | null | undefined) {
 }
 
 function GeneralColumn({ player }: { player: LivePlayer }) {
-  const inferred = livePersonalityLabels(player);
-  const personalityLabel = player.personality ?? inferred?.personality ?? null;
-  const mediaLabel = player.mediaHandling ?? inferred?.mediaHandling ?? null;
   const rows = [
     {
       label: "Ability",
@@ -215,23 +212,11 @@ function GeneralColumn({ player }: { player: LivePlayer }) {
       toneClass: abilityToneClass(player.currentAbility),
     },
     {
-      label: "Media Handling",
-      value: formatGeneralText(mediaLabel),
-    },
-    {
-      label: "Personality",
-      value: formatGeneralText(personalityLabel),
-    },
-    {
       label: "Potential",
       value: abilityLabel(player.potentialAbility),
       toneClass: abilityToneClass(player.potentialAbility),
     },
-    {
-      label: "Traits",
-      value: formatGeneralText(player.traits),
-    },
-  ].sort((a, b) => a.label.localeCompare(b.label));
+  ];
 
   return (
     <section className="attr-desk-group">
@@ -418,6 +403,9 @@ export function PlayerProfileScreen({
   const value = player.value?.trim() || null;
   const wage = player.wage?.trim() || null;
   const contract = player.contractStatus?.trim() || null;
+  const inferredLabels = livePersonalityLabels(player);
+  const personalityLabel = formatGeneralText(player.personality ?? inferredLabels?.personality ?? null);
+  const mediaLabel = formatGeneralText(player.mediaHandling ?? inferredLabels?.mediaHandling ?? null);
 
   return (
     <main className="player-dossier">
@@ -425,7 +413,15 @@ export function PlayerProfileScreen({
         <div className="dossier-heading">
           <Button variant="ghost" size="icon" aria-label="Back to squad" onClick={onBack}><ArrowLeft /></Button>
           <PlayerFace playerId={player.id} name={player.name} size="lg" />
-          <div><h1>{player.name}</h1><p>{clubName ?? "Club unknown"} · CA {abilityLabel(player.currentAbility)} · PA {abilityLabel(player.potentialAbility)}</p></div>
+          <div>
+            <h1>{player.name}</h1>
+            <p>{clubName ?? "Club unknown"} · CA {abilityLabel(player.currentAbility)} · PA {abilityLabel(player.potentialAbility)}</p>
+            <p className="dossier-personality" title={`${personalityLabel} · ${mediaLabel}`}>
+              <span>{personalityLabel}</span>
+              <span aria-hidden="true"> · </span>
+              <span>{mediaLabel}</span>
+            </p>
+          </div>
         </div>
         <div className="dossier-actions">
           <Button variant="outline" className={favorite ? "shortlist-active" : ""} onClick={onToggleFavorite}><Star data-icon="inline-start" fill={favorite ? "currentColor" : "none"} />{favorite ? "Saved" : "Save"}</Button>

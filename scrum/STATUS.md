@@ -4,7 +4,7 @@ Last updated: 2026-08-26 (T164 trim badges)
 
 ## Now
 
-**Shipped:** T164 — trim badge PNGs on cache; wide leftovers use cover.
+_(empty — pick next ready ticket)_
 
 **Verify:** quit FMT → rebuild → Load Active Save (fills `logo-cache-trim` / `flag-cache-trim`) → profile nation vs club should fill frames more evenly.
 
@@ -20,6 +20,7 @@ Last updated: 2026-08-26 (T164 trim badges)
 
 ## Recently done
 
+- **T166** Personality/Media in profile header; General = CA/PA only
 - **T164** Trim badge PNGs on cache for equal fill
 - **T165** Header squad search fills gap + readable hits → desk
 - **T163** General Personality + Media Handling labels
