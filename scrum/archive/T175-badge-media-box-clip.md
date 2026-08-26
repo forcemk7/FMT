@@ -30,4 +30,4 @@ Absolute `width/height:auto` imgs still paint past the frame in WebView (Spain/B
 
 Shipped: wrap flag/logo `<img>` in `.badge-media`; CSS uses fixed 100%×100% box + `object-fit:contain` + `overflow:hidden` (no absolute/`width:auto`). Deleted unused `badge-fit.ts`. Hard-refresh profile to verify Spain/Belgium/Uruguay.
 
-Commit: _(filled after git)_
+Commit: `cfbad10`
