@@ -30,4 +30,4 @@ In-game outfield desk is one band: Technical+Set Pieces | Mental | Physical+GK r
 ## Progress
 
 - `attribute-column-stack` + stretch; outfield GK rating `margin-top: auto`
-- Commit: _(filled after git)_
+- Commit: `3c2b1e2`
