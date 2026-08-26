@@ -1,0 +1,359 @@
+/**
+ * T158 — FMT desk design system
+ * Inspired by FM Portal atmosphere + FMT mockups: unified dark navy-teal,
+ * elevated panels, soft borders. Attribute band colors stay in --attr-tone-*.
+ */
+
+body.fmt-shell {
+  color-scheme: dark;
+  height: 100%;
+  overflow: hidden;
+
+  --shell-0: #070d10;
+  --shell-1: #0a1418;
+  --shell-2: #0d1a1f;
+  --panel: #121e24;
+  --panel-2: #16252c;
+  --panel-3: #1a2b33;
+  --hairline: rgba(210, 230, 240, 0.08);
+  --hairline-strong: rgba(210, 230, 240, 0.14);
+  --text: #f3f6f8;
+  --text-muted: #8b9ba8;
+  --text-dim: #6d7f8c;
+  --gold: #d4b45a;
+  --gold-soft: rgba(212, 180, 90, 0.14);
+  --action: #0c5c4c;
+  --action-border: rgba(46, 160, 130, 0.45);
+  --action-text: #e8fff8;
+
+  --background: var(--shell-1);
+  --foreground: var(--text);
+  --card: var(--panel);
+  --card-foreground: var(--text);
+  --popover: var(--panel-2);
+  --popover-foreground: var(--text);
+  --primary: var(--action);
+  --primary-foreground: var(--action-text);
+  --secondary: var(--panel-2);
+  --secondary-foreground: var(--text);
+  --muted: var(--panel-2);
+  --muted-foreground: var(--text-muted);
+  --accent: var(--panel-3);
+  --accent-foreground: var(--text);
+  --destructive: #bd4e4e;
+  --border: var(--hairline);
+  --input: var(--hairline-strong);
+  --ring: var(--gold);
+  --sidebar: var(--shell-0);
+  --sidebar-foreground: var(--text);
+  --sidebar-primary: var(--gold);
+  --sidebar-primary-foreground: var(--shell-0);
+  --sidebar-accent: var(--panel);
+  --sidebar-accent-foreground: var(--text);
+  --sidebar-border: var(--hairline);
+  --sidebar-ring: var(--gold);
+  --mint: #2bb89a;
+  --mint-soft: var(--panel-2);
+  --navy: var(--text);
+  --slate: var(--text-muted);
+  --amber: var(--gold);
+  --amber-soft: var(--gold-soft);
+  --panel-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  --shell-top: var(--shell-0);
+  --shell-bottom: #0b1c18;
+
+  --attr-tone-high: #65e53a;
+  --attr-tone-upper: #3a8acf;
+  --attr-tone-mid: #e6e6fa;
+  --attr-tone-low: #bd4e4e;
+
+  color: var(--text);
+  background:
+    radial-gradient(1100px 520px at 50% -8%, rgba(40, 90, 70, 0.18), transparent 58%),
+    radial-gradient(900px 480px at 85% 108%, rgba(30, 70, 90, 0.16), transparent 55%),
+    linear-gradient(180deg, var(--shell-0) 0%, var(--shell-1) 42%, var(--shell-bottom) 100%);
+}
+
+body.fmt-shell .app-canvas,
+body.fmt-shell .app-canvas.shell-single-header {
+  background: transparent;
+}
+
+/* —— Header —— */
+body.fmt-shell .shell-header {
+  background: rgba(8, 14, 18, 0.92);
+  border-bottom: 1px solid var(--hairline);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.28);
+}
+
+body.fmt-shell .shell-nav-item {
+  color: var(--text-muted);
+  background: transparent;
+}
+body.fmt-shell .shell-nav-item:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.04);
+}
+body.fmt-shell .shell-nav-item.is-active {
+  color: var(--gold);
+  background: var(--gold-soft);
+}
+body.fmt-shell .shell-nav-item.is-active .shell-nav-tbd {
+  color: var(--gold);
+}
+body.fmt-shell .shell-nav-item.is-later {
+  opacity: 0.55;
+}
+
+body.fmt-shell .shell-nav-trigger {
+  background: #e8eef1;
+  border-color: transparent;
+  color: #152028;
+  border-radius: 999px;
+  font-weight: 700;
+}
+body.fmt-shell .shell-nav-trigger svg {
+  opacity: 0.7;
+  color: #152028;
+}
+
+body.fmt-shell .shell-nav-menu {
+  background: var(--panel-2);
+  border-color: var(--hairline-strong);
+  box-shadow: var(--panel-shadow);
+}
+body.fmt-shell .shell-nav-menu-item {
+  color: var(--text-muted);
+}
+body.fmt-shell .shell-nav-menu-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+}
+body.fmt-shell .shell-nav-menu-item.is-active {
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+
+body.fmt-shell .shell-search input {
+  background: var(--panel);
+  border: 1px solid var(--hairline);
+  color: var(--text);
+  border-radius: 999px;
+  box-shadow: none;
+}
+body.fmt-shell .shell-search input::placeholder {
+  color: var(--text-dim);
+}
+body.fmt-shell .shell-search svg {
+  color: var(--text-dim);
+}
+
+body.fmt-shell .shell-load {
+  background: var(--panel);
+  border: 1px solid var(--hairline);
+  color: var(--text-muted);
+  border-radius: 999px;
+}
+body.fmt-shell .shell-load strong {
+  color: var(--text);
+}
+body.fmt-shell .shell-load.is-needs-load {
+  background: var(--action);
+  border-color: var(--action-border);
+  color: var(--action-text);
+}
+body.fmt-shell .shell-load.is-needs-load strong {
+  color: var(--action-text);
+}
+body.fmt-shell .shell-load.is-needs-load .shell-load-icon {
+  color: var(--action-text);
+}
+body.fmt-shell .shell-load .live-dot {
+  background: var(--gold);
+  box-shadow: 0 0 0 3px var(--gold-soft);
+}
+body.fmt-shell .shell-tools > button:not(.shell-load) {
+  color: var(--text-muted);
+  border-radius: 999px;
+}
+body.fmt-shell .shell-tools > button:not(.shell-load):hover,
+body.fmt-shell .shell-tools > button.is-active {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+
+/* —— Page chrome —— */
+body.fmt-shell .planner-heading h1,
+body.fmt-shell .page-intro h1,
+body.fmt-shell .dossier-heading h1 {
+  color: var(--text);
+  letter-spacing: -0.03em;
+}
+body.fmt-shell .planner-heading p,
+body.fmt-shell .page-intro p,
+body.fmt-shell .dossier-heading p {
+  color: var(--text-muted);
+}
+body.fmt-shell .player-name-link {
+  color: var(--text);
+}
+body.fmt-shell .player-name-link:hover {
+  color: var(--mint);
+}
+
+/* —— Elevated panels —— */
+body.fmt-shell .squad-live-table,
+body.fmt-shell .dossier-panel,
+body.fmt-shell .player-dossier,
+body.fmt-shell .settings-list > article,
+body.fmt-shell .attr-colors-panel,
+body.fmt-shell .screen-panel,
+body.fmt-shell .settings-expand,
+body.fmt-shell .advanced-diagnostics,
+body.fmt-shell .read-pipeline-grid article {
+  background: var(--panel) !important;
+  border: 1px solid var(--hairline) !important;
+  color: var(--text);
+  box-shadow: none;
+  border-radius: 14px;
+}
+
+body.fmt-shell .squad-live-table > header,
+body.fmt-shell .squad-position-group h2,
+body.fmt-shell .dossier-panel > header {
+  background: rgba(0, 0, 0, 0.22) !important;
+  color: var(--text-muted) !important;
+  border-color: var(--hairline);
+}
+
+body.fmt-shell .squad-player-row,
+body.fmt-shell .compact-dossier-panel > button {
+  border-color: var(--hairline) !important;
+  background: transparent !important;
+}
+body.fmt-shell .squad-player-row:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+body.fmt-shell .squad-table-empty {
+  background: transparent;
+  border-color: var(--hairline);
+}
+
+body.fmt-shell .attribute-column h3,
+body.fmt-shell .dossier-panel > header h2 {
+  color: var(--text-muted) !important;
+}
+body.fmt-shell .attribute-column strong {
+  color: inherit;
+}
+body.fmt-shell .attribute-column li,
+body.fmt-shell .attribute-column span,
+body.fmt-shell .attribute-column small {
+  color: var(--text-muted);
+}
+
+body.fmt-shell .attr-tone-high { color: var(--attr-tone-high); }
+body.fmt-shell .attr-tone-upper { color: var(--attr-tone-upper); }
+body.fmt-shell .attr-tone-mid { color: var(--attr-tone-mid); background: transparent; padding: 0; }
+body.fmt-shell .attr-tone-low { color: var(--attr-tone-low); }
+
+/* —— Ability rings —— */
+body.fmt-shell .fit-score-ring {
+  background: conic-gradient(var(--fit-color) var(--fit-score), rgba(255, 255, 255, 0.08) 0);
+}
+body.fmt-shell .fit-score-ring:after {
+  background: var(--panel-2);
+}
+body.fmt-shell .ability-ring-high { --fit-color: var(--attr-tone-high); }
+body.fmt-shell .ability-ring-upper { --fit-color: var(--attr-tone-upper); }
+body.fmt-shell .ability-ring-mid { --fit-color: var(--attr-tone-mid); }
+body.fmt-shell .ability-ring-low { --fit-color: var(--attr-tone-low); }
+
+/* —— Dashboard HAS —— */
+body.fmt-shell .dash-has-columns h3 {
+  color: var(--text-dim);
+}
+body.fmt-shell .dash-has-card {
+  background: var(--panel-2);
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  color: var(--text);
+}
+body.fmt-shell .dash-has-card:hover {
+  background: var(--panel-3);
+  border-color: var(--hairline-strong);
+}
+body.fmt-shell .dash-has-card-copy strong {
+  color: var(--text);
+}
+body.fmt-shell .dash-has-score {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text);
+}
+body.fmt-shell .dash-has-score.tone-high {
+  background: rgba(101, 229, 58, 0.12);
+  color: var(--attr-tone-high);
+}
+body.fmt-shell .dash-has-score.tone-upper {
+  background: rgba(58, 138, 207, 0.14);
+  color: var(--attr-tone-upper);
+}
+body.fmt-shell .dash-has-score.tone-mid {
+  background: rgba(230, 230, 250, 0.1);
+  color: var(--attr-tone-mid);
+}
+body.fmt-shell .dash-has-score.tone-low {
+  background: rgba(189, 78, 78, 0.14);
+  color: var(--attr-tone-low);
+}
+
+body.fmt-shell .dash-has-tooltip {
+  background: var(--panel-2) !important;
+  border: 1px solid var(--hairline-strong) !important;
+  color: var(--text) !important;
+  box-shadow: var(--panel-shadow);
+  border-radius: 12px;
+}
+body.fmt-shell .dash-has-tooltip-cell {
+  background: rgba(0, 0, 0, 0.25) !important;
+  border-radius: 8px;
+}
+body.fmt-shell .dash-has-tooltip-cell small {
+  color: var(--text-dim) !important;
+}
+body.fmt-shell .dash-has-tooltip-cell strong {
+  color: var(--text) !important;
+}
+body.fmt-shell .dash-has-tooltip-cell.tone-high strong { color: var(--attr-tone-high) !important; }
+body.fmt-shell .dash-has-tooltip-cell.tone-upper strong { color: var(--attr-tone-upper) !important; }
+body.fmt-shell .dash-has-tooltip-cell.tone-mid strong { color: var(--attr-tone-mid) !important; }
+body.fmt-shell .dash-has-tooltip-cell.tone-low strong { color: var(--attr-tone-low) !important; }
+
+/* —— Settings / empty / misc —— */
+body.fmt-shell .settings-expand-body,
+body.fmt-shell .attr-color-swatch {
+  background: var(--panel-2) !important;
+  border-color: var(--hairline) !important;
+  color: var(--text);
+}
+body.fmt-shell .live-data-state.is-compact,
+body.fmt-shell .live-data-state.is-empty {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: 0 !important;
+}
+body.fmt-shell .live-source-label {
+  color: var(--text-muted);
+}
+body.fmt-shell .Button,
+body.fmt-shell button[data-slot="button"] {
+  /* leave shadcn tokens; primary already remapped */
+}
+
+body.fmt-shell .startup-brand strong {
+  color: var(--text);
+}
+body.fmt-shell .startup-brand small {
+  color: var(--gold);
+}
