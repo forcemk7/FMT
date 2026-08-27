@@ -40,4 +40,4 @@ Loop A/B: surface young high-ceiling players who can still gain Professionalism 
 
 Shipped: `rankSquadProspects` + tests; Dashboard Prospects panel (PA + Pro → best mentor). Verified with vitest (5 prospects + 6 movers).
 
-Commit: _(pending)_
+Commit: `3ba269e`
