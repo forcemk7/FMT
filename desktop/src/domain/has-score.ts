@@ -22,6 +22,7 @@ type HasInputDef = {
 const HAS_KNEE = 10;
 const HAS_TAIL_FACTOR = 0.25;
 export const HAS_DASHBOARD_LEADERBOARD_SIZE = 10;
+export const HAS_DASHBOARD_PEEK_SIZE = 5;
 
 const HAS_INPUTS: HasInputDef[] = [
   {
@@ -284,6 +285,19 @@ function hasContributions(player: LivePlayer) {
   return rows;
 }
 
+/** Keys aligned with {@link liveHasBreakdown} row order (Pro → Con). */
+export const HAS_BREAKDOWN_FIELD_KEYS = [
+  "Professionalism",
+  "Pressure",
+  "Determination",
+  "Ambition",
+  "Leadership",
+  "Loyalty",
+  "Temperament",
+  "Sportsmanship",
+  "Controversy",
+] as const;
+
 /** Presentation order for HAS widgets — importance high → low. */
 export function liveHasBreakdown(player: LivePlayer): HasBreakdownRow[] {
   const contributions = hasContributions(player);
@@ -337,7 +351,10 @@ export function hasTone(score: number): HasTone {
   return hasBand(score);
 }
 
-export function squadHasRankings(players: LivePlayer[]) {
+export function squadHasRankings(
+  players: LivePlayer[],
+  size = HAS_DASHBOARD_LEADERBOARD_SIZE,
+) {
   const ranked = players
     .map((player) => ({ player, score: liveHasScore(player) }))
     .filter((row): row is { player: LivePlayer; score: number } => row.score != null)
@@ -346,13 +363,14 @@ export function squadHasRankings(players: LivePlayer[]) {
   const scores = ranked.map((row) => row.score);
   const eliteFloor = uniqueTopFractionFloor(scores, 0.25);
   const poorCeiling = uniqueBottomFractionCeiling(scores, 0.25);
+  const limit = Math.max(0, size);
 
   return {
     ranked,
     eliteFloor,
     poorCeiling,
-    top: ranked.slice(0, HAS_DASHBOARD_LEADERBOARD_SIZE),
-    bottom: [...ranked].reverse().slice(0, HAS_DASHBOARD_LEADERBOARD_SIZE),
+    top: ranked.slice(0, limit),
+    bottom: [...ranked].reverse().slice(0, limit),
   };
 }
 

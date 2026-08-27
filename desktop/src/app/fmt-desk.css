@@ -367,6 +367,21 @@ body.fmt-shell .squad-metric-ring strong.is-unknown {
 body.fmt-shell .dash-has-columns h3 {
   color: var(--text-dim);
 }
+body.fmt-shell .dash-widget {
+  background: var(--panel-2);
+  border-color: var(--hairline);
+}
+body.fmt-shell .dash-widget__head {
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom-color: var(--hairline);
+}
+body.fmt-shell .dash-widget__title h2 {
+  color: var(--text);
+}
+body.fmt-shell .dash-peek-row:hover {
+  background: var(--panel-3);
+  border-color: var(--hairline-strong);
+}
 body.fmt-shell .dash-mover-chip {
   background: rgba(255, 255, 255, 0.06);
   color: var(--text);

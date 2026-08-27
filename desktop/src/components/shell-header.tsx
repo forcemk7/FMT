@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { LiveFootballSnapshot } from "@/domain/adapters";
+import { isDashViewId } from "@/domain/dashboard-views";
 
 export type Screen =
   | "Dashboard"
@@ -26,7 +27,11 @@ export type Screen =
   | "Technical Director"
   | "Player Profile"
   | "Club Profile"
-  | "Settings";
+  | "Settings"
+  | "Movers"
+  | "Prospects"
+  | "HAS Top"
+  | "HAS Bottom";
 
 type NavItem = {
   label: Screen;
@@ -114,7 +119,11 @@ export function ShellHeader({
   const connected = snapshot.status.state === "connected";
   const club = snapshot.clubs.find((item) => item.id === snapshot.managedClubId);
   const activeNav =
-    screen === "Player Profile" || screen === "Club Profile" ? "Squad" : screen;
+    screen === "Player Profile" || screen === "Club Profile"
+      ? "Squad"
+      : isDashViewId(screen)
+        ? "Dashboard"
+        : screen;
   const needsLoad = !connected;
   const loadLabel = checking ? "Loading…" : needsLoad ? "Load Data" : club?.name ?? "Synced";
   const loadDetail = connected ? connectionDetail(snapshot) : null;

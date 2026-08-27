@@ -8,7 +8,7 @@ import { LaterRoleScreen } from "@/components/later-role-screen";
 import { PlayerProfileScreen } from "@/components/player-profile-screen";
 import { SettingsScreen } from "@/components/settings-screen";
 import { ClubProfileScreen } from "@/components/club-profile-screen";
-import { DashboardScreen } from "@/components/dashboard-screen";
+import { DashboardScreen, DashboardViewScreen } from "@/components/dashboard-screen";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import {
   fm26LiveAdapter,
@@ -17,6 +17,7 @@ import {
   type LivePlayer,
 } from "@/domain/adapters";
 import { recordPlayersFromSnapshot } from "@/domain/attribute-history";
+import { isDashViewId, type DashViewId } from "@/domain/dashboard-views";
 import { toggleFavorite, type FavoriteRecord } from "@/domain/live-data";
 import { warmSquadGraphics } from "@/domain/warm-squad-graphics";
 import { applyAttrColorPalette, loadAttrColorPalette } from "@/domain/attr-colors";
@@ -169,6 +170,13 @@ export function FMTApp() {
     [navigate, screen],
   );
 
+  const openDashView = useCallback(
+    (view: DashViewId) => {
+      navigate(view);
+    },
+    [navigate],
+  );
+
   const openClub = useCallback(
     (clubId: string) => {
       setReturnScreen((current) =>
@@ -201,7 +209,16 @@ export function FMTApp() {
         checking={checking}
         onRefresh={checkConnection}
         onOpenPlayer={openPlayer}
-        onOpenSquad={() => navigate("Squad")}
+        onOpenView={openDashView}
+      />
+    ) : isDashViewId(screen) ? (
+      <DashboardViewScreen
+        view={screen}
+        snapshot={snapshot}
+        checking={checking}
+        onRefresh={checkConnection}
+        onOpenPlayer={openPlayer}
+        onBack={() => navigate("Dashboard")}
       />
     ) : screen === "Squad" ? (
       <MyTeamScreen
@@ -217,9 +234,12 @@ export function FMTApp() {
         player={snapshot.players.find((player) => player.id === selectedPlayerId) ?? null}
         snapshot={snapshot}
         favorite={selectedPlayerId ? favorites.some((record) => record.playerId === selectedPlayerId) : false}
+        checking={checking}
+        onRefresh={checkConnection}
         onToggleFavorite={() => selectedPlayerId && togglePlayerFavorite(selectedPlayerId)}
         onBack={goBackOrReturn}
         onOpenClub={openClub}
+        onOpenPlayer={openPlayer}
       />
     ) : screen === "Club Profile" ? (
       <ClubProfileScreen
