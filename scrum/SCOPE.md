@@ -18,8 +18,9 @@ Load → **Dashboard** = collective view of the same squad/profile signals (move
 Nav stubs stay **Later** until they have load → desk → decision. Empty chrome = GlassScout failure mode.
 
 - **Loans** — live: Squad twin filtered to outgoing `loanedOut` (honesty / tracking).
-- **GM** — live: Squad twin that **advises Sell vs Loan** from this club’s **squad average CA**. Sell = PA below avg CA and CA≈PA (never good enough, maxed). Loan = PA at/above avg CA but CA below avg CA (loan to grow value / level). Not a transfer market, not a loan finder.
-- **Tactic · HoYD · TD** — still Later until each has its own proven loop.
+- **GM** — live: Squad twin that **advises Sell vs Loan** from squad **median CA**. Sell = capped low PA, or past dev age (25+) with CA far below PA (decline). Loan = age ≤24 with CA far below PA — youth below median (loan then sell) or CA still below median. Not a transfer market, not a loan finder.
+- **HoYD** — live: Squad twin filtered to **high-PA groom prospects** (`PA ≥ squad median CA`, headroom > 8), sorted PA desc. Not mentoring, not world search.
+- **Tactic · TD** — still Later until each has its own proven loop.
 
 **Loop D — Replace FMLE (Step 2, not funded)**  
 Full-save index at usable speed. Hard RE. Parked until Loop A is daily habit.
@@ -28,7 +29,7 @@ Full-save index at usable speed. Hard RE. Parked until Loop A is daily habit.
 
 - Squad-only live load; correct attrs; history that replaces sheets (Loop A)
 - One main header row (merge GS double header) so the shell is usable
-- Nav = Dashboard · Squad · Tactic · HoYD · GM · Loan · TD (+ Settings) — **Squad + Dashboard + Loans + GM live**; others muted roadmap
+- Nav = Dashboard · Squad · Tactic · HoYD · GM · Loan · TD (+ Settings) — **Squad + Dashboard + Loans + GM + HoYD live**; others muted roadmap
 - Dashboard = collective squad/profile signals (feeds Loop B), reusable “dashboard blocks” only when a second live tab needs them — no platform rewrite
 - Player profile desk + history teaching (CA/HA / movement) on Squad path
 - Installer daily driver; no empty console
@@ -38,7 +39,7 @@ Full-save index at usable speed. Hard RE. Parked until Loop A is daily habit.
 - Theme polish after header + nav + desk usable
 - Player cutout faces: Settings path + local cache (never hot-path stream live SI `graphics/` after copy)
 - Mentoring as a real desk only after Loop A sticks
-- Club-relative GM thresholds: done for avg CA in T194; Settings knobs still optional after that sticks
+- Club-relative GM thresholds: median CA in T194; Settings knobs still optional after that sticks
 
 ## Not need-to-have (discard)
 

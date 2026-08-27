@@ -2,6 +2,8 @@ import type { LivePlayer } from "@/domain/adapters";
 
 /** GM Sell lane: PA − CA at or below this (CA≈PA). */
 export const MOVE_ON_HEADROOM_MAX = 8;
+/** GM Loan lane: last age (inclusive) still in development range. */
+export const GM_DEVELOPMENT_AGE_MAX = 24;
 
 export type GmAdvice = "sell" | "loan";
 
@@ -23,37 +25,70 @@ export function isLoanedOutSquadPlayer(
   return player.loanedOut === true;
 }
 
-/** Mean CA of players with finite currentAbility; null if none. */
-export function squadAverageCA(
+/** Median CA of players with finite currentAbility; null if none. */
+export function squadMedianCA(
   players: Array<Pick<LivePlayer, "currentAbility">>,
 ): number | null {
-  let sum = 0;
-  let count = 0;
+  const values: number[] = [];
   for (const player of players) {
     const ca = player.currentAbility;
-    if (typeof ca !== "number" || !Number.isFinite(ca)) continue;
-    sum += ca;
-    count += 1;
+    if (typeof ca === "number" && Number.isFinite(ca)) values.push(ca);
   }
-  if (!count) return null;
-  return sum / count;
+  if (!values.length) return null;
+  values.sort((a, b) => a - b);
+  const mid = Math.floor(values.length / 2);
+  if (values.length % 2 === 1) return values[mid]!;
+  return (values[mid - 1]! + values[mid]!) / 2;
 }
 
 /**
- * GM advice vs this club’s squad average CA.
- * Sell: PA below avg and CA≈PA. Loan: PA at/above avg but CA still below avg.
+ * GM advice vs this club’s squad median CA.
+ * Sell: PA below ref and CA≈PA, or past dev age with CA far below PA (decline).
+ * Loan: in dev range (≤24) with CA far below PA — high PA youth below ref, or CA still below ref.
  */
 export function gmAdvice(
-  player: Pick<LivePlayer, "currentAbility" | "potentialAbility">,
-  avgCA: number,
+  player: Pick<LivePlayer, "currentAbility" | "potentialAbility" | "age">,
+  refCA: number,
 ): GmAdvice | null {
   const ca = player.currentAbility;
   const pa = player.potentialAbility;
+  const age = player.age;
   if (typeof ca !== "number" || typeof pa !== "number") return null;
-  if (!Number.isFinite(ca) || !Number.isFinite(pa) || !Number.isFinite(avgCA)) return null;
-  if (pa < avgCA && pa - ca <= MOVE_ON_HEADROOM_MAX) return "sell";
-  if (pa >= avgCA && ca < avgCA) return "loan";
+  if (!Number.isFinite(ca) || !Number.isFinite(pa) || !Number.isFinite(refCA)) return null;
+  const headroom = pa - ca;
+  const nearPA = headroom <= MOVE_ON_HEADROOM_MAX;
+  const farFromPA = headroom > MOVE_ON_HEADROOM_MAX;
+  const inDev =
+    typeof age === "number" && Number.isFinite(age) && age <= GM_DEVELOPMENT_AGE_MAX;
+  const pastDev =
+    typeof age === "number" && Number.isFinite(age) && age > GM_DEVELOPMENT_AGE_MAX;
+
+  if (pa < refCA && nearPA) return "sell";
+
+  if (pa >= refCA && ca < refCA && pastDev && farFromPA) return "sell";
+
+  if (inDev && farFromPA) {
+    if (pa < refCA) return "loan";
+    if (pa >= refCA && ca < refCA) return "loan";
+  }
+
   return null;
+}
+
+/**
+ * HoYD groom prospect vs squad median CA.
+ * High PA for this club with room left to develop (inverse of GM sell near-PA).
+ */
+export function isHoydProspect(
+  player: Pick<LivePlayer, "currentAbility" | "potentialAbility">,
+  refCA: number,
+): boolean {
+  const ca = player.currentAbility;
+  const pa = player.potentialAbility;
+  if (typeof ca !== "number" || typeof pa !== "number") return false;
+  if (!Number.isFinite(ca) || !Number.isFinite(pa) || !Number.isFinite(refCA)) return false;
+  if (pa < refCA) return false;
+  return pa - ca > MOVE_ON_HEADROOM_MAX;
 }
 
 export const positionGroups = [

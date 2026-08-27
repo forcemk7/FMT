@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   gmAdvice,
+  GM_DEVELOPMENT_AGE_MAX,
   isAtClubSquadPlayer,
+  isHoydProspect,
   isLoanedOutSquadPlayer,
   MOVE_ON_HEADROOM_MAX,
-  squadAverageCA,
+  squadMedianCA,
 } from "./live-data";
 
 describe("isAtClubSquadPlayer", () => {
@@ -44,70 +46,173 @@ describe("isLoanedOutSquadPlayer", () => {
   });
 });
 
-describe("squadAverageCA", () => {
-  it("averages finite CA only", () => {
+describe("squadMedianCA", () => {
+  it("returns middle CA (odd count)", () => {
     expect(
-      squadAverageCA([
+      squadMedianCA([
         { currentAbility: 100 },
         { currentAbility: 120 },
+        { currentAbility: 140 },
         { currentAbility: null },
       ]),
-    ).toBe(110);
+    ).toBe(120);
+  });
+
+  it("averages two middle values when even count", () => {
+    expect(
+      squadMedianCA([
+        { currentAbility: 100 },
+        { currentAbility: 120 },
+        { currentAbility: 140 },
+        { currentAbility: 160 },
+      ]),
+    ).toBe(130);
+  });
+
+  it("ignores a star outlier vs mean", () => {
+    const squad = [
+      { currentAbility: 100 },
+      { currentAbility: 110 },
+      { currentAbility: 120 },
+      { currentAbility: 130 },
+      { currentAbility: 200 },
+    ];
+    expect(squadMedianCA(squad)).toBe(120);
   });
 
   it("returns null when no finite CA", () => {
-    expect(squadAverageCA([{ currentAbility: null }])).toBeNull();
-    expect(squadAverageCA([])).toBeNull();
+    expect(squadMedianCA([{ currentAbility: null }])).toBeNull();
+    expect(squadMedianCA([])).toBeNull();
   });
 });
 
 describe("gmAdvice", () => {
-  const avg = 130;
+  const ref = 130;
 
-  it("sells when PA below avg and CA near PA", () => {
+  it("sells when PA below ref and CA near PA", () => {
     expect(
-      gmAdvice({ currentAbility: 118, potentialAbility: 122 }, avg),
+      gmAdvice({ currentAbility: 118, potentialAbility: 122 }, ref),
     ).toBe("sell");
     expect(
       gmAdvice(
         {
-          currentAbility: avg - 20 - MOVE_ON_HEADROOM_MAX,
-          potentialAbility: avg - 20,
+          currentAbility: ref - 20 - MOVE_ON_HEADROOM_MAX,
+          potentialAbility: ref - 20,
         },
-        avg,
+        ref,
       ),
     ).toBe("sell");
   });
 
-  it("loans when PA at/above avg and CA below avg", () => {
+  it("loans when PA at/above ref, CA below ref, and in dev range", () => {
     expect(
-      gmAdvice({ currentAbility: 110, potentialAbility: 140 }, avg),
+      gmAdvice(
+        { currentAbility: 110, potentialAbility: 140, age: 20 },
+        ref,
+      ),
     ).toBe("loan");
     expect(
-      gmAdvice({ currentAbility: 129, potentialAbility: 130 }, avg),
+      gmAdvice(
+        { currentAbility: 120, potentialAbility: 140, age: GM_DEVELOPMENT_AGE_MAX },
+        ref,
+      ),
     ).toBe("loan");
+  });
+
+  it("loans young low-PA players with room to grow before eventual sell", () => {
+    expect(
+      gmAdvice(
+        { currentAbility: 95, potentialAbility: 115, age: 19 },
+        ref,
+      ),
+    ).toBe("loan");
+  });
+
+  it("sells declining veterans instead of loaning", () => {
+    expect(
+      gmAdvice(
+        { currentAbility: 155, potentialAbility: 175, age: 32 },
+        167.5,
+      ),
+    ).toBe("sell");
+    expect(
+      gmAdvice(
+        { currentAbility: 120, potentialAbility: 140, age: 28 },
+        ref,
+      ),
+    ).toBe("sell");
+  });
+
+  it("does not loan past dev age even when CA below ref", () => {
+    expect(
+      gmAdvice(
+        { currentAbility: 129, potentialAbility: 135, age: 30 },
+        ref,
+      ),
+    ).toBeNull();
   });
 
   it("returns null when neither lane or missing CA/PA", () => {
-    // PA below avg but too much headroom → not sell; not loan either
     expect(
       gmAdvice(
         {
-          currentAbility: avg - 20 - MOVE_ON_HEADROOM_MAX - 1,
-          potentialAbility: avg - 20,
+          currentAbility: ref - 20 - MOVE_ON_HEADROOM_MAX - 1,
+          potentialAbility: ref - 20,
         },
-        avg,
+        ref,
       ),
     ).toBeNull();
-    // already at/above avg CA
     expect(
-      gmAdvice({ currentAbility: 130, potentialAbility: 140 }, avg),
+      gmAdvice({ currentAbility: 130, potentialAbility: 140 }, ref),
     ).toBeNull();
     expect(
-      gmAdvice({ currentAbility: null, potentialAbility: 120 }, avg),
+      gmAdvice({ currentAbility: null, potentialAbility: 120 }, ref),
     ).toBeNull();
     expect(
-      gmAdvice({ currentAbility: 120, potentialAbility: null }, avg),
+      gmAdvice({ currentAbility: 120, potentialAbility: null }, ref),
     ).toBeNull();
+  });
+});
+
+describe("isHoydProspect", () => {
+  const ref = 130;
+
+  it("includes high PA with headroom above squad median CA", () => {
+    expect(
+      isHoydProspect({ currentAbility: 110, potentialAbility: 150 }, ref),
+    ).toBe(true);
+    expect(
+      isHoydProspect(
+        {
+          currentAbility: ref - MOVE_ON_HEADROOM_MAX - 1,
+          potentialAbility: ref,
+        },
+        ref,
+      ),
+    ).toBe(true);
+  });
+
+  it("excludes low PA, near-ceiling, or missing CA/PA", () => {
+    expect(
+      isHoydProspect({ currentAbility: 120, potentialAbility: 125 }, ref),
+    ).toBe(false);
+    expect(
+      isHoydProspect(
+        {
+          currentAbility: ref - MOVE_ON_HEADROOM_MAX,
+          potentialAbility: ref,
+        },
+        ref,
+      ),
+    ).toBe(false);
+    expect(
+      isHoydProspect({ currentAbility: 110, potentialAbility: 120 }, ref),
+    ).toBe(false);
+    expect(
+      isHoydProspect({ currentAbility: null, potentialAbility: 150 }, ref),
+    ).toBe(false);
+    expect(
+      isHoydProspect({ currentAbility: 110, potentialAbility: null }, ref),
+    ).toBe(false);
   });
 });

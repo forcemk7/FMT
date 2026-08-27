@@ -4,7 +4,7 @@ import { useMemo, type ReactNode } from "react";
 import type { LiveFootballSnapshot, LivePlayer } from "@/domain/adapters";
 import { abilityToneFromScore } from "@/domain/attribute-tone";
 import { formatHasScore, hasBand, liveHasScore } from "@/domain/has-score";
-import { formatPlayerPositions, gmAdvice, groupSquad, isAtClubSquadPlayer, isLoanedOutSquadPlayer, positionGroups, squadAverageCA, type GmAdvice } from "@/domain/live-data";
+import { formatPlayerPositions, gmAdvice, groupSquad, isAtClubSquadPlayer, isHoydProspect, isLoanedOutSquadPlayer, positionGroups, squadMedianCA, type GmAdvice } from "@/domain/live-data";
 import { ClubLogo } from "@/components/club-logo";
 import { LiveDataState } from "@/components/live-data-state";
 import { HasBreakdownGridFromPlayer } from "@/components/has-breakdown-grid";
@@ -14,7 +14,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 const CARD_RING_SIZE = 28;
 const CARD_RING_STROKE = 1.25;
 
-export type SquadDeskMode = "at-club" | "loaned-out" | "move-on";
+export type SquadDeskMode = "at-club" | "loaned-out" | "move-on" | "hoyd";
 
 const GM_ADVICE_LANES: Array<{ advice: GmAdvice; title: string; empty: string }> = [
   { advice: "sell", title: "Sell", empty: "No sell candidates." },
@@ -26,6 +26,15 @@ function sortByCurrentAbility(players: LivePlayer[]) {
     const ca = a.currentAbility ?? -Infinity;
     const cb = b.currentAbility ?? -Infinity;
     if (cb !== ca) return cb - ca;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function sortByPotentialAbility(players: LivePlayer[]) {
+  return [...players].sort((a, b) => {
+    const pa = a.potentialAbility ?? -Infinity;
+    const pb = b.potentialAbility ?? -Infinity;
+    if (pb !== pa) return pb - pa;
     return a.name.localeCompare(b.name);
   });
 }
@@ -185,9 +194,9 @@ function SquadPlayerCard({
                 </span>
               }
             />
-            <TooltipContent side="top" className="squad-metric-tooltip">
-              <strong>{loanClubName}</strong>
-              <span>Loan club</span>
+            <TooltipContent side="bottom" align="center" className="squad-metric-tooltip">
+              <strong>Loan Club</strong>
+              <span>{loanClubName}</span>
             </TooltipContent>
           </Tooltip>
         ) : null}
@@ -243,6 +252,7 @@ export function MyTeamScreen({
 }) {
   const loanedMode = mode === "loaned-out";
   const moveOnMode = mode === "move-on";
+  const hoydMode = mode === "hoyd";
   const atClub = useMemo(
     () =>
       snapshot.players.filter((player) =>
@@ -250,19 +260,23 @@ export function MyTeamScreen({
       ),
     [snapshot.managedClubId, snapshot.players],
   );
-  const avgCA = useMemo(
-    () => (moveOnMode ? squadAverageCA(atClub) : null),
-    [atClub, moveOnMode],
+  const medianCA = useMemo(
+    () => (moveOnMode || hoydMode ? squadMedianCA(atClub) : null),
+    [atClub, hoydMode, moveOnMode],
   );
   const gmByAdvice = useMemo(() => {
     const empty: Record<GmAdvice, LivePlayer[]> = { sell: [], loan: [] };
-    if (!moveOnMode || avgCA == null) return empty;
+    if (!moveOnMode || medianCA == null) return empty;
     for (const player of atClub) {
-      const advice = gmAdvice(player, avgCA);
+      const advice = gmAdvice(player, medianCA);
       if (advice) empty[advice].push(player);
     }
     return empty;
-  }, [atClub, avgCA, moveOnMode]);
+  }, [atClub, medianCA, moveOnMode]);
+  const hoydProspects = useMemo(() => {
+    if (!hoydMode || medianCA == null) return [];
+    return atClub.filter((player) => isHoydProspect(player, medianCA));
+  }, [atClub, hoydMode, medianCA]);
   const squad = useMemo(
     () =>
       loanedMode
@@ -271,37 +285,46 @@ export function MyTeamScreen({
           )
         : moveOnMode
           ? [...gmByAdvice.sell, ...gmByAdvice.loan]
-          : atClub,
-    [atClub, gmByAdvice.loan, gmByAdvice.sell, loanedMode, moveOnMode, snapshot.managedClubId, snapshot.players],
+          : hoydMode
+            ? hoydProspects
+            : atClub,
+    [atClub, gmByAdvice.loan, gmByAdvice.sell, hoydMode, hoydProspects, loanedMode, moveOnMode, snapshot.managedClubId, snapshot.players],
   );
   const managedClub = snapshot.clubs.find((club) => club.id === snapshot.managedClubId);
   const connected =
     snapshot.status.state === "connected" && Boolean(snapshot.managedClubId);
-  const allowEmpty = loanedMode || moveOnMode;
+  const allowEmpty = loanedMode || moveOnMode || hoydMode;
   const ready = connected && (allowEmpty || squad.length > 0);
-  const title = loanedMode ? "Loans" : moveOnMode ? "GM" : "Squad";
+  const title = loanedMode ? "Loans" : moveOnMode ? "GM" : hoydMode ? "HoYD" : "Squad";
   const emptyHint = loanedMode
     ? "Outgoing loans — load when FM26 has a save open"
     : moveOnMode
       ? "Sell / Loan advice — load when FM26 has a save open"
-      : "First-team desk — load when FM26 has a save open";
-  const avgLabel =
-    avgCA == null ? null : Number.isInteger(avgCA) ? String(avgCA) : avgCA.toFixed(1);
+      : hoydMode
+        ? "Top talent to groom — load when FM26 has a save open"
+        : "First-team desk — load when FM26 has a save open";
+  const medianLabel =
+    medianCA == null ? null : Number.isInteger(medianCA) ? String(medianCA) : medianCA.toFixed(1);
   const readyBlurb = loanedMode
     ? `${managedClub?.name} · ${squad.length} out on loan`
     : moveOnMode
-      ? `${managedClub?.name} · squad avg CA ${avgLabel ?? "—"} · ${gmByAdvice.sell.length} sell · ${gmByAdvice.loan.length} loan`
-      : `${managedClub?.name} · ${squad.length} players`;
+      ? `${managedClub?.name} · squad median CA ${medianLabel ?? "—"} · ${gmByAdvice.sell.length} sell · ${gmByAdvice.loan.length} loan`
+      : hoydMode
+        ? `${managedClub?.name} · squad median CA ${medianLabel ?? "—"} · ${squad.length} to groom`
+        : `${managedClub?.name} · ${squad.length} players`;
   const emptyConnectedMessage = loanedMode
     ? "No players out on loan."
     : moveOnMode
-      ? "No Sell or Loan candidates vs squad average CA."
-      : null;
+      ? "No Sell or Loan candidates vs squad median CA."
+      : hoydMode
+        ? "No high-PA groom prospects vs squad median CA."
+        : null;
 
   function renderPositionMatrix(players: LivePlayer[], showLoanClub: boolean) {
     const byGroup = groupSquad(players);
+    const sortPlayers = hoydMode ? sortByPotentialAbility : sortByCurrentAbility;
     return positionGroups.map((group) => {
-      const groupPlayers = sortByCurrentAbility(byGroup.get(group) ?? []);
+      const groupPlayers = sortPlayers(byGroup.get(group) ?? []);
       if (!groupPlayers.length) return null;
       return (
         <section className="squad-position-group" key={group}>
@@ -326,7 +349,7 @@ export function MyTeamScreen({
 
   return (
     <main
-      className={`screen my-team-screen${loanedMode ? " is-loans-desk" : ""}${moveOnMode ? " is-gm-desk" : ""}`}
+      className={`screen my-team-screen${loanedMode ? " is-loans-desk" : ""}${moveOnMode ? " is-gm-desk" : ""}${hoydMode ? " is-hoyd-desk" : ""}`}
     >
       <div className="planner-heading">
         <div>

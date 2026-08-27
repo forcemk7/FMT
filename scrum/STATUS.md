@@ -1,10 +1,10 @@
 ﻿# Status
 
-Last updated: 2026-08-27 (T194 GM Sell vs Loan done)
+Last updated: 2026-08-28 (T195 HoYD high-PA groom desk)
 
 ## Now
 
-**T190** Development all-time from in-game history — `cursor-agent` (in_progress). Attributes recent frozen on T188 Load path.
+**T190** Development all-time from Progress Report CA strip — `cursor-agent` (in_progress; verify vs FM after Load)
 
 **Deferred:** T139 theme. T162 trophy cabinet. T124 quiet dev launch.
 
@@ -12,13 +12,14 @@ Last updated: 2026-08-27 (T194 GM Sell vs Loan done)
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
-| T190 | Development all-time from in-game history | in_progress | 1 | Attributes frozen; find Progress/CA pack for all-time |
+| T190 | Development all-time from Progress Report CA strip | in_progress | 1 | save-copy extract wired; Attributes frozen |
 | T124 | Quiet dev launch | ready | 9 | behind Loop A |
 | T139 | FMT visual theme | deferred | — | overlapped |
 | T162 | Player trophy cabinet | deferred | — | backlog |
 
 ## Recently done
 
+- **T195** HoYD desk = high-PA groom list (PA ≥ median CA, sorted PA desc)
 - **T194** GM advises Sell vs Loan from squad avg CA
 - **T193** Loans club logo pill + profile logo = active (loan) club
 - **T192** GM desk = Squad twin filtered to move-on (PA≤140, headroom≤8)
@@ -33,4 +34,4 @@ Last updated: 2026-08-27 (T194 GM Sell vs Loan done)
 
 ## Loop
 
-FM → FMT Dashboard/Squad → player Attributes / Development → Loans (outgoing) → GM (Sell / Loan vs avg CA) → (later) other role desks / world.
+FM → FMT Dashboard/Squad → player Attributes / Development → Loans (outgoing) → GM (Sell / Loan vs avg CA) → HoYD (high-PA groom) → (later) Tactic / TD / world.
