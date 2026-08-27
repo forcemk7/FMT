@@ -1,4 +1,5 @@
 import type { LivePlayer } from "./adapters";
+import type { AppTone } from "./attr-colors";
 import { attributeTone, type AttributeTone } from "./attribute-tone";
 
 /**
@@ -230,7 +231,8 @@ export const FRONTEND_CALCULATION_CARDS: FrontendCalculationCard[] = [
   },
 ];
 
-export type HasTone = "super" | "high" | "upper" | "mid" | "low";
+/** HAS display tones — same palette as attrs (`attr-colors`); `super` = elite overflow. */
+export type HasTone = AppTone;
 
 /**
  * Theoretical HAS bounds under current weights:
@@ -329,8 +331,8 @@ export function formatHasScore(score: number | null) {
 }
 
 /**
- * Absolute HAS color band.
- * Above practical ceiling → super (gold). Inside [floor_p, ceil_p] → four equal attr-like bands.
+ * Absolute HAS color band (uses the app-wide attr tone palette).
+ * Above practical ceiling → super. Inside [floor_p, ceil_p] → four equal attr bands.
  * Below practical floor → low.
  */
 export function hasBand(score: number): HasTone {

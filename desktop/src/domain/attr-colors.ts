@@ -1,16 +1,27 @@
+/**
+ * App-wide attribute / score tone palette (FM in-game bands).
+ * Single source for hex defaults, CSS vars, and class names — call from anywhere.
+ */
+
 import type { AttributeTone } from "./attribute-tone";
 
 export type AttrColorBand = AttributeTone;
 
+/** Attr bands + HAS elite overflow (gold). */
+export type AppTone = AttrColorBand | "super";
+
 export type AttrColorPalette = Record<AttrColorBand, string>;
 
-/** FM in-game RGB → hex (user-supplied). */
+/** FM in-game RGB → hex (locked product defaults). */
 export const FM_IN_GAME_ATTR_COLORS: AttrColorPalette = {
   high: "#65e53a", // 16–20  R101 G229 B58
   upper: "#3a8acf", // 11–15  R58 G138 B207
   mid: "#e6e6fa", // 6–10   R230 G230 B250
   low: "#bd4e4e", // 1–5    R189 G78 B78
 };
+
+/** HAS-only elite above practical ceiling. */
+export const APP_TONE_SUPER = "#d4b45a";
 
 export const ATTR_COLOR_BANDS: Array<{ key: AttrColorBand; label: string; range: string }> = [
   { key: "high", label: "High", range: "16–20" },
@@ -27,6 +38,8 @@ const CSS_VARS: Record<AttrColorBand, string> = {
   mid: "--attr-tone-mid",
   low: "--attr-tone-low",
 };
+
+const SUPER_CSS_VAR = "--attr-tone-super";
 
 function normalizeHex(value: string): string | null {
   const trimmed = value.trim().toLowerCase();
@@ -66,4 +79,28 @@ export function applyAttrColorPalette(palette: AttrColorPalette) {
   for (const band of ATTR_COLOR_BANDS) {
     root.style.setProperty(CSS_VARS[band.key], palette[band.key]);
   }
+  root.style.setProperty(SUPER_CSS_VAR, APP_TONE_SUPER);
+}
+
+/** CSS custom property name for a tone (`--attr-tone-mid`, …). */
+export function toneCssVar(tone: AppTone): string {
+  if (tone === "super") return SUPER_CSS_VAR;
+  return CSS_VARS[tone];
+}
+
+/** Utility class for a tone (`attr-tone-mid`, …). */
+export function toneClassName(tone: AppTone): string {
+  return `attr-tone-${tone}`;
+}
+
+/** Default hex for a tone (ignores user Settings overrides). */
+export function toneDefaultHex(tone: AppTone): string {
+  if (tone === "super") return APP_TONE_SUPER;
+  return FM_IN_GAME_ATTR_COLORS[tone];
+}
+
+/** Resolve hex from palette (or default), including super. */
+export function toneHex(tone: AppTone, palette: AttrColorPalette = FM_IN_GAME_ATTR_COLORS): string {
+  if (tone === "super") return APP_TONE_SUPER;
+  return palette[tone] ?? FM_IN_GAME_ATTR_COLORS[tone];
 }

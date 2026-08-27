@@ -95,6 +95,7 @@ body.fmt-shell {
   --attr-tone-upper: #3a8acf;
   --attr-tone-mid: #e6e6fa;
   --attr-tone-low: #bd4e4e;
+  --attr-tone-super: #d4b45a;
 
   color: var(--text);
   background:
@@ -437,8 +438,8 @@ body.fmt-shell .dash-has-score.tone-low {
   color: var(--attr-tone-low);
 }
 body.fmt-shell .dash-has-score.tone-super {
-  background: var(--gold-soft);
-  color: var(--gold);
+  background: color-mix(in srgb, var(--attr-tone-super, var(--gold)) 22%, transparent);
+  color: var(--attr-tone-super, var(--gold));
 }
 
 body.fmt-shell .dash-has-tooltip {
