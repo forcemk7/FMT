@@ -41,4 +41,5 @@ Loans cards bury loan club in the text stack. Profile shows loan club name but l
 
 ### Commit
 
-_(SHA after commit)_
+`92fdac8` — T193: loan club logo pill on cards and active-club profile logo
+(also included already-staged T192 GM desk files in the same commit)
