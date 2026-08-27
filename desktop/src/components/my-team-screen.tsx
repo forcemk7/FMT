@@ -4,7 +4,7 @@ import { useMemo, type ReactNode } from "react";
 import type { LiveFootballSnapshot, LivePlayer } from "@/domain/adapters";
 import { abilityToneFromScore } from "@/domain/attribute-tone";
 import { formatHasScore, hasBand, liveHasScore } from "@/domain/has-score";
-import { formatPlayerPositions, groupSquad, isAtClubSquadPlayer, isLoanedOutSquadPlayer, isMoveOnCandidate, positionGroups } from "@/domain/live-data";
+import { formatPlayerPositions, gmAdvice, groupSquad, isAtClubSquadPlayer, isLoanedOutSquadPlayer, positionGroups, squadAverageCA, type GmAdvice } from "@/domain/live-data";
 import { ClubLogo } from "@/components/club-logo";
 import { LiveDataState } from "@/components/live-data-state";
 import { HasBreakdownGridFromPlayer } from "@/components/has-breakdown-grid";
@@ -15,6 +15,11 @@ const CARD_RING_SIZE = 28;
 const CARD_RING_STROKE = 1.25;
 
 export type SquadDeskMode = "at-club" | "loaned-out" | "move-on";
+
+const GM_ADVICE_LANES: Array<{ advice: GmAdvice; title: string; empty: string }> = [
+  { advice: "sell", title: "Sell", empty: "No sell candidates." },
+  { advice: "loan", title: "Loan", empty: "No loan candidates." },
+];
 
 function sortByCurrentAbility(players: LivePlayer[]) {
   return [...players].sort((a, b) => {
@@ -161,6 +166,31 @@ function SquadPlayerCard({
     <button type="button" className="squad-player-card" onClick={() => onOpenPlayer(player.id)}>
       <span className="squad-player-card-face">
         <PlayerFace playerId={player.id} name={player.name} size="sm" highResolution />
+        {loanClubName ? (
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <span
+                  className="squad-loan-club-badge"
+                  tabIndex={-1}
+                  aria-label={`Loan club: ${loanClubName}`}
+                  onClick={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => event.stopPropagation()}
+                >
+                  {loanClubId ? (
+                    <ClubLogo clubId={loanClubId} name={loanClubName} size="sm" />
+                  ) : (
+                    <span className="club-logo club-logo-sm club-logo-empty" aria-hidden="true" />
+                  )}
+                </span>
+              }
+            />
+            <TooltipContent side="top" className="squad-metric-tooltip">
+              <strong>{loanClubName}</strong>
+              <span>Loan club</span>
+            </TooltipContent>
+          </Tooltip>
+        ) : null}
       </span>
       <span className="squad-player-card-copy">
         <strong title={player.name}>{player.name}</strong>
@@ -168,43 +198,31 @@ function SquadPlayerCard({
         <span className="squad-player-card-pos">{formatPlayerPositions(player)}</span>
         <span>{foot}</span>
       </span>
-      <span className="squad-player-card-side">
-        {loanClubName ? (
-          <span className="squad-loan-club-pill" title={loanClubName}>
-            {loanClubId ? (
-              <ClubLogo clubId={loanClubId} name={loanClubName} size="sm" />
-            ) : (
-              <span className="club-logo club-logo-sm club-logo-empty" aria-hidden="true" />
-            )}
-            <span className="squad-loan-club-pill-name">{loanClubName}</span>
-          </span>
-        ) : null}
-        <span className="squad-player-card-metrics" aria-label="Ability, potential, personality">
-          <MetricTip label="Ability" detail="Current ability (CA)">
-            <AbilityRing value={player.currentAbility} />
-          </MetricTip>
-          <MetricTip label="Potential" detail="Potential ability (PA)">
-            <AbilityRing value={player.potentialAbility} />
-          </MetricTip>
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <span
-                  className="squad-metric-tip"
-                  tabIndex={-1}
-                  onClick={(event) => event.stopPropagation()}
-                  onKeyDown={(event) => event.stopPropagation()}
-                >
-                  <PersonalityRing value={has} />
-                </span>
-              }
-            />
-            <TooltipContent side="top" align="end" className="dash-has-tooltip squad-metric-tooltip-wide">
-              <strong>Personality (HAS)</strong>
-              <HasBreakdownGridFromPlayer player={player} />
-            </TooltipContent>
-          </Tooltip>
-        </span>
+      <span className="squad-player-card-metrics" aria-label="Ability, potential, personality">
+        <MetricTip label="Ability" detail="Current ability (CA)">
+          <AbilityRing value={player.currentAbility} />
+        </MetricTip>
+        <MetricTip label="Potential" detail="Potential ability (PA)">
+          <AbilityRing value={player.potentialAbility} />
+        </MetricTip>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <span
+                className="squad-metric-tip"
+                tabIndex={-1}
+                onClick={(event) => event.stopPropagation()}
+                onKeyDown={(event) => event.stopPropagation()}
+              >
+                <PersonalityRing value={has} />
+              </span>
+            }
+          />
+          <TooltipContent side="top" align="end" className="dash-has-tooltip squad-metric-tooltip-wide">
+            <strong>Personality (HAS)</strong>
+            <HasBreakdownGridFromPlayer player={player} />
+          </TooltipContent>
+        </Tooltip>
       </span>
     </button>
   );
@@ -225,19 +243,37 @@ export function MyTeamScreen({
 }) {
   const loanedMode = mode === "loaned-out";
   const moveOnMode = mode === "move-on";
+  const atClub = useMemo(
+    () =>
+      snapshot.players.filter((player) =>
+        isAtClubSquadPlayer(player, snapshot.managedClubId),
+      ),
+    [snapshot.managedClubId, snapshot.players],
+  );
+  const avgCA = useMemo(
+    () => (moveOnMode ? squadAverageCA(atClub) : null),
+    [atClub, moveOnMode],
+  );
+  const gmByAdvice = useMemo(() => {
+    const empty: Record<GmAdvice, LivePlayer[]> = { sell: [], loan: [] };
+    if (!moveOnMode || avgCA == null) return empty;
+    for (const player of atClub) {
+      const advice = gmAdvice(player, avgCA);
+      if (advice) empty[advice].push(player);
+    }
+    return empty;
+  }, [atClub, avgCA, moveOnMode]);
   const squad = useMemo(
     () =>
-      snapshot.players.filter((player) => {
-        if (loanedMode) {
-          return isLoanedOutSquadPlayer(player, snapshot.managedClubId);
-        }
-        if (!isAtClubSquadPlayer(player, snapshot.managedClubId)) return false;
-        if (moveOnMode) return isMoveOnCandidate(player);
-        return true;
-      }),
-    [loanedMode, moveOnMode, snapshot.managedClubId, snapshot.players],
+      loanedMode
+        ? snapshot.players.filter((player) =>
+            isLoanedOutSquadPlayer(player, snapshot.managedClubId),
+          )
+        : moveOnMode
+          ? [...gmByAdvice.sell, ...gmByAdvice.loan]
+          : atClub,
+    [atClub, gmByAdvice.loan, gmByAdvice.sell, loanedMode, moveOnMode, snapshot.managedClubId, snapshot.players],
   );
-  const groups = useMemo(() => groupSquad(squad), [squad]);
   const managedClub = snapshot.clubs.find((club) => club.id === snapshot.managedClubId);
   const connected =
     snapshot.status.state === "connected" && Boolean(snapshot.managedClubId);
@@ -247,18 +283,46 @@ export function MyTeamScreen({
   const emptyHint = loanedMode
     ? "Outgoing loans — load when FM26 has a save open"
     : moveOnMode
-      ? "Move-on queue — load when FM26 has a save open"
+      ? "Sell / Loan advice — load when FM26 has a save open"
       : "First-team desk — load when FM26 has a save open";
+  const avgLabel =
+    avgCA == null ? null : Number.isInteger(avgCA) ? String(avgCA) : avgCA.toFixed(1);
   const readyBlurb = loanedMode
     ? `${managedClub?.name} · ${squad.length} out on loan`
     : moveOnMode
-      ? `${managedClub?.name} · ${squad.length} to move on`
+      ? `${managedClub?.name} · squad avg CA ${avgLabel ?? "—"} · ${gmByAdvice.sell.length} sell · ${gmByAdvice.loan.length} loan`
       : `${managedClub?.name} · ${squad.length} players`;
   const emptyConnectedMessage = loanedMode
     ? "No players out on loan."
     : moveOnMode
-      ? "No move-on candidates (low PA + CA near PA)."
+      ? "No Sell or Loan candidates vs squad average CA."
       : null;
+
+  function renderPositionMatrix(players: LivePlayer[], showLoanClub: boolean) {
+    const byGroup = groupSquad(players);
+    return positionGroups.map((group) => {
+      const groupPlayers = sortByCurrentAbility(byGroup.get(group) ?? []);
+      if (!groupPlayers.length) return null;
+      return (
+        <section className="squad-position-group" key={group}>
+          <header className="squad-position-head">
+            <h2>{group}</h2>
+            <span>{groupPlayers.length}</span>
+          </header>
+          <div className="squad-position-matrix">
+            {groupPlayers.map((player) => (
+              <SquadPlayerCard
+                key={player.id}
+                player={player}
+                onOpenPlayer={onOpenPlayer}
+                showLoanClub={showLoanClub}
+              />
+            ))}
+          </div>
+        </section>
+      );
+    });
+  }
 
   return (
     <main
@@ -301,29 +365,25 @@ export function MyTeamScreen({
               compact
             />
           </div>
-        ) : (
-          positionGroups.map((group) => {
-            const players = sortByCurrentAbility(groups.get(group) ?? []);
-            if (!players.length) return null;
+        ) : moveOnMode ? (
+          GM_ADVICE_LANES.map(({ advice, title: laneTitle, empty }) => {
+            const lanePlayers = gmByAdvice[advice];
             return (
-              <section className="squad-position-group" key={group}>
+              <section className="gm-advice-lane" key={advice}>
                 <header className="squad-position-head">
-                  <h2>{group}</h2>
-                  <span>{players.length}</span>
+                  <h2>{laneTitle}</h2>
+                  <span>{lanePlayers.length}</span>
                 </header>
-                <div className="squad-position-matrix">
-                  {players.map((player) => (
-                    <SquadPlayerCard
-                      key={player.id}
-                      player={player}
-                      onOpenPlayer={onOpenPlayer}
-                      showLoanClub={loanedMode}
-                    />
-                  ))}
-                </div>
+                {lanePlayers.length === 0 ? (
+                  <p className="squad-loans-empty">{empty}</p>
+                ) : (
+                  renderPositionMatrix(lanePlayers, false)
+                )}
               </section>
             );
           })
+        ) : (
+          renderPositionMatrix(squad, loanedMode)
         )}
       </section>
     </main>

@@ -354,10 +354,10 @@ body.fmt-shell .squad-player-card-copy strong {
 body.fmt-shell .squad-player-card-copy > span {
   color: var(--text-muted);
 }
-body.fmt-shell .squad-loan-club-pill {
-  border-color: var(--hairline);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text);
+body.fmt-shell .squad-loan-club-badge {
+  border-color: var(--hairline-strong);
+  background: var(--panel-3);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.35);
 }
 body.fmt-shell .squad-metric-ring-track {
   stroke: rgba(255, 255, 255, 0.1);
