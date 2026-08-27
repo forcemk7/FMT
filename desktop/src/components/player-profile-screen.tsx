@@ -178,8 +178,23 @@ export function PlayerProfileScreen({
     );
   }
 
-  const club = player.clubId ? snapshot.clubs.find((item) => item.id === player.clubId) : null;
-  const clubName = club?.name ?? player.clubName;
+  const parentClub = player.clubId ? snapshot.clubs.find((item) => item.id === player.clubId) : null;
+  const parentClubName = parentClub?.name ?? player.clubName;
+  const loanedOut = player.loanedOut === true;
+  const loanClubName = player.loanClubName?.trim() || null;
+  const loanClubId = player.loanClubId?.trim() || null;
+  const primaryClubId = loanedOut && loanClubId ? loanClubId : player.clubId;
+  const primaryClubName = loanedOut && loanClubName
+    ? loanClubName
+    : parentClubName;
+  const club = primaryClubId
+    ? snapshot.clubs.find((item) => item.id === primaryClubId) ?? parentClub
+    : parentClub;
+  const clubName = primaryClubName ?? club?.name;
+  const clubSub =
+    loanedOut && loanClubName
+      ? `Parent: ${parentClubName ?? "—"}`
+      : null;
   const mappedAttributeCount = Object.values(player.attributes ?? {}).filter((value) => typeof value === "number").length;
   const knownEvidence = player.scoutConfidence ?? Math.min(100, Math.round((mappedAttributeCount / 47) * 100));
   const unknownEvidence = 100 - knownEvidence;
@@ -267,14 +282,17 @@ export function PlayerProfileScreen({
             disabled={!club}
             onClick={() => club && onOpenClub?.(club.id)}
           >
-            <b>Club</b>
+            <b>{loanedOut && loanClubName ? "Loan club" : "Club"}</b>
             <span className="player-fact-identity">
               {club ? (
                 <ClubLogo clubId={club.id} name={club.name} size="md" />
               ) : (
                 <span className="club-logo club-logo-md club-logo-empty" aria-hidden="true" />
               )}
-              <strong title={clubName ?? undefined}>{clubName ?? "—"}</strong>
+              <span className="player-fact-value">
+                <strong title={clubName ?? undefined}>{clubName ?? "—"}</strong>
+                {clubSub ? <small className="player-fact-sub">{clubSub}</small> : null}
+              </span>
             </span>
           </button>
           <span>

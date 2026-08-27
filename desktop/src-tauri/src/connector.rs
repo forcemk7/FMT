@@ -1023,7 +1023,50 @@ fn try_resolve_human_manager(
     })
 }
 
-/// Club UniqueID from a team or club pointer (vtable-validated).
+/// Club UniqueID + name from a team or club pointer (vtable-validated).
+#[cfg(target_os = "windows")]
+fn resolve_club_from_pointer(
+    reader: &mut ProcessReader,
+    module: ModuleInfo,
+    profile: &EntityMapProfile,
+    pointer: u64,
+) -> Option<(u32, String)> {
+    if pointer == 0 {
+        return None;
+    }
+    let club = if validator::validate_vtable(
+        reader,
+        pointer,
+        module.base + profile.constants.club_vtable_rva,
+    )
+    .is_ok()
+    {
+        pointer
+    } else if validator::validate_vtable(
+        reader,
+        pointer,
+        module.base + profile.constants.team_vtable_rva,
+    )
+    .is_ok()
+    {
+        let club = reader
+            .read_pointer(pointer + profile.constants.team_club_offset)
+            .filter(|value| *value != 0)?;
+        validator::validate_vtable(reader, club, module.base + profile.constants.club_vtable_rva)
+            .ok()?;
+        club
+    } else {
+        return None;
+    };
+    let uid = reader
+        .read_u32(club + profile.constants.entity_uid_offset)
+        .filter(|uid| *uid > 0)?;
+    let name = reader
+        .read_pointer(club + profile.constants.club_name_offset)
+        .and_then(|pointer| reader.read_length_prefixed_string(pointer))?;
+    Some((uid, name))
+}
+
 #[cfg(target_os = "windows")]
 fn resolve_club_uid_from_pointer(
     reader: &mut ProcessReader,
@@ -1031,65 +1074,40 @@ fn resolve_club_uid_from_pointer(
     profile: &EntityMapProfile,
     pointer: u64,
 ) -> Option<u32> {
-    if pointer == 0 {
-        return None;
-    }
-    if validator::validate_vtable(reader, pointer, module.base + profile.constants.club_vtable_rva)
-        .is_ok()
-    {
-        return reader
-            .read_u32(pointer + profile.constants.entity_uid_offset)
-            .filter(|uid| *uid > 0);
-    }
-    if validator::validate_vtable(reader, pointer, module.base + profile.constants.team_vtable_rva)
-        .is_ok()
-    {
-        let club = reader
-            .read_pointer(pointer + profile.constants.team_club_offset)
-            .filter(|value| *value != 0)?;
-        validator::validate_vtable(reader, club, module.base + profile.constants.club_vtable_rva)
-            .ok()?;
-        return reader
-            .read_u32(club + profile.constants.entity_uid_offset)
-            .filter(|uid| *uid > 0);
-    }
-    None
+    resolve_club_from_pointer(reader, module, profile, pointer).map(|(uid, _)| uid)
 }
 
-/// Loan Club UniqueID from person → loan agreement (FMLE Parent/Loan Club split).
-/// Parent contract team stays the owning club; outgoing loans hang off `person_loan_offset`.
+/// Loan Club from person → loan agreement (FMLE Parent/Loan Club split).
 #[cfg(target_os = "windows")]
-fn read_person_loan_club_uid(
+fn read_person_loan_club(
     reader: &mut ProcessReader,
     module: ModuleInfo,
     profile: &EntityMapProfile,
     person: u64,
-) -> Option<u32> {
+) -> Option<(u32, String)> {
     let loan = reader
         .read_pointer(person + profile.constants.person_loan_offset)
         .filter(|value| *value != 0)?;
-    // Primary attachment: loan+0 → object with club/team at +0x10 / +0x18 (Bora→Napoli).
     if let Some(primary) = reader.read_pointer(loan).filter(|value| *value != 0) {
-        if let Some(uid) = resolve_club_uid_from_pointer(reader, module, profile, primary) {
-            return Some(uid);
+        if let Some(club) = resolve_club_from_pointer(reader, module, profile, primary) {
+            return Some(club);
         }
         for offset in [0x10u64, 0x18] {
             if let Some(pointer) = reader
                 .read_pointer(primary + offset)
                 .filter(|value| *value != 0)
             {
-                if let Some(uid) = resolve_club_uid_from_pointer(reader, module, profile, pointer) {
-                    return Some(uid);
+                if let Some(club) = resolve_club_from_pointer(reader, module, profile, pointer) {
+                    return Some(club);
                 }
             }
         }
     }
-    // Fallback: scan the loan object window for any club/team pointer.
     let bytes = reader.read_bytes(loan, 128)?;
     for offset in (0..bytes.len().saturating_sub(8)).step_by(8) {
         let pointer = u64::from_le_bytes(bytes[offset..offset + 8].try_into().ok()?);
-        if let Some(uid) = resolve_club_uid_from_pointer(reader, module, profile, pointer) {
-            return Some(uid);
+        if let Some(club) = resolve_club_from_pointer(reader, module, profile, pointer) {
+            return Some(club);
         }
         if pointer < 0x10000 {
             continue;
@@ -1099,16 +1117,25 @@ fn read_person_loan_club_uid(
         };
         for inner_offset in (0..inner.len().saturating_sub(8)).step_by(8) {
             let child = u64::from_le_bytes(inner[inner_offset..inner_offset + 8].try_into().ok()?);
-            if let Some(uid) = resolve_club_uid_from_pointer(reader, module, profile, child) {
-                return Some(uid);
+            if let Some(club) = resolve_club_from_pointer(reader, module, profile, child) {
+                return Some(club);
             }
         }
     }
     None
 }
 
+#[cfg(target_os = "windows")]
+fn read_person_loan_club_uid(
+    reader: &mut ProcessReader,
+    module: ModuleInfo,
+    profile: &EntityMapProfile,
+    person: u64,
+) -> Option<u32> {
+    read_person_loan_club(reader, module, profile, person).map(|(uid, _)| uid)
+}
+
 /// True when person has an active loan agreement pointing at another club.
-/// Missing loan pointer fails open (at-club).
 fn is_loaned_out_from_loan_club(loan_club_uid: Option<u32>, managed_club_uid: u32) -> bool {
     loan_club_uid
         .map(|uid| uid != managed_club_uid)
@@ -1313,6 +1340,22 @@ fn extract_live_data(
     }
     diagnostics.player_collection_pointer = Some(players_start);
     let player_count = ((players_end - players_start) / 8) as usize;
+    // Loaned player objects often lack a readable current-date; borrow one from the squad.
+    let mut squad_game_date = None;
+    for index in 0..player_count {
+        let Some(raw_player) = reader
+            .read_pointer(players_start + (index as u64 * 8))
+            .filter(|value| *value != 0)
+        else {
+            continue;
+        };
+        if let Some(date) =
+            read_fm_date(reader, raw_player + profile.constants.player_current_date_offset)
+        {
+            squad_game_date = Some(date);
+            break;
+        }
+    }
     let mut players = Vec::with_capacity(player_count);
     let mut managed_player_ids = HashSet::with_capacity(player_count);
     let mut managed_index_records = Vec::with_capacity(player_count);
@@ -1425,10 +1468,11 @@ fn extract_live_data(
             .map(|(position, _)| POSITION_NAMES[position].to_string());
         let goalkeeper_rating = goalkeeper_rating_from_positions(&position_bytes);
         let birth_date = read_fm_date(reader, person + profile.constants.person_birth_date_offset);
-        let current_date = read_fm_date(
+        let own_current_date = read_fm_date(
             reader,
             raw_player + profile.constants.player_current_date_offset,
         );
+        let current_date = own_current_date.or(squad_game_date);
         let age = birth_date
             .zip(current_date)
             .and_then(|(birth, current)| calculate_age(birth, current));
@@ -1490,8 +1534,17 @@ fn extract_live_data(
         let contract_address = reader
             .read_pointer(person + profile.constants.person_contract_offset)
             .filter(|value| *value != 0);
-        let loan_club_uid = read_person_loan_club_uid(reader, module, profile, person);
+        let loan_club = read_person_loan_club(reader, module, profile, person);
+        let loan_club_uid = loan_club.as_ref().map(|(uid, _)| *uid);
         let loaned_out = is_loaned_out_from_loan_club(loan_club_uid, club_uid);
+        let (loan_club_id, loan_club_name) = if loaned_out {
+            match loan_club {
+                Some((uid, name)) => (Some(uid.to_string()), Some(name)),
+                None => (None, None),
+            }
+        } else {
+            (None, None)
+        };
         managed_player_ids.insert(player_id.clone());
         managed_index_records.push(IndexedPlayerRecord {
             id: player_id.clone(),
@@ -1541,6 +1594,8 @@ fn extract_live_data(
             "weaknesses": weaknesses,
             "clubId": club_id,
             "loanedOut": loaned_out,
+            "loanClubId": loan_club_id,
+            "loanClubName": loan_club_name,
             "transferInterest": null,
             "loanInterest": null,
             "transferAvailable": null,

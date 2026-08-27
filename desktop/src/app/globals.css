@@ -917,6 +917,10 @@ h1, h2, h3, [data-slot="card-title"] { font-family: "Inter Variable", Inter, "Se
   text-overflow:ellipsis;
   white-space:nowrap;
 }
+.squad-player-card-loan{
+  color:var(--navy) !important;
+  font-weight:600;
+}
 .squad-player-card-pos{
   white-space:normal;
   display:-webkit-box;

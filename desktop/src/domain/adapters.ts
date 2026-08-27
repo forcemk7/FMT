@@ -100,6 +100,9 @@ export type LivePlayer = {
   clubName?: string | null;
   /** Owned by managed club but currently out on loan (not available for match squads). */
   loanedOut?: boolean | null;
+  /** Loan destination club when `loanedOut` (FMLE Loan Club). */
+  loanClubId?: string | null;
+  loanClubName?: string | null;
   transferInterest: string | null;
   loanInterest: string | null;
   transferAvailable: boolean | null;

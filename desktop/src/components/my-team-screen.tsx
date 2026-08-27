@@ -142,12 +142,19 @@ function MetricTip({
 function SquadPlayerCard({
   player,
   onOpenPlayer,
+  showLoanClub,
 }: {
   player: LivePlayer;
   onOpenPlayer: (id: string) => void;
+  showLoanClub?: boolean;
 }) {
   const has = liveHasScore(player);
   const foot = preferredFootDisplay(player);
+  const ageLine =
+    player.age == null ? "—" : `${player.age} years old`;
+  const clubLine = showLoanClub
+    ? player.loanClubName?.trim() || "On loan"
+    : null;
   return (
     <button type="button" className="squad-player-card" onClick={() => onOpenPlayer(player.id)}>
       <span className="squad-player-card-face">
@@ -155,7 +162,12 @@ function SquadPlayerCard({
       </span>
       <span className="squad-player-card-copy">
         <strong title={player.name}>{player.name}</strong>
-        <span>{player.age == null ? "—" : `${player.age} years old`}</span>
+        <span>{ageLine}</span>
+        {clubLine ? (
+          <span className="squad-player-card-loan" title={clubLine}>
+            {clubLine}
+          </span>
+        ) : null}
         <span className="squad-player-card-pos">{formatPlayerPositions(player)}</span>
         <span>{foot}</span>
       </span>
@@ -276,7 +288,12 @@ export function MyTeamScreen({
                 </header>
                 <div className="squad-position-matrix">
                   {players.map((player) => (
-                    <SquadPlayerCard key={player.id} player={player} onOpenPlayer={onOpenPlayer} />
+                    <SquadPlayerCard
+                      key={player.id}
+                      player={player}
+                      onOpenPlayer={onOpenPlayer}
+                      showLoanClub={loanedMode}
+                    />
                   ))}
                 </div>
               </section>
