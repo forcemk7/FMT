@@ -4,7 +4,7 @@ import { useMemo, type ReactNode } from "react";
 import type { LiveFootballSnapshot, LivePlayer } from "@/domain/adapters";
 import { abilityToneFromScore } from "@/domain/attribute-tone";
 import { formatHasScore, hasBand, liveHasScore } from "@/domain/has-score";
-import { formatPlayerPositions, groupSquad, isAtClubSquadPlayer, positionGroups } from "@/domain/live-data";
+import { formatPlayerPositions, groupSquad, isAtClubSquadPlayer, isLoanedOutSquadPlayer, positionGroups } from "@/domain/live-data";
 import { LiveDataState } from "@/components/live-data-state";
 import { HasBreakdownGridFromPlayer } from "@/components/has-breakdown-grid";
 import { PlayerFace } from "@/components/player-face";
@@ -12,6 +12,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 
 const CARD_RING_SIZE = 28;
 const CARD_RING_STROKE = 1.25;
+
+export type SquadDeskMode = "at-club" | "loaned-out";
 
 function sortByCurrentAbility(players: LivePlayer[]) {
   return [...players].sort((a, b) => {
@@ -192,33 +194,43 @@ export function MyTeamScreen({
   checking,
   onRefresh,
   onOpenPlayer,
+  mode = "at-club",
 }: {
   snapshot: LiveFootballSnapshot;
   checking: boolean;
   onRefresh: () => Promise<unknown>;
   onOpenPlayer: (playerId: string) => void;
+  mode?: SquadDeskMode;
 }) {
+  const loanedMode = mode === "loaned-out";
   const squad = useMemo(
     () =>
       snapshot.players.filter((player) =>
-        isAtClubSquadPlayer(player, snapshot.managedClubId),
+        loanedMode
+          ? isLoanedOutSquadPlayer(player, snapshot.managedClubId)
+          : isAtClubSquadPlayer(player, snapshot.managedClubId),
       ),
-    [snapshot.managedClubId, snapshot.players],
+    [loanedMode, snapshot.managedClubId, snapshot.players],
   );
   const groups = useMemo(() => groupSquad(squad), [squad]);
   const managedClub = snapshot.clubs.find((club) => club.id === snapshot.managedClubId);
-  const ready = snapshot.status.state === "connected" && Boolean(snapshot.managedClubId) && squad.length > 0;
+  const connected =
+    snapshot.status.state === "connected" && Boolean(snapshot.managedClubId);
+  const ready = connected && (loanedMode || squad.length > 0);
+  const title = loanedMode ? "Loans" : "Squad";
+  const emptyHint = loanedMode
+    ? "Outgoing loans — load when FM26 has a save open"
+    : "First-team desk — load when FM26 has a save open";
+  const readyBlurb = loanedMode
+    ? `${managedClub?.name} · ${squad.length} out on loan`
+    : `${managedClub?.name} · ${squad.length} players`;
 
   return (
-    <main className="screen my-team-screen">
+    <main className={`screen my-team-screen${loanedMode ? " is-loans-desk" : ""}`}>
       <div className="planner-heading">
         <div>
-          <h1>Squad</h1>
-          <p>
-            {ready
-              ? `${managedClub?.name} · ${squad.length} players`
-              : "First-team desk — load when FM26 has a save open"}
-          </p>
+          <h1>{title}</h1>
+          <p>{ready ? readyBlurb : emptyHint}</p>
         </div>
         {ready ? (
           <div className="live-source-label">
@@ -228,11 +240,25 @@ export function MyTeamScreen({
         ) : null}
       </div>
       <section className="squad-matrix">
-        {!ready ? (
+        {!connected ? (
           <div className="squad-table-empty">
             <LiveDataState
               snapshot={snapshot}
-              title="Squad"
+              title={title}
+              checking={checking}
+              onRefresh={onRefresh}
+              compact
+            />
+          </div>
+        ) : loanedMode && squad.length === 0 ? (
+          <div className="squad-table-empty">
+            <p className="squad-loans-empty">No players out on loan.</p>
+          </div>
+        ) : !ready ? (
+          <div className="squad-table-empty">
+            <LiveDataState
+              snapshot={snapshot}
+              title={title}
               checking={checking}
               onRefresh={onRefresh}
               compact

@@ -85,7 +85,6 @@ const LATER_ROLES: Screen[] = [
   "Tactic",
   "HoYD",
   "General Manager",
-  "Loan Manager",
   "Technical Director",
 ];
 
@@ -224,6 +223,14 @@ export function FMTApp() {
       />
     ) : screen === "Squad" ? (
       <MyTeamScreen
+        snapshot={snapshot}
+        checking={checking}
+        onRefresh={checkConnection}
+        onOpenPlayer={openPlayer}
+      />
+    ) : screen === "Loan Manager" ? (
+      <MyTeamScreen
+        mode="loaned-out"
         snapshot={snapshot}
         checking={checking}
         onRefresh={checkConnection}

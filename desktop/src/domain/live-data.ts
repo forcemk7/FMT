@@ -9,6 +9,15 @@ export function isAtClubSquadPlayer(
   return player.loanedOut !== true;
 }
 
+/** Managed-club players currently out on loan (Squad honesty complement). */
+export function isLoanedOutSquadPlayer(
+  player: Pick<LivePlayer, "clubId" | "loanedOut">,
+  managedClubId: string | null | undefined,
+): boolean {
+  if (!managedClubId || player.clubId !== managedClubId) return false;
+  return player.loanedOut === true;
+}
+
 export const positionGroups = [
   "Goalkeepers",
   "Centre-backs",

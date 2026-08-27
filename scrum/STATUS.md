@@ -1,12 +1,10 @@
 ﻿# Status
 
-Last updated: 2026-08-27 (T188 attr deltas load pipeline done)
+Last updated: 2026-08-27 (T189 Loans desk outgoing)
 
 ## Now
 
 _(empty — pick next ready ticket)_
-
-**Owner sequence:** Loans desk for outbound profiles next (not ticketed).
 
 **Deferred:** T139 theme (chrome/shell covered by T158/T159). T162 trophy cabinet (marketing visual; no RE until Loop A sticks). T124 quiet dev launch (installer friction; behind Loop A).
 
@@ -20,6 +18,7 @@ _(empty — pick next ready ticket)_
 
 ## Recently done
 
+- **T189** Loans desk = outgoing `loanedOut` players (Squad twin)
 - **T188** Attr deltas in load pipeline (recent → Attributes, all-time → Development)
 - **T187** Invalidate attr history poisoned by old rounding (v2 store)
 - **T186** Development plot color match, hover values, all-time Δ layout fix
@@ -30,8 +29,7 @@ _(empty — pick next ready ticket)_
 - **T181** Label attr tones as FMT design scheme (not FM chrome)
 - **T180** Unify attr tone palette as app-wide fundamental (`#e6e6fa` mid)
 - **T179** Dashboard widgets as distinct panels
-- **T178** Compact dashboard as filtered-view router
 
 ## Loop
 
-FM → FMT Dashboard/Squad → player Attributes / Development → (later) role desks / world.
+FM → FMT Dashboard/Squad → player Attributes / Development → Loans (outgoing honesty) → (later) role desks / world.
