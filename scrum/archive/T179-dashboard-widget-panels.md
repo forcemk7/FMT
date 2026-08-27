@@ -32,4 +32,4 @@ T178 peeks read as one continuous list on the dark shell (invisible hairlines, t
 
 Shipped: each widget uses `screen-panel` + elevated dark panel chrome; header label+chevron row; peek list forced column. Hard-refresh Dashboard to verify four boxes.
 
-Commit: _(pending)_
+Commit: `33c42b4`
