@@ -57,4 +57,4 @@ Owner already runs move-on decisions in Squad: promote who belongs, then find pl
 
 ### Commit
 
-_(filled after git)_
+Code landed in `92fdac8b02dc0f6c475ed57b8ab053ac808eeef0` (same commit as T193 — concurrent stage bleed). Board close SHA below after this Progress update.
