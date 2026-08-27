@@ -58,4 +58,4 @@ Owner already runs move-on decisions in Squad: promote who belongs, then find pl
 ### Commit
 
 - Product: `92fdac8b02dc0f6c475ed57b8ab053ac808eeef0` (landed with T193 in same commit — concurrent stage)
-- Board close: `8e01ee10a2f3be63db60f970fbff7d753f3367b6`
+- Board close: `e1d6da588197f819f205edec10cd9c191c987562`
