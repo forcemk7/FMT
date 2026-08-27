@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties } from "react";
 import {
   AlertCircle,
   ArrowLeft,
@@ -16,36 +16,19 @@ import {
   UserRound,
 } from "lucide-react";
 import type { LiveFootballSnapshot, LivePlayer } from "@/domain/adapters";
-import {
-  GK_TECHNICAL_ATTRIBUTES,
-  HIDDEN_ATTRIBUTES,
-  MENTAL_ATTRIBUTES,
-  PERSONALITY_ATTRIBUTES,
-  PHYSICAL_ATTRIBUTES,
-  SET_PIECE_ATTRIBUTES,
-  TECHNICAL_ATTRIBUTES,
-  gkGoalkeepingAttributeNames,
-  gkTechnicalTooltipNames,
-  isGoalkeeperPosition,
-  resolveGoalkeeperRating,
-  sortedAttributeEntries,
-} from "@/domain/attribute-desk";
+import { SET_PIECE_ATTRIBUTES } from "@/domain/attribute-desk";
 import { abilityToneFromScore, attributeTone } from "@/domain/attribute-tone";
 import { formatHasScore, hasBand, liveHasScore } from "@/domain/has-score";
 import { formatPlayerPositions } from "@/domain/live-data";
 import { livePersonalityLabels } from "@/domain/personality-labels";
+import { AttributeDesk } from "@/components/attribute-desk";
 import { AttributeHistoryPanel } from "@/components/attribute-history-panel";
+import { MentoringPanel } from "@/components/mentoring-panel";
 import { Button } from "@/components/ui/button";
 import { PlayerFace } from "@/components/player-face";
 import { ClubLogo } from "@/components/club-logo";
 import { NationFlag } from "@/components/nation-flag";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-
-function evidenceValue(map: Record<string, number | null> | undefined, attribute: string) {
-  const value = map?.[attribute];
-  return typeof value === "number" ? String(value) : "—";
-}
 
 function abilityLabel(value: number | null | undefined) {
   return typeof value === "number" ? String(value) : "—";
@@ -57,159 +40,14 @@ function abilityToneClass(value: number | null | undefined) {
   return `attr-tone-${abilityToneFromScore(value)}`;
 }
 
-function metricLabel(value: string) {
-  return value
-    .replace(/([a-z])([A-Z])/g, "$1 $2")
-    .replace(/\bXg\b/i, "xG")
-    .replace(/\bXa\b/i, "xA")
-    .replace(/^./, (letter) => letter.toUpperCase());
+function footToneClass(value: number | null | undefined) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "attr-tone-mid";
+  return `attr-tone-${attributeTone("Left Foot", value)}`;
 }
 
-function metricValue(label: string, value: unknown) {
-  if (typeof value !== "number") return "Unknown";
-  return value.toFixed(label.toLowerCase().includes("per 90") ? 2 : 0);
-}
-
-function AttrRow({
-  label,
-  value,
-  toneClass,
-  title,
-}: {
-  label: string;
-  value: string;
-  toneClass?: string;
-  title?: string;
-}) {
-  return (
-    <div className="attr-row">
-      <span className="attr-row-label">{label}</span>
-      <strong className={`attr-row-value ${toneClass ?? ""}`.trim()} title={title}>
-        {value}
-      </strong>
-    </div>
-  );
-}
-
-function AttributeRows({
-  names,
-  values,
-}: {
-  names: readonly string[];
-  values: Record<string, number | null> | undefined;
-}) {
-  return (
-    <div className="attr-row-list">
-      {names.map((name) => {
-        const raw = values?.[name];
-        const tone = typeof raw === "number" ? attributeTone(name, raw) : "mid";
-        return (
-          <AttrRow
-            key={name}
-            label={name}
-            value={evidenceValue(values, name)}
-            toneClass={`attr-tone attr-tone-${tone}`}
-          />
-        );
-      })}
-    </div>
-  );
-}
-
-function AttributeTooltipList({
-  names,
-  values,
-}: {
-  names: readonly string[];
-  values: Record<string, number | null> | undefined;
-}) {
-  return (
-    <ul className="attribute-tooltip-list">
-      {sortedAttributeEntries(names, values).map(({ name, value }) => {
-        const tone = typeof value === "number" ? attributeTone(name, value) : "mid";
-        return (
-          <li key={name}>
-            <span>{name}</span>
-            <strong className={`attr-tone attr-tone-${tone}`}>
-              {value == null ? "—" : String(value)}
-            </strong>
-          </li>
-        );
-      })}
-    </ul>
-  );
-}
-
-function AttributeHeading({
-  title,
-  tooltipNames,
-  values,
-}: {
-  title: string;
-  tooltipNames?: readonly string[];
-  values?: Record<string, number | null> | undefined;
-}) {
-  if (tooltipNames?.length) {
-    return (
-      <Tooltip>
-        <TooltipTrigger
-          render={<h3 className="attribute-column-heading attribute-column-heading-tip">{title}</h3>}
-        />
-        <TooltipContent side="bottom" align="start" className="attribute-tooltip">
-          <AttributeTooltipList names={tooltipNames} values={values} />
-        </TooltipContent>
-      </Tooltip>
-    );
-  }
-  return <h3 className="attribute-column-heading">{title}</h3>;
-}
-
-function AttributeGroup({
-  title,
-  names,
-  values,
-  col,
-  headerTooltipNames,
-  footer,
-}: {
-  title: string;
-  names: readonly string[];
-  values: Record<string, number | null> | undefined;
-  col?: 1 | 2 | 3;
-  headerTooltipNames?: readonly string[];
-  footer?: ReactNode;
-}) {
-  return (
-    <section className="attribute-column" data-col={col}>
-      <AttributeHeading title={title} tooltipNames={headerTooltipNames} values={values} />
-      <AttributeRows names={names} values={values} />
-      {footer}
-    </section>
-  );
-}
-
-function GoalkeeperRatingBlock({ player }: { player: LivePlayer }) {
-  const rating = resolveGoalkeeperRating(player.goalkeeperRating, player.attributes);
-  return (
-    <div className="attribute-extension attribute-gk-rating">
-      <AttributeHeading
-        title="Goalkeeping"
-        tooltipNames={gkGoalkeepingAttributeNames()}
-        values={player.attributes}
-      />
-      <div className="attr-row-list">
-        <AttrRow
-          label="Goalkeeper Rating"
-          value={rating == null ? "—" : `${rating} / 10`}
-          toneClass={
-            rating == null
-              ? "attr-tone attr-tone-mid"
-              : `attr-tone attr-tone-${attributeTone("Ability", rating * 2)}`
-          }
-        />
-      </div>
-    </div>
-  );
+function formatHeight(heightCm: number | null | undefined) {
+  if (typeof heightCm !== "number" || !Number.isFinite(heightCm)) return "—";
+  return `${(heightCm / 100).toFixed(2)} m`;
 }
 
 function formatGeneralText(value: string | null | undefined) {
@@ -229,84 +67,17 @@ function formatGeneralText(value: string | null | undefined) {
   return trimmed;
 }
 
-function GeneralColumn({ player, col = 3 }: { player: LivePlayer; col?: 1 | 2 | 3 }) {
-  const rows = [
-    {
-      label: "Ability",
-      value: abilityLabel(player.currentAbility),
-      toneClass: abilityToneClass(player.currentAbility),
-    },
-    {
-      label: "Potential",
-      value: abilityLabel(player.potentialAbility),
-      toneClass: abilityToneClass(player.potentialAbility),
-    },
-  ];
-
-  return (
-    <section className="attribute-column attribute-general" data-col={col}>
-      <AttributeHeading title="General" />
-      <div className="attr-row-list">
-        {rows.map((row) => (
-          <AttrRow
-            key={row.label}
-            label={row.label}
-            value={row.value}
-            toneClass={row.toneClass}
-            title={row.value === "—" ? undefined : row.value}
-          />
-        ))}
-      </div>
-    </section>
-  );
+function metricLabel(value: string) {
+  return value
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
+    .replace(/\bXg\b/i, "xG")
+    .replace(/\bXa\b/i, "xA")
+    .replace(/^./, (letter) => letter.toUpperCase());
 }
 
-/** Fixed 3-column FM desk: stacked Set Pieces / GK Technical under play attrs (matches in-game). */
-function AttributeDesk({ player }: { player: LivePlayer }) {
-  const gk = isGoalkeeperPosition(player.positions);
-  const attrs = player.attributes;
-
-  return (
-    <div className={`attribute-desk ${gk ? "attribute-desk-gk" : "attribute-desk-outfield"}`}>
-      {gk ? (
-        <div className="attribute-desk-row attribute-desk-primary">
-          <AttributeGroup
-            title="Goalkeeping"
-            names={gkGoalkeepingAttributeNames()}
-            values={attrs}
-            col={1}
-          />
-          <AttributeGroup title="Mental" names={MENTAL_ATTRIBUTES} values={attrs} col={2} />
-          <div className="attribute-column-stack" data-col={3}>
-            <AttributeGroup title="Physical" names={PHYSICAL_ATTRIBUTES} values={attrs} />
-            <AttributeGroup
-              title="Technical"
-              names={GK_TECHNICAL_ATTRIBUTES}
-              values={attrs}
-              headerTooltipNames={gkTechnicalTooltipNames()}
-            />
-          </div>
-        </div>
-      ) : (
-        <div className="attribute-desk-row attribute-desk-primary">
-          <div className="attribute-column-stack" data-col={1}>
-            <AttributeGroup title="Technical" names={TECHNICAL_ATTRIBUTES} values={attrs} />
-            <AttributeGroup title="Set Pieces" names={SET_PIECE_ATTRIBUTES} values={attrs} />
-          </div>
-          <AttributeGroup title="Mental" names={MENTAL_ATTRIBUTES} values={attrs} col={2} />
-          <div className="attribute-column-stack attribute-column-stack-anchor" data-col={3}>
-            <AttributeGroup title="Physical" names={PHYSICAL_ATTRIBUTES} values={attrs} />
-            <GoalkeeperRatingBlock player={player} />
-          </div>
-        </div>
-      )}
-      <div className="attribute-desk-row attribute-desk-footer">
-        <AttributeGroup title="Hidden" names={HIDDEN_ATTRIBUTES} values={player.hiddenAttributes} col={1} />
-        <AttributeGroup title="Personality" names={PERSONALITY_ATTRIBUTES} values={player.personalityAttributes} col={2} />
-        <GeneralColumn player={player} col={3} />
-      </div>
-    </div>
-  );
+function metricValue(label: string, value: unknown) {
+  if (typeof value !== "number") return "Unknown";
+  return value.toFixed(label.toLowerCase().includes("per 90") ? 2 : 0);
 }
 
 function PlayerPolygram({ player }: { player: LivePlayer }) {
@@ -360,20 +131,43 @@ function RoleFitCards({ player, limit = 6 }: { player: LivePlayer; limit?: numbe
   );
 }
 
+const PROFILE_TABS = [
+  "attributes",
+  "mentoring",
+  "development",
+  "overview",
+  "tactical",
+  "performance",
+  "career",
+] as const;
+
+function profileTabLabel(value: (typeof PROFILE_TABS)[number]) {
+  if (value === "tactical") return "Tactical fit";
+  if (value === "development") return "Development";
+  if (value === "mentoring") return "Mentoring";
+  return value[0]!.toUpperCase() + value.slice(1);
+}
+
 export function PlayerProfileScreen({
   player,
   snapshot,
   favorite,
+  checking,
+  onRefresh,
   onToggleFavorite,
   onBack,
   onOpenClub,
+  onOpenPlayer,
 }: {
   player: LivePlayer | null;
   snapshot: LiveFootballSnapshot;
   favorite: boolean;
+  checking: boolean;
+  onRefresh: () => Promise<unknown>;
   onToggleFavorite: () => void;
   onBack: () => void;
   onOpenClub?: (clubId: string) => void;
+  onOpenPlayer: (playerId: string) => void;
 }) {
   if (!player) {
     return (
@@ -390,20 +184,12 @@ export function PlayerProfileScreen({
   const knownEvidence = player.scoutConfidence ?? Math.min(100, Math.round((mappedAttributeCount / 47) * 100));
   const unknownEvidence = 100 - knownEvidence;
 
-  const ageDob =
-    [
-      player.age != null ? `${player.age} years old` : null,
-      player.dateOfBirth ? `(${player.dateOfBirth})` : null,
-    ]
-      .filter(Boolean)
-      .join(" ") || "—";
+  const ageLabel = player.age != null ? `${player.age} years old` : "—";
+  const dobLabel = player.dateOfBirth?.trim() || null;
   const position = formatPlayerPositions(player);
-  const foot =
-    player.preferredFoot || (player.leftFoot != null && player.rightFoot != null)
-      ? `${player.preferredFoot ?? "—"}${
-          player.leftFoot != null && player.rightFoot != null ? ` · ${player.leftFoot} / ${player.rightFoot}` : ""
-        }`
-      : "—";
+  const height = formatHeight(player.heightCm ?? null);
+  const leftFoot = player.leftFoot != null ? String(player.leftFoot) : "—";
+  const rightFoot = player.rightFoot != null ? String(player.rightFoot) : "—";
   const ca = abilityLabel(player.currentAbility);
   const pa = abilityLabel(player.potentialAbility);
   const hasScore = liveHasScore(player);
@@ -422,7 +208,6 @@ export function PlayerProfileScreen({
           <PlayerFace playerId={player.id} name={player.name} size="lg" />
           <div>
             <h1>{player.name}</h1>
-            <p>{clubName ?? "Club unknown"} · CA {abilityLabel(player.currentAbility)} · PA {abilityLabel(player.potentialAbility)}</p>
           </div>
         </div>
         <div className="dossier-actions">
@@ -443,21 +228,36 @@ export function PlayerProfileScreen({
               <strong title={nationLabel === "—" ? undefined : nationLabel}>{nationLabel}</strong>
             </span>
           </span>
-          <span>
+          <span className="player-age-fact">
             <b>Age</b>
-            <strong title={ageDob === "—" ? undefined : ageDob}>{ageDob}</strong>
+            <span className="player-fact-value">
+              <strong title={ageLabel === "—" ? undefined : ageLabel}>{ageLabel}</strong>
+              {dobLabel ? <small className="player-fact-sub">{dobLabel}</small> : null}
+            </span>
+          </span>
+          <span>
+            <b>Height</b>
+            <span className="player-fact-value">
+              <strong title={height === "—" ? undefined : height}>{height}</strong>
+            </span>
           </span>
           <span title={personalityLabel === "—" ? undefined : personalityLabel}>
             <b>Personality</b>
-            <strong>{personalityLabel}</strong>
-          </span>
-          <span>
-            <b>Preferred foot</b>
-            <strong title={foot === "—" ? undefined : foot}>{foot}</strong>
+            <span className="player-fact-value">
+              <strong>{personalityLabel}</strong>
+            </span>
           </span>
           <span>
             <b>Ability</b>
-            <strong className={abilityToneClass(player.currentAbility)}>{ca}</strong>
+            <span className="player-fact-value">
+              <strong className={abilityToneClass(player.currentAbility)}>{ca}</strong>
+            </span>
+          </span>
+          <span>
+            <b>Left foot</b>
+            <span className="player-fact-value">
+              <strong className={footToneClass(player.leftFoot)}>{leftFoot}</strong>
+            </span>
           </span>
         </div>
         <div className="player-facts-row">
@@ -479,32 +279,42 @@ export function PlayerProfileScreen({
           </button>
           <span>
             <b>Position</b>
-            <strong title={position === "—" ? undefined : position}>{position}</strong>
-          </span>
-          <span title={mediaLabel === "—" ? undefined : mediaLabel}>
-            <b>Media Handling</b>
-            <strong>{mediaLabel}</strong>
+            <span className="player-fact-value">
+              <strong title={position === "—" ? undefined : position}>{position}</strong>
+            </span>
           </span>
           <span>
             <b>HAS</b>
-            <strong className={hasTone}>{hasLabel}</strong>
+            <span className="player-fact-value">
+              <strong className={hasTone}>{hasLabel}</strong>
+            </span>
+          </span>
+          <span title={mediaLabel === "—" ? undefined : mediaLabel}>
+            <b>Media Handling</b>
+            <span className="player-fact-value">
+              <strong>{mediaLabel}</strong>
+            </span>
           </span>
           <span>
             <b>Potential</b>
-            <strong className={abilityToneClass(player.potentialAbility)}>{pa}</strong>
+            <span className="player-fact-value">
+              <strong className={abilityToneClass(player.potentialAbility)}>{pa}</strong>
+            </span>
+          </span>
+          <span>
+            <b>Right foot</b>
+            <span className="player-fact-value">
+              <strong className={footToneClass(player.rightFoot)}>{rightFoot}</strong>
+            </span>
           </span>
         </div>
       </section>
 
       <Tabs defaultValue="attributes" className="dossier-tabs">
         <TabsList variant="line">
-          {["attributes", "development", "overview", "tactical", "performance", "career"].map((value) => (
+          {PROFILE_TABS.map((value) => (
             <TabsTrigger key={value} value={value}>
-              {value === "tactical"
-                ? "Tactical fit"
-                : value === "development"
-                  ? "Development"
-                  : value[0].toUpperCase() + value.slice(1)}
+              {profileTabLabel(value)}
             </TabsTrigger>
           ))}
         </TabsList>
@@ -612,11 +422,29 @@ export function PlayerProfileScreen({
         </TabsContent>
         <TabsContent value="attributes">
           <section className="dossier-panel tab-evidence-panel attribute-desk-panel">
-            <AttributeDesk player={player} />
+            <AttributeDesk
+              player={player}
+              deltaMode="recent"
+              historySyncKey={snapshot.status.lastSync}
+            />
           </section>
         </TabsContent>
+        <TabsContent value="mentoring">
+          <MentoringPanel
+            key={player.id}
+            player={player}
+            snapshot={snapshot}
+            checking={checking}
+            onRefresh={onRefresh}
+            onOpenPlayer={onOpenPlayer}
+          />
+        </TabsContent>
         <TabsContent value="development">
-          <AttributeHistoryPanel key={player.id} playerId={player.id} />
+          <AttributeHistoryPanel
+            key={player.id}
+            player={player}
+            historySyncKey={snapshot.status.lastSync}
+          />
         </TabsContent>
         <TabsContent value="performance">
           <section className="dossier-panel tab-evidence-panel">

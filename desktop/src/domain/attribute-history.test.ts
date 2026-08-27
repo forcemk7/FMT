@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  allTimeDeltasFromPoints,
   buildAttrTimeline,
   factualHistorySummary,
   fieldDeltas,
@@ -33,6 +34,17 @@ describe("recentDeltasFromPoints", () => {
       { at: "2026-01-02", values: { CA: 83, Determination: 14 } },
     ];
     expect(recentDeltasFromPoints(points)).toEqual({ CA: 3, Determination: 2 });
+  });
+});
+
+describe("allTimeDeltasFromPoints", () => {
+  it("maps every tracked field to its all-time delta vs first point", () => {
+    const points: AttrHistoryPoint[] = [
+      { at: "2026-01-01", values: { CA: 100, Determination: 12 } },
+      { at: "2026-01-02", values: { CA: 103, Determination: 14 } },
+      { at: "2026-01-03", values: { CA: 102, Determination: 15 } },
+    ];
+    expect(allTimeDeltasFromPoints(points)).toEqual({ CA: 2, Determination: 3 });
   });
 });
 

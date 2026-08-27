@@ -141,9 +141,28 @@ export function recentDeltasFromPoints(points: AttrHistoryPoint[]): Record<strin
   return deltas;
 }
 
+/** All-time (vs first change-point) delta for every field in a history series. */
+export function allTimeDeltasFromPoints(points: AttrHistoryPoint[]): Record<string, number | null> {
+  if (!points.length) return {};
+  const fields = new Set<string>();
+  for (const point of points) {
+    for (const key of Object.keys(point.values)) fields.add(key);
+  }
+  const deltas: Record<string, number | null> = {};
+  for (const field of fields) {
+    deltas[field] = fieldDeltas(points, field).allTime;
+  }
+  return deltas;
+}
+
 /** Recent (vs previous change-point) delta for every field seen in this player's history. */
 export function recentDeltasForPlayer(playerId: string): Record<string, number | null> {
   return recentDeltasFromPoints(getPlayerAttrHistory(playerId));
+}
+
+/** All-time (vs first change-point) delta for every field seen in this player's history. */
+export function allTimeDeltasForPlayer(playerId: string): Record<string, number | null> {
+  return allTimeDeltasFromPoints(getPlayerAttrHistory(playerId));
 }
 
 export type SquadMoverChange = { field: string; delta: number };
