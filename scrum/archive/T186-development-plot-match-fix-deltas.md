@@ -23,4 +23,4 @@ depends_on: []
 ## Progress
 
 - Domain fieldDeltas first/last observation; compact column tokens; `--plot-swatch` row highlight; hover guide + tooltip
-- Commit: (filled after git)
+- Commit: `9bfb852`
