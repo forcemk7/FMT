@@ -1,5 +1,14 @@
 import type { LivePlayer } from "@/domain/adapters";
 
+/** Managed-club players available for match squads (excludes outgoing loans). */
+export function isAtClubSquadPlayer(
+  player: Pick<LivePlayer, "clubId" | "loanedOut">,
+  managedClubId: string | null | undefined,
+): boolean {
+  if (!managedClubId || player.clubId !== managedClubId) return false;
+  return player.loanedOut !== true;
+}
+
 export const positionGroups = [
   "Goalkeepers",
   "Centre-backs",

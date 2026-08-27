@@ -32,6 +32,7 @@
         "personSecondNameOffset": 88,
         "personCommonNameOffset": 96,
         "personContractOffset": 168,
+        "personLoanOffset": 176,
         "contractTeamOffset": 16,
         "teamVtableRva": 72094632,
         "teamClubOffset": 48,
@@ -46,6 +47,7 @@
         "playerCaOffset": 612,
         "playerPaOffset": 614,
         "playerCurrentDateOffset": 512,
+        "playerHeightOffset": 558,
         "personNationalityOffset": 104,
         "nationNameOffset": 24,
         "personBirthDateOffset": 136,
@@ -64,7 +66,8 @@
           "currentAbility": { "offset": 612, "source": "player", "valueType": "u16", "transform": "1-200 or omit", "status": "candidate", "confidence": 0.8, "validations": ["aligned FMSuperScout Fields.cs 26.3.x / Cheat Engine tables"] },
           "potentialAbility": { "offset": 614, "source": "player", "valueType": "u16", "transform": "1-200 or omit", "status": "candidate", "confidence": 0.8, "validations": ["aligned FMSuperScout Fields.cs 26.3.x / Cheat Engine tables"] },
           "personalityAttributes": { "offset": 112, "source": "person", "valueType": "u8[8]", "transform": "1-20 or omit per byte", "status": "candidate", "confidence": 0.8, "validations": ["person+0x70..0x77 personality pack; live LE compare pending"] },
-          "preferredFoot": { "offset": 375, "source": "player", "valueType": "u8[2]", "transform": "display 1-20 each; Either if equal else stronger side Left/Right", "status": "validated", "confidence": 0.97, "validations": ["left/right foot evidence matches managed profiles"] },
+          "preferredFoot": { "offset": 375, "source": "player", "valueType": "u8[2]", "transform": "display 1-20 each; Either when same competency band else higher band Left/Right", "status": "validated", "confidence": 0.97, "validations": ["left/right foot evidence matches managed profiles"] },
+          "heightCm": { "offset": 558, "source": "player", "valueType": "u8", "transform": "centimetres 140-220", "status": "validated", "confidence": 0.95, "validations": ["Sam Kizza 193", "Nathan Jones 192", "Felix Heynke 181", "Lorenzo Heilbrom 198", "consensus player+558 across 4/4"] },
           "form": { "offset": null, "source": "player", "valueType": "unknown", "transform": null, "status": "unmapped", "confidence": 0.0, "validations": [] }
         },
         "contract": {

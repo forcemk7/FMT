@@ -20,6 +20,7 @@ import {
 } from "@/components/dashboard-widgets";
 import { LiveDataState } from "@/components/live-data-state";
 import { Button } from "@/components/ui/button";
+import { isAtClubSquadPlayer } from "@/domain/live-data";
 
 function WidgetShell({
   title,
@@ -64,7 +65,10 @@ export function DashboardScreen({
   onOpenView: (view: DashViewId) => void;
 }) {
   const squad = useMemo(
-    () => snapshot.players.filter((player) => player.clubId === snapshot.managedClubId),
+    () =>
+      snapshot.players.filter((player) =>
+        isAtClubSquadPlayer(player, snapshot.managedClubId),
+      ),
     [snapshot.managedClubId, snapshot.players],
   );
   const club = snapshot.clubs.find((item) => item.id === snapshot.managedClubId);
@@ -206,7 +210,10 @@ export function DashboardViewScreen({
   onBack: () => void;
 }) {
   const squad = useMemo(
-    () => snapshot.players.filter((player) => player.clubId === snapshot.managedClubId),
+    () =>
+      snapshot.players.filter((player) =>
+        isAtClubSquadPlayer(player, snapshot.managedClubId),
+      ),
     [snapshot.managedClubId, snapshot.players],
   );
   const ready =

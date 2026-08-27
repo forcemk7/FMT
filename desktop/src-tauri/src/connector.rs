@@ -195,6 +195,15 @@ pub fn connector_snapshot() -> ConnectorSnapshot {
 }
 
 #[tauri::command]
+pub fn debug_dump_player_memory(
+    player_id: String,
+    window_size: Option<usize>,
+) -> Result<MappingLabCaptureData, String> {
+    let _ = collect_snapshot(false, None);
+    capture_mapping_lab_player(player_id.trim(), window_size.unwrap_or(1024))
+}
+
+#[tauri::command]
 pub fn load_active_save(app: tauri::AppHandle) -> ConnectorSnapshot {
     let progress = |stage: &'static str| {
         let _ = app.emit("fmt-load-progress", stage);
@@ -287,6 +296,15 @@ pub(crate) struct MappingLabWindow {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct MappingLabPersonProbe {
+    pub(crate) label: &'static str,
+    pub(crate) base_address: String,
+    pub(crate) uid_at_plus_12: Option<u32>,
+    pub(crate) name: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct MappingLabCaptureData {
     pub(crate) player_id: String,
     pub(crate) player_name: String,
@@ -294,7 +312,94 @@ pub(crate) struct MappingLabCaptureData {
     pub(crate) save_pointer: String,
     pub(crate) entity_map_profile_id: String,
     pub(crate) executable_sha256: String,
+    pub(crate) raw_player_address: String,
+    pub(crate) person_embedded_address: String,
+    pub(crate) person_probes: Vec<MappingLabPersonProbe>,
     pub(crate) windows: Vec<MappingLabWindow>,
+}
+
+#[cfg(target_os = "windows")]
+fn collect_player_memory_windows(
+    reader: &mut ProcessReader,
+    profile: &EntityMapProfile,
+    record: &IndexedPlayerRecord,
+    window_size: usize,
+) -> Result<Vec<MappingLabWindow>, String> {
+    let mut windows = Vec::new();
+    let person_field = record.raw_player_address + profile.constants.player_person_offset;
+    let person_pointer = reader
+        .read_pointer(person_field)
+        .filter(|value| *value != 0 && *value != person_field);
+    let resolved_person =
+        resolve_person_address(reader, record.raw_player_address, profile).unwrap_or(person_field);
+
+    let mut push_window = |object: &'static str, address: u64| -> Result<(), String> {
+        let bytes = reader
+            .read_bytes(address, window_size)
+            .ok_or_else(|| format!("The bounded {object} window was not readable @ {address:#x}."))?;
+        windows.push(MappingLabWindow {
+            object,
+            base_address: hex_address(address),
+            bytes,
+        });
+        Ok(())
+    };
+
+    push_window("player", record.raw_player_address)?;
+    push_window("personEmbedded", person_field)?;
+    push_window("personResolved", resolved_person)?;
+
+    if let Some(person_pointer) = person_pointer {
+        push_window("personPointer", person_pointer)?;
+    }
+
+    if let Some(contract) = record.contract_address {
+        push_window("contract", contract)?;
+    }
+
+    Ok(windows)
+}
+
+#[cfg(target_os = "windows")]
+fn probe_person_candidates(
+    reader: &mut ProcessReader,
+    profile: &EntityMapProfile,
+    raw_player: u64,
+) -> Vec<MappingLabPersonProbe> {
+    let mut probes = Vec::new();
+    let mapped = raw_player + profile.constants.player_person_offset;
+    let mut candidates: Vec<(&'static str, u64)> = vec![("personMapped", mapped)];
+    if let Some(resolved) = resolve_person_address(reader, raw_player, profile) {
+        if resolved != mapped {
+            candidates.push(("personResolved", resolved));
+        }
+    }
+    if let Some(person_pointer) = reader
+        .read_pointer(mapped)
+        .filter(|value| *value != 0 && *value != mapped)
+    {
+        candidates.push(("personPointer", person_pointer));
+    }
+
+    for (label, base) in candidates {
+        let uid = reader
+            .read_u32(base + profile.constants.entity_uid_offset)
+            .filter(|uid| *uid > 0);
+        let name = uid.and_then(|_| {
+            display_name(
+                read_name_field(reader, base + profile.constants.person_first_name_offset),
+                read_name_field(reader, base + profile.constants.person_second_name_offset),
+                read_name_field(reader, base + profile.constants.person_common_name_offset),
+            )
+        });
+        probes.push(MappingLabPersonProbe {
+            label,
+            base_address: hex_address(base),
+            uid_at_plus_12: uid,
+            name,
+        });
+    }
+    probes
 }
 
 #[cfg(target_os = "windows")]
@@ -340,24 +445,8 @@ pub(crate) fn capture_mapping_lab_player(
         identity.architecture.as_deref(),
     )
     .ok_or_else(|| "The running FM26 build does not match an exact entity map.".to_string())?;
-    let mut targets = vec![
-        ("player", record.raw_player_address),
-        ("person", record.person_address),
-    ];
-    if let Some(contract) = record.contract_address {
-        targets.push(("contract", contract));
-    }
-    let mut windows = Vec::with_capacity(targets.len());
-    for (object, address) in targets {
-        let bytes = reader
-            .read_bytes(address, window_size)
-            .ok_or_else(|| format!("The bounded {object} window was not readable."))?;
-        windows.push(MappingLabWindow {
-            object,
-            base_address: hex_address(address),
-            bytes,
-        });
-    }
+    let person_probes = probe_person_candidates(&mut reader, profile, record.raw_player_address);
+    let windows = collect_player_memory_windows(&mut reader, profile, &record, window_size)?;
     Ok(MappingLabCaptureData {
         player_id: record.id,
         player_name: record.name,
@@ -365,6 +454,9 @@ pub(crate) fn capture_mapping_lab_player(
         save_pointer: hex_address(save_pointer),
         entity_map_profile_id: profile.id.clone(),
         executable_sha256: identity.sha256.unwrap_or_default(),
+        raw_player_address: hex_address(record.raw_player_address),
+        person_embedded_address: hex_address(record.person_address),
+        person_probes,
         windows,
     })
 }
@@ -931,6 +1023,98 @@ fn try_resolve_human_manager(
     })
 }
 
+/// Club UniqueID from a team or club pointer (vtable-validated).
+#[cfg(target_os = "windows")]
+fn resolve_club_uid_from_pointer(
+    reader: &mut ProcessReader,
+    module: ModuleInfo,
+    profile: &EntityMapProfile,
+    pointer: u64,
+) -> Option<u32> {
+    if pointer == 0 {
+        return None;
+    }
+    if validator::validate_vtable(reader, pointer, module.base + profile.constants.club_vtable_rva)
+        .is_ok()
+    {
+        return reader
+            .read_u32(pointer + profile.constants.entity_uid_offset)
+            .filter(|uid| *uid > 0);
+    }
+    if validator::validate_vtable(reader, pointer, module.base + profile.constants.team_vtable_rva)
+        .is_ok()
+    {
+        let club = reader
+            .read_pointer(pointer + profile.constants.team_club_offset)
+            .filter(|value| *value != 0)?;
+        validator::validate_vtable(reader, club, module.base + profile.constants.club_vtable_rva)
+            .ok()?;
+        return reader
+            .read_u32(club + profile.constants.entity_uid_offset)
+            .filter(|uid| *uid > 0);
+    }
+    None
+}
+
+/// Loan Club UniqueID from person → loan agreement (FMLE Parent/Loan Club split).
+/// Parent contract team stays the owning club; outgoing loans hang off `person_loan_offset`.
+#[cfg(target_os = "windows")]
+fn read_person_loan_club_uid(
+    reader: &mut ProcessReader,
+    module: ModuleInfo,
+    profile: &EntityMapProfile,
+    person: u64,
+) -> Option<u32> {
+    let loan = reader
+        .read_pointer(person + profile.constants.person_loan_offset)
+        .filter(|value| *value != 0)?;
+    // Primary attachment: loan+0 → object with club/team at +0x10 / +0x18 (Bora→Napoli).
+    if let Some(primary) = reader.read_pointer(loan).filter(|value| *value != 0) {
+        if let Some(uid) = resolve_club_uid_from_pointer(reader, module, profile, primary) {
+            return Some(uid);
+        }
+        for offset in [0x10u64, 0x18] {
+            if let Some(pointer) = reader
+                .read_pointer(primary + offset)
+                .filter(|value| *value != 0)
+            {
+                if let Some(uid) = resolve_club_uid_from_pointer(reader, module, profile, pointer) {
+                    return Some(uid);
+                }
+            }
+        }
+    }
+    // Fallback: scan the loan object window for any club/team pointer.
+    let bytes = reader.read_bytes(loan, 128)?;
+    for offset in (0..bytes.len().saturating_sub(8)).step_by(8) {
+        let pointer = u64::from_le_bytes(bytes[offset..offset + 8].try_into().ok()?);
+        if let Some(uid) = resolve_club_uid_from_pointer(reader, module, profile, pointer) {
+            return Some(uid);
+        }
+        if pointer < 0x10000 {
+            continue;
+        }
+        let Some(inner) = reader.read_bytes(pointer, 64) else {
+            continue;
+        };
+        for inner_offset in (0..inner.len().saturating_sub(8)).step_by(8) {
+            let child = u64::from_le_bytes(inner[inner_offset..inner_offset + 8].try_into().ok()?);
+            if let Some(uid) = resolve_club_uid_from_pointer(reader, module, profile, child) {
+                return Some(uid);
+            }
+        }
+    }
+    None
+}
+
+/// True when person has an active loan agreement pointing at another club.
+/// Missing loan pointer fails open (at-club).
+fn is_loaned_out_from_loan_club(loan_club_uid: Option<u32>, managed_club_uid: u32) -> bool {
+    loan_club_uid
+        .map(|uid| uid != managed_club_uid)
+        .unwrap_or(false)
+}
+
 #[cfg(target_os = "windows")]
 fn extract_live_data(
     reader: &mut ProcessReader,
@@ -1134,6 +1318,8 @@ fn extract_live_data(
     let mut managed_index_records = Vec::with_capacity(player_count);
     let mut player_vtable = None;
     let mut skipped_squad_slots = 0u32;
+    let mut skipped_squad_details: Vec<String> = Vec::new();
+    let mut name_fallback_details: Vec<String> = Vec::new();
     for index in 0..player_count {
         let raw_player = match reader
             .read_pointer(players_start + (index as u64 * 8))
@@ -1142,6 +1328,7 @@ fn extract_live_data(
             Some(value) => value,
             None => {
                 skipped_squad_slots += 1;
+                skipped_squad_details.push(format!("slot {index}: empty player pointer"));
                 continue;
             }
         };
@@ -1152,29 +1339,33 @@ fn extract_live_data(
             Some(value) => value,
             None => {
                 skipped_squad_slots += 1;
+                skipped_squad_details.push(format!(
+                    "slot {index}: unreadable vtable @ {raw_player:#x}"
+                ));
                 continue;
             }
         };
         player_vtable.get_or_insert(vtable);
-        let person = raw_player + profile.constants.player_person_offset;
+        let person = match resolve_person_address(reader, raw_player, profile) {
+            Some(value) => value,
+            None => {
+                skipped_squad_slots += 1;
+                skipped_squad_details.push(format!(
+                    "slot {index}: person object not resolved @ {raw_player:#x}"
+                ));
+                continue;
+            }
+        };
         let uid = match reader
             .read_u32(person + profile.constants.entity_uid_offset)
-            .filter(|uid| *uid > 0)
+            .filter(|uid| is_plausible_fm_unique_id(*uid))
         {
             Some(value) => value,
             None => {
                 skipped_squad_slots += 1;
-                continue;
-            }
-        };
-        let name = match display_name(
-            read_name_field(reader, person + profile.constants.person_first_name_offset),
-            read_name_field(reader, person + profile.constants.person_second_name_offset),
-            read_name_field(reader, person + profile.constants.person_common_name_offset),
-        ) {
-            Some(value) => value,
-            None => {
-                skipped_squad_slots += 1;
+                skipped_squad_details.push(format!(
+                    "slot {index}: missing plausible UniqueID (person @ {person:#x})"
+                ));
                 continue;
             }
         };
@@ -1182,16 +1373,50 @@ fn extract_live_data(
             raw_player + profile.constants.player_positions_offset,
             POSITION_NAMES.len(),
         ) {
-            Some(bytes) if bytes.iter().all(|rating| *rating <= 20) => bytes,
-            _ => {
+            Some(bytes) => bytes,
+            None => {
                 skipped_squad_slots += 1;
+                skipped_squad_details.push(format!(
+                    "slot {index} uid {uid}: unreadable position blob"
+                ));
                 continue;
             }
         };
+        if let Some(issue) = position_bytes_issue(&position_bytes) {
+            skipped_squad_slots += 1;
+            skipped_squad_details.push(format!("slot {index} uid {uid}: {issue}"));
+            continue;
+        }
         let (positions, secondary_positions) = classify_player_positions(&position_bytes);
         if positions.is_empty() {
             skipped_squad_slots += 1;
+            skipped_squad_details.push(format!(
+                "slot {index} uid {uid}: no primary position after classification"
+            ));
             continue;
+        }
+        let attribute_bytes = match reader.read_bytes(
+            raw_player + profile.constants.player_attributes_offset,
+            PLAYER_ATTRIBUTE_NAMES.len(),
+        ) {
+            Some(bytes) => bytes,
+            None => {
+                skipped_squad_slots += 1;
+                skipped_squad_details.push(format!(
+                    "slot {index} uid {uid}: unreadable attribute blob"
+                ));
+                continue;
+            }
+        };
+        if let Some(issue) = attribute_bytes_issue(&attribute_bytes) {
+            skipped_squad_slots += 1;
+            skipped_squad_details.push(format!("slot {index} uid {uid}: {issue}"));
+            continue;
+        }
+        let (name, name_source) =
+            resolve_managed_squad_name(reader, person, profile, uid);
+        if name_source != "own-squad" {
+            name_fallback_details.push(format!("uid {uid} ({name_source})"));
         }
         let calculated_position = position_bytes
             .iter()
@@ -1214,16 +1439,6 @@ fn extract_live_data(
         });
         let nationality = read_nationality(reader, person, profile);
         let nationality_id = read_nation_id(reader, person, profile);
-        let attribute_bytes = match reader.read_bytes(
-            raw_player + profile.constants.player_attributes_offset,
-            PLAYER_ATTRIBUTE_NAMES.len(),
-        ) {
-            Some(bytes) if bytes.iter().all(|value| *value <= 100) => bytes,
-            _ => {
-                skipped_squad_slots += 1;
-                continue;
-            }
-        };
         let visible_attributes = visible_attribute_map(&attribute_bytes);
         let hidden_attributes = hidden_attribute_map(&attribute_bytes);
         let personality_bytes = reader
@@ -1239,6 +1454,10 @@ fn extract_live_data(
         let left_foot = display_attribute(attribute_bytes[24]);
         let right_foot = display_attribute(attribute_bytes[25]);
         let preferred_foot = preferred_foot_label(left_foot, right_foot);
+        let height_cm = reader
+            .read_bytes(raw_player + profile.constants.player_height_offset, 1)
+            .and_then(|bytes| bytes.first().copied())
+            .filter(|value| (140..=220).contains(value));
         // Full IP/OOP role catalogue scoring is deferred off the load path (LE-speed).
         // Cheap position-based ability score remains for desk sorting.
         let ability_score = calculated_position
@@ -1271,6 +1490,8 @@ fn extract_live_data(
         let contract_address = reader
             .read_pointer(person + profile.constants.person_contract_offset)
             .filter(|value| *value != 0);
+        let loan_club_uid = read_person_loan_club_uid(reader, module, profile, person);
+        let loaned_out = is_loaned_out_from_loan_club(loan_club_uid, club_uid);
         managed_player_ids.insert(player_id.clone());
         managed_index_records.push(IndexedPlayerRecord {
             id: player_id.clone(),
@@ -1315,9 +1536,11 @@ fn extract_live_data(
             "preferredFoot": preferred_foot,
             "leftFoot": left_foot,
             "rightFoot": right_foot,
+            "heightCm": height_cm,
             "strengths": strengths,
             "weaknesses": weaknesses,
             "clubId": club_id,
+            "loanedOut": loaned_out,
             "transferInterest": null,
             "loanInterest": null,
             "transferAvailable": null,
@@ -1348,7 +1571,7 @@ fn extract_live_data(
                 "label": if ability_score.is_some() { "full visible-attribute evidence" } else { "not enough evidence" }
             }
             ,"knowledge": {
-                "name": { "value": name, "visibility": "known", "source": "own-squad", "confidence": 100, "lastValidated": validated_at },
+                "name": { "value": name, "visibility": "known", "source": name_source, "confidence": if name_source == "own-squad" { 100 } else { 85 }, "lastValidated": validated_at },
                 "age": { "value": age, "visibility": "known", "source": "own-squad", "confidence": 100, "lastValidated": validated_at },
                 "nationality": { "value": nationality, "visibility": "known", "source": "own-squad", "confidence": 100, "lastValidated": validated_at },
                 "positions": { "value": positions, "visibility": "known", "source": "own-squad", "confidence": 100, "lastValidated": validated_at },
@@ -1369,9 +1592,30 @@ fn extract_live_data(
     }
     diagnostics.last_successful_read = Some("extract_managed_squad".to_string());
     let managed_tactic_records = managed_index_records.clone();
-    let skipped_squad_warning = (skipped_squad_slots > 0).then(|| {
+    let skipped_squad_warning = if skipped_squad_slots > 0 {
+        let mut message = format!(
+            "Managed squad memory listed {player_count} slots but {} passed validation ({skipped_squad_slots} skipped).",
+            players.len(),
+        );
+        for detail in skipped_squad_details.iter().take(8) {
+            message.push_str("\n- ");
+            message.push_str(detail);
+        }
+        if skipped_squad_details.len() > 8 {
+            message.push_str(&format!(
+                "\n- … and {} more skipped slot(s)",
+                skipped_squad_details.len() - 8
+            ));
+        }
+        Some(message)
+    } else {
+        None
+    };
+    let name_fallback_warning = (!name_fallback_details.is_empty()).then(|| {
         format!(
-            "Skipped {skipped_squad_slots} managed-squad slot(s) with unreadable identity/attributes (common on continue saves)."
+            "{} managed-squad name(s) used save-index fallback because live FM name strings were unreadable: {}",
+            name_fallback_details.len(),
+            name_fallback_details.join("; ")
         )
     });
 
@@ -1488,6 +1732,9 @@ fn extract_live_data(
             "The FM26 shortlist collection is not mapped safely. FMT Favorites remains a local list resolved against live players.".to_string(),
     ];
     if let Some(warning) = skipped_squad_warning {
+        warnings.push(warning);
+    }
+    if let Some(warning) = name_fallback_warning {
         warnings.push(warning);
     }
     if let Some(warning) = manager_pick_warning {
@@ -2037,10 +2284,10 @@ fn read_indexed_player_candidate(
     raw_player: u64,
     profile: &EntityMapProfile,
 ) -> Option<IndexedPlayerRecord> {
-    let person = raw_player.checked_add(profile.constants.player_person_offset)?;
+    let person = resolve_person_address(reader, raw_player, profile)?;
     let uid = reader
         .read_u32(person.checked_add(profile.constants.entity_uid_offset)?)
-        .filter(|uid| *uid > 0)?;
+        .filter(|uid| is_plausible_fm_unique_id(*uid))?;
     let name = display_name(
         read_name_field(
             reader,
@@ -2291,17 +2538,136 @@ fn display_name(
     (!full.is_empty()).then_some(full)
 }
 
+fn is_plausible_fm_unique_id(uid: u32) -> bool {
+    (20_000_000..=99_999_999).contains(&uid) || (1_900_000_000..=2_200_000_000).contains(&uid)
+}
+
+#[cfg(target_os = "windows")]
+fn is_heap_person_pointer(value: u64) -> bool {
+    (0x10_000..0x0000_7FF0_0000_0000).contains(&value) && value.is_multiple_of(8)
+}
+
+#[cfg(target_os = "windows")]
+fn person_identity_valid(
+    reader: &mut ProcessReader,
+    person: u64,
+    profile: &EntityMapProfile,
+) -> bool {
+    let Some(uid) = reader
+        .read_u32(person + profile.constants.entity_uid_offset)
+        .filter(|uid| is_plausible_fm_unique_id(*uid))
+    else {
+        return false;
+    };
+    if display_name(
+        read_name_field(
+            reader,
+            person + profile.constants.person_first_name_offset,
+        ),
+        read_name_field(
+            reader,
+            person + profile.constants.person_second_name_offset,
+        ),
+        read_name_field(
+            reader,
+            person + profile.constants.person_common_name_offset,
+        ),
+    )
+    .is_some()
+    {
+        return true;
+    }
+    fm_dossier::player_display_name(&uid.to_string()).is_some()
+}
+
+#[cfg(target_os = "windows")]
+fn resolve_person_address(
+    reader: &mut ProcessReader,
+    raw_player: u64,
+    profile: &EntityMapProfile,
+) -> Option<u64> {
+    let mapped = raw_player + profile.constants.player_person_offset;
+    if person_identity_valid(reader, mapped, profile) {
+        return Some(mapped);
+    }
+    if let Some(person_pointer) = reader
+        .read_pointer(mapped)
+        .filter(|value| is_heap_person_pointer(*value))
+    {
+        if person_identity_valid(reader, person_pointer, profile) {
+            return Some(person_pointer);
+        }
+    }
+    let scan_end = 1024u64.saturating_sub(16);
+    let mut offset = profile.constants.player_person_offset;
+    while offset <= scan_end {
+        let candidate = raw_player + offset;
+        if candidate != mapped && person_identity_valid(reader, candidate, profile) {
+            return Some(candidate);
+        }
+        offset += 8;
+    }
+    None
+}
+
 #[cfg(target_os = "windows")]
 fn read_name_field(reader: &mut ProcessReader, field: u64) -> Option<String> {
-    let entry = reader.read_pointer(field)?;
-    if entry == 0 {
-        return None;
+    reader.read_fm_string_pointer(field)
+}
+
+fn position_bytes_issue(bytes: &[u8]) -> Option<String> {
+    if bytes.is_empty() {
+        return Some("position blob unreadable".to_string());
     }
-    let text = reader.read_pointer(entry)?;
-    if text == 0 {
-        return None;
+    if let Some((index, value)) = bytes.iter().copied().enumerate().find(|(_, rating)| *rating > 20)
+    {
+        return Some(format!("position byte {index} = {value} (>20)"));
     }
-    reader.read_length_prefixed_string(text)
+    if bytes.iter().all(|rating| *rating == 0) {
+        return Some("all position familiarities are zero".to_string());
+    }
+    None
+}
+
+fn attribute_bytes_issue(bytes: &[u8]) -> Option<String> {
+    if bytes.len() < PLAYER_ATTRIBUTE_NAMES.len() {
+        return Some(format!(
+            "attribute blob unreadable (expected {} bytes)",
+            PLAYER_ATTRIBUTE_NAMES.len()
+        ));
+    }
+    if let Some((index, value)) = bytes
+        .iter()
+        .copied()
+        .enumerate()
+        .find(|(_, rating)| *rating > 100)
+    {
+        let label = PLAYER_ATTRIBUTE_NAMES
+            .get(index)
+            .copied()
+            .unwrap_or("unknown");
+        return Some(format!("attribute {label} byte {index} = {value} (>100)"));
+    }
+    None
+}
+
+fn resolve_managed_squad_name(
+    reader: &mut ProcessReader,
+    person: u64,
+    profile: &EntityMapProfile,
+    uid: u32,
+) -> (String, &'static str) {
+    if let Some(name) = display_name(
+        read_name_field(reader, person + profile.constants.person_first_name_offset),
+        read_name_field(reader, person + profile.constants.person_second_name_offset),
+        read_name_field(reader, person + profile.constants.person_common_name_offset),
+    ) {
+        return (name, "own-squad");
+    }
+    if let Some(name) = fm_dossier::player_display_name(&uid.to_string()) {
+        return (name, "dossier-fallback");
+    }
+    (format!("Player {uid}"), "uid-fallback")
 }
 
 #[cfg(test)]
@@ -2435,6 +2801,91 @@ mod tests {
             .max_by_key(|(squad_len, _)| *squad_len)
             .map(|(_, name)| *name);
         assert_eq!(best, Some("active"));
+    }
+
+    #[test]
+    fn loaned_out_flag_uses_loan_club_mismatch() {
+        assert!(super::is_loaned_out_from_loan_club(Some(1150), 920));
+        assert!(!super::is_loaned_out_from_loan_club(Some(920), 920));
+        assert!(!super::is_loaned_out_from_loan_club(None, 920));
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore]
+    fn debug_live_loaned_out_contract_club() {
+        if find_fm26_process().is_none() {
+            println!("FM26 is not running.");
+            return;
+        }
+        let snapshot = collect_snapshot(false, None);
+        println!(
+            "snapshot state={} club={} players={}",
+            snapshot.status.state,
+            snapshot.managed_club_id.as_deref().unwrap_or("?"),
+            snapshot.players.len()
+        );
+        assert_eq!(snapshot.status.state, "connected");
+        let mut at_club = 0u32;
+        let mut loaned_out = 0u32;
+        for player in &snapshot.players {
+            let loaned = player
+                .get("loanedOut")
+                .and_then(|value| value.as_bool())
+                .unwrap_or(false);
+            let name = player
+                .get("name")
+                .and_then(|value| value.as_str())
+                .unwrap_or("?");
+            if loaned {
+                loaned_out += 1;
+                println!("LOANED_OUT {name}");
+            } else {
+                at_club += 1;
+            }
+        }
+        println!("at_club={at_club} loaned_out={loaned_out}");
+        assert!(
+            loaned_out > 0,
+            "expected at least one outgoing loan on current senior list"
+        );
+        assert_eq!(at_club + loaned_out, snapshot.players.len() as u32);
+        let bora_loaned = snapshot.players.iter().any(|player| {
+            player
+                .get("name")
+                .and_then(|value| value.as_str())
+                .is_some_and(|name| name.contains("Eker"))
+                && player
+                    .get("loanedOut")
+                    .and_then(|value| value.as_bool())
+                    .unwrap_or(false)
+        });
+        assert!(bora_loaned, "Bora Eker must be loanedOut when present on senior list");
+    }
+
+    #[test]
+    fn fm_unique_id_heuristic_accepts_real_ids_and_rejects_misreads() {
+        assert!(super::is_plausible_fm_unique_id(20_001_881_73));
+        assert!(super::is_plausible_fm_unique_id(53_136_627));
+        assert!(super::is_plausible_fm_unique_id(2_000_029_953));
+        assert!(!super::is_plausible_fm_unique_id(168_365_072));
+    }
+
+    #[test]
+    fn managed_squad_validation_reports_specific_position_and_attribute_failures() {
+        let mut positions = vec![0_u8; 15];
+        positions[3] = 21;
+        assert_eq!(
+            super::position_bytes_issue(&positions).as_deref(),
+            Some("position byte 3 = 21 (>20)")
+        );
+
+        let mut attributes = vec![50_u8; super::PLAYER_ATTRIBUTE_NAMES.len()];
+        attributes[41] = 101;
+        assert_eq!(
+            super::attribute_bytes_issue(&attributes).as_deref(),
+            Some("attribute Dirtiness byte 41 = 101 (>100)")
+        );
     }
 
     #[test]
@@ -3283,5 +3734,424 @@ mod tests {
             }
         }
         runs
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore = "manual foot band probe; run with --ignored --nocapture"]
+    fn foot_probe_managed_squad_for_bands() {
+        use crate::fm26::parser::preferred_foot_label;
+
+        if find_fm26_process().is_none() {
+            eprintln!("FM not running");
+            return;
+        }
+        let snapshot = connector_snapshot();
+        if snapshot.status.state != "connected" {
+            eprintln!("not connected: {}", snapshot.status.message);
+            return;
+        }
+        let Some(managed) = snapshot.managed_club_id.as_deref() else {
+            eprintln!("no managed club");
+            return;
+        };
+        let mut rows = Vec::new();
+        for player in &snapshot.players {
+            if player.get("clubId").and_then(|value| value.as_str()) != Some(managed) {
+                continue;
+            }
+            let name = player["name"].as_str().unwrap_or("?");
+            let left = player["leftFoot"].as_u64().unwrap_or(0) as u8;
+            let right = player["rightFoot"].as_u64().unwrap_or(0) as u8;
+            let fmt = preferred_foot_label(left, right);
+            let ca = player["currentAbility"].as_u64().unwrap_or(0);
+            rows.push((name.to_string(), left, right, fmt.to_string(), ca));
+        }
+        rows.sort_by(|a, b| b.4.cmp(&a.4).then(a.0.cmp(&b.0)));
+        println!("MANAGED_SQUAD {} players", rows.len());
+        for (name, left, right, fmt, ca) in rows {
+            let diff = left.abs_diff(right);
+            let tag = if left == right {
+                "EQUAL"
+            } else if diff <= 3 {
+                "NEAR"
+            } else {
+                "FAR"
+            };
+            println!("{tag}\t{name}\tL{left}\tR{right}\tFMT={fmt}\tCA={ca}");
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore = "manual GK rating probe; run with --ignored --nocapture"]
+    fn gk_rating_probe_managed_squad() {
+        if find_fm26_process().is_none() {
+            eprintln!("FM not running");
+            return;
+        }
+        let snapshot = connector_snapshot();
+        if snapshot.status.state != "connected" {
+            eprintln!("not connected: {}", snapshot.status.message);
+            return;
+        }
+        let Some(managed) = snapshot.managed_club_id.as_deref() else {
+            eprintln!("no managed club");
+            return;
+        };
+
+        const CORE: [&str; 11] = [
+            "Aerial Reach",
+            "Command of Area",
+            "Communication",
+            "Eccentricity",
+            "Handling",
+            "Kicking",
+            "One on Ones",
+            "Punching",
+            "Reflexes",
+            "Rushing Out",
+            "Throwing",
+        ];
+
+        let mut rows = Vec::new();
+        for player in &snapshot.players {
+            if player.get("clubId").and_then(|value| value.as_str()) != Some(managed) {
+                continue;
+            }
+            let name = player["name"].as_str().unwrap_or("?");
+            let positions = player["positions"]
+                .as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str())
+                        .collect::<Vec<_>>()
+                        .join("/")
+                })
+                .unwrap_or_default();
+            let is_gk = positions.split('/').any(|p| p.trim() == "GK");
+            let live_rating = player["goalkeeperRating"].as_u64();
+            let attrs = player["attributes"].as_object();
+            let mut core_vals = Vec::new();
+            if let Some(map) = attrs {
+                for key in CORE {
+                    if let Some(v) = map.get(key).and_then(|v| v.as_u64()) {
+                        core_vals.push(v as u8);
+                    }
+                }
+            }
+            if core_vals.is_empty() {
+                continue;
+            }
+            let max_v = *core_vals.iter().max().unwrap();
+            let sum: u32 = core_vals.iter().map(|v| u32::from(*v)).sum();
+            let mean = sum as f64 / core_vals.len() as f64;
+            let mean_round = mean.round() as u8;
+            let mean_half = (mean / 2.0).round() as u8;
+            let mut sorted = core_vals.clone();
+            sorted.sort_unstable();
+            let top3 = &sorted[sorted.len().saturating_sub(3)..];
+            let top3_mean =
+                (top3.iter().map(|v| u32::from(*v)).sum::<u32>() as f64 / top3.len() as f64).round()
+                    as u8;
+            let ca = player["currentAbility"].as_u64().unwrap_or(0);
+            let ft = attrs
+                .and_then(|m| m.get("First Touch"))
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            let pass = attrs
+                .and_then(|m| m.get("Passing"))
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0);
+            rows.push((
+                is_gk,
+                name.to_string(),
+                positions,
+                live_rating,
+                max_v,
+                mean_round,
+                mean_half,
+                top3_mean,
+                ca,
+                ft,
+                pass,
+                core_vals,
+            ));
+        }
+        rows.sort_by(|a, b| b.4.cmp(&a.4).then(b.8.cmp(&a.8)).then(a.1.cmp(&b.1)));
+        println!("GK_RATING_PROBE outfield first (FMT liveRating=positions[0] cap10)");
+        println!(
+            "tag\tname\tpos\tlive\tmax\tmean\tmean/2\ttop3\tCA\tFT\tPas\tcore"
+        );
+        for (is_gk, name, positions, live, max_v, mean_r, mean_h, top3, ca, ft, pass, core) in
+            &rows
+        {
+            if *is_gk {
+                continue;
+            }
+            let core_s = core
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+                .join(",");
+            println!(
+                "OF\t{name}\t{positions}\t{live:?}\t{max_v}\t{mean_r}\t{mean_h}\t{top3}\t{ca}\t{ft}\t{pass}\t[{core_s}]"
+            );
+        }
+        println!("--- keepers (skip for /10 UI) ---");
+        for (is_gk, name, positions, live, max_v, mean_r, mean_h, top3, ca, ft, pass, core) in
+            &rows
+        {
+            if !*is_gk {
+                continue;
+            }
+            let core_s = core
+                .iter()
+                .map(|v| v.to_string())
+                .collect::<Vec<_>>()
+                .join(",");
+            println!(
+                "GK\t{name}\t{positions}\t{live:?}\t{max_v}\t{mean_r}\t{mean_h}\t{top3}\t{ca}\t{ft}\t{pass}\t[{core_s}]"
+            );
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore = "manual GK rating offset hunt; run with --ignored --nocapture"]
+    fn gk_rating_offset_hunt() {
+        use std::collections::{HashMap, HashSet};
+
+        if find_fm26_process().is_none() {
+            eprintln!("FM not running");
+            return;
+        }
+        let snapshot = connector_snapshot();
+        if snapshot.status.state != "connected" {
+            eprintln!("not connected: {}", snapshot.status.message);
+            return;
+        }
+
+        let labels: HashMap<&str, u8> = HashMap::from([
+            ("Pietro Miraglia", 4),
+            ("Stephen Segun", 3),
+            ("Josef Tusjak", 3),
+            ("Felix Heynke", 3),
+            ("Mate Kolarek", 3),
+            ("Corvin Garbe", 2),
+            ("Jordan Dobler", 2),
+        ]);
+
+        let mut per_player: Vec<(String, u8, Vec<u8>, Vec<u8>)> = Vec::new();
+        for player in &snapshot.players {
+            let name = player["name"].as_str().unwrap_or("");
+            let Some(&fm) = labels.get(name) else {
+                continue;
+            };
+            let id = player["id"].as_str().unwrap_or(name);
+            let dump = match capture_mapping_lab_player(id, 1024) {
+                Ok(dump) => dump,
+                Err(err) => {
+                    eprintln!("capture failed for {name}: {err}");
+                    continue;
+                }
+            };
+            let mut player_bytes = None;
+            let mut person_bytes = None;
+            for window in &dump.windows {
+                if window.object == "player" {
+                    player_bytes = Some(window.bytes.clone());
+                }
+                if window.object == "person" || window.object == "personEmbedded" {
+                    person_bytes = Some(window.bytes.clone());
+                }
+            }
+            let Some(player_bytes) = player_bytes else {
+                eprintln!("no player window for {name}");
+                continue;
+            };
+            println!(
+                "captured {name} fm={fm} player_len={} person_len={}",
+                player_bytes.len(),
+                person_bytes.as_ref().map(|b| b.len()).unwrap_or(0)
+            );
+            // raw attrs + extras for offline formula search
+            if player_bytes.len() >= 351 + 54 {
+                let raw = &player_bytes[351..351 + 54];
+                let pick = |i: usize| raw[i];
+                let disp = |v: u8| (((u16::from(v) + 2) / 5) as u8).clamp(1, 20);
+                println!(
+                    "  extras FT={} Pas={} Agi={} JR={} Str={} Bal={} Ant={} Dec={} Pos={} Cmp={} Con={}",
+                    disp(pick(22)),
+                    disp(pick(7)),
+                    disp(pick(46)),
+                    disp(pick(39)),
+                    disp(pick(36)),
+                    disp(pick(42)),
+                    disp(pick(17)),
+                    disp(pick(18)),
+                    disp(pick(20)),
+                    disp(pick(52)),
+                    disp(pick(53)),
+                );
+                println!(
+                    "  raw_scale fm*5={} fm*10={}",
+                    fm.saturating_mul(5),
+                    fm.saturating_mul(10)
+                );
+            }
+            per_player.push((
+                name.to_string(),
+                fm,
+                player_bytes,
+                person_bytes.unwrap_or_default(),
+            ));
+        }
+
+        if per_player.len() < 2 {
+            eprintln!("need >=2 captures");
+            return;
+        }
+
+        let min_player_len = per_player.iter().map(|p| p.2.len()).min().unwrap_or(0);
+
+        // Exact u8 == fm
+        let mut candidates: HashSet<usize> = (0..min_player_len).collect();
+        for (_, fm, bytes, _) in &per_player {
+            candidates.retain(|off| bytes.get(*off).copied() == Some(*fm));
+        }
+        println!("PLAYER_U8 ==fm : {}", candidates.len());
+
+        // u8 == fm*5 (raw-attr style)
+        let mut cand_x5: HashSet<usize> = (0..min_player_len).collect();
+        for (_, fm, bytes, _) in &per_player {
+            let target = fm.saturating_mul(5);
+            cand_x5.retain(|off| bytes.get(*off).copied() == Some(target));
+        }
+        println!("PLAYER_U8 ==fm*5 : {}", cand_x5.len());
+        let mut sorted: Vec<usize> = cand_x5.into_iter().collect();
+        sorted.sort_unstable();
+        for off in &sorted {
+            println!("  player+{off}");
+        }
+
+        // u16 LE == fm
+        let mut cand_u16 = Vec::new();
+        for off in 0..min_player_len.saturating_sub(1) {
+            let ok = per_player.iter().all(|(_, fm, bytes, _)| {
+                let v = u16::from_le_bytes([bytes[off], bytes[off + 1]]);
+                v == u16::from(*fm)
+            });
+            if ok {
+                cand_u16.push(off);
+            }
+        }
+        println!("PLAYER_U16LE ==fm : {}", cand_u16.len());
+        for off in cand_u16.iter().take(40) {
+            println!("  player+{off}");
+        }
+
+        // u16 LE == fm*5
+        let mut cand_u16_x5 = Vec::new();
+        for off in 0..min_player_len.saturating_sub(1) {
+            let ok = per_player.iter().all(|(_, fm, bytes, _)| {
+                let v = u16::from_le_bytes([bytes[off], bytes[off + 1]]);
+                v == u16::from(fm.saturating_mul(5))
+            });
+            if ok {
+                cand_u16_x5.push(off);
+            }
+        }
+        println!("PLAYER_U16LE ==fm*5 : {}", cand_u16_x5.len());
+        for off in cand_u16_x5.iter().take(40) {
+            println!("  player+{off}");
+        }
+
+        let min_person = per_player
+            .iter()
+            .map(|p| p.3.len())
+            .filter(|l| *l > 0)
+            .min()
+            .unwrap_or(0);
+        if min_person > 0 {
+            let mut person_cand: HashSet<usize> = (0..min_person).collect();
+            for (_, fm, _, person) in &per_player {
+                person_cand.retain(|off| person.get(*off).copied() == Some(*fm));
+            }
+            println!("PERSON_U8 ==fm : {}", person_cand.len());
+            let mut person_x5: HashSet<usize> = (0..min_person).collect();
+            for (_, fm, _, person) in &per_player {
+                let target = fm.saturating_mul(5);
+                person_x5.retain(|off| person.get(*off).copied() == Some(target));
+            }
+            println!("PERSON_U8 ==fm*5 : {}", person_x5.len());
+            let mut sorted: Vec<usize> = person_x5.into_iter().collect();
+            sorted.sort_unstable();
+            for off in sorted.iter().take(40) {
+                println!("  person+{off}");
+            }
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore = "manual: dump live player object to tmp/; FM must be running with save loaded"]
+    fn dump_player_168365072_object() {
+        use std::{fs, path::PathBuf};
+
+        if find_fm26_process().is_none() {
+            eprintln!("FM not running — skipping dump");
+            return;
+        }
+        let snapshot = connector_snapshot();
+        if snapshot.status.state != "connected" {
+            eprintln!("not connected: {}", snapshot.status.message);
+            return;
+        }
+        let dump = capture_mapping_lab_player("168365072", 1024).expect("capture");
+        let out_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tmp");
+        fs::create_dir_all(&out_dir).expect("tmp dir");
+        let json_path = out_dir.join("player-dump-168365072.json");
+        fs::write(
+            &json_path,
+            serde_json::to_vec_pretty(&dump).expect("encode dump"),
+        )
+        .expect("write json");
+
+        let mut text = String::new();
+        text.push_str(&format!(
+            "player_id={} name={}\nraw_player={} person_embedded={}\n\n",
+            dump.player_id, dump.player_name, dump.raw_player_address, dump.person_embedded_address
+        ));
+        for probe in &dump.person_probes {
+            text.push_str(&format!(
+                "probe {} @ {} uid+12={:?} name={:?}\n",
+                probe.label, probe.base_address, probe.uid_at_plus_12, probe.name
+            ));
+        }
+        for window in &dump.windows {
+            text.push_str(&format!(
+                "\n=== {} @ {} ({} bytes) ===\n",
+                window.object,
+                window.base_address,
+                window.bytes.len()
+            ));
+            for (offset, chunk) in window.bytes.chunks(16).enumerate() {
+                let base = offset * 16;
+                let hex: String = chunk
+                    .iter()
+                    .map(|byte| format!("{byte:02X}"))
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                text.push_str(&format!("{base:04X}  {hex}\n"));
+            }
+        }
+        let txt_path = out_dir.join("player-dump-168365072.txt");
+        fs::write(&txt_path, text).expect("write txt");
+        println!(
+            "Wrote {} and {}",
+            json_path.display(),
+            txt_path.display()
+        );
     }
 }

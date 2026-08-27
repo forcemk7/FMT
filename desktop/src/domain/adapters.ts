@@ -98,6 +98,8 @@ export type LivePlayer = {
   weaknesses: string[];
   clubId: string | null;
   clubName?: string | null;
+  /** Owned by managed club but currently out on loan (not available for match squads). */
+  loanedOut?: boolean | null;
   transferInterest: string | null;
   loanInterest: string | null;
   transferAvailable: boolean | null;

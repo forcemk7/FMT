@@ -77,6 +77,9 @@ pub(crate) struct MapConstants {
     pub(crate) person_second_name_offset: u64,
     pub(crate) person_common_name_offset: u64,
     pub(crate) person_contract_offset: u64,
+    /// Active outgoing loan agreement on the person (null when at club).
+    /// Adjacent to `person_contract_offset` (+8). FMLE "Loan Club" lives under this object.
+    pub(crate) person_loan_offset: u64,
     pub(crate) contract_team_offset: u64,
     pub(crate) team_vtable_rva: u64,
     pub(crate) team_club_offset: u64,
@@ -91,6 +94,7 @@ pub(crate) struct MapConstants {
     pub(crate) player_ca_offset: u64,
     pub(crate) player_pa_offset: u64,
     pub(crate) player_current_date_offset: u64,
+    pub(crate) player_height_offset: u64,
     pub(crate) person_nationality_offset: u64,
     pub(crate) nation_name_offset: u64,
     pub(crate) person_birth_date_offset: u64,

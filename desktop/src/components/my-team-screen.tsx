@@ -1,22 +1,26 @@
 "use client";
 
-import { useMemo } from "react";
-import { ExternalLink } from "lucide-react";
+import { useMemo, type ReactNode } from "react";
 import type { LiveFootballSnapshot, LivePlayer } from "@/domain/adapters";
 import { abilityToneFromScore } from "@/domain/attribute-tone";
 import { formatHasScore, hasBand, liveHasScore } from "@/domain/has-score";
-import { formatPlayerPositions, groupSquad, positionGroups } from "@/domain/live-data";
+import { formatPlayerPositions, groupSquad, isAtClubSquadPlayer, positionGroups } from "@/domain/live-data";
 import { LiveDataState } from "@/components/live-data-state";
+import { HasBreakdownGridFromPlayer } from "@/components/has-breakdown-grid";
 import { PlayerFace } from "@/components/player-face";
-import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-function shown(value: string | number | null | undefined) {
-  return value == null || value === "" ? "—" : value;
+const CARD_RING_SIZE = 28;
+const CARD_RING_STROKE = 1.25;
+
+function sortByCurrentAbility(players: LivePlayer[]) {
+  return [...players].sort((a, b) => {
+    const ca = a.currentAbility ?? -Infinity;
+    const cb = b.currentAbility ?? -Infinity;
+    if (cb !== ca) return cb - ca;
+    return a.name.localeCompare(b.name);
+  });
 }
-
-/** Same outer size as player-face-sm; hairline SVG stroke (not conic/inset donut). */
-const SQUAD_RING_SIZE = 40;
-const SQUAD_RING_STROKE = 1.25;
 
 function SquadMetricRing({
   display,
@@ -27,41 +31,44 @@ function SquadMetricRing({
   progress: number;
   tone: string;
 }) {
-  const r = (SQUAD_RING_SIZE - SQUAD_RING_STROKE) / 2;
+  const size = CARD_RING_SIZE;
+  const r = (size - CARD_RING_STROKE) / 2;
   const circumference = 2 * Math.PI * r;
   const clamped = Math.max(0, Math.min(1, progress));
   const dashOffset = circumference * (1 - clamped);
+
   return (
-    <span className={`squad-ability-cell squad-metric-ring ability-ring-${tone}`}>
-      <svg
-        width={SQUAD_RING_SIZE}
-        height={SQUAD_RING_SIZE}
-        viewBox={`0 0 ${SQUAD_RING_SIZE} ${SQUAD_RING_SIZE}`}
-        aria-hidden
-      >
+    <span
+      className={`squad-metric-ring ability-ring-${tone}`}
+      style={{ width: size, height: size }}
+      aria-hidden
+    >
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <circle
           className="squad-metric-ring-track"
-          cx={SQUAD_RING_SIZE / 2}
-          cy={SQUAD_RING_SIZE / 2}
+          cx={size / 2}
+          cy={size / 2}
           r={r}
           fill="none"
-          strokeWidth={SQUAD_RING_STROKE}
+          strokeWidth={CARD_RING_STROKE}
           strokeLinecap="round"
         />
         <circle
           className="squad-metric-ring-value"
-          cx={SQUAD_RING_SIZE / 2}
-          cy={SQUAD_RING_SIZE / 2}
+          cx={size / 2}
+          cy={size / 2}
           r={r}
           fill="none"
-          strokeWidth={SQUAD_RING_STROKE}
+          strokeWidth={CARD_RING_STROKE}
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={dashOffset}
-          transform={`rotate(-90 ${SQUAD_RING_SIZE / 2} ${SQUAD_RING_SIZE / 2})`}
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
         />
       </svg>
-      <strong className={tone === "unknown" ? "attr-tone-mid" : `attr-tone-${tone}`}>{display}</strong>
+      <span className={`squad-metric-ring-label${tone === "unknown" ? " is-unknown" : ""}`}>
+        {display}
+      </span>
     </span>
   );
 }
@@ -78,7 +85,6 @@ function AbilityRing({ value }: { value: number | null | undefined }) {
   );
 }
 
-/** HAS ring — absolute practical range + gold above practical ceiling. */
 function PersonalityRing({ value }: { value: number | null }) {
   const safeValue = value == null ? 0 : Math.max(0, Math.min(20, value));
   const tone = value == null || !Number.isFinite(value) ? "unknown" : hasBand(value);
@@ -91,41 +97,93 @@ function PersonalityRing({ value }: { value: number | null }) {
   );
 }
 
-function footLine(player: LivePlayer) {
-  const left = player.leftFoot;
-  const right = player.rightFoot;
-  if (left == null || right == null) {
-    return player.preferredFoot ?? "—";
-  }
-  const side = player.preferredFoot ?? (left === right ? "Either" : left > right ? "Left" : "Right");
-  return `${side} · ${left} / ${right}`;
+function preferredFootDisplay(player: LivePlayer) {
+  const pref = player.preferredFoot;
+  if (!pref) return "—";
+  if (/either/i.test(pref)) return "Either";
+  if (/left/i.test(pref)) return "Left Foot";
+  if (/right/i.test(pref)) return "Right Foot";
+  return pref;
 }
 
-function PlayerRow({ player, onOpenPlayer }: { player: LivePlayer; onOpenPlayer: (id: string) => void }) {
-  const has = liveHasScore(player);
+function MetricTip({
+  label,
+  detail,
+  children,
+}: {
+  label: string;
+  detail?: string;
+  children: ReactNode;
+}) {
   return (
-    <article className="squad-player-row squad-player-row-mapped" onClick={() => onOpenPlayer(player.id)}>
-      <div className="squad-player-identity">
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <span
+            className="squad-metric-tip"
+            tabIndex={-1}
+            onClick={(event) => event.stopPropagation()}
+            onKeyDown={(event) => event.stopPropagation()}
+          >
+            {children}
+          </span>
+        }
+      />
+      <TooltipContent side="top" className="squad-metric-tooltip">
+        <strong>{label}</strong>
+        {detail ? <span>{detail}</span> : null}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+function SquadPlayerCard({
+  player,
+  onOpenPlayer,
+}: {
+  player: LivePlayer;
+  onOpenPlayer: (id: string) => void;
+}) {
+  const has = liveHasScore(player);
+  const foot = preferredFootDisplay(player);
+  return (
+    <button type="button" className="squad-player-card" onClick={() => onOpenPlayer(player.id)}>
+      <span className="squad-player-card-face">
         <PlayerFace playerId={player.id} name={player.name} size="sm" highResolution />
-        <span>
-          <button type="button" className="player-name-link">{player.name}</button>
-          <small>
-            {shown(player.nationality)} · {shown(player.age)} yrs
-          </small>
-        </span>
-      </div>
-      <span>
-        <strong>{formatPlayerPositions(player)}</strong>
-        <small>{footLine(player)}</small>
       </span>
-      <AbilityRing value={player.currentAbility} />
-      <AbilityRing value={player.potentialAbility} />
-      <PersonalityRing value={has} />
-      <Button variant="outline" size="sm">
-        Profile
-        <ExternalLink data-icon="inline-end" />
-      </Button>
-    </article>
+      <span className="squad-player-card-copy">
+        <strong title={player.name}>{player.name}</strong>
+        <span>{player.age == null ? "—" : `${player.age} years old`}</span>
+        <span className="squad-player-card-pos">{formatPlayerPositions(player)}</span>
+        <span>{foot}</span>
+      </span>
+      <span className="squad-player-card-metrics" aria-label="Ability, potential, personality">
+        <MetricTip label="Ability" detail="Current ability (CA)">
+          <AbilityRing value={player.currentAbility} />
+        </MetricTip>
+        <MetricTip label="Potential" detail="Potential ability (PA)">
+          <AbilityRing value={player.potentialAbility} />
+        </MetricTip>
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <span
+                className="squad-metric-tip"
+                tabIndex={-1}
+                onClick={(event) => event.stopPropagation()}
+                onKeyDown={(event) => event.stopPropagation()}
+              >
+                <PersonalityRing value={has} />
+              </span>
+            }
+          />
+          <TooltipContent side="top" align="end" className="dash-has-tooltip squad-metric-tooltip-wide">
+            <strong>Personality (HAS)</strong>
+            <HasBreakdownGridFromPlayer player={player} />
+          </TooltipContent>
+        </Tooltip>
+      </span>
+    </button>
   );
 }
 
@@ -141,7 +199,10 @@ export function MyTeamScreen({
   onOpenPlayer: (playerId: string) => void;
 }) {
   const squad = useMemo(
-    () => snapshot.players.filter((player) => player.clubId === snapshot.managedClubId),
+    () =>
+      snapshot.players.filter((player) =>
+        isAtClubSquadPlayer(player, snapshot.managedClubId),
+      ),
     [snapshot.managedClubId, snapshot.players],
   );
   const groups = useMemo(() => groupSquad(squad), [squad]);
@@ -166,15 +227,7 @@ export function MyTeamScreen({
           </div>
         ) : null}
       </div>
-      <section className="squad-live-table squad-live-table-mapped">
-        <header>
-          <span>Player</span>
-          <span>Position</span>
-          <span>Ability</span>
-          <span>Potential</span>
-          <span>Personality</span>
-          <span>Details</span>
-        </header>
+      <section className="squad-matrix">
         {!ready ? (
           <div className="squad-table-empty">
             <LiveDataState
@@ -187,18 +240,20 @@ export function MyTeamScreen({
           </div>
         ) : (
           positionGroups.map((group) => {
-            const players = groups.get(group) ?? [];
+            const players = sortByCurrentAbility(groups.get(group) ?? []);
             if (!players.length) return null;
             return (
-              <div className="squad-position-group" key={group}>
-                <h2>
-                  {group}
+              <section className="squad-position-group" key={group}>
+                <header className="squad-position-head">
+                  <h2>{group}</h2>
                   <span>{players.length}</span>
-                </h2>
-                {players.map((player) => (
-                  <PlayerRow key={player.id} player={player} onOpenPlayer={onOpenPlayer} />
-                ))}
-              </div>
+                </header>
+                <div className="squad-position-matrix">
+                  {players.map((player) => (
+                    <SquadPlayerCard key={player.id} player={player} onOpenPlayer={onOpenPlayer} />
+                  ))}
+                </div>
+              </section>
             );
           })
         )}
