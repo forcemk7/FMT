@@ -26,4 +26,4 @@ Blanket all-time −1 while CA climbed: v1 history baselines used pre-T132 `(raw
 
 - `STORE_VERSION = 2`, drop legacy `fmt.attr-history.v1` on load; `parseAttrHistoryStore` rejects non-v2
 - Reload Active Save once to seed a clean baseline; all-time Δ will be empty until a second change-point
-- Commit: (filled after git)
+- Commit: `e353e8e`
