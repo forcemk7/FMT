@@ -1,6 +1,7 @@
 /**
- * App-wide attribute / score tone palette (FM in-game bands).
- * Single source for hex defaults, CSS vars, and class names — call from anywhere.
+ * App-wide attribute / score tone palette — FMT design scheme.
+ * Hex defaults are owner preference inherited by FMT (not SI / FM in-game chrome).
+ * Band cutoffs live in `attribute-tone.ts`; call `toneCssVar` / `toneClassName` / `toneHex` anywhere.
  */
 
 import type { AttributeTone } from "./attribute-tone";
@@ -12,8 +13,8 @@ export type AppTone = AttrColorBand | "super";
 
 export type AttrColorPalette = Record<AttrColorBand, string>;
 
-/** FM in-game RGB → hex (locked product defaults). */
-export const FM_IN_GAME_ATTR_COLORS: AttrColorPalette = {
+/** FMT default tone hexes (design scheme, not FM in-game). */
+export const FMT_ATTR_TONE_COLORS: AttrColorPalette = {
   high: "#65e53a", // 16–20  R101 G229 B58
   upper: "#3a8acf", // 11–15  R58 G138 B207
   mid: "#e6e6fa", // 6–10   R230 G230 B250
@@ -52,19 +53,19 @@ function normalizeHex(value: string): string | null {
 }
 
 export function loadAttrColorPalette(): AttrColorPalette {
-  if (typeof window === "undefined") return { ...FM_IN_GAME_ATTR_COLORS };
+  if (typeof window === "undefined") return { ...FMT_ATTR_TONE_COLORS };
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { ...FM_IN_GAME_ATTR_COLORS };
+    if (!raw) return { ...FMT_ATTR_TONE_COLORS };
     const parsed = JSON.parse(raw) as Partial<AttrColorPalette>;
     return {
-      high: normalizeHex(parsed.high ?? "") ?? FM_IN_GAME_ATTR_COLORS.high,
-      upper: normalizeHex(parsed.upper ?? "") ?? FM_IN_GAME_ATTR_COLORS.upper,
-      mid: normalizeHex(parsed.mid ?? "") ?? FM_IN_GAME_ATTR_COLORS.mid,
-      low: normalizeHex(parsed.low ?? "") ?? FM_IN_GAME_ATTR_COLORS.low,
+      high: normalizeHex(parsed.high ?? "") ?? FMT_ATTR_TONE_COLORS.high,
+      upper: normalizeHex(parsed.upper ?? "") ?? FMT_ATTR_TONE_COLORS.upper,
+      mid: normalizeHex(parsed.mid ?? "") ?? FMT_ATTR_TONE_COLORS.mid,
+      low: normalizeHex(parsed.low ?? "") ?? FMT_ATTR_TONE_COLORS.low,
     };
   } catch {
-    return { ...FM_IN_GAME_ATTR_COLORS };
+    return { ...FMT_ATTR_TONE_COLORS };
   }
 }
 
@@ -96,11 +97,11 @@ export function toneClassName(tone: AppTone): string {
 /** Default hex for a tone (ignores user Settings overrides). */
 export function toneDefaultHex(tone: AppTone): string {
   if (tone === "super") return APP_TONE_SUPER;
-  return FM_IN_GAME_ATTR_COLORS[tone];
+  return FMT_ATTR_TONE_COLORS[tone];
 }
 
 /** Resolve hex from palette (or default), including super. */
-export function toneHex(tone: AppTone, palette: AttrColorPalette = FM_IN_GAME_ATTR_COLORS): string {
+export function toneHex(tone: AppTone, palette: AttrColorPalette = FMT_ATTR_TONE_COLORS): string {
   if (tone === "super") return APP_TONE_SUPER;
-  return palette[tone] ?? FM_IN_GAME_ATTR_COLORS[tone];
+  return palette[tone] ?? FMT_ATTR_TONE_COLORS[tone];
 }

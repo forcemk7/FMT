@@ -1,12 +1,12 @@
 ﻿# Status
 
-Last updated: 2026-08-27 (T180 attr tone unify done)
+Last updated: 2026-08-27 (T181 FMT design tone labels)
 
 ## Now
 
 _(empty — pick next ready ticket)_
 
-**Verify:** Mid attrs/HAS use `#e6e6fa` (R230 G230 B250); no `#9aa0c8` mid.
+**Verify:** Tone palette named/docs as FMT design scheme (not FM in-game colors).
 
 **Deferred:** T139 theme (chrome/shell covered by T158/T159). T162 trophy cabinet (marketing visual; no RE until Loop A sticks).
 
@@ -20,8 +20,9 @@ _(empty — pick next ready ticket)_
 
 ## Recently done
 
+- **T181** Label attr tones as FMT design scheme (not FM chrome)
 - **T180** Unify attr tone palette as app-wide fundamental (`#e6e6fa` mid)
-- **T179** Dashboard widgets as distinct panels (screen-panel chrome)
+- **T179** Dashboard widgets as distinct panels
 - **T178** Compact dashboard as filtered-view router
 - **T177** Dashboard Prospects
 - **T176** Dashboard Movers
@@ -29,7 +30,6 @@ _(empty — pick next ready ticket)_
 - **T173** Best-position squad labels and groups
 - **T174** Hard-clip badge frames (superseded by T175)
 - **T172** Attribute desk header size + separator padding
-- **T171** FM stacked attribute desk top row (outfield/GK)
 
 ## Loop
 

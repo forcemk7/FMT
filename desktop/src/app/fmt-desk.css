@@ -5,7 +5,7 @@
  *   --chrome-*     nav / menu / settings interactive states
  *   --control-*    search, load, outline pills
  *   --shell-*      canvas depth (blue-dominant, green only as atmosphere)
- *   --attr-tone-*  FM attribute bands (fixed product colors)
+ *   --attr-tone-*  FMT tone bands (design-scheme product colors)
  */
 
 body.fmt-shell {

@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { abilityToneFromScore, attributeTone } from "./attribute-tone";
+import { abilityToneFromScore, attributeDeltaTone, attributeTone } from "./attribute-tone";
 
 describe("attributeTone", () => {
-  it("uses FM four-band ranges for standard attrs", () => {
+  it("uses FMT four-band ranges for standard attrs", () => {
     expect(attributeTone("Passing", 16)).toBe("high");
     expect(attributeTone("Passing", 20)).toBe("high");
     expect(attributeTone("Technique", 15)).toBe("upper");
@@ -35,5 +35,20 @@ describe("attributeTone", () => {
     expect(abilityToneFromScore(109)).toBe("mid");
     expect(abilityToneFromScore(60)).toBe("mid");
     expect(abilityToneFromScore(59)).toBe("low");
+  });
+});
+
+describe("attributeDeltaTone", () => {
+  it("uses green for gains and red for drops on standard attrs", () => {
+    expect(attributeDeltaTone("Passing", 1)).toBe("high");
+    expect(attributeDeltaTone("CA", -1)).toBe("low");
+    expect(attributeDeltaTone("Pace", 0)).toBeNull();
+  });
+
+  it("inverts Controversy and Injury Proneness", () => {
+    expect(attributeDeltaTone("Controversy", -1)).toBe("high");
+    expect(attributeDeltaTone("Controversy", 1)).toBe("low");
+    expect(attributeDeltaTone("Injury Proneness", -2)).toBe("high");
+    expect(attributeDeltaTone("Injury Proneness", 1)).toBe("low");
   });
 });
