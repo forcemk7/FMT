@@ -1,9 +1,9 @@
 import type { LivePlayer } from "@/domain/adapters";
 
-/** v1 GM move-on: PA − CA at or below this (CA≈PA). */
+/** GM Sell lane: PA − CA at or below this (CA≈PA). */
 export const MOVE_ON_HEADROOM_MAX = 8;
-/** v1 GM move-on: PA at or below this (not a meaningful squad ceiling). */
-export const PA_MOVE_ON_MAX = 140;
+
+export type GmAdvice = "sell" | "loan";
 
 /** Managed-club players available for match squads (excludes outgoing loans). */
 export function isAtClubSquadPlayer(
@@ -23,19 +23,37 @@ export function isLoanedOutSquadPlayer(
   return player.loanedOut === true;
 }
 
+/** Mean CA of players with finite currentAbility; null if none. */
+export function squadAverageCA(
+  players: Array<Pick<LivePlayer, "currentAbility">>,
+): number | null {
+  let sum = 0;
+  let count = 0;
+  for (const player of players) {
+    const ca = player.currentAbility;
+    if (typeof ca !== "number" || !Number.isFinite(ca)) continue;
+    sum += ca;
+    count += 1;
+  }
+  if (!count) return null;
+  return sum / count;
+}
+
 /**
- * Low PA + little headroom → move on (sell, or loan then sell).
- * At-club filtering stays in the desk (with `isAtClubSquadPlayer`).
+ * GM advice vs this club’s squad average CA.
+ * Sell: PA below avg and CA≈PA. Loan: PA at/above avg but CA still below avg.
  */
-export function isMoveOnCandidate(
+export function gmAdvice(
   player: Pick<LivePlayer, "currentAbility" | "potentialAbility">,
-): boolean {
+  avgCA: number,
+): GmAdvice | null {
   const ca = player.currentAbility;
   const pa = player.potentialAbility;
-  if (typeof ca !== "number" || typeof pa !== "number") return false;
-  if (!Number.isFinite(ca) || !Number.isFinite(pa)) return false;
-  if (pa > PA_MOVE_ON_MAX) return false;
-  return pa - ca <= MOVE_ON_HEADROOM_MAX;
+  if (typeof ca !== "number" || typeof pa !== "number") return null;
+  if (!Number.isFinite(ca) || !Number.isFinite(pa) || !Number.isFinite(avgCA)) return null;
+  if (pa < avgCA && pa - ca <= MOVE_ON_HEADROOM_MAX) return "sell";
+  if (pa >= avgCA && ca < avgCA) return "loan";
+  return null;
 }
 
 export const positionGroups = [

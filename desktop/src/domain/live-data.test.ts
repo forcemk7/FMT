@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  gmAdvice,
   isAtClubSquadPlayer,
   isLoanedOutSquadPlayer,
-  isMoveOnCandidate,
   MOVE_ON_HEADROOM_MAX,
-  PA_MOVE_ON_MAX,
+  squadAverageCA,
 } from "./live-data";
 
 describe("isAtClubSquadPlayer", () => {
@@ -44,40 +44,70 @@ describe("isLoanedOutSquadPlayer", () => {
   });
 });
 
-describe("isMoveOnCandidate", () => {
-  it("keeps low PA with CA near PA", () => {
+describe("squadAverageCA", () => {
+  it("averages finite CA only", () => {
     expect(
-      isMoveOnCandidate({ currentAbility: 120, potentialAbility: 128 }),
-    ).toBe(true);
-    expect(
-      isMoveOnCandidate({
-        currentAbility: PA_MOVE_ON_MAX,
-        potentialAbility: PA_MOVE_ON_MAX,
-      }),
-    ).toBe(true);
-    expect(
-      isMoveOnCandidate({
-        currentAbility: PA_MOVE_ON_MAX - MOVE_ON_HEADROOM_MAX,
-        potentialAbility: PA_MOVE_ON_MAX,
-      }),
-    ).toBe(true);
+      squadAverageCA([
+        { currentAbility: 100 },
+        { currentAbility: 120 },
+        { currentAbility: null },
+      ]),
+    ).toBe(110);
   });
 
-  it("drops high PA, big headroom, or missing CA/PA", () => {
+  it("returns null when no finite CA", () => {
+    expect(squadAverageCA([{ currentAbility: null }])).toBeNull();
+    expect(squadAverageCA([])).toBeNull();
+  });
+});
+
+describe("gmAdvice", () => {
+  const avg = 130;
+
+  it("sells when PA below avg and CA near PA", () => {
     expect(
-      isMoveOnCandidate({ currentAbility: 130, potentialAbility: 141 }),
-    ).toBe(false);
+      gmAdvice({ currentAbility: 118, potentialAbility: 122 }, avg),
+    ).toBe("sell");
     expect(
-      isMoveOnCandidate({
-        currentAbility: PA_MOVE_ON_MAX - MOVE_ON_HEADROOM_MAX - 1,
-        potentialAbility: PA_MOVE_ON_MAX,
-      }),
-    ).toBe(false);
+      gmAdvice(
+        {
+          currentAbility: avg - 20 - MOVE_ON_HEADROOM_MAX,
+          potentialAbility: avg - 20,
+        },
+        avg,
+      ),
+    ).toBe("sell");
+  });
+
+  it("loans when PA at/above avg and CA below avg", () => {
     expect(
-      isMoveOnCandidate({ currentAbility: null, potentialAbility: 120 }),
-    ).toBe(false);
+      gmAdvice({ currentAbility: 110, potentialAbility: 140 }, avg),
+    ).toBe("loan");
     expect(
-      isMoveOnCandidate({ currentAbility: 120, potentialAbility: null }),
-    ).toBe(false);
+      gmAdvice({ currentAbility: 129, potentialAbility: 130 }, avg),
+    ).toBe("loan");
+  });
+
+  it("returns null when neither lane or missing CA/PA", () => {
+    // PA below avg but too much headroom → not sell; not loan either
+    expect(
+      gmAdvice(
+        {
+          currentAbility: avg - 20 - MOVE_ON_HEADROOM_MAX - 1,
+          potentialAbility: avg - 20,
+        },
+        avg,
+      ),
+    ).toBeNull();
+    // already at/above avg CA
+    expect(
+      gmAdvice({ currentAbility: 130, potentialAbility: 140 }, avg),
+    ).toBeNull();
+    expect(
+      gmAdvice({ currentAbility: null, potentialAbility: 120 }, avg),
+    ).toBeNull();
+    expect(
+      gmAdvice({ currentAbility: 120, potentialAbility: null }, avg),
+    ).toBeNull();
   });
 });
