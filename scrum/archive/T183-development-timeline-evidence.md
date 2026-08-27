@@ -27,4 +27,4 @@ Loop A Development tab was a chart plus literacy caption. Reframed as this playe
 
 - Shipped: `movedFieldsBetween` / `buildAttrTimeline` / `factualHistorySummary` + Development panel timeline; vitest `attribute-history.test.ts` green
 - Out of scope held: mentoring-match, claims, cohorts
-- Commit: (filled after git)
+- Commit: `bdb89a33000c564cf82824ffd96245efd621e9e5`
