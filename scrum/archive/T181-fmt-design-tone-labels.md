@@ -31,4 +31,4 @@ Tone hexes are owner preference inherited by FMT, not Sports Interactive / FM in
 
 Shipped: `FMT_ATTR_TONE_COLORS`; comments on `attr-colors` / `attribute-tone` / desk CSS; dropped `FM_IN_GAME_ATTR_COLORS`.
 
-Commit: _(pending)_
+Commit: `2598a42`
