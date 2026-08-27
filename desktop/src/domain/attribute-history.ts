@@ -206,6 +206,97 @@ export function formatDelta(value: number | null): string {
   return String(value);
 }
 
+export type AttrFieldMove = { field: string; from: number | null; to: number; delta: number };
+
+/** Fields that differ between two consecutive observations (appear / change / leave counted as move). */
+export function movedFieldsBetween(
+  previous: Record<string, number> | null | undefined,
+  next: Record<string, number>,
+): AttrFieldMove[] {
+  const prev = previous ?? {};
+  const keys = new Set([...Object.keys(prev), ...Object.keys(next)]);
+  const moves: AttrFieldMove[] = [];
+  for (const field of keys) {
+    const from = isFiniteNumber(prev[field]) ? prev[field]! : null;
+    const to = isFiniteNumber(next[field]) ? next[field]! : null;
+    if (to == null) continue;
+    if (from === to) continue;
+    const delta = from == null ? to : to - from;
+    if (delta === 0) continue;
+    moves.push({ field, from, to, delta });
+  }
+  return moves.sort((a, b) => {
+    if (Math.abs(b.delta) !== Math.abs(a.delta)) return Math.abs(b.delta) - Math.abs(a.delta);
+    return a.field.localeCompare(b.field);
+  });
+}
+
+export type AttrTimelineRow = {
+  /** Index in chronological store (0 = first observation). */
+  index: number;
+  at: string;
+  gameDate: string | null;
+  /** Prefer in-game date; fall back to wall-clock observation time. */
+  label: string;
+  isFirst: boolean;
+  moves: AttrFieldMove[];
+  values: Record<string, number>;
+};
+
+function formatWallClock(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/** Newest-first evidence rows for the Development desk. */
+export function buildAttrTimeline(points: AttrHistoryPoint[]): AttrTimelineRow[] {
+  const rows: AttrTimelineRow[] = [];
+  for (let index = points.length - 1; index >= 0; index--) {
+    const point = points[index]!;
+    const previous = index > 0 ? points[index - 1]!.values : null;
+    const gameDate = point.gameDate?.trim() ? point.gameDate.trim() : null;
+    rows.push({
+      index,
+      at: point.at,
+      gameDate,
+      label: gameDate ?? formatWallClock(point.at),
+      isFirst: index === 0,
+      // First point is baseline — no prior to diff against.
+      moves: previous ? movedFieldsBetween(previous, point.values) : [],
+      values: point.values,
+    });
+  }
+  return rows;
+}
+
+/** Factual one-liner — counts and CA span only; no mentoring doctrine. */
+export function factualHistorySummary(points: AttrHistoryPoint[]): string | null {
+  if (points.length === 0) return null;
+  if (points.length === 1) {
+    return "1 observation on record. Reload after in-game days; a new point appends when tracked values change.";
+  }
+  const ca = fieldDeltas(points, "CA");
+  const lastMoves = movedFieldsBetween(
+    points[points.length - 2]!.values,
+    points[points.length - 1]!.values,
+  );
+  const parts = [
+    `${points.length} observations`,
+    ca.allTime != null ? `CA ${formatDelta(ca.allTime)} vs first` : null,
+    lastMoves.length
+      ? `${lastMoves.length} field${lastMoves.length === 1 ? "" : "s"} moved last load`
+      : "no field moves last load",
+  ];
+  return parts.filter(Boolean).join(" · ") + ".";
+}
+
 const PLOT_COLORS = [
   "#5b8def", "#3ecf8e", "#f0b429", "#e85d75", "#a78bfa",
   "#2dd4bf", "#fb923c", "#38bdf8", "#c084fc", "#86efac",

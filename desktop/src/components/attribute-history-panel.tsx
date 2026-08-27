@@ -2,7 +2,9 @@
 
 import { useMemo, useState } from "react";
 import {
+  buildAttrTimeline,
   colorForSeries,
+  factualHistorySummary,
   fieldDeltas,
   formatDelta,
   getPlayerAttrHistory,
@@ -50,37 +52,19 @@ function availableFields(points: AttrHistoryPoint[]): string[] {
   return [...keys].sort((a, b) => a.localeCompare(b));
 }
 
-function developmentNote(points: AttrHistoryPoint[]): string | null {
-  if (points.length < 2) return null;
-  const ca = fieldDeltas(points, "CA");
-  const det = fieldDeltas(points, "Determination");
-  const pro = fieldDeltas(points, "Professionalism");
-  const cons = fieldDeltas(points, "Consistency");
-  if (ca.allTime == null) return null;
-  const haBits = [
-    det.latest != null ? `DET ${det.latest}` : null,
-    pro.latest != null ? `PRO ${pro.latest}` : null,
-    cons.latest != null ? `CON ${cons.latest}` : null,
+function baselineCaps(values: Record<string, number>): string {
+  const bits = [
+    typeof values.CA === "number" ? `CA ${values.CA}` : null,
+    typeof values.PA === "number" ? `PA ${values.PA}` : null,
   ].filter(Boolean);
-  const direction =
-    ca.allTime > 0 ? "up" : ca.allTime < 0 ? "down" : "flat";
-  const pace =
-    points.length >= 3 && ca.allTime != null
-      ? `≈ ${(ca.allTime / (points.length - 1)).toFixed(1)} CA / change-point`
-      : null;
-  return [
-    `CA ${formatDelta(ca.allTime)} since first point (${direction}).`,
-    haBits.length ? `Personality/HA snapshot: ${haBits.join(" · ")}.` : null,
-    pace,
-    "Compare high-DET/PRO players over the same span to see who develops faster — reload after training weeks.",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  return bits.length ? bits.join(" · ") : "Baseline recorded";
 }
 
 export function AttributeHistoryPanel({ playerId }: { playerId: string }) {
   const points = getPlayerAttrHistory(playerId);
   const fields = availableFields(points);
+  const timeline = buildAttrTimeline(points);
+  const summary = factualHistorySummary(points);
   const [preset, setPreset] = useState<keyof typeof PRESETS | "Custom">("Development");
   const [active, setActive] = useState<string[] | null>(null);
 
@@ -129,8 +113,6 @@ export function AttributeHistoryPanel({ playerId }: { playerId: string }) {
     return { width, height, pad, yMin, yMax, series };
   }, [playerId, points, selectedKey]);
 
-  const teaching = developmentNote(points);
-
   const applyPreset = (name: keyof typeof PRESETS) => {
     setPreset(name);
     setActive(null);
@@ -150,12 +132,12 @@ export function AttributeHistoryPanel({ playerId }: { playerId: string }) {
     return (
       <section className="dossier-panel tab-evidence-panel attr-history-panel">
         <header>
-          <h2>Attribute history</h2>
-          <span>No change-points yet</span>
+          <h2>Development</h2>
+          <span>No observations yet</span>
         </header>
         <p className="evidence-caption">
-          History appends on each Load when values change. Reload after development days to
-          replace the spreadsheet.
+          Each Load appends a point when this player’s tracked values change. Play in FM, then
+          reload here — the timeline is the notebook.
         </p>
       </section>
     );
@@ -164,77 +146,112 @@ export function AttributeHistoryPanel({ playerId }: { playerId: string }) {
   return (
     <section className="dossier-panel tab-evidence-panel attr-history-panel">
       <header>
-        <h2>Attribute history</h2>
+        <h2>Development</h2>
         <span>
-          {points.length} change-point{points.length === 1 ? "" : "s"} · append-only
+          {points.length} observation{points.length === 1 ? "" : "s"} · newest first
         </span>
       </header>
 
-      {teaching ? <p className="attr-history-teach">{teaching}</p> : null}
+      {summary ? <p className="attr-history-summary">{summary}</p> : null}
 
-      <div className="attr-history-presets" role="group" aria-label="History presets">
-        {(Object.keys(PRESETS) as Array<keyof typeof PRESETS>).map((name) => (
-          <button
-            key={name}
-            type="button"
-            className={preset === name ? "is-on" : undefined}
-            onClick={() => applyPreset(name)}
-          >
-            {name}
-          </button>
+      <ol className="attr-history-timeline" aria-label="Player development timeline">
+        {timeline.map((row) => (
+          <li key={`${row.index}-${row.at}`}>
+            <div className="attr-history-timeline-head">
+              <strong>{row.label}</strong>
+              <span>{row.isFirst ? "baseline" : `vs prior · ${row.moves.length} moved`}</span>
+            </div>
+            {row.isFirst ? (
+              <p className="attr-history-timeline-moves">{baselineCaps(row.values)}</p>
+            ) : row.moves.length ? (
+              <ul className="attr-history-timeline-moves">
+                {row.moves.map((move) => (
+                  <li key={move.field}>
+                    <span>{move.field}</span>
+                    <span>
+                      {move.from ?? "—"} → {move.to}{" "}
+                      <em data-delta={move.delta > 0 ? "up" : "down"}>{formatDelta(move.delta)}</em>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="attr-history-timeline-moves">No field deltas vs prior point.</p>
+            )}
+          </li>
         ))}
-      </div>
+      </ol>
 
-      <div className="attr-history-layout">
-        <div className="attr-history-toggles">
-          {fields.map((field) => {
-            const on = selected.includes(field);
-            const deltas = fieldDeltas(points, field);
-            return (
+      {points.length >= 2 ? (
+        <>
+          <div className="attr-history-presets" role="group" aria-label="History presets">
+            {(Object.keys(PRESETS) as Array<keyof typeof PRESETS>).map((name) => (
               <button
-                key={field}
+                key={name}
                 type="button"
-                className={on ? "is-on" : undefined}
-                onClick={() => toggle(field)}
+                className={preset === name ? "is-on" : undefined}
+                onClick={() => applyPreset(name)}
               >
-                <strong>{field}</strong>
-                <small>
-                  {deltas.latest ?? "—"} · Δr {formatDelta(deltas.recent)} · Δ∞{" "}
-                  {formatDelta(deltas.allTime)}
-                </small>
+                {name}
               </button>
-            );
-          })}
-        </div>
-        <div className="attr-history-chart">
-          {chart ? (
-            <svg viewBox={`0 0 ${chart.width} ${chart.height}`} role="img" aria-label="Attribute history plot">
-              <text x={8} y={chart.pad.top + 4} className="attr-history-axis">
-                {Math.round(chart.yMax)}
-              </text>
-              <text x={8} y={chart.height - chart.pad.bottom} className="attr-history-axis">
-                {Math.round(chart.yMin)}
-              </text>
-              {chart.series.map((series) => (
-                <g key={series.field}>
-                  <path d={series.path} fill="none" stroke={series.color} strokeWidth={2} />
-                  {series.pts.map((pt, index) => (
-                    <circle key={`${series.field}-${index}`} cx={pt.x} cy={pt.y} r={3} fill={series.color} />
+            ))}
+          </div>
+
+          <div className="attr-history-layout">
+            <div className="attr-history-toggles">
+              {fields.map((field) => {
+                const on = selected.includes(field);
+                const deltas = fieldDeltas(points, field);
+                return (
+                  <button
+                    key={field}
+                    type="button"
+                    className={on ? "is-on" : undefined}
+                    onClick={() => toggle(field)}
+                  >
+                    <strong>{field}</strong>
+                    <small>
+                      {deltas.latest ?? "—"} · Δ∞ {formatDelta(deltas.allTime)}
+                    </small>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="attr-history-chart">
+              {chart ? (
+                <svg viewBox={`0 0 ${chart.width} ${chart.height}`} role="img" aria-label="Attribute history plot">
+                  <text x={8} y={chart.pad.top + 4} className="attr-history-axis">
+                    {Math.round(chart.yMax)}
+                  </text>
+                  <text x={8} y={chart.height - chart.pad.bottom} className="attr-history-axis">
+                    {Math.round(chart.yMin)}
+                  </text>
+                  {chart.series.map((series) => (
+                    <g key={series.field}>
+                      <path d={series.path} fill="none" stroke={series.color} strokeWidth={2} />
+                      {series.pts.map((pt, index) => (
+                        <circle key={`${series.field}-${index}`} cx={pt.x} cy={pt.y} r={3} fill={series.color} />
+                      ))}
+                    </g>
                   ))}
-                </g>
-              ))}
-              <text x={chart.width / 2} y={chart.height - 6} textAnchor="middle" className="attr-history-axis">
-                change-points (reload after in-game days)
-              </text>
-            </svg>
-          ) : (
-            <p className="evidence-caption">Toggle fields or pick a preset to plot.</p>
-          )}
-        </div>
-      </div>
-      <p className="evidence-caption">
-        Δr = vs previous point · Δ∞ = vs first point. Values are never overwritten.
-      </p>
+                  <text x={chart.width / 2} y={chart.height - 6} textAnchor="middle" className="attr-history-axis">
+                    observations (in-game date when known)
+                  </text>
+                </svg>
+              ) : (
+                <p className="evidence-caption">Toggle fields or pick a preset to plot.</p>
+              )}
+            </div>
+          </div>
+          <p className="evidence-caption">
+            Timeline above is the evidence log. Plot is optional. Δ∞ = vs first observation.
+          </p>
+        </>
+      ) : (
+        <p className="evidence-caption">
+          One observation so far. After more in-game days, Load again — moved fields will list here.
+        </p>
+      )}
     </section>
   );
 }

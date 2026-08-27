@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildAttrTimeline,
+  factualHistorySummary,
   fieldDeltas,
+  movedFieldsBetween,
   rankSquadMovers,
   recentDeltasFromPoints,
   type AttrHistoryPoint,
@@ -72,5 +75,50 @@ describe("rankSquadMovers", () => {
     expect(
       rankSquadMovers([{ id: "a" }, { id: "d" }], (id) => history[id] ?? [], 1),
     ).toHaveLength(1);
+  });
+});
+
+describe("movedFieldsBetween", () => {
+  it("lists signed deltas for fields that changed", () => {
+    expect(
+      movedFieldsBetween({ CA: 100, Determination: 12 }, { CA: 103, Determination: 12, Professionalism: 14 }),
+    ).toEqual([
+      { field: "Professionalism", from: null, to: 14, delta: 14 },
+      { field: "CA", from: 100, to: 103, delta: 3 },
+    ]);
+  });
+
+  it("returns empty when nothing moved", () => {
+    expect(movedFieldsBetween({ CA: 100 }, { CA: 100 })).toEqual([]);
+  });
+});
+
+describe("buildAttrTimeline", () => {
+  it("returns newest-first rows with game date labels and moves vs prior", () => {
+    const points: AttrHistoryPoint[] = [
+      { at: "2026-01-01T10:00:00.000Z", gameDate: "July 2026", values: { CA: 100 } },
+      { at: "2026-01-08T10:00:00.000Z", gameDate: "August 2026", values: { CA: 102 } },
+    ];
+    const rows = buildAttrTimeline(points);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]!.label).toBe("August 2026");
+    expect(rows[0]!.moves).toEqual([{ field: "CA", from: 100, to: 102, delta: 2 }]);
+    expect(rows[1]!.isFirst).toBe(true);
+    expect(rows[1]!.moves).toEqual([]);
+  });
+});
+
+describe("factualHistorySummary", () => {
+  it("states observation counts without Det/Pro mentoring advice", () => {
+    const points: AttrHistoryPoint[] = [
+      { at: "2026-01-01", values: { CA: 100, Determination: 10 } },
+      { at: "2026-01-02", values: { CA: 104, Determination: 11 } },
+    ];
+    const summary = factualHistorySummary(points);
+    expect(summary).toContain("2 observations");
+    expect(summary).toContain("CA +4");
+    expect(summary).toContain("2 fields moved last load");
+    expect(summary?.toLowerCase()).not.toContain("mentor");
+    expect(summary?.toLowerCase()).not.toContain("high-det");
   });
 });
