@@ -163,48 +163,48 @@ function SquadPlayerCard({
         <PlayerFace playerId={player.id} name={player.name} size="sm" highResolution />
       </span>
       <span className="squad-player-card-copy">
-        <span className="squad-player-card-name-row">
-          <strong title={player.name}>{player.name}</strong>
-          {loanClubName ? (
-            <span className="squad-loan-club-pill" title={loanClubName}>
-              {loanClubId ? (
-                <ClubLogo clubId={loanClubId} name={loanClubName} size="sm" />
-              ) : (
-                <span className="club-logo club-logo-sm club-logo-empty" aria-hidden="true" />
-              )}
-              <span className="squad-loan-club-pill-name">{loanClubName}</span>
-            </span>
-          ) : null}
-        </span>
+        <strong title={player.name}>{player.name}</strong>
         <span>{ageLine}</span>
         <span className="squad-player-card-pos">{formatPlayerPositions(player)}</span>
         <span>{foot}</span>
       </span>
-      <span className="squad-player-card-metrics" aria-label="Ability, potential, personality">
-        <MetricTip label="Ability" detail="Current ability (CA)">
-          <AbilityRing value={player.currentAbility} />
-        </MetricTip>
-        <MetricTip label="Potential" detail="Potential ability (PA)">
-          <AbilityRing value={player.potentialAbility} />
-        </MetricTip>
-        <Tooltip>
-          <TooltipTrigger
-            render={
-              <span
-                className="squad-metric-tip"
-                tabIndex={-1}
-                onClick={(event) => event.stopPropagation()}
-                onKeyDown={(event) => event.stopPropagation()}
-              >
-                <PersonalityRing value={has} />
-              </span>
-            }
-          />
-          <TooltipContent side="top" align="end" className="dash-has-tooltip squad-metric-tooltip-wide">
-            <strong>Personality (HAS)</strong>
-            <HasBreakdownGridFromPlayer player={player} />
-          </TooltipContent>
-        </Tooltip>
+      <span className="squad-player-card-side">
+        {loanClubName ? (
+          <span className="squad-loan-club-pill" title={loanClubName}>
+            {loanClubId ? (
+              <ClubLogo clubId={loanClubId} name={loanClubName} size="sm" />
+            ) : (
+              <span className="club-logo club-logo-sm club-logo-empty" aria-hidden="true" />
+            )}
+            <span className="squad-loan-club-pill-name">{loanClubName}</span>
+          </span>
+        ) : null}
+        <span className="squad-player-card-metrics" aria-label="Ability, potential, personality">
+          <MetricTip label="Ability" detail="Current ability (CA)">
+            <AbilityRing value={player.currentAbility} />
+          </MetricTip>
+          <MetricTip label="Potential" detail="Potential ability (PA)">
+            <AbilityRing value={player.potentialAbility} />
+          </MetricTip>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <span
+                  className="squad-metric-tip"
+                  tabIndex={-1}
+                  onClick={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => event.stopPropagation()}
+                >
+                  <PersonalityRing value={has} />
+                </span>
+              }
+            />
+            <TooltipContent side="top" align="end" className="dash-has-tooltip squad-metric-tooltip-wide">
+              <strong>Personality (HAS)</strong>
+              <HasBreakdownGridFromPlayer player={player} />
+            </TooltipContent>
+          </Tooltip>
+        </span>
       </span>
     </button>
   );

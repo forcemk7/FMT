@@ -866,7 +866,7 @@ h1, h2, h3, [data-slot="card-title"] { font-family: "Inter Variable", Inter, "Se
 .squad-player-card{
   display:grid;
   grid-template-columns:36px minmax(0,1fr) auto;
-  grid-template-areas:"face copy metrics";
+  grid-template-areas:"face copy side";
   align-items:center;
   gap:8px 10px;
   width:100%;
@@ -900,14 +900,6 @@ h1, h2, h3, [data-slot="card-title"] { font-family: "Inter Variable", Inter, "Se
   grid-area:copy;
   align-self:center;
 }
-.squad-player-card-name-row{
-  display:flex;
-  align-items:center;
-  gap:6px;
-  min-width:0;
-  margin-bottom:1px;
-}
-.squad-player-card-name-row strong,
 .squad-player-card-copy strong{
   font-size:10px;
   font-weight:700;
@@ -915,8 +907,7 @@ h1, h2, h3, [data-slot="card-title"] { font-family: "Inter Variable", Inter, "Se
   text-overflow:ellipsis;
   white-space:nowrap;
   color:var(--navy);
-  min-width:0;
-  flex:1 1 auto;
+  margin-bottom:1px;
 }
 .squad-player-card-copy>span{
   font-size:8px;
@@ -926,12 +917,21 @@ h1, h2, h3, [data-slot="card-title"] { font-family: "Inter Variable", Inter, "Se
   text-overflow:ellipsis;
   white-space:nowrap;
 }
+.squad-player-card-side{
+  grid-area:side;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-end;
+  justify-content:center;
+  gap:4px;
+  min-width:0;
+  flex-shrink:0;
+}
 .squad-loan-club-pill{
   display:inline-flex;
   align-items:center;
   gap:4px;
-  flex:0 1 auto;
-  max-width:48%;
+  max-width:140px;
   min-width:0;
   padding:1px 6px 1px 2px;
   border-radius:8px;
@@ -962,11 +962,9 @@ h1, h2, h3, [data-slot="card-title"] { font-family: "Inter Variable", Inter, "Se
   -webkit-line-clamp:2;
 }
 .squad-player-card-metrics{
-  grid-area:metrics;
   display:flex;
   align-items:center;
   gap:5px;
-  align-self:center;
   flex-shrink:0;
 }
 .squad-metric-tip{display:inline-flex;flex:0 0 auto;line-height:0;cursor:help}

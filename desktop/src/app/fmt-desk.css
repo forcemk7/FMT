@@ -348,8 +348,7 @@ body.fmt-shell .squad-player-card:hover {
 body.fmt-shell .squad-player-card:focus-visible {
   outline-color: var(--gold);
 }
-body.fmt-shell .squad-player-card-copy strong,
-body.fmt-shell .squad-player-card-name-row strong {
+body.fmt-shell .squad-player-card-copy strong {
   color: var(--text);
 }
 body.fmt-shell .squad-player-card-copy > span {
