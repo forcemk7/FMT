@@ -14,9 +14,12 @@ Load save → FMT connects (squad only) → **Squad** → open player desk → a
 **Loop B — Squad at a glance (Step 1 companion)**  
 Load → **Dashboard** = collective view of the same squad/profile signals (movement, CA/HA, flags) → click into a player (Loop A). Dashboard is not a second product; it is Squad rolled up.
 
-**Loop C — Club roles (visual roadmap only until a loop exists)**  
-Nav stubs: Tactic · HoYD · General Manager · Loan Manager · Technical Director.  
-Each stub is labeled **Later** until it has its own load → desk → decision loop. Empty chrome = GlassScout failure mode — do not build desks ahead of loops.
+**Loop C — Club roles (only when a decision loop is proven)**  
+Nav stubs stay **Later** until they have load → desk → decision. Empty chrome = GlassScout failure mode.
+
+- **Loans** — live: Squad twin filtered to outgoing `loanedOut` (honesty / tracking).
+- **GM** — next: Squad twin filtered to **move-on** candidates (PA too low to become meaningful contributors **and** CA≈PA so value won’t grow from first-team minutes). Decision: sell now, or loan to bump value then sell. Same exit for both: leave the club. Not a transfer market, not a loan finder.
+- **Tactic · HoYD · TD** — still Later until each has its own proven loop.
 
 **Loop D — Replace FMLE (Step 2, not funded)**  
 Full-save index at usable speed. Hard RE. Parked until Loop A is daily habit.
@@ -25,7 +28,7 @@ Full-save index at usable speed. Hard RE. Parked until Loop A is daily habit.
 
 - Squad-only live load; correct attrs; history that replaces sheets (Loop A)
 - One main header row (merge GS double header) so the shell is usable
-- Nav = Dashboard · Squad · Tactic · HoYD · GM · Loan · TD (+ Settings) — **Squad + Dashboard live**; others muted roadmap
+- Nav = Dashboard · Squad · Tactic · HoYD · GM · Loan · TD (+ Settings) — **Squad + Dashboard + Loans live**; GM when T192 ships; others muted roadmap
 - Dashboard = collective squad/profile signals (feeds Loop B), reusable “dashboard blocks” only when a second live tab needs them — no platform rewrite
 - Player profile desk + history teaching (CA/HA / movement) on Squad path
 - Installer daily driver; no empty console
@@ -34,18 +37,20 @@ Full-save index at usable speed. Hard RE. Parked until Loop A is daily habit.
 
 - Theme polish after header + nav + desk usable
 - Player cutout faces: Settings path + local cache (never hot-path stream live SI `graphics/` after copy)
-- Mentoring / loans as real Loop C desks only after Loop A sticks
+- Mentoring as a real desk only after Loop A sticks
+- Club-relative / Settings knobs for GM move-on thresholds (after fixed v1 constants prove the loop)
 
 ## Not need-to-have (discard)
 
 - Six layers of headers / GS recruitment chrome
-- Building Tactic/HoYD/GM/Loan/TD as fake working products
+- Building Tactic/HoYD/TD (or GM beyond filtered Squad) as fake working products
+- GM sell/loan recommenders, listing workflows, world search
 - Blind world-table RE / beat FMLE this week
 - Offline `.fm` extract / BepInEx
 - “Dashboard component framework” as a standalone project
 
 ## Gate
 
-1. Does this strengthen Loop A or B this week?
+1. Does this strengthen Loop A or B this week? (GM only after the move-on loop is proven — it is.)
 2. If we never ship Loop C/D, does Loop A still beat sheets?
 3. Smallest UI change that removes friction from Loop A?

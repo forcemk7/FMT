@@ -183,14 +183,15 @@ export function PlayerProfileScreen({
   const loanedOut = player.loanedOut === true;
   const loanClubName = player.loanClubName?.trim() || null;
   const loanClubId = player.loanClubId?.trim() || null;
-  const primaryClubId = loanedOut && loanClubId ? loanClubId : player.clubId;
-  const primaryClubName = loanedOut && loanClubName
+  // Active club = where they play now (loan if set). Logo must not fall back to parent.
+  const activeClubId = loanedOut && loanClubId ? loanClubId : player.clubId ?? null;
+  const activeClubName = loanedOut && loanClubName
     ? loanClubName
-    : parentClubName;
-  const club = primaryClubId
-    ? snapshot.clubs.find((item) => item.id === primaryClubId) ?? parentClub
-    : parentClub;
-  const clubName = primaryClubName ?? club?.name;
+    : parentClubName ?? null;
+  const club = activeClubId
+    ? snapshot.clubs.find((item) => item.id === activeClubId) ?? null
+    : null;
+  const clubName = activeClubName ?? club?.name ?? null;
   const clubSub =
     loanedOut && loanClubName
       ? `Parent: ${parentClubName ?? "—"}`
@@ -284,8 +285,12 @@ export function PlayerProfileScreen({
           >
             <b>{loanedOut && loanClubName ? "Loan club" : "Club"}</b>
             <span className="player-fact-identity">
-              {club ? (
-                <ClubLogo clubId={club.id} name={club.name} size="md" />
+              {activeClubId ? (
+                <ClubLogo
+                  clubId={activeClubId}
+                  name={clubName ?? club?.name ?? "Club"}
+                  size="md"
+                />
               ) : (
                 <span className="club-logo club-logo-md club-logo-empty" aria-hidden="true" />
               )}

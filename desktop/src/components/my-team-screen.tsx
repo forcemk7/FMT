@@ -4,7 +4,8 @@ import { useMemo, type ReactNode } from "react";
 import type { LiveFootballSnapshot, LivePlayer } from "@/domain/adapters";
 import { abilityToneFromScore } from "@/domain/attribute-tone";
 import { formatHasScore, hasBand, liveHasScore } from "@/domain/has-score";
-import { formatPlayerPositions, groupSquad, isAtClubSquadPlayer, isLoanedOutSquadPlayer, positionGroups } from "@/domain/live-data";
+import { formatPlayerPositions, groupSquad, isAtClubSquadPlayer, isLoanedOutSquadPlayer, isMoveOnCandidate, positionGroups } from "@/domain/live-data";
+import { ClubLogo } from "@/components/club-logo";
 import { LiveDataState } from "@/components/live-data-state";
 import { HasBreakdownGridFromPlayer } from "@/components/has-breakdown-grid";
 import { PlayerFace } from "@/components/player-face";
@@ -13,7 +14,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 const CARD_RING_SIZE = 28;
 const CARD_RING_STROKE = 1.25;
 
-export type SquadDeskMode = "at-club" | "loaned-out";
+export type SquadDeskMode = "at-club" | "loaned-out" | "move-on";
 
 function sortByCurrentAbility(players: LivePlayer[]) {
   return [...players].sort((a, b) => {
@@ -152,22 +153,30 @@ function SquadPlayerCard({
   const foot = preferredFootDisplay(player);
   const ageLine =
     player.age == null ? "—" : `${player.age} years old`;
-  const clubLine = showLoanClub
+  const loanClubName = showLoanClub
     ? player.loanClubName?.trim() || "On loan"
     : null;
+  const loanClubId = showLoanClub ? player.loanClubId?.trim() || null : null;
   return (
     <button type="button" className="squad-player-card" onClick={() => onOpenPlayer(player.id)}>
       <span className="squad-player-card-face">
         <PlayerFace playerId={player.id} name={player.name} size="sm" highResolution />
       </span>
       <span className="squad-player-card-copy">
-        <strong title={player.name}>{player.name}</strong>
+        <span className="squad-player-card-name-row">
+          <strong title={player.name}>{player.name}</strong>
+          {loanClubName ? (
+            <span className="squad-loan-club-pill" title={loanClubName}>
+              {loanClubId ? (
+                <ClubLogo clubId={loanClubId} name={loanClubName} size="sm" />
+              ) : (
+                <span className="club-logo club-logo-sm club-logo-empty" aria-hidden="true" />
+              )}
+              <span className="squad-loan-club-pill-name">{loanClubName}</span>
+            </span>
+          ) : null}
+        </span>
         <span>{ageLine}</span>
-        {clubLine ? (
-          <span className="squad-player-card-loan" title={clubLine}>
-            {clubLine}
-          </span>
-        ) : null}
         <span className="squad-player-card-pos">{formatPlayerPositions(player)}</span>
         <span>{foot}</span>
       </span>
@@ -215,30 +224,46 @@ export function MyTeamScreen({
   mode?: SquadDeskMode;
 }) {
   const loanedMode = mode === "loaned-out";
+  const moveOnMode = mode === "move-on";
   const squad = useMemo(
     () =>
-      snapshot.players.filter((player) =>
-        loanedMode
-          ? isLoanedOutSquadPlayer(player, snapshot.managedClubId)
-          : isAtClubSquadPlayer(player, snapshot.managedClubId),
-      ),
-    [loanedMode, snapshot.managedClubId, snapshot.players],
+      snapshot.players.filter((player) => {
+        if (loanedMode) {
+          return isLoanedOutSquadPlayer(player, snapshot.managedClubId);
+        }
+        if (!isAtClubSquadPlayer(player, snapshot.managedClubId)) return false;
+        if (moveOnMode) return isMoveOnCandidate(player);
+        return true;
+      }),
+    [loanedMode, moveOnMode, snapshot.managedClubId, snapshot.players],
   );
   const groups = useMemo(() => groupSquad(squad), [squad]);
   const managedClub = snapshot.clubs.find((club) => club.id === snapshot.managedClubId);
   const connected =
     snapshot.status.state === "connected" && Boolean(snapshot.managedClubId);
-  const ready = connected && (loanedMode || squad.length > 0);
-  const title = loanedMode ? "Loans" : "Squad";
+  const allowEmpty = loanedMode || moveOnMode;
+  const ready = connected && (allowEmpty || squad.length > 0);
+  const title = loanedMode ? "Loans" : moveOnMode ? "GM" : "Squad";
   const emptyHint = loanedMode
     ? "Outgoing loans — load when FM26 has a save open"
-    : "First-team desk — load when FM26 has a save open";
+    : moveOnMode
+      ? "Move-on queue — load when FM26 has a save open"
+      : "First-team desk — load when FM26 has a save open";
   const readyBlurb = loanedMode
     ? `${managedClub?.name} · ${squad.length} out on loan`
-    : `${managedClub?.name} · ${squad.length} players`;
+    : moveOnMode
+      ? `${managedClub?.name} · ${squad.length} to move on`
+      : `${managedClub?.name} · ${squad.length} players`;
+  const emptyConnectedMessage = loanedMode
+    ? "No players out on loan."
+    : moveOnMode
+      ? "No move-on candidates (low PA + CA near PA)."
+      : null;
 
   return (
-    <main className={`screen my-team-screen${loanedMode ? " is-loans-desk" : ""}`}>
+    <main
+      className={`screen my-team-screen${loanedMode ? " is-loans-desk" : ""}${moveOnMode ? " is-gm-desk" : ""}`}
+    >
       <div className="planner-heading">
         <div>
           <h1>{title}</h1>
@@ -262,9 +287,9 @@ export function MyTeamScreen({
               compact
             />
           </div>
-        ) : loanedMode && squad.length === 0 ? (
+        ) : allowEmpty && squad.length === 0 ? (
           <div className="squad-table-empty">
-            <p className="squad-loans-empty">No players out on loan.</p>
+            <p className="squad-loans-empty">{emptyConnectedMessage}</p>
           </div>
         ) : !ready ? (
           <div className="squad-table-empty">

@@ -16,7 +16,7 @@ import {
   type LiveFootballSnapshot,
   type LivePlayer,
 } from "@/domain/adapters";
-import { ingestSnapshotPlayers } from "@/domain/attribute-history";
+import { recordPlayersFromSnapshot } from "@/domain/attribute-history";
 import { isDashViewId, type DashViewId } from "@/domain/dashboard-views";
 import { toggleFavorite, type FavoriteRecord } from "@/domain/live-data";
 import { warmSquadGraphics } from "@/domain/warm-squad-graphics";
@@ -84,7 +84,6 @@ const initialSnapshot: LiveFootballSnapshot = {
 const LATER_ROLES: Screen[] = [
   "Tactic",
   "HoYD",
-  "General Manager",
   "Technical Director",
 ];
 
@@ -144,11 +143,9 @@ export function FMTApp() {
     try {
       const nextSnapshot = await fm26LiveAdapter.getSnapshot();
       if (nextSnapshot.status.state === "connected" && nextSnapshot.players.length) {
-        const players = ingestSnapshotPlayers(nextSnapshot.players, nextSnapshot.season);
-        // UID → background XML index → disk cache. Never block Load Active Save.
-        warmSquadGraphics({ ...nextSnapshot, players });
-        setSnapshot({ ...nextSnapshot, players });
-        return nextSnapshot.status;
+        // Plot/local notes only — desk Δ come from in-game CA pack on the connector payload.
+        recordPlayersFromSnapshot(nextSnapshot.players, nextSnapshot.season);
+        warmSquadGraphics(nextSnapshot);
       }
       setSnapshot(nextSnapshot);
       return nextSnapshot.status;
@@ -231,6 +228,14 @@ export function FMTApp() {
     ) : screen === "Loan Manager" ? (
       <MyTeamScreen
         mode="loaned-out"
+        snapshot={snapshot}
+        checking={checking}
+        onRefresh={checkConnection}
+        onOpenPlayer={openPlayer}
+      />
+    ) : screen === "General Manager" ? (
+      <MyTeamScreen
+        mode="move-on"
         snapshot={snapshot}
         checking={checking}
         onRefresh={checkConnection}

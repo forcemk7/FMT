@@ -900,6 +900,14 @@ h1, h2, h3, [data-slot="card-title"] { font-family: "Inter Variable", Inter, "Se
   grid-area:copy;
   align-self:center;
 }
+.squad-player-card-name-row{
+  display:flex;
+  align-items:center;
+  gap:6px;
+  min-width:0;
+  margin-bottom:1px;
+}
+.squad-player-card-name-row strong,
 .squad-player-card-copy strong{
   font-size:10px;
   font-weight:700;
@@ -907,7 +915,8 @@ h1, h2, h3, [data-slot="card-title"] { font-family: "Inter Variable", Inter, "Se
   text-overflow:ellipsis;
   white-space:nowrap;
   color:var(--navy);
-  margin-bottom:1px;
+  min-width:0;
+  flex:1 1 auto;
 }
 .squad-player-card-copy>span{
   font-size:8px;
@@ -917,9 +926,34 @@ h1, h2, h3, [data-slot="card-title"] { font-family: "Inter Variable", Inter, "Se
   text-overflow:ellipsis;
   white-space:nowrap;
 }
-.squad-player-card-loan{
-  color:var(--navy) !important;
+.squad-loan-club-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  flex:0 1 auto;
+  max-width:48%;
+  min-width:0;
+  padding:1px 6px 1px 2px;
+  border-radius:8px;
+  border:1px solid var(--border);
+  background:rgba(255,255,255,.72);
+  color:var(--navy);
+  font-size:8px;
   font-weight:600;
+  line-height:1.2;
+}
+.squad-loan-club-pill .club-logo{
+  width:16px;
+  height:16px;
+  padding:1px;
+  flex-shrink:0;
+  border-radius:4px;
+}
+.squad-loan-club-pill-name{
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+  min-width:0;
 }
 .squad-player-card-pos{
   white-space:normal;

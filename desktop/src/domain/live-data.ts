@@ -1,5 +1,10 @@
 import type { LivePlayer } from "@/domain/adapters";
 
+/** v1 GM move-on: PA − CA at or below this (CA≈PA). */
+export const MOVE_ON_HEADROOM_MAX = 8;
+/** v1 GM move-on: PA at or below this (not a meaningful squad ceiling). */
+export const PA_MOVE_ON_MAX = 140;
+
 /** Managed-club players available for match squads (excludes outgoing loans). */
 export function isAtClubSquadPlayer(
   player: Pick<LivePlayer, "clubId" | "loanedOut">,
@@ -16,6 +21,21 @@ export function isLoanedOutSquadPlayer(
 ): boolean {
   if (!managedClubId || player.clubId !== managedClubId) return false;
   return player.loanedOut === true;
+}
+
+/**
+ * Low PA + little headroom → move on (sell, or loan then sell).
+ * At-club filtering stays in the desk (with `isAtClubSquadPlayer`).
+ */
+export function isMoveOnCandidate(
+  player: Pick<LivePlayer, "currentAbility" | "potentialAbility">,
+): boolean {
+  const ca = player.currentAbility;
+  const pa = player.potentialAbility;
+  if (typeof ca !== "number" || typeof pa !== "number") return false;
+  if (!Number.isFinite(ca) || !Number.isFinite(pa)) return false;
+  if (pa > PA_MOVE_ON_MAX) return false;
+  return pa - ca <= MOVE_ON_HEADROOM_MAX;
 }
 
 export const positionGroups = [

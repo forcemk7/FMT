@@ -45,7 +45,7 @@ const navigation: NavItem[] = [
   { label: "Squad", short: "Squad", live: true, icon: UsersRound },
   { label: "Tactic", short: "Tactic", live: false },
   { label: "HoYD", short: "HoYD", live: false },
-  { label: "General Manager", short: "GM", live: false },
+  { label: "General Manager", short: "GM", live: true, icon: UsersRound },
   { label: "Loan Manager", short: "Loans", live: true, icon: UsersRound },
   { label: "Technical Director", short: "TD", live: false },
 ];
