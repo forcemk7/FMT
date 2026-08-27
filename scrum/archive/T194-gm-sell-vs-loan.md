@@ -60,4 +60,4 @@ A player matches at most one lane. Missing CA/PA → excluded. Drop `PA_MOVE_ON_
 
 ### Commit
 
-_(filled after git)_
+`4a4b2514df261095a4d045b879155fcc8a674745` (domain + board). UI lanes landed earlier in `f76e7e6` with T193.
