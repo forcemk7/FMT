@@ -375,6 +375,9 @@ body.fmt-shell .dash-mover-chip.is-more {
   color: var(--text-muted);
   background: transparent;
 }
+body.fmt-shell .dash-prospect-mentor {
+  color: var(--text-muted);
+}
 body.fmt-shell .dash-has-card {
   background: var(--panel-2);
   border: 1px solid var(--hairline);

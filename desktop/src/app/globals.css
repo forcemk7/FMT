@@ -3177,6 +3177,7 @@ body.fmt-shell {
 }
 .dash-mover-chip small{font-size:8px;font-weight:600;opacity:.75;text-transform:uppercase}
 .dash-mover-chip.is-more{font-weight:600;color:var(--slate,#64748b);background:transparent;padding-inline:2px}
+.dash-prospect-card .dash-prospect-mentor{color:var(--slate,#64748b);white-space:normal}
 .dash-has-card{
   display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;
   width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fafbfc;

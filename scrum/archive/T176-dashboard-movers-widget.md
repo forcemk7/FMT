@@ -38,4 +38,4 @@ Loop B: Dashboard should surface who changed since the last history change-point
 
 Shipped: `rankSquadMovers` + unit tests; Dashboard Movers panel (chips for changed fields, click → profile). Verified with `vitest run src/domain/attribute-history.test.ts` (6 pass).
 
-Commit: _(pending)_
+Commit: `6acb0bd`

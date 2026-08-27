@@ -11,6 +11,7 @@ import {
 import { formatPlayerPositions } from "@/domain/live-data";
 import { formatHasScore, hasBand, squadHasRankings, type HasTone } from "@/domain/has-score";
 import { attributeDeltaTone } from "@/domain/attribute-tone";
+import { rankSquadProspects, type SquadProspect } from "@/domain/squad-prospects";
 import { LiveDataState } from "@/components/live-data-state";
 import { HasBreakdownGridFromPlayer } from "@/components/has-breakdown-grid";
 import { PlayerFace } from "@/components/player-face";
@@ -92,6 +93,35 @@ function MoverCard({
   );
 }
 
+function ProspectCard({
+  row,
+  onOpen,
+}: {
+  row: SquadProspect;
+  onOpen: (id: string) => void;
+}) {
+  const { player, pa, professionalism, mentor, mentorPro, proGap } = row;
+  return (
+    <button
+      type="button"
+      className="dash-has-card dash-prospect-card"
+      onClick={() => onOpen(player.id)}
+    >
+      <PlayerFace playerId={player.id} name={player.name} size="sm" />
+      <span className="dash-has-card-copy">
+        <strong>{player.name}</strong>
+        <small>
+          {player.age != null ? `Age ${player.age} · ` : ""}
+          PA {Math.round(pa)}
+        </small>
+        <small className="dash-prospect-mentor">
+          Pro {professionalism} → {mentor.name} (+{proGap}, {mentorPro})
+        </small>
+      </span>
+    </button>
+  );
+}
+
 export function DashboardScreen({
   snapshot,
   checking,
@@ -115,6 +145,7 @@ export function DashboardScreen({
     () => rankSquadMovers(squad),
     [squad, snapshot.status.lastSync, snapshot.status.lastSuccessfulRead],
   );
+  const prospects = useMemo(() => rankSquadProspects(squad), [squad]);
   const ready =
     snapshot.status.state === "connected" && Boolean(snapshot.managedClubId) && squad.length > 0;
 
@@ -165,6 +196,33 @@ export function DashboardScreen({
             <p className="evidence-caption">
               No attribute moves since the last recorded change-point. Load again after training or
               matches.
+            </p>
+          )}
+        </div>
+      </section>
+
+      <section className="screen-panel dash-has-widget" aria-label="Prospects with Pro mentor room">
+        <header className="screen-panel__head">
+          <h2>Prospects</h2>
+        </header>
+        <div className="screen-panel__body">
+          {!ready ? (
+            <LiveDataState
+              snapshot={snapshot}
+              title="Dashboard"
+              checking={checking}
+              onRefresh={onRefresh}
+              compact
+            />
+          ) : prospects.length ? (
+            <div className="dash-has-list dash-movers-list">
+              {prospects.map((row) => (
+                <ProspectCard key={row.player.id} row={row} onOpen={onOpenPlayer} />
+              ))}
+            </div>
+          ) : (
+            <p className="evidence-caption">
+              No young high-PA players with a clear Professionalism mentor on squad.
             </p>
           )}
         </div>
