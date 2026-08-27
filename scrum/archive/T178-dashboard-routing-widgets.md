@@ -38,4 +38,4 @@ Dashboard should be a routing hub of filtered peeks (FM-style views), not tall f
 
 Shipped: 2×2 compact peeks (cap 5); header → Movers/Prospects/HAS Top/HAS Bottom pages; row → player; Squad CTA removed from Dashboard heading. Verified tsc + vitest (15).
 
-Commit: _(pending)_
+Commit: `c5c1c0b`
