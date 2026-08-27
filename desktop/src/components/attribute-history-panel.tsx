@@ -3,23 +3,12 @@
 import { useMemo, useState } from "react";
 import type { LivePlayer } from "@/domain/adapters";
 import {
-  HIDDEN_ATTRIBUTES,
-  PERSONALITY_ATTRIBUTES,
-} from "@/domain/attribute-desk";
-import {
   colorForSeries,
-  factualHistorySummary,
   getPlayerAttrHistory,
 } from "@/domain/attribute-history";
 import { AttributeDesk } from "@/components/attribute-desk";
 
-const PLOT_PRESETS: Record<string, string[]> = {
-  Ability: ["CA", "PA"],
-  Hidden: [...HIDDEN_ATTRIBUTES],
-  Personality: [...PERSONALITY_ATTRIBUTES],
-  Development: ["CA", "Determination", "Professionalism", "Consistency", "Natural Fitness"],
-};
-
+const DEFAULT_PLOT = ["CA", "PA"] as const;
 const MAX_PLOT_SERIES = 6;
 
 function smoothLinePath(pts: Array<{ x: number; y: number }>): string {
@@ -41,16 +30,6 @@ function smoothLinePath(pts: Array<{ x: number; y: number }>): string {
   return d;
 }
 
-function shortFieldLabel(field: string): string {
-  if (field === "CA") return "Ability";
-  if (field === "PA") return "Potential";
-  if (field === "Important Matches") return "Imp. Matches";
-  if (field === "Injury Proneness") return "Injury Pron.";
-  if (field === "Natural Fitness") return "Nat. Fitness";
-  if (field === "Professionalism") return "Professionalism";
-  return field;
-}
-
 export function AttributeHistoryPanel({
   player,
   historySyncKey = null,
@@ -59,29 +38,10 @@ export function AttributeHistoryPanel({
   historySyncKey?: string | null;
 }) {
   const points = getPlayerAttrHistory(player.id);
-  const summary = factualHistorySummary(points);
-  const available = useMemo(() => {
-    const keys = new Set<string>();
-    for (const point of points) {
-      for (const key of Object.keys(point.values)) keys.add(key);
-    }
-    return keys;
-  }, [player.id, points.length, historySyncKey]);
-
-  const [preset, setPreset] = useState<keyof typeof PLOT_PRESETS | "Custom">("Ability");
-  const [selected, setSelected] = useState<string[]>(() =>
-    PLOT_PRESETS.Ability.filter((field) => true),
-  );
-
+  const [selected, setSelected] = useState<string[]>(() => [...DEFAULT_PLOT]);
   const selectedSet = useMemo(() => new Set(selected), [selected]);
 
-  const applyPreset = (name: keyof typeof PLOT_PRESETS) => {
-    setPreset(name);
-    setSelected(PLOT_PRESETS[name]!.filter((field) => available.size === 0 || available.has(field) || field === "CA" || field === "PA"));
-  };
-
   const toggleField = (field: string) => {
-    setPreset("Custom");
     setSelected((current) => {
       if (current.includes(field)) return current.filter((item) => item !== field);
       if (current.length >= MAX_PLOT_SERIES) return [...current.slice(1), field];
@@ -89,7 +49,9 @@ export function AttributeHistoryPanel({
     });
   };
 
-  const plotFields = selected.filter((field) => available.has(field) || points.some((p) => field in p.values));
+  const plotFields = selected.filter((field) =>
+    points.some((point) => typeof point.values[field] === "number"),
+  );
 
   const chart = useMemo(() => {
     if (points.length === 0 || plotFields.length === 0) return null;
@@ -154,8 +116,6 @@ export function AttributeHistoryPanel({
       width,
       height,
       pad,
-      yMin: normalize ? 0 : sharedMin,
-      yMax: normalize ? 1 : sharedMax,
       yLabelTop: normalize ? "↑" : String(Math.round(sharedMax)),
       yLabelBottom: normalize ? "↓" : String(Math.round(sharedMin)),
       normalize,
@@ -164,66 +124,12 @@ export function AttributeHistoryPanel({
     };
   }, [player.id, points, plotFields.join("\0")]);
 
-  if (points.length === 0) {
-    return (
-      <section className="dossier-panel tab-evidence-panel development-desk-panel">
-        <header>
-          <h2>Development</h2>
-          <span>No observations yet</span>
-        </header>
-        <p className="evidence-caption development-desk-empty">
-          Each Load appends a point when this player’s tracked values change. Play in FM, reload here —
-          the desk shows all-time Δ and the plot tracks any attribute you select.
-        </p>
-      </section>
-    );
-  }
-
   return (
     <section className="dossier-panel tab-evidence-panel development-desk-panel">
-      <header>
-        <h2>Development</h2>
-        <span>All-time Δ · click rows to plot</span>
-      </header>
-
-      {summary ? <p className="attr-history-summary development-desk-summary">{summary}</p> : null}
-
       <div className="development-desk-body">
-        <div className="development-desk-plot-block">
-          <div className="attr-history-presets development-plot-presets" role="group" aria-label="Plot presets">
-            {(Object.keys(PLOT_PRESETS) as Array<keyof typeof PLOT_PRESETS>).map((name) => (
-              <button
-                key={name}
-                type="button"
-                className={preset === name ? "is-on" : undefined}
-                onClick={() => applyPreset(name)}
-              >
-                {name}
-              </button>
-            ))}
-          </div>
-
-          <div className="development-plot-legend" aria-label="Plotted fields">
-            {plotFields.length ? (
-              plotFields.map((field, index) => (
-                <button
-                  key={field}
-                  type="button"
-                  className="development-plot-legend-item"
-                  onClick={() => toggleField(field)}
-                  title="Remove from plot"
-                >
-                  <i style={{ background: colorForSeries(index) }} />
-                  {shortFieldLabel(field)}
-                </button>
-              ))
-            ) : (
-              <span>Select desk rows or a preset to plot.</span>
-            )}
-          </div>
-
-          <div className="development-desk-chart">
-            {chart ? (
+        {chart ? (
+          <div className="development-desk-plot-block">
+            <div className="development-desk-chart">
               <svg viewBox={`0 0 ${chart.width} ${chart.height}`} role="img" aria-label="Attribute development plot">
                 <text x={6} y={chart.pad.top + 4} className="attr-history-axis">
                   {chart.yLabelTop}
@@ -231,11 +137,6 @@ export function AttributeHistoryPanel({
                 <text x={6} y={chart.height - chart.pad.bottom} className="attr-history-axis">
                   {chart.yLabelBottom}
                 </text>
-                {chart.normalize ? (
-                  <text x={chart.width - 8} y={12} textAnchor="end" className="attr-history-axis">
-                    shapes (mixed scale)
-                  </text>
-                ) : null}
                 {chart.series.map((series) => (
                   <g key={series.field}>
                     <path d={series.path} fill="none" stroke={series.color} strokeWidth={2} />
@@ -256,11 +157,9 @@ export function AttributeHistoryPanel({
                   </text>
                 ))}
               </svg>
-            ) : (
-              <p className="evidence-caption">Need values in history for the selected fields.</p>
-            )}
+            </div>
           </div>
-        </div>
+        ) : null}
 
         <div className="development-desk-attrs">
           <AttributeDesk

@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-08-27 (T182 live Squad at-club only)
+Last updated: 2026-08-27 (T185 Development plot+desk only done)
 
 ## Now
 
@@ -20,6 +20,7 @@ _(empty — pick next ready ticket)_
 
 ## Recently done
 
+- **T185** Development content = plot + desk only (zero chrome)
 - **T182** Live Squad = at-club match squad only (`loanedOut` via person loan agreement)
 - **T184** Development desk compact single-page (all-time Δ desk + plot)
 - **T183** Development desk = player timeline evidence (facts over doctrine caption)
@@ -30,7 +31,6 @@ _(empty — pick next ready ticket)_
 - **T177** Dashboard Prospects
 - **T176** Dashboard Movers
 - **T175** Badge media box clips tall flags
-- **T173** Best-position squad labels and groups
 
 ## Loop
 
