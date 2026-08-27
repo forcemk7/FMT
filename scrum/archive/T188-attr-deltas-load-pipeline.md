@@ -22,4 +22,4 @@ depends_on: []
 ## Progress
 
 - `ingestSnapshotPlayers` in fmt-app; LivePlayer delta fields; AttributeDesk reads attached maps
-- Commit: (filled after git)
+- Commit: `b9d798d`
