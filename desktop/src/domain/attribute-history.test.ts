@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   allTimeDeltasFromPoints,
   buildAttrTimeline,
-  factualHistorySummary,
   fieldDeltas,
   movedFieldsBetween,
+  parseAttrHistoryStore,
   rankSquadMovers,
   recentDeltasFromPoints,
   type AttrHistoryPoint,
@@ -130,17 +130,25 @@ describe("buildAttrTimeline", () => {
   });
 });
 
-describe("factualHistorySummary", () => {
-  it("states observation counts without Det/Pro mentoring advice", () => {
-    const points: AttrHistoryPoint[] = [
-      { at: "2026-01-01", values: { CA: 100, Determination: 10 } },
-      { at: "2026-01-02", values: { CA: 104, Determination: 11 } },
-    ];
-    const summary = factualHistorySummary(points);
-    expect(summary).toContain("2 observations");
-    expect(summary).toContain("CA +4");
-    expect(summary).toContain("2 fields moved last load");
-    expect(summary?.toLowerCase()).not.toContain("mentor");
-    expect(summary?.toLowerCase()).not.toContain("high-det");
+describe("parseAttrHistoryStore", () => {
+  it("discards version 1 stores poisoned by pre-T132 attr rounding", () => {
+    const raw = JSON.stringify({
+      version: 1,
+      players: {
+        p1: [{ at: "2026-01-01", values: { Crossing: 8, CA: 140 } }],
+      },
+    });
+    expect(parseAttrHistoryStore(raw)).toEqual({ version: 2, players: {} });
+  });
+
+  it("keeps version 2 stores", () => {
+    const raw = JSON.stringify({
+      version: 2,
+      players: {
+        p1: [{ at: "2026-01-01", values: { Crossing: 7, CA: 146 } }],
+      },
+    });
+    expect(parseAttrHistoryStore(raw).players.p1).toHaveLength(1);
+    expect(parseAttrHistoryStore(raw).version).toBe(2);
   });
 });

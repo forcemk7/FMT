@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-08-27 (T186 Development plot match + Δ fix done)
+Last updated: 2026-08-27 (T187 invalidate poisoned attr history done)
 
 ## Now
 
@@ -20,6 +20,7 @@ _(empty — pick next ready ticket)_
 
 ## Recently done
 
+- **T187** Invalidate attr history poisoned by old rounding (v2 store)
 - **T186** Development plot color match, hover values, all-time Δ layout fix
 - **T185** Development content = plot + desk only (zero chrome)
 - **T182** Live Squad = at-club match squad only (`loanedOut` via person loan agreement)
@@ -30,7 +31,6 @@ _(empty — pick next ready ticket)_
 - **T179** Dashboard widgets as distinct panels
 - **T178** Compact dashboard as filtered-view router
 - **T177** Dashboard Prospects
-- **T176** Dashboard Movers
 
 ## Loop
 

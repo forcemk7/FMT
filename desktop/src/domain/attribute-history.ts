@@ -1,11 +1,17 @@
 /**
  * Append-only attribute history (visible / hidden / personality / CA / PA).
  * Never overwrites prior change-points — spreadsheet replacement with ups and downs.
+ *
+ * Store v2: T132 fixed FM attr rounding `(raw+2)/5`. v1 points were often +1 high;
+ * keeping them made Development “all-time” look like blanket −1 after the fix.
  */
 
 import type { LivePlayer } from "@/domain/adapters";
 
-const STORAGE_KEY = "fmt.attr-history.v1";
+const STORE_VERSION = 2 as const;
+const STORAGE_KEY = "fmt.attr-history.v2";
+/** Pre-T132 rounding poison — ignore and drop if still present. */
+const LEGACY_STORAGE_KEY = "fmt.attr-history.v1";
 
 export type AttrHistoryPoint = {
   /** Wall-clock observation time (ISO). */
@@ -16,12 +22,12 @@ export type AttrHistoryPoint = {
 };
 
 export type AttrHistoryStore = {
-  version: 1;
+  version: typeof STORE_VERSION;
   players: Record<string, AttrHistoryPoint[]>;
 };
 
 function emptyStore(): AttrHistoryStore {
-  return { version: 1, players: {} };
+  return { version: STORE_VERSION, players: {} };
 }
 
 function isFiniteNumber(value: unknown): value is number {
@@ -52,14 +58,34 @@ function signaturesEqual(a: Record<string, number>, b: Record<string, number>): 
   return true;
 }
 
+/** Parse persisted JSON; any non-v2 payload is treated as empty (drops rounding-poisoned v1). */
+export function parseAttrHistoryStore(raw: string | null | undefined): AttrHistoryStore {
+  if (!raw) return emptyStore();
+  try {
+    const parsed = JSON.parse(raw) as { version?: unknown; players?: unknown };
+    if (
+      !parsed ||
+      parsed.version !== STORE_VERSION ||
+      typeof parsed.players !== "object" ||
+      parsed.players == null ||
+      Array.isArray(parsed.players)
+    ) {
+      return emptyStore();
+    }
+    return { version: STORE_VERSION, players: parsed.players as Record<string, AttrHistoryPoint[]> };
+  } catch {
+    return emptyStore();
+  }
+}
+
 export function loadAttrHistoryStore(): AttrHistoryStore {
   try {
     if (typeof window === "undefined") return emptyStore();
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return emptyStore();
-    const parsed = JSON.parse(raw) as AttrHistoryStore;
-    if (!parsed || parsed.version !== 1 || typeof parsed.players !== "object") return emptyStore();
-    return parsed;
+    // Drop legacy v1 so Development cannot read poisoned baselines.
+    if (window.localStorage.getItem(LEGACY_STORAGE_KEY) != null) {
+      window.localStorage.removeItem(LEGACY_STORAGE_KEY);
+    }
+    return parseAttrHistoryStore(window.localStorage.getItem(STORAGE_KEY));
   } catch {
     return emptyStore();
   }
@@ -68,7 +94,8 @@ export function loadAttrHistoryStore(): AttrHistoryStore {
 export function saveAttrHistoryStore(store: AttrHistoryStore): void {
   try {
     if (typeof window === "undefined") return;
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+    const payload: AttrHistoryStore = { version: STORE_VERSION, players: store.players };
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch {
     // Quota / private mode — history is best-effort.
   }
