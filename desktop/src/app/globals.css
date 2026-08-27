@@ -1480,17 +1480,17 @@ button:active,
   overflow:visible;
   padding-bottom:8px;
 }
-.development-desk-attrs{
-  overflow:visible;
-}
 .development-desk-plot-block{
   flex:0 0 auto;
   display:flex;
   flex-direction:column;
   gap:4px;
-  padding:0 10px;
-  border-top:1px solid var(--border);
-  padding-top:6px;
+  padding:0 10px 6px;
+  border-bottom:1px solid var(--border);
+}
+.development-desk-attrs{
+  overflow:visible;
+  border-top:0;
 }
 .development-plot-presets{margin:0}
 .development-plot-presets button{height:24px;padding:0 9px;font-size:9px;border-radius:6px}

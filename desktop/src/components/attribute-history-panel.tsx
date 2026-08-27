@@ -189,17 +189,6 @@ export function AttributeHistoryPanel({
       {summary ? <p className="attr-history-summary development-desk-summary">{summary}</p> : null}
 
       <div className="development-desk-body">
-        <div className="development-desk-attrs">
-          <AttributeDesk
-            player={player}
-            deltaMode="allTime"
-            compact
-            historySyncKey={historySyncKey}
-            selectedFields={selectedSet}
-            onToggleField={toggleField}
-          />
-        </div>
-
         <div className="development-desk-plot-block">
           <div className="attr-history-presets development-plot-presets" role="group" aria-label="Plot presets">
             {(Object.keys(PLOT_PRESETS) as Array<keyof typeof PLOT_PRESETS>).map((name) => (
@@ -271,6 +260,17 @@ export function AttributeHistoryPanel({
               <p className="evidence-caption">Need values in history for the selected fields.</p>
             )}
           </div>
+        </div>
+
+        <div className="development-desk-attrs">
+          <AttributeDesk
+            player={player}
+            deltaMode="allTime"
+            compact
+            historySyncKey={historySyncKey}
+            selectedFields={selectedSet}
+            onToggleField={toggleField}
+          />
         </div>
       </div>
     </section>
