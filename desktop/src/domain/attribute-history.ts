@@ -127,6 +127,79 @@ export function fieldDeltas(
   return { recent, allTime, latest };
 }
 
+/** Recent (vs previous change-point) delta for every field in a history series. */
+export function recentDeltasFromPoints(points: AttrHistoryPoint[]): Record<string, number | null> {
+  if (!points.length) return {};
+  const fields = new Set<string>();
+  for (const point of points) {
+    for (const key of Object.keys(point.values)) fields.add(key);
+  }
+  const deltas: Record<string, number | null> = {};
+  for (const field of fields) {
+    deltas[field] = fieldDeltas(points, field).recent;
+  }
+  return deltas;
+}
+
+/** Recent (vs previous change-point) delta for every field seen in this player's history. */
+export function recentDeltasForPlayer(playerId: string): Record<string, number | null> {
+  return recentDeltasFromPoints(getPlayerAttrHistory(playerId));
+}
+
+export type SquadMoverChange = { field: string; delta: number };
+
+export type SquadMover<T extends { id: string } = { id: string }> = {
+  player: T;
+  changes: SquadMoverChange[];
+  /** Sum of |delta| — primary sort key. */
+  magnitude: number;
+};
+
+const MOVER_FIELD_PRIORITY = ["CA", "PA", "Determination", "Professionalism"];
+
+function sortMoverChanges(changes: SquadMoverChange[]): SquadMoverChange[] {
+  return [...changes].sort((a, b) => {
+    const ai = MOVER_FIELD_PRIORITY.indexOf(a.field);
+    const bi = MOVER_FIELD_PRIORITY.indexOf(b.field);
+    const aPri = ai === -1 ? 99 : ai;
+    const bPri = bi === -1 ? 99 : bi;
+    if (aPri !== bPri) return aPri - bPri;
+    if (Math.abs(b.delta) !== Math.abs(a.delta)) return Math.abs(b.delta) - Math.abs(a.delta);
+    return a.field.localeCompare(b.field);
+  });
+}
+
+/**
+ * Managed-squad players with any non-zero recent history delta (vs prior change-point).
+ * Empty when history has fewer than two points or nothing moved.
+ */
+export function rankSquadMovers<T extends { id: string }>(
+  players: T[],
+  getHistory: (playerId: string) => AttrHistoryPoint[] = getPlayerAttrHistory,
+  limit = 12,
+): SquadMover<T>[] {
+  const movers: SquadMover<T>[] = [];
+  for (const player of players) {
+    if (!player.id) continue;
+    const deltas = recentDeltasFromPoints(getHistory(player.id));
+    const changes: SquadMoverChange[] = [];
+    let magnitude = 0;
+    for (const [field, delta] of Object.entries(deltas)) {
+      if (delta == null || delta === 0) continue;
+      changes.push({ field, delta });
+      magnitude += Math.abs(delta);
+    }
+    if (!changes.length) continue;
+    movers.push({ player, changes: sortMoverChanges(changes), magnitude });
+  }
+  movers.sort((a, b) => {
+    if (b.magnitude !== a.magnitude) return b.magnitude - a.magnitude;
+    if (b.changes.length !== a.changes.length) return b.changes.length - a.changes.length;
+    return a.player.id.localeCompare(b.player.id);
+  });
+  return movers.slice(0, Math.max(0, limit));
+}
+
 export function formatDelta(value: number | null): string {
   if (value == null) return "—";
   if (value > 0) return `+${value}`;

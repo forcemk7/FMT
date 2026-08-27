@@ -3,26 +3,19 @@
 import { useMemo } from "react";
 import { ArrowRight } from "lucide-react";
 import type { LiveFootballSnapshot, LivePlayer } from "@/domain/adapters";
+import {
+  formatDelta,
+  rankSquadMovers,
+  type SquadMoverChange,
+} from "@/domain/attribute-history";
 import { formatPlayerPositions } from "@/domain/live-data";
-import { formatHasScore, hasBand, liveHasBreakdown, squadHasRankings, type HasTone } from "@/domain/has-score";
+import { formatHasScore, hasBand, squadHasRankings, type HasTone } from "@/domain/has-score";
+import { attributeDeltaTone } from "@/domain/attribute-tone";
 import { LiveDataState } from "@/components/live-data-state";
+import { HasBreakdownGridFromPlayer } from "@/components/has-breakdown-grid";
 import { PlayerFace } from "@/components/player-face";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-
-function HasBreakdownTooltip({ player }: { player: LivePlayer }) {
-  const rows = liveHasBreakdown(player);
-  return (
-    <div className="dash-has-tooltip-grid" aria-label="HAS inputs">
-      {rows.map((row) => (
-        <span key={row.abbr} className={`dash-has-tooltip-cell tone-${row.tone}`} title={row.label}>
-          <small>{row.abbr}</small>
-          <strong>{row.value}</strong>
-        </span>
-      ))}
-    </div>
-  );
-}
 
 function HasCard({
   player,
@@ -50,9 +43,52 @@ function HasCard({
         }
       />
       <TooltipContent side="bottom" align="start" className="dash-has-tooltip">
-        <HasBreakdownTooltip player={player} />
+        <HasBreakdownGridFromPlayer player={player} />
       </TooltipContent>
     </Tooltip>
+  );
+}
+
+function MoverChangeChips({ changes }: { changes: SquadMoverChange[] }) {
+  const shown = changes.slice(0, 4);
+  const extra = changes.length - shown.length;
+  return (
+    <span className="dash-mover-chips">
+      {shown.map((change) => {
+        const tone = attributeDeltaTone(change.field, change.delta) ?? "mid";
+        return (
+          <span
+            key={change.field}
+            className={`dash-mover-chip attr-tone attr-tone-${tone}`}
+            title={`${change.field} ${formatDelta(change.delta)}`}
+          >
+            <small>{change.field}</small> {formatDelta(change.delta)}
+          </span>
+        );
+      })}
+      {extra > 0 ? <span className="dash-mover-chip is-more">+{extra}</span> : null}
+    </span>
+  );
+}
+
+function MoverCard({
+  player,
+  changes,
+  onOpen,
+}: {
+  player: LivePlayer;
+  changes: SquadMoverChange[];
+  onOpen: (id: string) => void;
+}) {
+  return (
+    <button type="button" className="dash-has-card dash-mover-card" onClick={() => onOpen(player.id)}>
+      <PlayerFace playerId={player.id} name={player.name} size="sm" />
+      <span className="dash-has-card-copy">
+        <strong>{player.name}</strong>
+        <small>{formatPlayerPositions(player)}</small>
+      </span>
+      <MoverChangeChips changes={changes} />
+    </button>
   );
 }
 
@@ -75,6 +111,10 @@ export function DashboardScreen({
   );
   const club = snapshot.clubs.find((item) => item.id === snapshot.managedClubId);
   const has = useMemo(() => squadHasRankings(squad), [squad]);
+  const movers = useMemo(
+    () => rankSquadMovers(squad),
+    [squad, snapshot.status.lastSync, snapshot.status.lastSuccessfulRead],
+  );
   const ready =
     snapshot.status.state === "connected" && Boolean(snapshot.managedClubId) && squad.length > 0;
 
@@ -96,6 +136,39 @@ export function DashboardScreen({
           </Button>
         </div>
       </div>
+
+      <section className="screen-panel dash-has-widget" aria-label="Movers since last change">
+        <header className="screen-panel__head">
+          <h2>Movers</h2>
+        </header>
+        <div className="screen-panel__body">
+          {!ready ? (
+            <LiveDataState
+              snapshot={snapshot}
+              title="Dashboard"
+              checking={checking}
+              onRefresh={onRefresh}
+              compact
+            />
+          ) : movers.length ? (
+            <div className="dash-has-list dash-movers-list">
+              {movers.map(({ player, changes }) => (
+                <MoverCard
+                  key={player.id}
+                  player={player}
+                  changes={changes}
+                  onOpen={onOpenPlayer}
+                />
+              ))}
+            </div>
+          ) : (
+            <p className="evidence-caption">
+              No attribute moves since the last recorded change-point. Load again after training or
+              matches.
+            </p>
+          )}
+        </div>
+      </section>
 
       <section className="screen-panel dash-has-widget" aria-label="Personality overview">
         <header className="screen-panel__head">

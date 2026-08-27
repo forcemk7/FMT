@@ -221,6 +221,23 @@ body.fmt-shell .page-intro p,
 body.fmt-shell .dossier-heading p {
   color: var(--text-muted);
 }
+
+body.fmt-shell .player-facts {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+body.fmt-shell .player-facts-row:last-child > span,
+body.fmt-shell .player-facts-row:last-child > .player-club-fact {
+  border-color: var(--hairline);
+}
+body.fmt-shell .player-facts,
+body.fmt-shell .player-facts-row > span,
+body.fmt-shell .player-facts-row > .player-club-fact {
+  border-color: var(--hairline);
+}
+body.fmt-shell .player-facts b,
+body.fmt-shell .player-facts .player-fact-sub {
+  color: var(--text-muted);
+}
 body.fmt-shell .player-name-link {
   color: var(--text);
 }
@@ -230,12 +247,11 @@ body.fmt-shell .player-name-link:hover {
 
 /* —— Elevated panels —— */
 body.fmt-shell .squad-live-table,
+body.fmt-shell .squad-matrix,
 body.fmt-shell .dossier-panel,
 body.fmt-shell .player-dossier,
-body.fmt-shell .settings-list > article,
-body.fmt-shell .attr-colors-panel,
+body.fmt-shell .settings-list,
 body.fmt-shell .screen-panel,
-body.fmt-shell .settings-expand,
 body.fmt-shell .advanced-diagnostics,
 body.fmt-shell .read-pipeline-grid article {
   background: var(--panel) !important;
@@ -273,6 +289,9 @@ body.fmt-shell .dossier-panel > header h2 {
 body.fmt-shell .attribute-column strong {
   color: inherit;
 }
+body.fmt-shell .attribute-desk .attr-row-label {
+  color: var(--text-muted);
+}
 body.fmt-shell .attribute-column li,
 body.fmt-shell .attribute-column span,
 body.fmt-shell .attribute-column small {
@@ -296,9 +315,65 @@ body.fmt-shell .ability-ring-upper { --fit-color: var(--attr-tone-upper); }
 body.fmt-shell .ability-ring-mid { --fit-color: var(--attr-tone-mid); }
 body.fmt-shell .ability-ring-low { --fit-color: var(--attr-tone-low); }
 body.fmt-shell .ability-ring-super { --fit-color: var(--gold); }
+body.fmt-shell .squad-matrix {
+  background: var(--panel) !important;
+  border-color: var(--hairline);
+}
+body.fmt-shell .squad-position-head {
+  background: rgba(0, 0, 0, 0.22);
+  border-color: var(--hairline);
+}
+body.fmt-shell .squad-position-head h2 {
+  color: var(--text-muted);
+}
+body.fmt-shell .squad-position-head span {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-dim);
+}
+body.fmt-shell .squad-position-group {
+  border-color: var(--hairline);
+}
+body.fmt-shell .squad-player-card {
+  background: var(--panel-2);
+  border-color: var(--hairline);
+  color: var(--text);
+}
+body.fmt-shell .squad-player-card:hover {
+  background: var(--panel-3);
+  border-color: var(--hairline-strong);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
+}
+body.fmt-shell .squad-player-card:focus-visible {
+  outline-color: var(--gold);
+}
+body.fmt-shell .squad-player-card-copy strong {
+  color: var(--text);
+}
+body.fmt-shell .squad-player-card-copy > span {
+  color: var(--text-muted);
+}
+body.fmt-shell .squad-metric-ring-track {
+  stroke: rgba(255, 255, 255, 0.1);
+}
+body.fmt-shell .squad-metric-ring-label,
+body.fmt-shell .squad-metric-ring strong {
+  color: var(--text);
+}
+body.fmt-shell .squad-metric-ring-label.is-unknown,
+body.fmt-shell .squad-metric-ring strong.is-unknown {
+  color: var(--text-muted);
+}
 
 body.fmt-shell .dash-has-columns h3 {
   color: var(--text-dim);
+}
+body.fmt-shell .dash-mover-chip {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+body.fmt-shell .dash-mover-chip.is-more {
+  color: var(--text-muted);
+  background: transparent;
 }
 body.fmt-shell .dash-has-card {
   background: var(--panel-2);
@@ -360,11 +435,132 @@ body.fmt-shell .dash-has-tooltip-cell.tone-upper strong { color: var(--attr-tone
 body.fmt-shell .dash-has-tooltip-cell.tone-mid strong { color: var(--attr-tone-mid) !important; }
 body.fmt-shell .dash-has-tooltip-cell.tone-low strong { color: var(--attr-tone-low) !important; }
 
-body.fmt-shell .settings-expand-body,
-body.fmt-shell .attr-color-swatch {
-  background: var(--panel-2) !important;
+body.fmt-shell .settings-expand-body {
+  background: transparent !important;
   border-color: var(--hairline) !important;
   color: var(--text);
+}
+
+/* Settings — one list shell, rows inside (not separate floating cards) */
+body.fmt-shell .settings-list {
+  overflow: hidden;
+}
+body.fmt-shell .settings-list > article,
+body.fmt-shell .settings-list .settings-expand {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+body.fmt-shell .settings-list > article,
+body.fmt-shell .settings-list .settings-expand {
+  border-top: 1px solid var(--hairline) !important;
+}
+body.fmt-shell .settings-list > article:first-child {
+  border-top: 0 !important;
+}
+body.fmt-shell .settings-list > article strong,
+body.fmt-shell .settings-list .settings-expand > summary strong {
+  color: var(--text);
+}
+body.fmt-shell .settings-list > article span,
+body.fmt-shell .settings-list > article b,
+body.fmt-shell .settings-list .settings-expand > summary span,
+body.fmt-shell .settings-expand-meta b {
+  color: var(--text-muted);
+}
+body.fmt-shell .settings-list > article svg,
+body.fmt-shell .settings-list .settings-expand > summary > svg:first-child {
+  color: var(--mint);
+}
+body.fmt-shell .settings-face-pills li {
+  background: var(--panel-2) !important;
+  border-color: var(--hairline) !important;
+  color: var(--text-muted);
+}
+body.fmt-shell .settings-face-pills li > b[data-kind="Faces"] {
+  background: rgba(43, 184, 154, 0.18);
+  color: var(--mint);
+}
+body.fmt-shell .settings-face-pills li > b[data-kind="Logos"] {
+  background: rgba(58, 138, 207, 0.18);
+  color: var(--attr-tone-upper);
+}
+body.fmt-shell .read-pipeline-grid article[data-state="passed"] {
+  border-color: rgba(43, 184, 154, 0.35) !important;
+  background: rgba(43, 184, 154, 0.08) !important;
+}
+body.fmt-shell .read-pipeline-grid article[data-state="warning"] {
+  border-color: rgba(212, 180, 90, 0.4) !important;
+  background: rgba(212, 180, 90, 0.08) !important;
+}
+body.fmt-shell .read-pipeline-grid article[data-state="blocked"] {
+  border-color: rgba(189, 78, 78, 0.4) !important;
+  background: rgba(189, 78, 78, 0.08) !important;
+}
+body.fmt-shell .read-pipeline-grid article > span {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-muted);
+}
+body.fmt-shell .read-pipeline-grid article[data-state="passed"] > span {
+  background: rgba(43, 184, 154, 0.2);
+  color: var(--mint);
+}
+body.fmt-shell .read-pipeline-grid article[data-state="warning"] > span {
+  background: rgba(212, 180, 90, 0.2);
+  color: var(--gold);
+}
+body.fmt-shell .read-pipeline-grid article[data-state="blocked"] > span {
+  background: rgba(189, 78, 78, 0.2);
+  color: var(--attr-tone-low);
+}
+body.fmt-shell .read-pipeline-grid strong {
+  color: var(--text);
+}
+body.fmt-shell .read-pipeline-grid p {
+  color: var(--text-muted);
+}
+body.fmt-shell .graphics-pack-grid article[data-kind="Faces"] {
+  border-color: rgba(43, 184, 154, 0.35) !important;
+  background: rgba(43, 184, 154, 0.08) !important;
+}
+body.fmt-shell .graphics-pack-grid article[data-kind="Faces"] > span {
+  background: rgba(43, 184, 154, 0.2);
+  color: var(--mint);
+}
+body.fmt-shell .graphics-pack-grid article[data-kind="Logos"] {
+  border-color: rgba(58, 138, 207, 0.35) !important;
+  background: rgba(58, 138, 207, 0.08) !important;
+}
+body.fmt-shell .graphics-pack-grid article[data-kind="Logos"] > span {
+  background: rgba(58, 138, 207, 0.2);
+  color: var(--attr-tone-upper);
+}
+body.fmt-shell .graphics-pack-grid .graphics-pack-path {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-muted);
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 10px;
+  line-height: 1.45;
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+body.fmt-shell .advanced-diagnostics summary span {
+  color: var(--text);
+}
+body.fmt-shell .advanced-diagnostics dt {
+  color: var(--text-dim);
+}
+body.fmt-shell .advanced-diagnostics dd {
+  color: var(--text);
+}
+body.fmt-shell .advanced-diagnostics > p {
+  color: var(--text-muted);
+}
+body.fmt-shell .mapping-coverage > header {
+  background: rgba(0, 0, 0, 0.22) !important;
+  border-color: var(--hairline);
 }
 body.fmt-shell .live-data-state.is-compact,
 body.fmt-shell .live-data-state.is-empty {
@@ -433,4 +629,46 @@ body.fmt-shell .global-search-results > button small {
 body.fmt-shell .global-search-results > p {
   color: var(--text-muted);
   font-size: 13px;
+}
+
+body.fmt-shell .mentoring-column {
+  background: var(--panel-2);
+  border-color: var(--hairline);
+}
+body.fmt-shell .mentoring-column-head h3 {
+  color: var(--text);
+}
+body.fmt-shell .mentoring-count {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+body.fmt-shell .mentoring-player-card {
+  background: var(--panel);
+  border-color: var(--hairline);
+  color: var(--text);
+}
+body.fmt-shell .mentoring-player-card[data-tier="tradeoff"] {
+  border-color: rgba(46, 160, 130, 0.35);
+}
+body.fmt-shell .mentoring-player-card:hover {
+  background: var(--panel-3);
+  border-color: var(--hairline-strong);
+}
+body.fmt-shell .mentoring-player-name {
+  color: var(--text);
+}
+body.fmt-shell .mentoring-player-card-grid {
+  border-top-color: var(--hairline);
+}
+body.fmt-shell .mentoring-empty {
+  border-color: var(--hairline);
+}
+body.fmt-shell .mentoring-player-list {
+  scrollbar-color: transparent transparent;
+}
+body.fmt-shell .mentoring-player-list:hover {
+  scrollbar-color: var(--hairline-strong) transparent;
+}
+body.fmt-shell .mentoring-player-list:hover::-webkit-scrollbar-thumb {
+  background: var(--hairline-strong);
 }
