@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   allTimeDeltasFromPoints,
+  attachAttrDeltas,
   buildAttrTimeline,
   fieldDeltas,
   movedFieldsBetween,
@@ -8,7 +9,9 @@ import {
   rankSquadMovers,
   recentDeltasFromPoints,
   type AttrHistoryPoint,
+  type AttrHistoryStore,
 } from "./attribute-history";
+import type { LivePlayer } from "./adapters";
 
 describe("fieldDeltas", () => {
   const points: AttrHistoryPoint[] = [
@@ -127,6 +130,46 @@ describe("buildAttrTimeline", () => {
     expect(rows[0]!.moves).toEqual([{ field: "CA", from: 100, to: 102, delta: 2 }]);
     expect(rows[1]!.isFirst).toBe(true);
     expect(rows[1]!.moves).toEqual([]);
+  });
+});
+
+describe("attachAttrDeltas", () => {
+  it("stamps recent and all-time maps from a two-point store for Attributes/Development", () => {
+    const store: AttrHistoryStore = {
+      version: 2,
+      players: {
+        p1: [
+          { at: "2026-01-01", values: { CA: 140, Crossing: 8, Determination: 12 } },
+          { at: "2026-01-08", values: { CA: 146, Crossing: 7, Determination: 14 } },
+        ],
+      },
+    };
+    const [player] = attachAttrDeltas(
+      [{ id: "p1", name: "Test" } as LivePlayer],
+      store,
+    );
+    expect(player!.recentAttrDeltas).toEqual({
+      CA: 6,
+      Crossing: -1,
+      Determination: 2,
+    });
+    expect(player!.allTimeAttrDeltas).toEqual({
+      CA: 6,
+      Crossing: -1,
+      Determination: 2,
+    });
+  });
+
+  it("returns empty delta maps when only one observation exists", () => {
+    const store: AttrHistoryStore = {
+      version: 2,
+      players: {
+        p1: [{ at: "2026-01-01", values: { CA: 146, Crossing: 7 } }],
+      },
+    };
+    const [player] = attachAttrDeltas([{ id: "p1", name: "Test" } as LivePlayer], store);
+    expect(player!.recentAttrDeltas).toEqual({ CA: null, Crossing: null });
+    expect(player!.allTimeAttrDeltas).toEqual({ CA: null, Crossing: null });
   });
 });
 

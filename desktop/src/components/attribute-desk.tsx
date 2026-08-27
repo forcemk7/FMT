@@ -356,10 +356,20 @@ export function AttributeDesk({
   const gk = isGoalkeeperPosition(player.positions);
   const attrs = player.attributes;
   const deltas = useMemo(() => {
-    if (deltaMode === "recent") return recentDeltasForPlayer(player.id);
-    if (deltaMode === "allTime") return allTimeDeltasForPlayer(player.id);
+    if (deltaMode === "recent") {
+      return player.recentAttrDeltas ?? recentDeltasForPlayer(player.id);
+    }
+    if (deltaMode === "allTime") {
+      return player.allTimeAttrDeltas ?? allTimeDeltasForPlayer(player.id);
+    }
     return undefined;
-  }, [player.id, deltaMode, historySyncKey]);
+  }, [
+    player.id,
+    player.recentAttrDeltas,
+    player.allTimeAttrDeltas,
+    deltaMode,
+    historySyncKey,
+  ]);
 
   const select = { selectedFields, selectedOrder, onToggleField };
 

@@ -16,7 +16,7 @@ import {
   type LiveFootballSnapshot,
   type LivePlayer,
 } from "@/domain/adapters";
-import { recordPlayersFromSnapshot } from "@/domain/attribute-history";
+import { ingestSnapshotPlayers } from "@/domain/attribute-history";
 import { isDashViewId, type DashViewId } from "@/domain/dashboard-views";
 import { toggleFavorite, type FavoriteRecord } from "@/domain/live-data";
 import { warmSquadGraphics } from "@/domain/warm-squad-graphics";
@@ -145,9 +145,11 @@ export function FMTApp() {
     try {
       const nextSnapshot = await fm26LiveAdapter.getSnapshot();
       if (nextSnapshot.status.state === "connected" && nextSnapshot.players.length) {
-        recordPlayersFromSnapshot(nextSnapshot.players, nextSnapshot.season);
+        const players = ingestSnapshotPlayers(nextSnapshot.players, nextSnapshot.season);
         // UID → background XML index → disk cache. Never block Load Active Save.
-        warmSquadGraphics(nextSnapshot);
+        warmSquadGraphics({ ...nextSnapshot, players });
+        setSnapshot({ ...nextSnapshot, players });
+        return nextSnapshot.status;
       }
       setSnapshot(nextSnapshot);
       return nextSnapshot.status;

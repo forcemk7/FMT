@@ -135,6 +135,40 @@ export function recordPlayersFromSnapshot(
   return store;
 }
 
+/** Attach recent + all-time delta maps from a history store onto each player. */
+export function attachAttrDeltas(
+  players: LivePlayer[],
+  store: AttrHistoryStore = loadAttrHistoryStore(),
+): LivePlayer[] {
+  return players.map((player) => {
+    if (!player.id) {
+      return {
+        ...player,
+        recentAttrDeltas: {},
+        allTimeAttrDeltas: {},
+      };
+    }
+    const points = store.players[player.id] ?? [];
+    return {
+      ...player,
+      recentAttrDeltas: recentDeltasFromPoints(points),
+      allTimeAttrDeltas: allTimeDeltasFromPoints(points),
+    };
+  });
+}
+
+/**
+ * Load pipeline: append change-points, then stamp recent/all-time Δ on players
+ * for Attributes / Development desks.
+ */
+export function ingestSnapshotPlayers(
+  players: LivePlayer[],
+  gameDate?: string | null,
+): LivePlayer[] {
+  const store = recordPlayersFromSnapshot(players, gameDate);
+  return attachAttrDeltas(players, store);
+}
+
 export function getPlayerAttrHistory(playerId: string): AttrHistoryPoint[] {
   if (!playerId) return [];
   return loadAttrHistoryStore().players[playerId] ?? [];

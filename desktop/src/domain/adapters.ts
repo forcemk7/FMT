@@ -110,6 +110,10 @@ export type LivePlayer = {
   hiddenAttributes?: Record<string, number | null>;
   /** Personality pack (Adaptability…Controversy), 1–20 when readable */
   personalityAttributes?: Record<string, number | null>;
+  /** vs previous history change-point — attached on Load (Attributes desk). */
+  recentAttrDeltas?: Record<string, number | null>;
+  /** vs first history observation — attached on Load (Development desk). */
+  allTimeAttrDeltas?: Record<string, number | null>;
   per90?: Record<string, number | null>;
   inPossessionFit?: number | null;
   outOfPossessionFit?: number | null;
