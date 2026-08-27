@@ -35,14 +35,14 @@ function WidgetShell({
   empty?: string | null;
 }) {
   return (
-    <section className="dash-widget" aria-label={title}>
+    <section className="screen-panel dash-widget" aria-label={title}>
       <header className="dash-widget__head">
         <button type="button" className="dash-widget__title" onClick={() => onOpenView(viewId)}>
-          <h2>{title}</h2>
-          <ArrowRight aria-hidden className="dash-widget__chevron" />
+          <span className="dash-widget__label">{title}</span>
+          <ArrowRight aria-hidden className="dash-widget__chevron" size={16} strokeWidth={2.25} />
         </button>
       </header>
-      <div className="dash-widget__body">
+      <div className="screen-panel__body dash-widget__body">
         {children}
         {empty ? <p className="evidence-caption">{empty}</p> : null}
       </div>

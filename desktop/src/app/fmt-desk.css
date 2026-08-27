@@ -252,6 +252,7 @@ body.fmt-shell .dossier-panel,
 body.fmt-shell .player-dossier,
 body.fmt-shell .settings-list,
 body.fmt-shell .screen-panel,
+body.fmt-shell .dash-widget,
 body.fmt-shell .advanced-diagnostics,
 body.fmt-shell .read-pipeline-grid article {
   background: var(--panel) !important;
@@ -367,16 +368,25 @@ body.fmt-shell .squad-metric-ring strong.is-unknown {
 body.fmt-shell .dash-has-columns h3 {
   color: var(--text-dim);
 }
-body.fmt-shell .dash-widget {
-  background: var(--panel-2);
-  border-color: var(--hairline);
-}
 body.fmt-shell .dash-widget__head {
-  background: rgba(255, 255, 255, 0.03);
-  border-bottom-color: var(--hairline);
+  background: rgba(0, 0, 0, 0.22) !important;
+  border-bottom: 1px solid var(--hairline);
 }
-body.fmt-shell .dash-widget__title h2 {
+body.fmt-shell .dash-widget__label {
   color: var(--text);
+}
+body.fmt-shell .dash-widget__chevron {
+  color: var(--text-muted);
+}
+body.fmt-shell .dash-peek-list {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100%;
+}
+body.fmt-shell .dash-peek-row {
+  display: grid !important;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  width: 100%;
 }
 body.fmt-shell .dash-peek-row:hover {
   background: var(--panel-3);
