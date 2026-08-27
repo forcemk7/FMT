@@ -20,4 +20,4 @@ depends_on: []
 ## Progress
 
 - Stripped `AttributeHistoryPanel` chrome; row click still toggles plot series (default CA/PA)
-- Commit: (filled after git)
+- Commit: `04132b0`
