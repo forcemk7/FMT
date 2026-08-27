@@ -32,4 +32,4 @@ HAS and shell CSS drifted mid to `#9aa0c8`; correct FM mid is R230 G230 B250 (`#
 
 Shipped: `toneCssVar` / `toneClassName` / `toneHex` on `attr-colors`; mid locked `#e6e6fa`; globals drift `#9aa0c8` / `#5b5b7a` removed; HAS `HasTone` = `AppTone`. Vitest 12 pass.
 
-Commit: _(pending)_
+Commit: `f5b1f52`
