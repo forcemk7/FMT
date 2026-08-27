@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { useMemo } from "react";
 import type { LivePlayer } from "@/domain/adapters";
 import {
@@ -20,6 +20,7 @@ import {
 import { abilityToneFromScore, attributeTone } from "@/domain/attribute-tone";
 import {
   allTimeDeltasForPlayer,
+  colorForPlotField,
   recentDeltasForPlayer,
 } from "@/domain/attribute-history";
 import { AttrDeltaBadge } from "@/components/attr-delta-badge";
@@ -51,6 +52,7 @@ function AttrRow({
   showDeltaColumn = false,
   fieldKey,
   selected = false,
+  plotColor,
   onToggle,
 }: {
   label: string;
@@ -63,6 +65,7 @@ function AttrRow({
   /** History / plot field key (defaults to label). */
   fieldKey?: string;
   selected?: boolean;
+  plotColor?: string | null;
   onToggle?: (field: string) => void;
 }) {
   const key = fieldKey ?? label;
@@ -74,6 +77,13 @@ function AttrRow({
   ]
     .filter(Boolean)
     .join(" ");
+
+  const style =
+    selected && plotColor
+      ? ({
+          ["--plot-swatch" as string]: plotColor,
+        } as CSSProperties)
+      : undefined;
 
   const body = (
     <>
@@ -96,6 +106,7 @@ function AttrRow({
       <button
         type="button"
         className={className}
+        style={style}
         aria-pressed={selected}
         onClick={() => onToggle(key)}
       >
@@ -104,20 +115,27 @@ function AttrRow({
     );
   }
 
-  return <div className={className}>{body}</div>;
+  return (
+    <div className={className} style={style}>
+      {body}
+    </div>
+  );
 }
+
 
 function AttributeRows({
   names,
   values,
   deltas,
   selectedFields,
+  selectedOrder,
   onToggleField,
 }: {
   names: readonly string[];
   values: Record<string, number | null> | undefined;
   deltas?: Record<string, number | null>;
   selectedFields?: ReadonlySet<string>;
+  selectedOrder?: readonly string[];
   onToggleField?: (field: string) => void;
 }) {
   const showDeltaColumn = deltas !== undefined;
@@ -126,6 +144,7 @@ function AttributeRows({
       {names.map((name) => {
         const raw = values?.[name];
         const tone = typeof raw === "number" ? attributeTone(name, raw) : "mid";
+        const selected = selectedFields?.has(name) ?? false;
         return (
           <AttrRow
             key={name}
@@ -134,7 +153,8 @@ function AttributeRows({
             toneClass={`attr-tone attr-tone-${tone}`}
             delta={deltas?.[name]}
             showDeltaColumn={showDeltaColumn}
-            selected={selectedFields?.has(name) ?? false}
+            selected={selected}
+            plotColor={selected && selectedOrder ? colorForPlotField(name, selectedOrder) : null}
             onToggle={onToggleField}
           />
         );
@@ -200,6 +220,7 @@ function AttributeGroup({
   footer,
   deltas,
   selectedFields,
+  selectedOrder,
   onToggleField,
 }: {
   title: string;
@@ -210,6 +231,7 @@ function AttributeGroup({
   footer?: ReactNode;
   deltas?: Record<string, number | null>;
   selectedFields?: ReadonlySet<string>;
+  selectedOrder?: readonly string[];
   onToggleField?: (field: string) => void;
 }) {
   return (
@@ -220,6 +242,7 @@ function AttributeGroup({
         values={values}
         deltas={deltas}
         selectedFields={selectedFields}
+        selectedOrder={selectedOrder}
         onToggleField={onToggleField}
       />
       {footer}
@@ -256,12 +279,14 @@ function GeneralColumn({
   col = 3,
   deltas,
   selectedFields,
+  selectedOrder,
   onToggleField,
 }: {
   player: LivePlayer;
   col?: 1 | 2 | 3;
   deltas?: Record<string, number | null>;
   selectedFields?: ReadonlySet<string>;
+  selectedOrder?: readonly string[];
   onToggleField?: (field: string) => void;
 }) {
   const rows = [
@@ -285,21 +310,25 @@ function GeneralColumn({
     <section className="attribute-column attribute-general" data-col={col}>
       <AttributeHeading title="General" />
       <div className="attr-row-list">
-        {rows.map((row) => (
-          <AttrRow
-            key={row.label}
-            label={row.label}
-            fieldKey={row.field}
-            value={row.value}
-            toneClass={row.toneClass}
-            title={row.value === "—" ? undefined : row.value}
-            delta={deltas?.[row.field]}
-            deltaAttribute={row.field}
-            showDeltaColumn={showDeltaColumn}
-            selected={selectedFields?.has(row.field) ?? false}
-            onToggle={onToggleField}
-          />
-        ))}
+        {rows.map((row) => {
+          const selected = selectedFields?.has(row.field) ?? false;
+          return (
+            <AttrRow
+              key={row.label}
+              label={row.label}
+              fieldKey={row.field}
+              value={row.value}
+              toneClass={row.toneClass}
+              title={row.value === "—" ? undefined : row.value}
+              delta={deltas?.[row.field]}
+              deltaAttribute={row.field}
+              showDeltaColumn={showDeltaColumn}
+              selected={selected}
+              plotColor={selected && selectedOrder ? colorForPlotField(row.field, selectedOrder) : null}
+              onToggle={onToggleField}
+            />
+          );
+        })}
       </div>
     </section>
   );
@@ -312,6 +341,7 @@ export function AttributeDesk({
   compact = false,
   historySyncKey = null,
   selectedFields,
+  selectedOrder,
   onToggleField,
 }: {
   player: LivePlayer;
@@ -319,6 +349,8 @@ export function AttributeDesk({
   compact?: boolean;
   historySyncKey?: string | null;
   selectedFields?: ReadonlySet<string>;
+  /** Selection order — drives plot swatch colors on rows. */
+  selectedOrder?: readonly string[];
   onToggleField?: (field: string) => void;
 }) {
   const gk = isGoalkeeperPosition(player.positions);
@@ -329,7 +361,7 @@ export function AttributeDesk({
     return undefined;
   }, [player.id, deltaMode, historySyncKey]);
 
-  const select = { selectedFields, onToggleField };
+  const select = { selectedFields, selectedOrder, onToggleField };
 
   return (
     <div

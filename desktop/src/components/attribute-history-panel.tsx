@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type MouseEvent } from "react";
 import type { LivePlayer } from "@/domain/adapters";
 import {
   colorForSeries,
   getPlayerAttrHistory,
+  type AttrHistoryPoint,
 } from "@/domain/attribute-history";
 import { AttributeDesk } from "@/components/attribute-desk";
 
@@ -30,6 +31,16 @@ function smoothLinePath(pts: Array<{ x: number; y: number }>): string {
   return d;
 }
 
+function shortFieldLabel(field: string): string {
+  if (field === "CA") return "Ability";
+  if (field === "PA") return "Potential";
+  return field;
+}
+
+function observationLabel(point: AttrHistoryPoint, index: number): string {
+  return point.gameDate?.trim() || `Observation ${index + 1}`;
+}
+
 export function AttributeHistoryPanel({
   player,
   historySyncKey = null,
@@ -39,6 +50,7 @@ export function AttributeHistoryPanel({
 }) {
   const points = getPlayerAttrHistory(player.id);
   const [selected, setSelected] = useState<string[]>(() => [...DEFAULT_PLOT]);
+  const [hoverIndex, setHoverIndex] = useState<number | null>(null);
   const selectedSet = useMemo(() => new Set(selected), [selected]);
 
   const toggleField = (field: string) => {
@@ -98,31 +110,53 @@ export function AttributeHistoryPanel({
       pad.top + ((max - value) / (max - min)) * innerH;
 
     const series = validRanges.map((row, index) => {
+      const orderIndex = selected.indexOf(row.field);
+      const color = colorForSeries(orderIndex >= 0 ? orderIndex : index);
       const pts = points.flatMap((point, pointIndex) => {
         const value = point.values[row.field];
         if (typeof value !== "number") return [];
         const y = normalize ? yAtNorm(value, row.min, row.max) : yAtShared(value);
-        return [{ x: xAt(pointIndex), y }];
+        return [{ x: xAt(pointIndex), y, value, pointIndex }];
       });
-      return { field: row.field, color: colorForSeries(index), path: smoothLinePath(pts), pts };
+      return { field: row.field, color, path: smoothLinePath(pts), pts };
     });
 
     const xLabels = points.map((point, index) => ({
       x: xAt(index),
-      label: point.gameDate?.trim() || String(index + 1),
+      label: observationLabel(point, index),
     }));
 
     return {
       width,
       height,
       pad,
+      innerW,
       yLabelTop: normalize ? "↑" : String(Math.round(sharedMax)),
       yLabelBottom: normalize ? "↓" : String(Math.round(sharedMin)),
-      normalize,
       series,
       xLabels,
+      xAt,
     };
-  }, [player.id, points, plotFields.join("\0")]);
+  }, [player.id, points, plotFields.join("\0"), selected.join("\0")]);
+
+  const hoverPoint =
+    hoverIndex != null && points[hoverIndex] ? points[hoverIndex]! : null;
+
+  const onPlotMove = (event: MouseEvent<SVGSVGElement>) => {
+    if (!chart || points.length === 0) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width) * chart.width;
+    let best = 0;
+    let bestDist = Infinity;
+    for (let index = 0; index < points.length; index++) {
+      const dist = Math.abs(chart.xAt(index) - x);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = index;
+      }
+    }
+    setHoverIndex(best);
+  };
 
   return (
     <section className="dossier-panel tab-evidence-panel development-desk-panel">
@@ -130,7 +164,13 @@ export function AttributeHistoryPanel({
         {chart ? (
           <div className="development-desk-plot-block">
             <div className="development-desk-chart">
-              <svg viewBox={`0 0 ${chart.width} ${chart.height}`} role="img" aria-label="Attribute development plot">
+              <svg
+                viewBox={`0 0 ${chart.width} ${chart.height}`}
+                role="img"
+                aria-label="Attribute development plot"
+                onMouseMove={onPlotMove}
+                onMouseLeave={() => setHoverIndex(null)}
+              >
                 <text x={6} y={chart.pad.top + 4} className="attr-history-axis">
                   {chart.yLabelTop}
                 </text>
@@ -140,11 +180,26 @@ export function AttributeHistoryPanel({
                 {chart.series.map((series) => (
                   <g key={series.field}>
                     <path d={series.path} fill="none" stroke={series.color} strokeWidth={2} />
-                    {series.pts.map((pt, index) => (
-                      <circle key={`${series.field}-${index}`} cx={pt.x} cy={pt.y} r={2.5} fill={series.color} />
+                    {series.pts.map((pt) => (
+                      <circle
+                        key={`${series.field}-${pt.pointIndex}`}
+                        cx={pt.x}
+                        cy={pt.y}
+                        r={hoverIndex === pt.pointIndex ? 3.5 : 2.5}
+                        fill={series.color}
+                      />
                     ))}
                   </g>
                 ))}
+                {hoverIndex != null ? (
+                  <line
+                    x1={chart.xAt(hoverIndex)}
+                    x2={chart.xAt(hoverIndex)}
+                    y1={chart.pad.top}
+                    y2={chart.height - chart.pad.bottom}
+                    className="development-plot-guide"
+                  />
+                ) : null}
                 {chart.xLabels.map((item, index) => (
                   <text
                     key={`${item.label}-${index}`}
@@ -157,6 +212,24 @@ export function AttributeHistoryPanel({
                   </text>
                 ))}
               </svg>
+              {hoverPoint && hoverIndex != null ? (
+                <div className="development-plot-hover" role="status">
+                  <strong>{observationLabel(hoverPoint, hoverIndex)}</strong>
+                  <ul>
+                    {plotFields.map((field) => {
+                      const value = hoverPoint.values[field];
+                      const color = colorForSeries(selected.indexOf(field));
+                      return (
+                        <li key={field}>
+                          <i style={{ background: color }} />
+                          <span>{shortFieldLabel(field)}</span>
+                          <b>{typeof value === "number" ? value : "—"}</b>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ) : null}
             </div>
           </div>
         ) : null}
@@ -168,6 +241,7 @@ export function AttributeHistoryPanel({
             compact
             historySyncKey={historySyncKey}
             selectedFields={selectedSet}
+            selectedOrder={selected}
             onToggleField={toggleField}
           />
         </div>

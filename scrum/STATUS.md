@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-08-27 (T185 Development plot+desk only done)
+Last updated: 2026-08-27 (T186 Development plot match + Δ fix done)
 
 ## Now
 
@@ -20,6 +20,7 @@ _(empty — pick next ready ticket)_
 
 ## Recently done
 
+- **T186** Development plot color match, hover values, all-time Δ layout fix
 - **T185** Development content = plot + desk only (zero chrome)
 - **T182** Live Squad = at-club match squad only (`loanedOut` via person loan agreement)
 - **T184** Development desk compact single-page (all-time Δ desk + plot)
@@ -30,7 +31,6 @@ _(empty — pick next ready ticket)_
 - **T178** Compact dashboard as filtered-view router
 - **T177** Dashboard Prospects
 - **T176** Dashboard Movers
-- **T175** Badge media box clips tall flags
 
 ## Loop
 

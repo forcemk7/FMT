@@ -117,13 +117,24 @@ export function fieldDeltas(
   points: AttrHistoryPoint[],
   field: string,
 ): { recent: number | null; allTime: number | null; latest: number | null } {
-  const series = points
-    .map((point) => point.values[field])
-    .filter((value): value is number => isFiniteNumber(value));
-  if (!series.length) return { recent: null, allTime: null, latest: null };
-  const latest = series[series.length - 1]!;
-  const recent = series.length >= 2 ? latest - series[series.length - 2]! : null;
-  const allTime = series.length >= 2 ? latest - series[0]! : null;
+  if (!points.length) return { recent: null, allTime: null, latest: null };
+
+  // All-time = last observation − first observation for this field.
+  // Do not skip early points that lack the field (that invents a false baseline).
+  const firstRaw = points[0]!.values[field];
+  const lastRaw = points[points.length - 1]!.values[field];
+  const latest = isFiniteNumber(lastRaw) ? lastRaw : null;
+  const allTime =
+    points.length >= 2 && isFiniteNumber(firstRaw) && isFiniteNumber(lastRaw)
+      ? lastRaw - firstRaw
+      : null;
+
+  let recent: number | null = null;
+  if (points.length >= 2) {
+    const prevRaw = points[points.length - 2]!.values[field];
+    if (isFiniteNumber(prevRaw) && isFiniteNumber(lastRaw)) recent = lastRaw - prevRaw;
+  }
+
   return { recent, allTime, latest };
 }
 
@@ -325,3 +336,11 @@ const PLOT_COLORS = [
 export function colorForSeries(index: number): string {
   return PLOT_COLORS[index % PLOT_COLORS.length]!;
 }
+
+/** Stable plot color for a field in the current selection order; null if not selected. */
+export function colorForPlotField(field: string, selectedFields: readonly string[]): string | null {
+  const index = selectedFields.indexOf(field);
+  if (index < 0) return null;
+  return colorForSeries(index);
+}
+

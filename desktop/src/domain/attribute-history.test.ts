@@ -25,6 +25,16 @@ describe("fieldDeltas", () => {
   it("returns null recent when only one point exists", () => {
     expect(fieldDeltas([points[0]!], "CA")).toEqual({ recent: null, allTime: null, latest: 100 });
   });
+
+  it("all-time is null when the first observation lacks the field", () => {
+    const sparse: AttrHistoryPoint[] = [
+      { at: "2026-01-01", values: { Passing: 10 } },
+      { at: "2026-01-02", values: { CA: 100, Passing: 11 } },
+      { at: "2026-01-03", values: { CA: 110, Passing: 12 } },
+    ];
+    expect(fieldDeltas(sparse, "CA")).toEqual({ recent: 10, allTime: null, latest: 110 });
+    expect(fieldDeltas(sparse, "Passing")).toEqual({ recent: 1, allTime: 2, latest: 12 });
+  });
 });
 
 describe("recentDeltasFromPoints", () => {
