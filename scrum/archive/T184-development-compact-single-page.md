@@ -27,4 +27,4 @@ T183 nested scroll hid the plot. Development is now one compact AttributeDesk (a
 
 - Extracted `AttributeDesk` to shared component; Development uses `deltaMode="allTime"` + compact + row toggle for plot
 - Domain `allTimeDeltasFromPoints` / `allTimeDeltasForPlayer`; vitest green; tsc clean
-- Commit: (filled after git)
+- Commit: `36fe561695d551602cbc1edc690b8f16494dad51`
