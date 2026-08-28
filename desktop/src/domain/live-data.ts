@@ -7,13 +7,28 @@ export const GM_DEVELOPMENT_AGE_MAX = 24;
 
 export type GmAdvice = "sell" | "loan";
 
+export type SquadUnit = "firstTeam" | "under19s" | "reserves";
+
 /** Managed-club players available for match squads (excludes outgoing loans). */
 export function isAtClubSquadPlayer(
-  player: Pick<LivePlayer, "clubId" | "loanedOut">,
+  player: Pick<LivePlayer, "clubId" | "loanedOut" | "squadUnit">,
   managedClubId: string | null | undefined,
+  squadUnit: SquadUnit = "firstTeam",
 ): boolean {
   if (!managedClubId || player.clubId !== managedClubId) return false;
-  return player.loanedOut !== true;
+  if (player.loanedOut === true) return false;
+  const unit = player.squadUnit ?? "firstTeam";
+  return unit === squadUnit;
+}
+
+export function countAtClubSquadUnit(
+  players: Array<Pick<LivePlayer, "clubId" | "loanedOut" | "squadUnit">>,
+  managedClubId: string | null | undefined,
+  squadUnit: SquadUnit,
+): number {
+  return players.filter((player) =>
+    isAtClubSquadPlayer(player, managedClubId, squadUnit),
+  ).length;
 }
 
 /** Managed-club players currently out on loan (Squad honesty complement). */
@@ -77,16 +92,18 @@ export function gmAdvice(
 
 /**
  * HoYD groom prospect vs squad median CA.
- * High PA for this club with room left to develop (inverse of GM sell near-PA).
+ * High PA for this club with room left to develop; youth only (≤24).
  */
 export function isHoydProspect(
-  player: Pick<LivePlayer, "currentAbility" | "potentialAbility">,
+  player: Pick<LivePlayer, "currentAbility" | "potentialAbility" | "age">,
   refCA: number,
 ): boolean {
   const ca = player.currentAbility;
   const pa = player.potentialAbility;
+  const age = player.age;
   if (typeof ca !== "number" || typeof pa !== "number") return false;
   if (!Number.isFinite(ca) || !Number.isFinite(pa) || !Number.isFinite(refCA)) return false;
+  if (typeof age !== "number" || !Number.isFinite(age) || age > GM_DEVELOPMENT_AGE_MAX) return false;
   if (pa < refCA) return false;
   return pa - ca > MOVE_ON_HEADROOM_MAX;
 }

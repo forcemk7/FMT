@@ -98,6 +98,8 @@ export type LivePlayer = {
   weaknesses: string[];
   clubId: string | null;
   clubName?: string | null;
+  /** Managed-club squad unit when mapped from live read (T196). */
+  squadUnit?: "firstTeam" | "under19s" | "reserves" | null;
   /** Owned by managed club but currently out on loan (not available for match squads). */
   loanedOut?: boolean | null;
   /** Loan destination club when `loanedOut` (FMLE Loan Club). */
@@ -113,10 +115,12 @@ export type LivePlayer = {
   hiddenAttributes?: Record<string, number | null>;
   /** Personality pack (Adaptability…Controversy), 1–20 when readable */
   personalityAttributes?: Record<string, number | null>;
-  /** vs previous history change-point — attached on Load (Attributes desk). */
+  /** Load-history recent — Attributes desk (T188; frozen until Development solved). */
   recentAttrDeltas?: Record<string, number | null>;
-  /** vs first history observation — attached on Load (Development desk). */
+  /** Development desk — Load all-time for now; replace with in-game pack when locus found. */
   allTimeAttrDeltas?: Record<string, number | null>;
+  /** In-game CA pack change-points from live lookback (Development hunt). */
+  caPackPointCount?: number | null;
   per90?: Record<string, number | null>;
   inPossessionFit?: number | null;
   outOfPossessionFit?: number | null;

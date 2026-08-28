@@ -1,10 +1,12 @@
 ﻿# Status
 
-Last updated: 2026-08-28 (T195 HoYD high-PA groom desk)
+Last updated: 2026-08-29 (T196 done — U19 via GS index)
 
 ## Now
 
-**T190** Development all-time from Progress Report CA strip — `cursor-agent` (in_progress; verify vs FM after Load)
+**Human test T196** — Schalke FM24Career: FM U19 at-club count vs FMT Squad Under 19s subtab.
+
+**T190 parked** — blocked on RAM lock for Live Editor Save ID before save-copy CA path.
 
 **Deferred:** T139 theme. T162 trophy cabinet. T124 quiet dev launch.
 
@@ -12,14 +14,14 @@ Last updated: 2026-08-28 (T195 HoYD high-PA groom desk)
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
-| T190 | Development all-time from Progress Report CA strip | in_progress | 1 | save-copy extract wired; Attributes frozen |
+| T190 | Development all-time from Progress Report CA strip | blocked | 2 | **parked** — need Save ID in RAM before `.fm` pick |
 | T124 | Quiet dev launch | ready | 9 | behind Loop A |
 | T139 | FMT visual theme | deferred | — | overlapped |
 | T162 | Player trophy cabinet | deferred | — | backlog |
 
 ## Recently done
 
-- **T195** HoYD desk = high-PA groom list (PA ≥ median CA, sorted PA desc)
+- **T196** U19 squad — GS full index on load + contract-team U19 promote + Squad subtabs
 - **T194** GM advises Sell vs Loan from squad avg CA
 - **T193** Loans club logo pill + profile logo = active (loan) club
 - **T192** GM desk = Squad twin filtered to move-on (PA≤140, headroom≤8)

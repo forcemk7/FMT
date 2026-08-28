@@ -12,8 +12,8 @@ use std::{
 use tauri::Emitter;
 
 use crate::{
-    data::players::{IndexedPlayerRecord, PlayerDatabaseIndex},
-    fm26::{
+    data::players::{IndexedPlayerRecord, LiveMemoryAnchors, PlayerDatabaseIndex},
+        fm26::{
         memory::{ModuleInfo, ProcessReader},
         offsets::{find_entity_map, mapping_coverage, EntityMapProfile, MappingCoverage},
         parser::{
@@ -208,9 +208,8 @@ pub fn load_active_save(app: tauri::AppHandle) -> ConnectorSnapshot {
     let progress = |stage: &'static str| {
         let _ = app.emit("fmt-load-progress", stage);
     };
-    // Club desk (T137): managed squad only. No private-heap world spray on load —
-    // world/outward search stays deferred (use FMLE until a later step).
-    collect_snapshot(false, Some(&progress))
+    // T196: restore GS full index on load; club employees promoted from index after FT read.
+    collect_snapshot(true, Some(&progress))
 }
 
 #[tauri::command]
@@ -1067,16 +1066,6 @@ fn resolve_club_from_pointer(
     Some((uid, name))
 }
 
-#[cfg(target_os = "windows")]
-fn resolve_club_uid_from_pointer(
-    reader: &mut ProcessReader,
-    module: ModuleInfo,
-    profile: &EntityMapProfile,
-    pointer: u64,
-) -> Option<u32> {
-    resolve_club_from_pointer(reader, module, profile, pointer).map(|(uid, _)| uid)
-}
-
 /// Loan Club from person → loan agreement (FMLE Parent/Loan Club split).
 #[cfg(target_os = "windows")]
 fn read_person_loan_club(
@@ -1125,21 +1114,414 @@ fn read_person_loan_club(
     None
 }
 
-#[cfg(target_os = "windows")]
-fn read_person_loan_club_uid(
-    reader: &mut ProcessReader,
-    module: ModuleInfo,
-    profile: &EntityMapProfile,
-    person: u64,
-) -> Option<u32> {
-    read_person_loan_club(reader, module, profile, person).map(|(uid, _)| uid)
-}
-
 /// True when person has an active loan agreement pointing at another club.
 fn is_loaned_out_from_loan_club(loan_club_uid: Option<u32>, managed_club_uid: u32) -> bool {
     loan_club_uid
         .map(|uid| uid != managed_club_uid)
         .unwrap_or(false)
+}
+
+/// Contract object → employing team pointer.
+#[cfg(target_os = "windows")]
+fn resolve_contract_team(
+    reader: &mut ProcessReader,
+    profile: &EntityMapProfile,
+    contract: u64,
+) -> Option<u64> {
+    reader
+        .read_pointer(contract + profile.constants.contract_team_offset)
+        .filter(|value| *value != 0)
+}
+
+/// Team pointer → club UniqueID when vtable-validated.
+#[cfg(target_os = "windows")]
+fn contract_team_club_uid(
+    reader: &mut ProcessReader,
+    module: ModuleInfo,
+    profile: &EntityMapProfile,
+    team: u64,
+) -> Option<u32> {
+    resolve_club_from_pointer(reader, module, profile, team).map(|(uid, _)| uid)
+}
+
+/// U19 = non-FT contract team at managed club with the most club employees (index-derived).
+#[cfg(target_os = "windows")]
+fn pick_u19_team_from_index(
+    reader: &mut ProcessReader,
+    module: ModuleInfo,
+    profile: &EntityMapProfile,
+    records: &HashMap<String, IndexedPlayerRecord>,
+    managed_club_uid: u32,
+    first_team: u64,
+) -> Option<u64> {
+    let mut team_counts: HashMap<u64, usize> = HashMap::new();
+    for record in records.values() {
+        let Some(contract) = record.contract_address else {
+            continue;
+        };
+        let Some(team) = resolve_contract_team(reader, profile, contract) else {
+            continue;
+        };
+        let Some(team_club_uid) = contract_team_club_uid(reader, module, profile, team) else {
+            continue;
+        };
+        if team_club_uid != managed_club_uid {
+            continue;
+        }
+        *team_counts.entry(team).or_insert(0) += 1;
+    }
+    team_counts
+        .into_iter()
+        .filter(|(team, count)| *team != first_team && *count > 0)
+        .max_by(|(team_a, count_a), (team_b, count_b)| {
+            count_a
+                .cmp(count_b)
+                .then_with(|| team_b.cmp(team_a))
+        })
+        .map(|(team, _)| team)
+}
+
+#[cfg(target_os = "windows")]
+#[allow(clippy::too_many_arguments)]
+fn push_squad_player_from_raw(
+    reader: &mut ProcessReader,
+    module: ModuleInfo,
+    profile: &EntityMapProfile,
+    raw_player: u64,
+    slot_label: &str,
+    squad_unit: &'static str,
+    club_id: &str,
+    club_uid: u32,
+    squad_game_date: Option<FmDate>,
+    managed_player_ids: &mut HashSet<String>,
+    managed_index_records: &mut Vec<IndexedPlayerRecord>,
+    players: &mut Vec<Value>,
+    skipped_squad_slots: &mut u32,
+    skipped_squad_details: &mut Vec<String>,
+    name_fallback_details: &mut Vec<String>,
+    player_vtable: &mut Option<u64>,
+) {
+    let vtable = match reader
+        .read_pointer(raw_player)
+        .filter(|value| *value != 0)
+    {
+        Some(value) => value,
+        None => {
+            *skipped_squad_slots += 1;
+            skipped_squad_details.push(format!(
+                "{slot_label}: unreadable vtable @ {raw_player:#x}"
+            ));
+            return;
+        }
+    };
+    player_vtable.get_or_insert(vtable);
+    let person = match resolve_person_address(reader, raw_player, profile) {
+        Some(value) => value,
+        None => {
+            *skipped_squad_slots += 1;
+            skipped_squad_details.push(format!(
+                "{slot_label}: person object not resolved @ {raw_player:#x}"
+            ));
+            return;
+        }
+    };
+    let uid = match reader
+        .read_u32(person + profile.constants.entity_uid_offset)
+        .filter(|uid| is_plausible_fm_unique_id(*uid))
+    {
+        Some(value) => value,
+        None => {
+            *skipped_squad_slots += 1;
+            skipped_squad_details.push(format!(
+                "{slot_label}: missing plausible UniqueID (person @ {person:#x})"
+            ));
+            return;
+        }
+    };
+    let position_bytes = match reader.read_bytes(
+        raw_player + profile.constants.player_positions_offset,
+        POSITION_NAMES.len(),
+    ) {
+        Some(bytes) => bytes,
+        None => {
+            *skipped_squad_slots += 1;
+            skipped_squad_details.push(format!("{slot_label} uid {uid}: unreadable position blob"));
+            return;
+        }
+    };
+    if let Some(issue) = position_bytes_issue(&position_bytes) {
+        *skipped_squad_slots += 1;
+        skipped_squad_details.push(format!("{slot_label} uid {uid}: {issue}"));
+        return;
+    }
+    let (positions, secondary_positions) = classify_player_positions(&position_bytes);
+    if positions.is_empty() {
+        *skipped_squad_slots += 1;
+        skipped_squad_details.push(format!(
+            "{slot_label} uid {uid}: no primary position after classification"
+        ));
+        return;
+    }
+    let attribute_bytes = match reader.read_bytes(
+        raw_player + profile.constants.player_attributes_offset,
+        PLAYER_ATTRIBUTE_NAMES.len(),
+    ) {
+        Some(bytes) => bytes,
+        None => {
+            *skipped_squad_slots += 1;
+            skipped_squad_details.push(format!("{slot_label} uid {uid}: unreadable attribute blob"));
+            return;
+        }
+    };
+    if let Some(issue) = attribute_bytes_issue(&attribute_bytes) {
+        *skipped_squad_slots += 1;
+        skipped_squad_details.push(format!("{slot_label} uid {uid}: {issue}"));
+        return;
+    }
+    let (name, name_source) = resolve_managed_squad_name(reader, person, profile, uid);
+    if name_source != "own-squad" {
+        name_fallback_details.push(format!("uid {uid} ({name_source})"));
+    }
+    let calculated_position = position_bytes
+        .iter()
+        .enumerate()
+        .max_by_key(|(_, rating)| **rating)
+        .map(|(position, _)| POSITION_NAMES[position].to_string());
+    let goalkeeper_rating = goalkeeper_rating_from_positions(&position_bytes);
+    let birth_date = read_fm_date(reader, person + profile.constants.person_birth_date_offset);
+    let own_current_date =
+        read_fm_date(reader, raw_player + profile.constants.player_current_date_offset);
+    let current_date = own_current_date.or(squad_game_date);
+    let age = birth_date
+        .zip(current_date)
+        .and_then(|(birth, current)| calculate_age(birth, current));
+    let date_of_birth = birth_date.and_then(format_fm_date);
+    let season = current_date.map(|date| {
+        let next_year = date.year.saturating_add(1);
+        format!("{}/{}", date.year, next_year % 100)
+    });
+    let nationality = read_nationality(reader, person, profile);
+    let nationality_id = read_nation_id(reader, person, profile);
+    let visible_attributes = visible_attribute_map(&attribute_bytes);
+    let hidden_attributes = hidden_attribute_map(&attribute_bytes);
+    let all_time_attr_deltas = Value::Object(serde_json::Map::new());
+    let ca_pack_point_count = 0usize;
+    let recent_attr_deltas = Value::Object(serde_json::Map::new());
+    let personality_bytes = reader
+        .read_bytes(person + profile.constants.person_personality_offset, 8)
+        .unwrap_or_default();
+    let personality_attributes = personality_attribute_map(&personality_bytes);
+    let current_ability = reader
+        .read_u16(raw_player + profile.constants.player_ca_offset)
+        .filter(|value| (1..=200).contains(value));
+    let potential_ability = reader
+        .read_u16(raw_player + profile.constants.player_pa_offset)
+        .filter(|value| (1..=200).contains(value));
+    let left_foot = display_attribute(attribute_bytes[24]);
+    let right_foot = display_attribute(attribute_bytes[25]);
+    let preferred_foot = preferred_foot_label(left_foot, right_foot);
+    let height_cm = reader
+        .read_bytes(raw_player + profile.constants.player_height_offset, 1)
+        .and_then(|bytes| bytes.first().copied())
+        .filter(|value| (140..=220).contains(value));
+    let ability_score = calculated_position
+        .as_deref()
+        .and_then(|position| visible_ability_score(position, &visible_attributes));
+    let best_role: Option<String> = None;
+    let playable_roles: Vec<Value> = Vec::new();
+    let other_roles: Vec<Value> = Vec::new();
+    let role_reasoning = vec![
+        "Role catalogue scoring is deferred on load for speed; open the player after roles are re-enabled or use attributes/CA/PA/HA.".to_string(),
+    ];
+    let (strengths, weaknesses) = attribute_evidence(&visible_attributes);
+    let validated_at = unix_milliseconds();
+    let attribute_knowledge: serde_json::Map<String, Value> = visible_attributes
+        .iter()
+        .map(|(name, value)| {
+            (
+                name.clone(),
+                json!({
+                    "value": value,
+                    "visibility": "known",
+                    "source": "own-squad",
+                    "confidence": 100,
+                    "lastValidated": validated_at
+                }),
+            )
+        })
+        .collect();
+    let player_id = uid.to_string();
+    if managed_player_ids.contains(&player_id) {
+        return;
+    }
+    let contract_address = reader
+        .read_pointer(person + profile.constants.person_contract_offset)
+        .filter(|value| *value != 0);
+    let loan_club = read_person_loan_club(reader, module, profile, person);
+    let loan_club_uid = loan_club.as_ref().map(|(uid, _)| *uid);
+    let loaned_out = is_loaned_out_from_loan_club(loan_club_uid, club_uid);
+    let (loan_club_id, loan_club_name) = if loaned_out {
+        match loan_club {
+            Some((uid, name)) => (Some(uid.to_string()), Some(name)),
+            None => (None, None),
+        }
+    } else {
+        (None, None)
+    };
+    managed_player_ids.insert(player_id.clone());
+    managed_index_records.push(IndexedPlayerRecord {
+        id: player_id.clone(),
+        name: name.clone(),
+        positions: positions.clone(),
+        managed_squad: true,
+        visibility_safe: true,
+        raw_player_address: raw_player,
+        person_address: person,
+        contract_address,
+    });
+    players.push(json!({
+        "id": player_id,
+        "name": name.clone(),
+        "_season": season,
+        "age": age,
+        "dateOfBirth": date_of_birth,
+        "nationality": nationality.clone(),
+        "nationalityId": nationality_id.clone(),
+        "secondNationality": null,
+        "positions": positions.clone(),
+        "secondaryPositions": secondary_positions.clone(),
+        "goalkeeperRating": goalkeeper_rating,
+        "bestRole": best_role,
+        "currentAbility": current_ability,
+        "potentialAbility": potential_ability,
+        "abilityScore": ability_score,
+        "form": null,
+        "averageRating": null,
+        "minutesPlayed": null,
+        "goals": null,
+        "assists": null,
+        "contractStatus": null,
+        "value": null,
+        "wage": null,
+        "squadImportance": null,
+        "developmentTrend": null,
+        "tacticalFit": null,
+        "roleFit": ability_score,
+        "playableRoles": playable_roles,
+        "otherRoles": other_roles,
+        "preferredFoot": preferred_foot,
+        "leftFoot": left_foot,
+        "rightFoot": right_foot,
+        "heightCm": height_cm,
+        "strengths": strengths,
+        "weaknesses": weaknesses,
+        "clubId": club_id,
+        "squadUnit": squad_unit,
+        "loanedOut": loaned_out,
+        "loanClubId": loan_club_id,
+        "loanClubName": loan_club_name,
+        "transferInterest": null,
+        "loanInterest": null,
+        "transferAvailable": null,
+        "loanAvailable": null,
+        "attributes": visible_attributes,
+        "hiddenAttributes": hidden_attributes,
+        "personalityAttributes": personality_attributes,
+        "recentAttrDeltas": recent_attr_deltas,
+        "allTimeAttrDeltas": all_time_attr_deltas,
+        "caPackPointCount": ca_pack_point_count,
+        "per90": {},
+        "scoutKnowledge": "fully_known",
+        "scoutConfidence": 100,
+        "lastScoutedDate": null,
+        "reportReliability": null,
+        "bestCalculatedPosition": calculated_position,
+        "truePrice": null,
+        "fairPriceRange": null,
+        "valuationLabel": "unavailable",
+        "valuationReasoning": ["FM26 valuation fields are not mapped for this exact build."],
+        "retrainingSuggestion": null,
+        "roleReasoning": role_reasoning,
+        "riskLevel": "unknown",
+        "marketValueAmount": null
+        ,"personality": null
+        ,"condition": null
+        ,"recommendation": {
+            "minimum": ability_score,
+            "maximum": ability_score,
+            "completeness": 100,
+            "label": if ability_score.is_some() { "full visible-attribute evidence" } else { "not enough evidence" }
+        }
+        ,"knowledge": {
+            "name": { "value": name, "visibility": "known", "source": name_source, "confidence": if name_source == "own-squad" { 100 } else { 85 }, "lastValidated": validated_at },
+            "age": { "value": age, "visibility": "known", "source": "own-squad", "confidence": 100, "lastValidated": validated_at },
+            "nationality": { "value": nationality, "visibility": "known", "source": "own-squad", "confidence": 100, "lastValidated": validated_at },
+            "positions": { "value": positions, "visibility": "known", "source": "own-squad", "confidence": 100, "lastValidated": validated_at },
+            "attributes": attribute_knowledge,
+            "form": { "value": null, "visibility": "unknown", "source": "memory-raw", "confidence": 0, "lastValidated": null },
+            "contract": { "value": null, "visibility": "unknown", "source": "memory-raw", "confidence": 0, "lastValidated": null },
+            "wage": { "value": null, "visibility": "unknown", "source": "memory-raw", "confidence": 0, "lastValidated": null },
+            "value": { "value": null, "visibility": "unknown", "source": "memory-raw", "confidence": 0, "lastValidated": null },
+            "interest": { "value": null, "visibility": "unknown", "source": "memory-raw", "confidence": 0, "lastValidated": null }
+        }
+    }));
+}
+
+#[cfg(target_os = "windows")]
+fn promote_club_team_from_index(
+    reader: &mut ProcessReader,
+    module: ModuleInfo,
+    profile: &EntityMapProfile,
+    u19_team: u64,
+    club_id: &str,
+    club_uid: u32,
+    squad_game_date: Option<FmDate>,
+    managed_player_ids: &mut HashSet<String>,
+    managed_index_records: &mut Vec<IndexedPlayerRecord>,
+    players: &mut Vec<Value>,
+    skipped_squad_slots: &mut u32,
+    skipped_squad_details: &mut Vec<String>,
+    name_fallback_details: &mut Vec<String>,
+    player_vtable: &mut Option<u64>,
+) {
+    let index = PLAYER_DATABASE_INDEX.get_or_init(|| RwLock::new(PlayerDatabaseIndex::default()));
+    let records = index
+        .read()
+        .ok()
+        .map(|guard| guard.records.clone())
+        .unwrap_or_default();
+    for record in records.values() {
+        let Some(contract) = record.contract_address else {
+            continue;
+        };
+        let Some(team) = resolve_contract_team(reader, profile, contract) else {
+            continue;
+        };
+        if team != u19_team {
+            continue;
+        }
+        if managed_player_ids.contains(&record.id) {
+            continue;
+        }
+        push_squad_player_from_raw(
+            reader,
+            module,
+            profile,
+            record.raw_player_address,
+            &format!("index uid {}", record.id),
+            "under19s",
+            club_id,
+            club_uid,
+            squad_game_date,
+            managed_player_ids,
+            managed_index_records,
+            players,
+            skipped_squad_slots,
+            skipped_squad_details,
+            name_fallback_details,
+            player_vtable,
+        );
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -1313,6 +1695,43 @@ fn extract_live_data(
 
     let club_id = club_uid.to_string();
 
+    let memory_anchors = LiveMemoryAnchors {
+        save_pointer: human,
+        human_pointer: human,
+        team_pointer: team,
+        club_pointer: club,
+        players_collection_start: 0,
+        tactic_manager_pointer: None,
+    };
+
+    // Loaned player objects often lack a readable current-date; borrow one from the squad.
+    let mut squad_game_date = None;
+    if let Some(players_start) = reader
+        .read_pointer(team + profile.constants.team_players_start_offset)
+        .filter(|value| *value != 0)
+    {
+        if let Some(players_end) = reader
+            .read_pointer(team + profile.constants.team_players_end_offset)
+            .filter(|value| *value != 0)
+        {
+            let player_count = ((players_end.saturating_sub(players_start)) / 8) as usize;
+            for index in 0..player_count {
+                let Some(raw_player) = reader
+                    .read_pointer(players_start + (index as u64 * 8))
+                    .filter(|value| *value != 0)
+                else {
+                    continue;
+                };
+                if let Some(date) =
+                    read_fm_date(reader, raw_player + profile.constants.player_current_date_offset)
+                {
+                    squad_game_date = Some(date);
+                    break;
+                }
+            }
+        }
+    }
+
     let players_start = reader
         .read_pointer(team + profile.constants.team_players_start_offset)
         .ok_or_else(|| {
@@ -1340,305 +1759,47 @@ fn extract_live_data(
     }
     diagnostics.player_collection_pointer = Some(players_start);
     let player_count = ((players_end - players_start) / 8) as usize;
-    // Loaned player objects often lack a readable current-date; borrow one from the squad.
-    let mut squad_game_date = None;
+
+    let mut players = Vec::new();
+    let mut managed_player_ids = HashSet::new();
+    let mut managed_index_records = Vec::new();
+    let mut player_vtable = None;
+    let mut skipped_squad_slots = 0u32;
+    let mut skipped_squad_details: Vec<String> = Vec::new();
+    let mut name_fallback_details: Vec<String> = Vec::new();
+
     for index in 0..player_count {
         let Some(raw_player) = reader
             .read_pointer(players_start + (index as u64 * 8))
             .filter(|value| *value != 0)
         else {
-            continue;
-        };
-        if let Some(date) =
-            read_fm_date(reader, raw_player + profile.constants.player_current_date_offset)
-        {
-            squad_game_date = Some(date);
-            break;
-        }
-    }
-    let mut players = Vec::with_capacity(player_count);
-    let mut managed_player_ids = HashSet::with_capacity(player_count);
-    let mut managed_index_records = Vec::with_capacity(player_count);
-    let mut player_vtable = None;
-    let mut skipped_squad_slots = 0u32;
-    let mut skipped_squad_details: Vec<String> = Vec::new();
-    let mut name_fallback_details: Vec<String> = Vec::new();
-    for index in 0..player_count {
-        let raw_player = match reader
-            .read_pointer(players_start + (index as u64 * 8))
-            .filter(|value| *value != 0)
-        {
-            Some(value) => value,
-            None => {
-                skipped_squad_slots += 1;
-                skipped_squad_details.push(format!("slot {index}: empty player pointer"));
-                continue;
-            }
-        };
-        let vtable = match reader
-            .read_pointer(raw_player)
-            .filter(|value| *value != 0)
-        {
-            Some(value) => value,
-            None => {
-                skipped_squad_slots += 1;
-                skipped_squad_details.push(format!(
-                    "slot {index}: unreadable vtable @ {raw_player:#x}"
-                ));
-                continue;
-            }
-        };
-        player_vtable.get_or_insert(vtable);
-        let person = match resolve_person_address(reader, raw_player, profile) {
-            Some(value) => value,
-            None => {
-                skipped_squad_slots += 1;
-                skipped_squad_details.push(format!(
-                    "slot {index}: person object not resolved @ {raw_player:#x}"
-                ));
-                continue;
-            }
-        };
-        let uid = match reader
-            .read_u32(person + profile.constants.entity_uid_offset)
-            .filter(|uid| is_plausible_fm_unique_id(*uid))
-        {
-            Some(value) => value,
-            None => {
-                skipped_squad_slots += 1;
-                skipped_squad_details.push(format!(
-                    "slot {index}: missing plausible UniqueID (person @ {person:#x})"
-                ));
-                continue;
-            }
-        };
-        let position_bytes = match reader.read_bytes(
-            raw_player + profile.constants.player_positions_offset,
-            POSITION_NAMES.len(),
-        ) {
-            Some(bytes) => bytes,
-            None => {
-                skipped_squad_slots += 1;
-                skipped_squad_details.push(format!(
-                    "slot {index} uid {uid}: unreadable position blob"
-                ));
-                continue;
-            }
-        };
-        if let Some(issue) = position_bytes_issue(&position_bytes) {
             skipped_squad_slots += 1;
-            skipped_squad_details.push(format!("slot {index} uid {uid}: {issue}"));
+            skipped_squad_details.push(format!("slot {index}: empty player pointer"));
             continue;
-        }
-        let (positions, secondary_positions) = classify_player_positions(&position_bytes);
-        if positions.is_empty() {
-            skipped_squad_slots += 1;
-            skipped_squad_details.push(format!(
-                "slot {index} uid {uid}: no primary position after classification"
-            ));
-            continue;
-        }
-        let attribute_bytes = match reader.read_bytes(
-            raw_player + profile.constants.player_attributes_offset,
-            PLAYER_ATTRIBUTE_NAMES.len(),
-        ) {
-            Some(bytes) => bytes,
-            None => {
-                skipped_squad_slots += 1;
-                skipped_squad_details.push(format!(
-                    "slot {index} uid {uid}: unreadable attribute blob"
-                ));
-                continue;
-            }
         };
-        if let Some(issue) = attribute_bytes_issue(&attribute_bytes) {
-            skipped_squad_slots += 1;
-            skipped_squad_details.push(format!("slot {index} uid {uid}: {issue}"));
-            continue;
-        }
-        let (name, name_source) =
-            resolve_managed_squad_name(reader, person, profile, uid);
-        if name_source != "own-squad" {
-            name_fallback_details.push(format!("uid {uid} ({name_source})"));
-        }
-        let calculated_position = position_bytes
-            .iter()
-            .enumerate()
-            .max_by_key(|(_, rating)| **rating)
-            .map(|(position, _)| POSITION_NAMES[position].to_string());
-        let goalkeeper_rating = goalkeeper_rating_from_positions(&position_bytes);
-        let birth_date = read_fm_date(reader, person + profile.constants.person_birth_date_offset);
-        let own_current_date = read_fm_date(
+        push_squad_player_from_raw(
             reader,
-            raw_player + profile.constants.player_current_date_offset,
+            module,
+            profile,
+            raw_player,
+            &format!("slot {index}"),
+            "firstTeam",
+            &club_id,
+            club_uid,
+            squad_game_date,
+            &mut managed_player_ids,
+            &mut managed_index_records,
+            &mut players,
+            &mut skipped_squad_slots,
+            &mut skipped_squad_details,
+            &mut name_fallback_details,
+            &mut player_vtable,
         );
-        let current_date = own_current_date.or(squad_game_date);
-        let age = birth_date
-            .zip(current_date)
-            .and_then(|(birth, current)| calculate_age(birth, current));
-        let date_of_birth = birth_date.and_then(format_fm_date);
-        let season = current_date.map(|date| {
-            let next_year = date.year.saturating_add(1);
-            format!("{}/{}", date.year, next_year % 100)
-        });
-        let nationality = read_nationality(reader, person, profile);
-        let nationality_id = read_nation_id(reader, person, profile);
-        let visible_attributes = visible_attribute_map(&attribute_bytes);
-        let hidden_attributes = hidden_attribute_map(&attribute_bytes);
-        let personality_bytes = reader
-            .read_bytes(person + profile.constants.person_personality_offset, 8)
-            .unwrap_or_default();
-        let personality_attributes = personality_attribute_map(&personality_bytes);
-        let current_ability = reader
-            .read_u16(raw_player + profile.constants.player_ca_offset)
-            .filter(|value| (1..=200).contains(value));
-        let potential_ability = reader
-            .read_u16(raw_player + profile.constants.player_pa_offset)
-            .filter(|value| (1..=200).contains(value));
-        let left_foot = display_attribute(attribute_bytes[24]);
-        let right_foot = display_attribute(attribute_bytes[25]);
-        let preferred_foot = preferred_foot_label(left_foot, right_foot);
-        let height_cm = reader
-            .read_bytes(raw_player + profile.constants.player_height_offset, 1)
-            .and_then(|bytes| bytes.first().copied())
-            .filter(|value| (140..=220).contains(value));
-        // Full IP/OOP role catalogue scoring is deferred off the load path (LE-speed).
-        // Cheap position-based ability score remains for desk sorting.
-        let ability_score = calculated_position
-            .as_deref()
-            .and_then(|position| visible_ability_score(position, &visible_attributes));
-        let best_role: Option<String> = None;
-        let playable_roles: Vec<Value> = Vec::new();
-        let other_roles: Vec<Value> = Vec::new();
-        let role_reasoning = vec![
-            "Role catalogue scoring is deferred on load for speed; open the player after roles are re-enabled or use attributes/CA/PA/HA.".to_string(),
-        ];
-        let (strengths, weaknesses) = attribute_evidence(&visible_attributes);
-        let validated_at = unix_milliseconds();
-        let attribute_knowledge: serde_json::Map<String, Value> = visible_attributes
-            .iter()
-            .map(|(name, value)| {
-                (
-                    name.clone(),
-                    json!({
-                        "value": value,
-                        "visibility": "known",
-                        "source": "own-squad",
-                        "confidence": 100,
-                        "lastValidated": validated_at
-                    }),
-                )
-            })
-            .collect();
-        let player_id = uid.to_string();
-        let contract_address = reader
-            .read_pointer(person + profile.constants.person_contract_offset)
-            .filter(|value| *value != 0);
-        let loan_club = read_person_loan_club(reader, module, profile, person);
-        let loan_club_uid = loan_club.as_ref().map(|(uid, _)| *uid);
-        let loaned_out = is_loaned_out_from_loan_club(loan_club_uid, club_uid);
-        let (loan_club_id, loan_club_name) = if loaned_out {
-            match loan_club {
-                Some((uid, name)) => (Some(uid.to_string()), Some(name)),
-                None => (None, None),
-            }
-        } else {
-            (None, None)
-        };
-        managed_player_ids.insert(player_id.clone());
-        managed_index_records.push(IndexedPlayerRecord {
-            id: player_id.clone(),
-            name: name.clone(),
-            positions: positions.clone(),
-            managed_squad: true,
-            visibility_safe: true,
-            raw_player_address: raw_player,
-            person_address: person,
-            contract_address,
-        });
-        players.push(json!({
-            "id": player_id,
-            "name": name.clone(),
-            "_season": season,
-            "age": age,
-            "dateOfBirth": date_of_birth,
-            "nationality": nationality.clone(),
-            "nationalityId": nationality_id.clone(),
-            "secondNationality": null,
-            "positions": positions.clone(),
-            "secondaryPositions": secondary_positions.clone(),
-            "goalkeeperRating": goalkeeper_rating,
-            "bestRole": best_role,
-            "currentAbility": current_ability,
-            "potentialAbility": potential_ability,
-            "abilityScore": ability_score,
-            "form": null,
-            "averageRating": null,
-            "minutesPlayed": null,
-            "goals": null,
-            "assists": null,
-            "contractStatus": null,
-            "value": null,
-            "wage": null,
-            "squadImportance": null,
-            "developmentTrend": null,
-            "tacticalFit": null,
-            "roleFit": ability_score,
-            "playableRoles": playable_roles,
-            "otherRoles": other_roles,
-            "preferredFoot": preferred_foot,
-            "leftFoot": left_foot,
-            "rightFoot": right_foot,
-            "heightCm": height_cm,
-            "strengths": strengths,
-            "weaknesses": weaknesses,
-            "clubId": club_id,
-            "loanedOut": loaned_out,
-            "loanClubId": loan_club_id,
-            "loanClubName": loan_club_name,
-            "transferInterest": null,
-            "loanInterest": null,
-            "transferAvailable": null,
-            "loanAvailable": null,
-            "attributes": visible_attributes,
-            "hiddenAttributes": hidden_attributes,
-            "personalityAttributes": personality_attributes,
-            "per90": {},
-            "scoutKnowledge": "fully_known",
-            "scoutConfidence": 100,
-            "lastScoutedDate": null,
-            "reportReliability": null,
-            "bestCalculatedPosition": calculated_position,
-            "truePrice": null,
-            "fairPriceRange": null,
-            "valuationLabel": "unavailable",
-            "valuationReasoning": ["FM26 valuation fields are not mapped for this exact build."],
-            "retrainingSuggestion": null,
-            "roleReasoning": role_reasoning,
-            "riskLevel": "unknown",
-            "marketValueAmount": null
-            ,"personality": null
-            ,"condition": null
-            ,"recommendation": {
-                "minimum": ability_score,
-                "maximum": ability_score,
-                "completeness": 100,
-                "label": if ability_score.is_some() { "full visible-attribute evidence" } else { "not enough evidence" }
-            }
-            ,"knowledge": {
-                "name": { "value": name, "visibility": "known", "source": name_source, "confidence": if name_source == "own-squad" { 100 } else { 85 }, "lastValidated": validated_at },
-                "age": { "value": age, "visibility": "known", "source": "own-squad", "confidence": 100, "lastValidated": validated_at },
-                "nationality": { "value": nationality, "visibility": "known", "source": "own-squad", "confidence": 100, "lastValidated": validated_at },
-                "positions": { "value": positions, "visibility": "known", "source": "own-squad", "confidence": 100, "lastValidated": validated_at },
-                "attributes": attribute_knowledge,
-                "form": { "value": null, "visibility": "unknown", "source": "memory-raw", "confidence": 0, "lastValidated": null },
-                "contract": { "value": null, "visibility": "unknown", "source": "memory-raw", "confidence": 0, "lastValidated": null },
-                "wage": { "value": null, "visibility": "unknown", "source": "memory-raw", "confidence": 0, "lastValidated": null },
-                "value": { "value": null, "visibility": "unknown", "source": "memory-raw", "confidence": 0, "lastValidated": null },
-                "interest": { "value": null, "visibility": "unknown", "source": "memory-raw", "confidence": 0, "lastValidated": null }
-            }
-        }));
     }
+
+    let mut memory_anchors = memory_anchors;
+    memory_anchors.players_collection_start = players_start;
+
     if players.is_empty() {
         return Err(ExtractionFailure::new(
             "player_identity",
@@ -1649,7 +1810,7 @@ fn extract_live_data(
     let managed_tactic_records = managed_index_records.clone();
     let skipped_squad_warning = if skipped_squad_slots > 0 {
         let mut message = format!(
-            "Managed squad memory listed {player_count} slots but {} passed validation ({skipped_squad_slots} skipped).",
+            "Managed squad memory skipped {skipped_squad_slots} slot(s); {} players passed validation.",
             players.len(),
         );
         for detail in skipped_squad_details.iter().take(8) {
@@ -1695,7 +1856,7 @@ fn extract_live_data(
             reader,
             profile,
             process_id,
-            diagnostics.save_pointer.unwrap_or_default(),
+            memory_anchors,
             seed_vtable,
             module,
             &managed_player_ids,
@@ -1716,7 +1877,7 @@ fn extract_live_data(
                 )
             }
             Err(failure) => (
-                player_count as u32,
+                managed_player_ids.len() as u32,
                 0,
                 "failed",
                 "managed-squad",
@@ -1725,13 +1886,9 @@ fn extract_live_data(
             ),
         }
     } else {
-        store_player_index(
-            process_id,
-            diagnostics.save_pointer.unwrap_or_default(),
-            managed_index_records,
-        );
+        store_player_index(process_id, memory_anchors, managed_index_records);
         (
-            player_count as u32,
+            managed_player_ids.len() as u32,
             0,
             "not_run",
             "managed-squad",
@@ -1739,6 +1896,44 @@ fn extract_live_data(
             None,
         )
     };
+
+    let mut u19_promoted = 0usize;
+    if database_index_status == "ready" {
+        if let Some(index_records) = PLAYER_DATABASE_INDEX
+            .get()
+            .and_then(|index| index.read().ok())
+            .map(|guard| guard.records.clone())
+        {
+            if let Some(u19_team) = pick_u19_team_from_index(
+                reader,
+                module,
+                profile,
+                &index_records,
+                club_uid,
+                team,
+            ) {
+                let before = players.len();
+                let mut promoted_index_records = Vec::new();
+                promote_club_team_from_index(
+                    reader,
+                    module,
+                    profile,
+                    u19_team,
+                    &club_id,
+                    club_uid,
+                    squad_game_date,
+                    &mut managed_player_ids,
+                    &mut promoted_index_records,
+                    &mut players,
+                    &mut skipped_squad_slots,
+                    &mut skipped_squad_details,
+                    &mut name_fallback_details,
+                    &mut player_vtable,
+                );
+                u19_promoted = players.len().saturating_sub(before);
+            }
+        }
+    }
 
     let season = players
         .first()
@@ -1814,6 +2009,11 @@ fn extract_live_data(
             "The wider player database could not be indexed safely; only the managed squad is available."
                 .to_string(),
         );
+    }
+    if u19_promoted > 0 {
+        warnings.push(format!(
+            "{u19_promoted} Under-19 squad player(s) promoted from the live club index via contract team (same club as senior)."
+        ));
     }
     if let Some(reference) = &dossier_reference {
         warnings.push(format!(
@@ -2251,7 +2451,12 @@ struct IndexSummary {
 }
 
 #[cfg(target_os = "windows")]
-fn store_player_index(process_id: u32, save_pointer: u64, records: Vec<IndexedPlayerRecord>) {
+fn store_player_index(
+    process_id: u32,
+    anchors: LiveMemoryAnchors,
+    records: Vec<IndexedPlayerRecord>,
+) {
+    let save_pointer = anchors.save_pointer;
     let records = records
         .into_iter()
         .map(|record| (record.id.clone(), record))
@@ -2261,6 +2466,7 @@ fn store_player_index(process_id: u32, save_pointer: u64, records: Vec<IndexedPl
         *index = PlayerDatabaseIndex {
             process_id,
             save_pointer,
+            anchors,
             records,
         };
     }
@@ -2271,7 +2477,7 @@ fn index_full_player_database(
     reader: &mut ProcessReader,
     profile: &EntityMapProfile,
     process_id: u32,
-    save_pointer: u64,
+    mut anchors: LiveMemoryAnchors,
     player_vtable: u64,
     module: ModuleInfo,
     managed_player_ids: &HashSet<String>,
@@ -2318,11 +2524,14 @@ fn index_full_player_database(
         .values()
         .filter(|record| !record.managed_squad)
         .count() as u32;
+    anchors.tactic_manager_pointer = tactic_manager_pointer;
+    let save_pointer = anchors.save_pointer;
     let index = PLAYER_DATABASE_INDEX.get_or_init(|| RwLock::new(PlayerDatabaseIndex::default()));
     if let Ok(mut index) = index.write() {
         *index = PlayerDatabaseIndex {
             process_id,
             save_pointer,
+            anchors,
             records,
         };
     }
@@ -2863,6 +3072,1328 @@ mod tests {
         assert!(super::is_loaned_out_from_loan_club(Some(1150), 920));
         assert!(!super::is_loaned_out_from_loan_club(Some(920), 920));
         assert!(!super::is_loaned_out_from_loan_club(None, 920));
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore]
+    fn hunt_ca_join_live() {
+        use std::collections::HashMap;
+
+        use crate::fm26::{
+            ca_history::flatten_current,
+            ca_join::{
+                diagnose_fingerprint, format_all_time_deltas, format_join_line, hunt_squad,
+                SquadTarget,
+            },
+            process::find_fm26_process,
+        };
+
+        let Some((process_id, _)) = find_fm26_process() else {
+            println!("FM26 not running — skip");
+            return;
+        };
+        let snapshot = collect_snapshot(false, None);
+        assert_eq!(
+            snapshot.status.state, "connected",
+            "need connected save: {}",
+            snapshot.status.message
+        );
+        let (anchors, records) = {
+            let index = PLAYER_DATABASE_INDEX
+                .get()
+                .expect("index")
+                .read()
+                .expect("lock");
+            let records: Vec<_> = index
+                .records
+                .values()
+                .filter(|r| r.managed_squad)
+                .cloned()
+                .collect();
+            (index.anchors, records)
+        };
+
+        let mut attr_by_id: HashMap<String, (HashMap<String, u8>, HashMap<String, u8>)> = HashMap::new();
+        for player in &snapshot.players {
+            let Some(id) = player.get("id").and_then(|v| v.as_str()) else {
+                continue;
+            };
+            let visible = player
+                .get("attributes")
+                .and_then(|v| serde_json::from_value::<HashMap<String, u8>>(v.clone()).ok())
+                .unwrap_or_default();
+            let hidden = player
+                .get("hiddenAttributes")
+                .and_then(|v| serde_json::from_value::<HashMap<String, u8>>(v.clone()).ok())
+                .unwrap_or_default();
+            attr_by_id.insert(
+                id.to_string(),
+                (visible.clone(), flatten_current(&visible, &hidden)),
+            );
+        }
+
+        let mut targets: Vec<SquadTarget> = records
+            .into_iter()
+            .filter_map(|r| {
+                let uid = r.id.parse::<u32>().ok()?;
+                let (visible, current) = attr_by_id.get(&r.id).cloned().unwrap_or_default();
+                Some(SquadTarget {
+                    uid,
+                    person: r.person_address,
+                    raw_player: r.raw_player_address,
+                    name: r.name,
+                    visible,
+                    current,
+                })
+            })
+            .collect();
+        targets.sort_by(|a, b| a.name.cmp(&b.name));
+
+        let mut reader = ProcessReader::open(process_id).expect("open fm");
+        println!(
+            "=== CA join hunt ({} managed, cluster scan ~2GB once) ===",
+            targets.len()
+        );
+        let report = hunt_squad(&mut reader, &anchors, &targets);
+
+        for (i, c) in report.clusters.iter().take(6).enumerate() {
+            println!(
+                "  cluster[{i}] {:#x} cards={} history_pts={}",
+                c.base, c.cards, c.history_points
+            );
+        }
+
+        let mut joined = 0usize;
+        let mut max_pts = 0usize;
+        for target in &targets {
+            let Some(hit) = report.joins.get(&target.uid) else {
+                println!("  MISS  {}", target.name);
+                continue;
+            };
+            joined += 1;
+            max_pts = max_pts.max(hit.points.len());
+            println!(
+                "  {}",
+                format_join_line(&target.name, target.uid, hit, &target.current)
+            );
+        }
+        println!("\njoined {joined}/{} (max {max_pts} history pts)", targets.len());
+
+        if joined > 0 {
+            println!("\n=== All-time Δ vs first Progress Report point (compare in FM) ===");
+            for target in &targets {
+                let Some(hit) = report.joins.get(&target.uid) else {
+                    continue;
+                };
+                let deltas = format_all_time_deltas(hit, &target.current);
+                println!("\n## {} (uid={})", target.name, target.uid);
+                println!("strategy={} pack_points={}", hit.strategy, hit.points.len());
+                if deltas.is_empty() {
+                    println!("  (no non-zero attribute movement vs first pack point)");
+                } else {
+                    for (attr, delta) in &deltas {
+                        println!("  {attr}: {delta:+}");
+                    }
+                }
+            }
+        } else {
+            println!("No joins — fingerprint/index miss on all strategies.");
+            let probe_names = ["Assan Ouédraogo", "Domenico Gilson", "Robert Müller"];
+            for name in probe_names {
+                if let Some(t) = targets.iter().find(|x| x.name == name) {
+                    println!("\nNear-miss segments for {name} (lowest L1 = best visible match):");
+                    let segs: Vec<_> = report
+                        .clusters
+                        .iter()
+                        .take(2)
+                        .flat_map(|c| {
+                            let lo = c.base.saturating_sub(8 * 1024 * 1024);
+                            reader
+                                .read_bytes(lo, 4 * 1024 * 1024)
+                                .map(|blob| crate::fm26::ca_join::cluster_segments(&blob, lo))
+                                .unwrap_or_default()
+                        })
+                        .collect();
+                    for (l1, pts, end) in diagnose_fingerprint(&segs, t, 5) {
+                        println!("  L1={l1} pts={pts} end={end:#x}");
+                    }
+                }
+            }
+        }
+        if joined == 0 {
+            println!("\nTip: open Progress Report in FM for a youth, then re-run.");
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore]
+    fn probe_assan_person_index_live() {
+        use std::collections::HashMap;
+
+        use crate::fm26::{
+            ca_history::flatten_current,
+            ca_resolve::probe_person_ca,
+            process::find_fm26_process,
+        };
+
+        let Some((process_id, _)) = find_fm26_process() else {
+            println!("FM26 not running — skip");
+            return;
+        };
+        let snapshot = collect_snapshot(false, None);
+        assert_eq!(
+            snapshot.status.state, "connected",
+            "need connected save: {}",
+            snapshot.status.message
+        );
+
+        let record = {
+            let index = PLAYER_DATABASE_INDEX
+                .get()
+                .expect("index")
+                .read()
+                .expect("lock");
+            index
+                .records
+                .values()
+                .find(|r| r.name == "Assan Ouédraogo")
+                .cloned()
+                .expect("Assan in managed squad")
+        };
+        let anchors = PLAYER_DATABASE_INDEX
+            .get()
+            .expect("index")
+            .read()
+            .expect("lock")
+            .anchors;
+
+        let uid = record.id.parse::<u32>().expect("uid");
+        let mut visible = HashMap::new();
+        let mut hidden = HashMap::new();
+        for player in &snapshot.players {
+            if player.get("id").and_then(|v| v.as_str()) != Some(record.id.as_str()) {
+                continue;
+            }
+            visible = player
+                .get("attributes")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+            hidden = player
+                .get("hiddenAttributes")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+        }
+        let current = flatten_current(&visible, &hidden);
+
+        let mut reader = ProcessReader::open(process_id).expect("open fm");
+        println!(
+            "=== Assan person-index probe (uid={uid} person={:#x} raw={:#x}) ===",
+            record.person_address, record.raw_player_address
+        );
+        let probe = probe_person_ca(
+            &mut reader,
+            &anchors,
+            uid,
+            record.person_address,
+            record.raw_player_address,
+        );
+
+        for (i, c) in probe.clusters.iter().take(6).enumerate() {
+            println!(
+                "  cluster[{i}] {:#x} cards={} history_pts={}",
+                c.base, c.cards, c.history_points
+            );
+        }
+        for hit in probe.pointer_chase.iter().take(8) {
+            println!(
+                "  ptr_chase {} end={:#x} cards={} history_pts={}",
+                hit.label, hit.ptr, hit.cards, hit.history_points
+            );
+        }
+
+        let best_pts = probe
+            .candidates
+            .first()
+            .map(|c| c.points.len())
+            .unwrap_or(0);
+        println!(
+            "\n{} strip candidates (best {best_pts} pack points)",
+            probe.candidates.len()
+        );
+        for cand in probe.candidates.iter().take(12) {
+            println!(
+                "  {:24} pts={} end={:#x}",
+                cand.label,
+                cand.points.len(),
+                cand.strip_end
+            );
+        }
+
+        if let Some(best) = probe.candidates.first().filter(|c| c.points.len() >= 2) {
+            use crate::fm26::ca_history::deltas_from_pack;
+            let (_recent, all_time) = deltas_from_pack(&best.points, &current);
+            println!(
+                "\n## All-time Δ (strategy={} pack_points={}) — compare FM Progress Report",
+                best.label,
+                best.points.len()
+            );
+            let mut moves: Vec<_> = all_time
+                .into_iter()
+                .filter_map(|(k, v)| v.map(|d| (k, d)))
+                .filter(|(_, d)| *d != 0)
+                .collect();
+            moves.sort_by(|a, b| a.0.cmp(&b.0));
+            if moves.is_empty() {
+                println!("  (no non-zero movement vs first pack point)");
+            } else {
+                for (attr, delta) in &moves {
+                    println!("  {attr}: {delta:+}");
+                }
+            }
+            println!("\nFM ground truth (All Time arrows): Long Shots, Tackling, Acceleration, Balance, Jumping Reach, Strength");
+        } else {
+            println!("\nNo strip with ≥2 pack points — person index not cracked yet.");
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore]
+    fn probe_assan_ptr_array_live() {
+        use std::collections::HashMap;
+
+        use crate::fm26::{
+            ca_history::{deltas_from_pack, flatten_current},
+            ca_ptr_array::probe_ptr_array_history,
+            process::find_fm26_process,
+        };
+
+        let Some((process_id, _)) = find_fm26_process() else {
+            println!("FM26 not running — skip");
+            return;
+        };
+        let snapshot = collect_snapshot(false, None);
+        assert_eq!(
+            snapshot.status.state, "connected",
+            "need connected save: {}",
+            snapshot.status.message
+        );
+
+        let record = {
+            let index = PLAYER_DATABASE_INDEX
+                .get()
+                .expect("index")
+                .read()
+                .expect("lock");
+            index
+                .records
+                .values()
+                .find(|r| r.name == "Assan Ouédraogo")
+                .cloned()
+                .expect("Assan in managed squad")
+        };
+
+        let mut visible = HashMap::new();
+        let mut hidden = HashMap::new();
+        for player in &snapshot.players {
+            if player.get("id").and_then(|v| v.as_str()) != Some(record.id.as_str()) {
+                continue;
+            }
+            visible = player
+                .get("attributes")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+            hidden = player
+                .get("hiddenAttributes")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+        }
+        let current = flatten_current(&visible, &hidden);
+
+        let mut reader = ProcessReader::open(process_id).expect("open fm");
+        println!(
+            "=== Assan pointer-array chase (person={:#x} raw={:#x}) ===",
+            record.person_address, record.raw_player_address
+        );
+        let hit = probe_ptr_array_history(
+            &mut reader,
+            record.person_address,
+            record.raw_player_address,
+            &visible,
+        );
+
+        println!("person heap ptrs ({}):", hit.person_ptrs.len());
+        for p in hit.person_ptrs.iter().take(16) {
+            println!("  {p:#x}");
+        }
+
+        if hit.points.is_empty() {
+            println!("\nNo card array found — try Progress Report open on Assan.");
+            return;
+        }
+
+        println!(
+            "\nbest layout: {} pack_points={} newest_l1={}",
+            hit.label,
+            hit.points.len(),
+            hit.newest_l1
+        );
+
+        let (_recent, all_time) = deltas_from_pack(&hit.points, &current);
+        println!("\n## All-time Δ vs first pack point");
+        let mut moves: Vec<_> = all_time
+            .into_iter()
+            .filter_map(|(k, v)| v.map(|d| (k, d)))
+            .filter(|(_, d)| *d != 0)
+            .collect();
+        moves.sort_by(|a, b| a.0.cmp(&b.0));
+        if moves.is_empty() {
+            println!("  (no non-zero movement)");
+        } else {
+            for (attr, delta) in &moves {
+                println!("  {attr}: {delta:+}");
+            }
+        }
+        println!("\nFM All Time arrows: Long Shots, Tackling, Acceleration, Balance, Jumping Reach, Strength");
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore]
+    fn probe_assan_person_table_merge_live() {
+        use std::collections::HashMap;
+
+        use crate::fm26::{
+            ca_history::{deltas_from_pack, flatten_current},
+            ca_seed_dump::{
+                merge_person_table_history, print_person_table_merge, wait_for_seeds,
+            },
+            process::find_fm26_process,
+        };
+
+        let Some((process_id, _)) = find_fm26_process() else {
+            println!("FM26 not running — skip");
+            return;
+        };
+        let snapshot = collect_snapshot(false, None);
+        assert_eq!(
+            snapshot.status.state, "connected",
+            "need connected save: {}",
+            snapshot.status.message
+        );
+
+        let record = {
+            let index = PLAYER_DATABASE_INDEX
+                .get()
+                .expect("index")
+                .read()
+                .expect("lock");
+            index
+                .records
+                .values()
+                .find(|r| r.name == "Assan Ouédraogo")
+                .cloned()
+                .expect("Assan in managed squad")
+        };
+
+        let mut visible = HashMap::new();
+        let mut hidden = HashMap::new();
+        for player in &snapshot.players {
+            if player.get("id").and_then(|v| v.as_str()) != Some(record.id.as_str()) {
+                continue;
+            }
+            visible = player
+                .get("attributes")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+            hidden = player
+                .get("hiddenAttributes")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+        }
+        let current = flatten_current(&visible, &hidden);
+
+        let mut reader = ProcessReader::open(process_id).expect("open fm");
+        println!(
+            "=== Assan person-table merge — keep Progress Report open ===\nperson={:#x}",
+            record.person_address
+        );
+        let seeds = wait_for_seeds(
+            &mut reader,
+            record.person_address,
+            record.raw_player_address,
+            15,
+            45_000,
+        );
+        if seeds.len() < 5 {
+            println!("only {} seeds materialized — open Progress Report and re-run", seeds.len());
+            return;
+        }
+
+        let merge = merge_person_table_history(
+            &mut reader,
+            record.person_address,
+            record.raw_player_address,
+            &current,
+            80,
+        );
+        print_person_table_merge(&merge, &current);
+
+        if merge.matched_seeds == 0 {
+            println!("\nNo seeds matched Assan fingerprint (L1≤80) — cards may be shared pool garbage.");
+            let near: Vec<_> = merge
+                .per_seed
+                .iter()
+                .filter_map(|(s, _, l1, _)| l1.map(|l| (*s, l)))
+                .collect();
+            if let Some((s, l)) = near.iter().min_by_key(|(_, l)| *l) {
+                println!("nearest miss: {s:#x} L1={l}");
+            }
+            return;
+        }
+
+        if merge.merged.len() < 2 {
+            println!("\nMatched seeds but only {} distinct snapshot(s) — need ≥2 for all-time Δ.", merge.merged.len());
+            return;
+        }
+
+        let (_recent, all_time) = deltas_from_pack(&merge.merged, &current);
+        println!("\n## All-time Δ (Assan-matched seeds only, L1≤80)");
+        let mut moves: Vec<_> = all_time
+            .into_iter()
+            .filter_map(|(k, v)| v.map(|d| (k, d)))
+            .filter(|(_, d)| *d != 0)
+            .collect();
+        moves.sort_by(|a, b| a.0.cmp(&b.0));
+        if moves.is_empty() {
+            println!("  (no non-zero movement vs first pack point)");
+        } else {
+            for (attr, delta) in &moves {
+                println!("  {attr}: {delta:+}");
+            }
+        }
+        println!("\nFM All Time: Long Shots, Tackling, Acceleration, Balance, Jumping Reach, Strength");
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore]
+    fn probe_assan_long_shots_timeline_live() {
+        use crate::fm26::{
+            ca_bench_search::{print_long_shots_timeline, run_assan_long_shots_timeline_search},
+            process::find_fm26_process,
+        };
+
+        let Some((process_id, _)) = find_fm26_process() else {
+            println!("FM26 not running — skip");
+            return;
+        };
+        let snapshot = collect_snapshot(false, None);
+        assert_eq!(snapshot.status.state, "connected");
+
+        let record = {
+            let index = PLAYER_DATABASE_INDEX.get().unwrap().read().unwrap();
+            index
+                .records
+                .values()
+                .find(|r| r.name == "Assan Ouédraogo")
+                .cloned()
+                .expect("Assan")
+        };
+
+        let mut reader = ProcessReader::open(process_id).expect("open");
+        println!(
+            "=== Long Shots timeline hunt [14×8, 13] — Progress Report open ===\n\
+             person={:#x} raw={:#x}",
+            record.person_address, record.raw_player_address
+        );
+        let report = run_assan_long_shots_timeline_search(
+            &mut reader,
+            record.person_address,
+            record.raw_player_address,
+        );
+        print_long_shots_timeline(&report);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore]
+    fn probe_assan_progress_timeline_live() {
+        use crate::fm26::{
+            ca_bench_search::{print_assan_progress_timeline, run_assan_progress_timeline_search},
+            process::find_fm26_process,
+        };
+
+        let Some((process_id, _)) = find_fm26_process() else {
+            println!("FM26 not running — skip");
+            return;
+        };
+        let snapshot = collect_snapshot(false, None);
+        assert_eq!(snapshot.status.state, "connected");
+
+        let record = {
+            let index = PLAYER_DATABASE_INDEX.get().unwrap().read().unwrap();
+            index
+                .records
+                .values()
+                .find(|r| r.name == "Assan Ouédraogo")
+                .cloned()
+                .expect("Assan")
+        };
+
+        let mut reader = ProcessReader::open(process_id).expect("open");
+        println!(
+            "=== Progress timeline hunt — Report open ===\n\
+             LS [14×8,13] + Tac [10×9] + Acc [11×8,10] + Str [10×3,9×6]\n\
+             person={:#x} raw={:#x}",
+            record.person_address, record.raw_player_address
+        );
+        let report = run_assan_progress_timeline_search(
+            &mut reader,
+            record.person_address,
+            record.raw_player_address,
+        );
+        print_assan_progress_timeline(&report);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore]
+    fn probe_game_details_live() {
+        use crate::fm26::{
+            game_details::{
+                hunt_game_details, hunt_game_details_numeric, list_fm24career_saves_on_disk,
+                print_disk_save_candidates, print_game_details, print_numeric_hits,
+            },
+            memory::ProcessReader,
+            offsets::find_entity_map,
+            process::find_fm26_process,
+        };
+
+        let disk = list_fm24career_saves_on_disk();
+        print_disk_save_candidates(&disk);
+
+        let Some((process_id, _)) = find_fm26_process() else {
+            println!("FM26 not running — disk only");
+            return;
+        };
+        let snapshot = collect_snapshot(false, None);
+        assert_eq!(snapshot.status.state, "connected");
+
+        let human = snapshot
+            .status
+            .save_pointer
+            .as_deref()
+            .and_then(|s| u64::from_str_radix(s.trim_start_matches("0x"), 16).ok())
+            .unwrap_or(0);
+        let club = snapshot
+            .clubs
+            .first()
+            .and_then(|c| c.get("name"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        let mut reader = ProcessReader::open(process_id).expect("open");
+        let module = snapshot
+            .status
+            .process_path
+            .as_deref()
+            .and_then(|path| {
+                let identity = read_executable_identity(path);
+                let profile = find_entity_map(
+                    identity.file_version.as_deref(),
+                    identity.product_version.as_deref(),
+                    identity.sha256.as_deref(),
+                    identity.architecture.as_deref(),
+                )?;
+                reader.module(&profile.module)
+            });
+        println!("=== Game Details RAM hunt — keep Game Details screen open ===");
+        let numeric = hunt_game_details_numeric(&mut reader, human);
+        print_numeric_hits(&numeric);
+        let report = hunt_game_details(
+            &mut reader,
+            human,
+            club,
+            module.map(|m| m.base),
+            module.map(|m| m.size).unwrap_or(0),
+        );
+        print_game_details(&report);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore]
+    fn probe_assan_ui_flicker_listen_live() {
+        use crate::fm26::{
+            ca_ui_listen::{listen_ui_flicker, print_ui_listen_summary},
+            process::find_fm26_process,
+        };
+
+        let duration_ms = std::env::var("FMT_UI_LISTEN_MS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(120_000);
+        let interval_ms = std::env::var("FMT_UI_LISTEN_INTERVAL_MS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(100);
+
+        let Some((process_id, _)) = find_fm26_process() else {
+            println!("FM26 not running — skip");
+            return;
+        };
+        let snapshot = collect_snapshot(false, None);
+        assert_eq!(snapshot.status.state, "connected");
+
+        let record = {
+            let index = PLAYER_DATABASE_INDEX.get().unwrap().read().unwrap();
+            index
+                .records
+                .values()
+                .find(|r| r.name == "Assan Ouédraogo")
+                .cloned()
+                .expect("Assan")
+        };
+
+        let mut reader = ProcessReader::open(process_id).expect("open");
+        println!(
+            "=== UI flicker memory listen ===\n\
+             Assan Progress Report open → Attributes tab → All Time.\n\
+             person={:#x} raw={:#x}\n\
+             \n\
+             PROTOCOL (single attr first — clearest signal):\n\
+             1. Toggle LONG SHOTS plot on/off ~8 times (1 toggle per 2s)\n\
+             2. Pause 5s\n\
+             3. Repeat for Tackling, Acceleration, Strength\n\
+             \n\
+             Listening {duration_ms}ms @ {interval_ms}ms poll. Env: FMT_UI_LISTEN_MS, FMT_UI_LISTEN_INTERVAL_MS\n",
+            record.person_address,
+            record.raw_player_address,
+        );
+        let report = listen_ui_flicker(
+            &mut reader,
+            record.person_address,
+            record.raw_player_address,
+            duration_ms,
+            interval_ms,
+        );
+        print_ui_listen_summary(&report);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore]
+    fn probe_assan_ls_tac_dual_timeline_live() {
+        use crate::fm26::{
+            ca_bench_search::{print_ls_tac_dual_timeline, run_assan_ls_tac_dual_search},
+            process::find_fm26_process,
+        };
+
+        let Some((process_id, _)) = find_fm26_process() else {
+            println!("FM26 not running — skip");
+            return;
+        };
+        let snapshot = collect_snapshot(false, None);
+        assert_eq!(snapshot.status.state, "connected");
+
+        let record = {
+            let index = PLAYER_DATABASE_INDEX.get().unwrap().read().unwrap();
+            index
+                .records
+                .values()
+                .find(|r| r.name == "Assan Ouédraogo")
+                .cloned()
+                .expect("Assan")
+        };
+
+        let mut reader = ProcessReader::open(process_id).expect("open");
+        println!(
+            "=== LS+Tac dual hunt — Progress Report open ===\n\
+             LS [14×8,13] + Tac [10×9]\n\
+             person={:#x} raw={:#x}",
+            record.person_address, record.raw_player_address
+        );
+        let report = run_assan_ls_tac_dual_search(
+            &mut reader,
+            record.person_address,
+            record.raw_player_address,
+        );
+        print_ls_tac_dual_timeline(&report);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore]
+    fn probe_assan_bench_search_live() {
+        use crate::fm26::{
+            ca_bench_search::{print_bench_report, run_assan_bench_search, BENCH_ATTRS},
+            process::find_fm26_process,
+        };
+
+        let Some((process_id, _)) = find_fm26_process() else {
+            println!("FM26 not running — skip");
+            return;
+        };
+        let snapshot = collect_snapshot(false, None);
+        assert_eq!(
+            snapshot.status.state, "connected",
+            "need connected save: {}",
+            snapshot.status.message
+        );
+
+        let record = {
+            let index = PLAYER_DATABASE_INDEX
+                .get()
+                .expect("index")
+                .read()
+                .expect("lock");
+            index
+                .records
+                .values()
+                .find(|r| r.name == "Assan Ouédraogo")
+                .cloned()
+                .expect("Assan in managed squad")
+        };
+
+        let mut reader = ProcessReader::open(process_id).expect("open fm");
+        println!(
+            "=== Assan benchmark card search (7 attrs, Jan43 vs Sep43) ===\n\
+             Keep Progress Report open. Bench: {}",
+            BENCH_ATTRS.join(", ")
+        );
+        println!(
+            "person={:#x} — if 0 exact hits, retry another player (Assan has split timelines)",
+            record.person_address
+        );
+
+        let report = run_assan_bench_search(
+            &mut reader,
+            record.person_address,
+            record.raw_player_address,
+        );
+        print_bench_report(&report);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore]
+    fn probe_assan_hub_chase_live() {
+        use std::collections::HashMap;
+
+        use crate::fm26::{
+            ca_history::{deltas_from_pack, flatten_current},
+            ca_seed_dump::{chase_development_hub, print_hub_chase, wait_for_seeds},
+            process::find_fm26_process,
+        };
+
+        let Some((process_id, _)) = find_fm26_process() else {
+            println!("FM26 not running — skip");
+            return;
+        };
+        let snapshot = collect_snapshot(false, None);
+        assert_eq!(
+            snapshot.status.state, "connected",
+            "need connected save: {}",
+            snapshot.status.message
+        );
+
+        let record = {
+            let index = PLAYER_DATABASE_INDEX
+                .get()
+                .expect("index")
+                .read()
+                .expect("lock");
+            index
+                .records
+                .values()
+                .find(|r| r.name == "Assan Ouédraogo")
+                .cloned()
+                .expect("Assan in managed squad")
+        };
+        let uid = record.id.parse::<u32>().expect("uid");
+
+        let mut visible = HashMap::new();
+        let mut hidden = HashMap::new();
+        for player in &snapshot.players {
+            if player.get("id").and_then(|v| v.as_str()) != Some(record.id.as_str()) {
+                continue;
+            }
+            visible = player
+                .get("attributes")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+            hidden = player
+                .get("hiddenAttributes")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+        }
+        let current = flatten_current(&visible, &hidden);
+
+        let mut reader = ProcessReader::open(process_id).expect("open fm");
+        println!(
+            "=== Assan hub chase (0x22489aacf24 table) — Progress Report open ===\nperson={:#x} uid={uid}",
+            record.person_address
+        );
+        let seeds = wait_for_seeds(
+            &mut reader,
+            record.person_address,
+            record.raw_player_address,
+            15,
+            45_000,
+        );
+        if seeds.len() < 5 {
+            println!("only {} seeds — open Progress Report and re-run", seeds.len());
+            return;
+        }
+
+        let report = chase_development_hub(
+            &mut reader,
+            &seeds,
+            uid,
+            record.person_address,
+            &current,
+            80,
+        );
+        print_hub_chase(&report);
+
+        if report.merged.len() < 2 {
+            println!("\nNo Assan-matched multi-point timeline from hub (merged={}).", report.merged.len());
+            return;
+        }
+
+        let (_recent, all_time) = deltas_from_pack(&report.merged, &current);
+        println!("\n## All-time Δ (hub chase, L1≤80)");
+        let fm_attrs = [
+            "Long Shots",
+            "Tackling",
+            "Acceleration",
+            "Balance",
+            "Jumping Reach",
+            "Strength",
+        ];
+        for attr in fm_attrs {
+            let d = all_time.get(attr).and_then(|v| *v);
+            println!("  {attr}: {}", d.map(|x| format!("{x:+}")).unwrap_or_else(|| "—".into()));
+        }
+        println!("\n(all non-zero)");
+        for (attr, delta) in all_time
+            .into_iter()
+            .filter_map(|(k, v)| v.map(|d| (k, d)))
+            .filter(|(_, d)| *d != 0)
+        {
+            if !fm_attrs.contains(&attr.as_str()) {
+                println!("  {attr}: {delta:+}");
+            }
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore]
+    fn probe_assan_seed_hex_live() {
+        use std::collections::HashMap;
+
+        use crate::fm26::{
+            ca_history::{deltas_from_pack, flatten_current},
+            ca_seed_dump::{dump_and_analyze_seeds, print_seed_dump_with_visible, wait_for_seeds},
+            process::find_fm26_process,
+        };
+
+        let Some((process_id, _)) = find_fm26_process() else {
+            println!("FM26 not running — skip");
+            return;
+        };
+        let snapshot = collect_snapshot(false, None);
+        assert_eq!(
+            snapshot.status.state, "connected",
+            "need connected save: {}",
+            snapshot.status.message
+        );
+
+        let record = {
+            let index = PLAYER_DATABASE_INDEX
+                .get()
+                .expect("index")
+                .read()
+                .expect("lock");
+            index
+                .records
+                .values()
+                .find(|r| r.name == "Assan Ouédraogo")
+                .cloned()
+                .expect("Assan in managed squad")
+        };
+
+        let mut visible = HashMap::new();
+        let mut hidden = HashMap::new();
+        for player in &snapshot.players {
+            if player.get("id").and_then(|v| v.as_str()) != Some(record.id.as_str()) {
+                continue;
+            }
+            visible = player
+                .get("attributes")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+            hidden = player
+                .get("hiddenAttributes")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+        }
+        let current = flatten_current(&visible, &hidden);
+
+        let mut reader = ProcessReader::open(process_id).expect("open fm");
+        println!(
+            "=== Assan seed hex dump — keep Progress Report open (waiting for seeds) ===\nperson={:#x}",
+            record.person_address
+        );
+        let seeds = wait_for_seeds(
+            &mut reader,
+            record.person_address,
+            record.raw_player_address,
+            20,
+            45_000,
+        );
+        if seeds.len() < 5 {
+            println!("only {} seeds — open Assan Progress Report and re-run", seeds.len());
+            return;
+        }
+
+        let report = dump_and_analyze_seeds(&mut reader, record.person_address, &seeds, &visible);
+        print_seed_dump_with_visible(&report, &mut reader, &visible);
+
+        if let Some((label, points)) = &report.best_layout {
+            if points.len() >= 2 {
+                let (_recent, all_time) = deltas_from_pack(points, &current);
+                println!("\n## All-time Δ ({label})");
+                let mut moves: Vec<_> = all_time
+                    .into_iter()
+                    .filter_map(|(k, v)| v.map(|d| (k, d)))
+                    .filter(|(_, d)| *d != 0)
+                    .collect();
+                moves.sort_by(|a, b| a.0.cmp(&b.0));
+                for (attr, delta) in &moves {
+                    println!("  {attr}: {delta:+}");
+                }
+            }
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore]
+    fn probe_assan_ptr_array_poll_live() {
+        use std::collections::HashMap;
+
+        use crate::fm26::{
+            ca_history::{deltas_from_pack, flatten_current},
+            ca_ptr_array::poll_ptr_array_history,
+            process::find_fm26_process,
+        };
+
+        let Some((process_id, _)) = find_fm26_process() else {
+            println!("FM26 not running — skip");
+            return;
+        };
+        let snapshot = collect_snapshot(false, None);
+        assert_eq!(
+            snapshot.status.state, "connected",
+            "need connected save: {}",
+            snapshot.status.message
+        );
+
+        let record = {
+            let index = PLAYER_DATABASE_INDEX
+                .get()
+                .expect("index")
+                .read()
+                .expect("lock");
+            index
+                .records
+                .values()
+                .find(|r| r.name == "Assan Ouédraogo")
+                .cloned()
+                .expect("Assan in managed squad")
+        };
+
+        let mut visible = HashMap::new();
+        let mut hidden = HashMap::new();
+        for player in &snapshot.players {
+            if player.get("id").and_then(|v| v.as_str()) != Some(record.id.as_str()) {
+                continue;
+            }
+            visible = player
+                .get("attributes")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+            hidden = player
+                .get("hiddenAttributes")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+        }
+        let current = flatten_current(&visible, &hidden);
+
+        let mut reader = ProcessReader::open(process_id).expect("open fm");
+        println!(
+            "=== Assan pointer poll (120s) — close/reopen Progress Report now ===\nperson={:#x}",
+            record.person_address
+        );
+        let (hit, trace) = poll_ptr_array_history(
+            &mut reader,
+            record.person_address,
+            record.raw_player_address,
+            &visible,
+            120_000,
+            2_000,
+        );
+
+        let peak_seeds = trace.iter().map(|s| s.seed_count).max().unwrap_or(0);
+        println!("\npoll done: samples={} peak_seeds={peak_seeds}", trace.len());
+        if !hit.person_ptrs.is_empty() {
+            println!("best seeds:");
+            for p in hit.person_ptrs.iter().take(12) {
+                println!("  {p:#x}");
+            }
+        }
+
+        if hit.points.is_empty() {
+            println!("No card array resolved across poll window.");
+            return;
+        }
+
+        println!(
+            "\nbest: {} pack_points={} newest_l1={}",
+            hit.label,
+            hit.points.len(),
+            hit.newest_l1
+        );
+        let (_recent, all_time) = deltas_from_pack(&hit.points, &current);
+        println!("\n## All-time Δ");
+        let mut moves: Vec<_> = all_time
+            .into_iter()
+            .filter_map(|(k, v)| v.map(|d| (k, d)))
+            .filter(|(_, d)| *d != 0)
+            .collect();
+        moves.sort_by(|a, b| a.0.cmp(&b.0));
+        for (attr, delta) in &moves {
+            println!("  {attr}: {delta:+}");
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore]
+    fn resolve_ca_packs_in_live_memory() {
+        use crate::fm26::process::find_fm26_process;
+
+        if find_fm26_process().is_none() {
+            println!("FM26 not running — skip");
+            return;
+        }
+        let snapshot = collect_snapshot(false, None);
+        assert_eq!(
+            snapshot.status.state, "connected",
+            "need connected save: {}",
+            snapshot.status.message
+        );
+        let mut with_pack = 0usize;
+        let mut best_pts = 0usize;
+        let mut samples: Vec<String> = Vec::new();
+        for player in &snapshot.players {
+            let pts = player
+                .get("caPackPointCount")
+                .and_then(|v| v.as_u64())
+                .unwrap_or(0) as usize;
+            if pts == 0 {
+                continue;
+            }
+            with_pack += 1;
+            best_pts = best_pts.max(pts);
+            let name = player.get("name").and_then(|v| v.as_str()).unwrap_or("?");
+            let id = player.get("id").and_then(|v| v.as_str()).unwrap_or("?");
+            let deltas = player.get("allTimeAttrDeltas").and_then(|v| v.as_object());
+            let non_null = deltas
+                .map(|m| m.values().filter(|v| !v.is_null()).count())
+                .unwrap_or(0);
+            if samples.len() < 6 {
+                samples.push(format!("{name} ({id}): {pts} pts, {non_null} attrs"));
+            }
+        }
+        println!(
+            "CA packs: {with_pack}/{} managed players with history (max {best_pts} pts)",
+            snapshot.players.len()
+        );
+        for line in &samples {
+            println!("  {line}");
+        }
+        if with_pack == 0 {
+            println!("No CA packs resolved — index/uid join still missing.");
+            if let Ok(index) = PLAYER_DATABASE_INDEX.get().expect("index").read() {
+                let squad: Vec<_> = index
+                    .records
+                    .values()
+                    .filter(|r| r.managed_squad)
+                    .map(|r| {
+                        (
+                            r.id.parse::<u32>().unwrap_or(0),
+                            r.person_address,
+                        )
+                    })
+                    .collect();
+                drop(index);
+                let mut reader = ProcessReader::open(find_fm26_process().unwrap().0).ok();
+                if let Some(reader) = reader.as_mut() {
+                    let ctx = crate::fm26::ca_resolve::CaResolveContext::build(
+                        reader,
+                        &PLAYER_DATABASE_INDEX
+                            .get()
+                            .unwrap()
+                            .read()
+                            .unwrap()
+                            .anchors,
+                        &squad,
+                    );
+                    println!(
+                        "  debug: {} clusters, {} cluster_uid hits, {} index ptrs",
+                        ctx.clusters.len(),
+                        ctx.cluster_histories.len(),
+                        ctx.index_strip_end.len()
+                    );
+                    for (i, c) in ctx.clusters.iter().take(3).enumerate() {
+                        println!(
+                            "    cluster[{i}] {:#x} cards={} pts={}",
+                            c.base, c.cards, c.history_points
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    #[ignore]
+    fn probe_ca_history_in_live_memory() {
+        use crate::fm26::{
+            ca_hunt::{history_from_cluster_uid, run_ca_hunt, uid_in_cluster, uid_near_cluster},
+            ca_probe::{best_probe, probe_ca_for_player},
+            process::find_fm26_process,
+        };
+
+        let Some((process_id, _)) = find_fm26_process() else {
+            println!("FM26 not running — skip");
+            return;
+        };
+        let snapshot = collect_snapshot(false, None);
+        assert_eq!(
+            snapshot.status.state, "connected",
+            "need connected save: {}",
+            snapshot.status.message
+        );
+        let (anchors, managed) = {
+            let index = PLAYER_DATABASE_INDEX
+                .get()
+                .expect("index")
+                .read()
+                .expect("lock");
+            let managed: Vec<_> = index
+                .records
+                .values()
+                .filter(|r| r.managed_squad)
+                .cloned()
+                .collect();
+            (index.anchors, managed)
+        };
+        let mut managed = managed;
+        managed.sort_by(|a, b| a.name.cmp(&b.name));
+
+        let mut reader = ProcessReader::open(process_id).expect("open fm");
+        let sample_uid = managed
+            .first()
+            .and_then(|r| r.id.parse::<u32>().ok())
+            .unwrap_or(0);
+
+        println!("=== CA cluster + pointer hunt (2GB heap scan) ===");
+        let hunt = run_ca_hunt(&mut reader, &anchors, sample_uid);
+        for (i, cluster) in hunt.top_clusters.iter().take(8).enumerate() {
+            let uid_hit = if sample_uid != 0 {
+                uid_in_cluster(&mut reader, sample_uid, cluster)
+            } else {
+                false
+            };
+            let near = if sample_uid != 0 {
+                uid_near_cluster(&mut reader, sample_uid, cluster, 8 * 1024 * 1024).len()
+            } else {
+                0
+            };
+            println!(
+                "  cluster[{i}] base={:#x} cards={} history_pts={} uid_in_win={uid_hit} uid_near_8mb={near}",
+                cluster.base, cluster.cards, cluster.history_points
+            );
+        }
+        for hit in hunt.pointer_chase.iter().take(10) {
+            println!(
+                "  ptr_chase {} ptr={:#x} cards={} history_pts={}",
+                hit.label, hit.ptr, hit.cards, hit.history_points
+            );
+        }
+        for hit in &hunt.anchor_windows {
+            println!(
+                "  anchor_win {} ptr={:#x} cards={} history_pts={}",
+                hit.label, hit.ptr, hit.cards, hit.history_points
+            );
+        }
+
+        let mut any_points = 0usize;
+        let sample = managed.len().min(8);
+        println!(
+            "\n=== per-player person/double probe ({sample}/{} managed) ===",
+            managed.len()
+        );
+        for record in managed.iter().take(sample) {
+            let uid = record.id.parse::<u32>().unwrap_or(0);
+            let strategies = probe_ca_for_player(&mut reader, uid, record.person_address);
+            let best = best_probe(&strategies);
+            let best_pts = best.map(|b| b.points).unwrap_or(0);
+            any_points = any_points.max(best_pts);
+            println!("\n{} uid={} person={:#x}", record.name, uid, record.person_address);
+            for s in &strategies {
+                println!(
+                    "  {:28} points={} gap_tip={:?}",
+                    s.label, s.points, s.gap_tip
+                );
+            }
+            for cluster in hunt.top_clusters.iter().take(3) {
+                let near = uid_near_cluster(&mut reader, uid, cluster, 8 * 1024 * 1024);
+                if !near.is_empty() {
+                    let (cards, pts) = history_from_cluster_uid(&mut reader, uid, cluster);
+                    println!(
+                        "  uid near cluster {:#x}: doubles={} cards={cards} history_pts={pts}",
+                        cluster.base,
+                        near.len()
+                    );
+                }
+            }
+        }
+        println!("\nmax pack points in per-player sample: {any_points}");
+        let best_cluster_pts = hunt
+            .top_clusters
+            .first()
+            .map(|c| c.history_points)
+            .unwrap_or(0);
+        if any_points >= 2 {
+            println!("Per-player CA strip reachable in live RAM.");
+        } else if best_cluster_pts >= 2 {
+            println!(
+                "Shared attrish clusters exist (max {best_cluster_pts} history pts) but per-player join not proven yet."
+            );
+        } else {
+            println!(
+                "CA strip NOT found (player max {any_points}, cluster max {best_cluster_pts})."
+            );
+        }
     }
 
     #[cfg(target_os = "windows")]

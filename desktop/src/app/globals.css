@@ -807,6 +807,39 @@ h1, h2, h3, [data-slot="card-title"] { font-family: "Inter Variable", Inter, "Se
 .squad-metric-ring-label.is-unknown{color:var(--slate);font-weight:600}
 .squad-metric-ring-track{stroke:#e4ebef}
 .squad-metric-ring-value{stroke:var(--fit-color);transition:stroke-dashoffset .2s ease}
+.squad-unit-tabs{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin:-6px 0 14px;
+}
+.squad-unit-tab{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:7px 12px;
+  border:1px solid var(--border);
+  border-radius:999px;
+  background:rgba(255,255,255,.72);
+  color:var(--slate);
+  font-size:12px;
+  font-weight:600;
+  cursor:pointer;
+}
+.squad-unit-tab.is-active{
+  border-color:#c7d8e2;
+  background:#f7fafb;
+  color:var(--navy);
+}
+.squad-unit-tab-count{
+  min-width:1.4em;
+  padding:1px 6px;
+  border-radius:999px;
+  background:#edf3f6;
+  color:var(--navy);
+  font-size:11px;
+  font-variant-numeric:tabular-nums;
+}
 .squad-matrix{
   display:flex;
   flex-direction:column;
@@ -898,17 +931,20 @@ h1, h2, h3, [data-slot="card-title"] { font-family: "Inter Variable", Inter, "Se
   width:36px;
   height:36px;
 }
+.squad-player-card-face:has(.squad-loan-club-badge){
+  height:50px;
+}
 .squad-player-card-face .player-face-sm{width:36px;height:36px}
 .squad-loan-club-badge{
   position:absolute;
-  right:-5px;
-  bottom:-5px;
+  left:50%;
+  bottom:0;
   z-index:1;
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  width:18px;
-  height:18px;
+  width:16px;
+  height:16px;
   padding:0;
   border-radius:5px;
   border:1px solid var(--border);
@@ -916,10 +952,11 @@ h1, h2, h3, [data-slot="card-title"] { font-family: "Inter Variable", Inter, "Se
   box-shadow:0 1px 4px rgba(34,61,78,.18);
   line-height:0;
   cursor:help;
+  transform:translateX(-50%);
 }
 .squad-loan-club-badge .club-logo{
-  width:16px;
-  height:16px;
+  width:14px;
+  height:14px;
   padding:1px;
   border-radius:4px;
 }

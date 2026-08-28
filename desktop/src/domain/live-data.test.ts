@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  countAtClubSquadUnit,
   gmAdvice,
   GM_DEVELOPMENT_AGE_MAX,
   isAtClubSquadPlayer,
@@ -12,11 +13,20 @@ import {
 describe("isAtClubSquadPlayer", () => {
   it("keeps managed at-club players", () => {
     expect(
-      isAtClubSquadPlayer({ clubId: "920", loanedOut: false }, "920"),
+      isAtClubSquadPlayer({ clubId: "920", loanedOut: false, squadUnit: "firstTeam" }, "920"),
     ).toBe(true);
     expect(isAtClubSquadPlayer({ clubId: "920", loanedOut: null }, "920")).toBe(
       true,
     );
+  });
+
+  it("filters by squad unit", () => {
+    expect(
+      isAtClubSquadPlayer({ clubId: "920", loanedOut: false, squadUnit: "under19s" }, "920", "under19s"),
+    ).toBe(true);
+    expect(
+      isAtClubSquadPlayer({ clubId: "920", loanedOut: false, squadUnit: "under19s" }, "920", "firstTeam"),
+    ).toBe(false);
   });
 
   it("drops outgoing loans and other clubs", () => {
@@ -29,6 +39,19 @@ describe("isAtClubSquadPlayer", () => {
     expect(isAtClubSquadPlayer({ clubId: "920", loanedOut: false }, null)).toBe(
       false,
     );
+  });
+});
+
+describe("countAtClubSquadUnit", () => {
+  it("counts only at-club players in the requested unit", () => {
+    const players = [
+      { clubId: "920", loanedOut: false, squadUnit: "firstTeam" as const },
+      { clubId: "920", loanedOut: false, squadUnit: "under19s" as const },
+      { clubId: "920", loanedOut: true, squadUnit: "under19s" as const },
+      { clubId: "912", loanedOut: false, squadUnit: "under19s" as const },
+    ];
+    expect(countAtClubSquadUnit(players, "920", "under19s")).toBe(1);
+    expect(countAtClubSquadUnit(players, "920", "firstTeam")).toBe(1);
   });
 });
 
@@ -179,40 +202,54 @@ describe("isHoydProspect", () => {
 
   it("includes high PA with headroom above squad median CA", () => {
     expect(
-      isHoydProspect({ currentAbility: 110, potentialAbility: 150 }, ref),
+      isHoydProspect({ currentAbility: 110, potentialAbility: 150, age: 20 }, ref),
     ).toBe(true);
     expect(
       isHoydProspect(
         {
           currentAbility: ref - MOVE_ON_HEADROOM_MAX - 1,
           potentialAbility: ref,
+          age: GM_DEVELOPMENT_AGE_MAX,
         },
         ref,
       ),
     ).toBe(true);
   });
 
+  it("excludes players past development age", () => {
+    expect(
+      isHoydProspect(
+        { currentAbility: 110, potentialAbility: 150, age: GM_DEVELOPMENT_AGE_MAX + 1 },
+        ref,
+      ),
+    ).toBe(false);
+    expect(
+      isHoydProspect({ currentAbility: 110, potentialAbility: 150, age: null }, ref),
+    ).toBe(false);
+  });
+
   it("excludes low PA, near-ceiling, or missing CA/PA", () => {
     expect(
-      isHoydProspect({ currentAbility: 120, potentialAbility: 125 }, ref),
+      isHoydProspect({ currentAbility: 120, potentialAbility: 125, age: 20 }, ref),
     ).toBe(false);
     expect(
       isHoydProspect(
         {
           currentAbility: ref - MOVE_ON_HEADROOM_MAX,
           potentialAbility: ref,
+          age: 20,
         },
         ref,
       ),
     ).toBe(false);
     expect(
-      isHoydProspect({ currentAbility: 110, potentialAbility: 120 }, ref),
+      isHoydProspect({ currentAbility: 110, potentialAbility: 120, age: 20 }, ref),
     ).toBe(false);
     expect(
-      isHoydProspect({ currentAbility: null, potentialAbility: 150 }, ref),
+      isHoydProspect({ currentAbility: null, potentialAbility: 150, age: 20 }, ref),
     ).toBe(false);
     expect(
-      isHoydProspect({ currentAbility: 110, potentialAbility: null }, ref),
+      isHoydProspect({ currentAbility: 110, potentialAbility: null, age: 20 }, ref),
     ).toBe(false);
   });
 });

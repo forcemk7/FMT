@@ -1,10 +1,22 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { LiveFootballSnapshot, LivePlayer } from "@/domain/adapters";
 import { abilityToneFromScore } from "@/domain/attribute-tone";
 import { formatHasScore, hasBand, liveHasScore } from "@/domain/has-score";
-import { formatPlayerPositions, gmAdvice, groupSquad, isAtClubSquadPlayer, isHoydProspect, isLoanedOutSquadPlayer, positionGroups, squadMedianCA, type GmAdvice } from "@/domain/live-data";
+import {
+  countAtClubSquadUnit,
+  formatPlayerPositions,
+  gmAdvice,
+  groupSquad,
+  isAtClubSquadPlayer,
+  isHoydProspect,
+  isLoanedOutSquadPlayer,
+  positionGroups,
+  squadMedianCA,
+  type GmAdvice,
+  type SquadUnit,
+} from "@/domain/live-data";
 import { ClubLogo } from "@/components/club-logo";
 import { LiveDataState } from "@/components/live-data-state";
 import { HasBreakdownGridFromPlayer } from "@/components/has-breakdown-grid";
@@ -15,6 +27,11 @@ const CARD_RING_SIZE = 28;
 const CARD_RING_STROKE = 1.25;
 
 export type SquadDeskMode = "at-club" | "loaned-out" | "move-on" | "hoyd";
+
+const SQUAD_UNIT_TABS: Array<{ unit: SquadUnit; label: string }> = [
+  { unit: "firstTeam", label: "First Team" },
+  { unit: "under19s", label: "Under 19s" },
+];
 
 const GM_ADVICE_LANES: Array<{ advice: GmAdvice; title: string; empty: string }> = [
   { advice: "sell", title: "Sell", empty: "No sell candidates." },
@@ -253,11 +270,25 @@ export function MyTeamScreen({
   const loanedMode = mode === "loaned-out";
   const moveOnMode = mode === "move-on";
   const hoydMode = mode === "hoyd";
+  const squadDeskMode = !loanedMode && !moveOnMode && !hoydMode;
+  const [squadUnit, setSquadUnit] = useState<SquadUnit>("firstTeam");
   const atClub = useMemo(
     () =>
       snapshot.players.filter((player) =>
-        isAtClubSquadPlayer(player, snapshot.managedClubId),
+        isAtClubSquadPlayer(
+          player,
+          snapshot.managedClubId,
+          squadDeskMode ? squadUnit : "firstTeam",
+        ),
       ),
+    [snapshot.managedClubId, snapshot.players, squadDeskMode, squadUnit],
+  );
+  const squadUnitCounts = useMemo(
+    () =>
+      SQUAD_UNIT_TABS.map(({ unit }) => ({
+        unit,
+        count: countAtClubSquadUnit(snapshot.players, snapshot.managedClubId, unit),
+      })),
     [snapshot.managedClubId, snapshot.players],
   );
   const medianCA = useMemo(
@@ -293,7 +324,7 @@ export function MyTeamScreen({
   const managedClub = snapshot.clubs.find((club) => club.id === snapshot.managedClubId);
   const connected =
     snapshot.status.state === "connected" && Boolean(snapshot.managedClubId);
-  const allowEmpty = loanedMode || moveOnMode || hoydMode;
+  const allowEmpty = loanedMode || moveOnMode || hoydMode || (squadDeskMode && connected);
   const ready = connected && (allowEmpty || squad.length > 0);
   const title = loanedMode ? "Loans" : moveOnMode ? "GM" : hoydMode ? "HoYD" : "Squad";
   const emptyHint = loanedMode
@@ -301,8 +332,10 @@ export function MyTeamScreen({
     : moveOnMode
       ? "Sell / Loan advice — load when FM26 has a save open"
       : hoydMode
-        ? "Top talent to groom — load when FM26 has a save open"
-        : "First-team desk — load when FM26 has a save open";
+        ? "Top talent to groom (age ≤24) — load when FM26 has a save open"
+        : "First Team · Under 19s — load when FM26 has a save open";
+  const activeUnitLabel =
+    SQUAD_UNIT_TABS.find((tab) => tab.unit === squadUnit)?.label ?? "Squad";
   const medianLabel =
     medianCA == null ? null : Number.isInteger(medianCA) ? String(medianCA) : medianCA.toFixed(1);
   const readyBlurb = loanedMode
@@ -311,14 +344,16 @@ export function MyTeamScreen({
       ? `${managedClub?.name} · squad median CA ${medianLabel ?? "—"} · ${gmByAdvice.sell.length} sell · ${gmByAdvice.loan.length} loan`
       : hoydMode
         ? `${managedClub?.name} · squad median CA ${medianLabel ?? "—"} · ${squad.length} to groom`
-        : `${managedClub?.name} · ${squad.length} players`;
+        : `${managedClub?.name} · ${activeUnitLabel} · ${squad.length} at club`;
   const emptyConnectedMessage = loanedMode
     ? "No players out on loan."
     : moveOnMode
       ? "No Sell or Loan candidates vs squad median CA."
       : hoydMode
-        ? "No high-PA groom prospects vs squad median CA."
-        : null;
+        ? "No high-PA groom prospects (age ≤24) vs squad median CA."
+        : squadUnit === "under19s"
+          ? "No Under 19s at club loaded yet — check FM squad screen vs FMT read."
+          : null;
 
   function renderPositionMatrix(players: LivePlayer[], showLoanClub: boolean) {
     const byGroup = groupSquad(players);
@@ -363,6 +398,28 @@ export function MyTeamScreen({
           </div>
         ) : null}
       </div>
+      {squadDeskMode && connected ? (
+        <div className="squad-unit-tabs" role="tablist" aria-label="Squad unit">
+          {SQUAD_UNIT_TABS.map(({ unit, label }) => {
+            const count =
+              squadUnitCounts.find((entry) => entry.unit === unit)?.count ?? 0;
+            const active = squadUnit === unit;
+            return (
+              <button
+                key={unit}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                className={`squad-unit-tab${active ? " is-active" : ""}`}
+                onClick={() => setSquadUnit(unit)}
+              >
+                {label}
+                <span className="squad-unit-tab-count">{count}</span>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
       <section className="squad-matrix">
         {!connected ? (
           <div className="squad-table-empty">
