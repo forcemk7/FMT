@@ -1,10 +1,12 @@
 ﻿# Status
 
-Last updated: 2026-08-29 (T196 done — U19 via GS index)
+Last updated: 2026-08-30 (T198 done — affiliate graph RAM probe)
 
 ## Now
 
-**Human test T196** — Schalke FM24Career: FM U19 at-club count vs FMT Squad Under 19s subtab.
+**Human verify T198** — Schalke save: invoke `debug_scan_club_affiliates`, compare `backLinksToManagedClub` vs FM Board → Affiliated Clubs (B Team vs Feeder types → `relationshipCandidates` u32).
+
+**T199 ready** — load reserve rosters from typed B-team affiliates (blocked on T198 human compare).
 
 **T190 parked** — blocked on RAM lock for Live Editor Save ID before save-copy CA path.
 
@@ -14,6 +16,7 @@ Last updated: 2026-08-29 (T196 done — U19 via GS index)
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
+| T199 | Reserves — B-team affiliate rosters | ready | 1 | after T198 human RE lock |
 | T190 | Development all-time from Progress Report CA strip | blocked | 2 | **parked** — need Save ID in RAM before `.fm` pick |
 | T124 | Quiet dev launch | ready | 9 | behind Loop A |
 | T139 | FMT visual theme | deferred | — | overlapped |
@@ -21,6 +24,7 @@ Last updated: 2026-08-29 (T196 done — U19 via GS index)
 
 ## Recently done
 
+- **T198** Club affiliate graph RE — `debug_scan_club_affiliates` forward/back links + relationship u32 candidates
 - **T196** U19 squad — GS full index on load + contract-team U19 promote + Squad subtabs
 - **T194** GM advises Sell vs Loan from squad avg CA
 - **T193** Loans club logo pill + profile logo = active (loan) club

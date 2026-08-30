@@ -1,4 +1,4 @@
-use serde::Serialize;
+﻿use serde::Serialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::{
@@ -15,7 +15,10 @@ use crate::{
     data::players::{IndexedPlayerRecord, LiveMemoryAnchors, PlayerDatabaseIndex},
         fm26::{
         memory::{ModuleInfo, ProcessReader},
-        offsets::{find_entity_map, mapping_coverage, EntityMapProfile, MappingCoverage},
+        offsets::{
+            executable_sha256_for_versions, find_entity_map, mapping_coverage, EntityMapProfile,
+            MappingCoverage,
+        },
         parser::{
             classify_player_positions, display_attribute, goalkeeper_rating_from_positions,
             hidden_attribute_map, personality_attribute_map, preferred_foot_label,
@@ -56,6 +59,7 @@ pub struct ConnectorStatus {
     state: &'static str,
     players_loaded: u32,
     managed_squad_players: u32,
+    club_employees: u32,
     database_players_indexed: u32,
     background_players_indexed: u32,
     visible_players_loaded: u32,
@@ -101,6 +105,7 @@ pub struct ConnectorSnapshot {
     manager_name: Option<String>,
     season: Option<String>,
     clubs: Vec<Value>,
+    club_teams: Vec<Value>,
     players: Vec<Value>,
     tactic: Option<Value>,
     tactic_source: &'static str,
@@ -155,6 +160,7 @@ struct LiveData {
     manager_name: String,
     season: Option<String>,
     clubs: Vec<Value>,
+    club_teams: Vec<Value>,
     players: Vec<Value>,
     tactic: Option<Value>,
     database_players_indexed: u32,
@@ -164,6 +170,7 @@ struct LiveData {
     database_index_error: Option<String>,
     warnings: Vec<String>,
     tactic_manager_pointer: Option<u64>,
+    club_employees: u32,
 }
 
 static PLAYER_DATABASE_INDEX: OnceLock<RwLock<PlayerDatabaseIndex>> = OnceLock::new();
@@ -195,21 +202,245 @@ pub fn connector_snapshot() -> ConnectorSnapshot {
 }
 
 #[tauri::command]
-pub fn debug_dump_player_memory(
-    player_id: String,
-    window_size: Option<usize>,
-) -> Result<MappingLabCaptureData, String> {
-    let _ = collect_snapshot(false, None);
-    capture_mapping_lab_player(player_id.trim(), window_size.unwrap_or(1024))
+pub async fn load_active_save(app: tauri::AppHandle) -> ConnectorSnapshot {
+    let app_emit = app.clone();
+    match tauri::async_runtime::spawn_blocking(move || {
+        crate::fmt_log::load_begin("load_active_save", true);
+        let progress = |stage: &'static str| {
+            crate::fmt_log::load_progress(stage);
+            let _ = app_emit.emit("fmt-load-progress", stage);
+        };
+        // Fast path: managed squad only — no full-save memory scan or dossier merge.
+        collect_snapshot(false, Some(&progress))
+    })
+    .await
+    {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            crate::fmt_log::load_detail(format!("load worker panicked: {error}"));
+            let mut status = empty_status();
+            status.message = "FMT load failed unexpectedly.".to_string();
+            empty_snapshot(status.clone(), status.message)
+        }
+    }
 }
 
+/// Live RAM probe: managed club affiliate graph (forward/back club links + affiliate teams).
 #[tauri::command]
-pub fn load_active_save(app: tauri::AppHandle) -> ConnectorSnapshot {
-    let progress = |stage: &'static str| {
-        let _ = app.emit("fmt-load-progress", stage);
+pub fn debug_scan_club_affiliates() -> Result<Value, String> {
+    #[cfg(not(target_os = "windows"))]
+    {
+        return Err("Club affiliate scan requires the Windows FM26 connector.".to_string());
+    }
+    #[cfg(target_os = "windows")]
+    debug_scan_club_affiliates_impl()
+}
+
+/// Live RAM probe: club-linked teams with roster player UID/name samples.
+#[tauri::command]
+pub fn debug_scan_club_teams() -> Result<Value, String> {
+    #[cfg(not(target_os = "windows"))]
+    {
+        return Err("Club team scan requires the Windows FM26 connector.".to_string());
+    }
+    #[cfg(target_os = "windows")]
+    debug_scan_club_teams_impl()
+}
+
+/// Background pass: heap-scan club satellite teams (U19 etc.) after the fast first load.
+#[tauri::command]
+pub async fn load_club_satellite_squads() -> Result<Value, String> {
+    #[cfg(not(target_os = "windows"))]
+    {
+        return Err("Club satellite squad load requires the Windows FM26 connector.".to_string());
+    }
+    #[cfg(target_os = "windows")]
+    {
+        tauri::async_runtime::spawn_blocking(load_club_satellite_squads_impl)
+            .await
+            .map_err(|error| format!("Satellite squad worker failed: {error}"))
+            .and_then(|result| result)
+    }
+}
+
+/// Compare person/player bytes between database and high-UID managed squad samples.
+#[tauri::command]
+pub fn debug_probe_player_origin() -> Result<Value, String> {
+    #[cfg(not(target_os = "windows"))]
+    {
+        return Err("Player origin probe requires the Windows FM26 connector.".to_string());
+    }
+    #[cfg(target_os = "windows")]
+    debug_probe_player_origin_impl()
+}
+
+#[cfg(target_os = "windows")]
+fn load_club_satellite_squads_impl() -> Result<Value, String> {
+    let Some((process_id, _)) = find_fm26_process() else {
+        return Err("FM26 process not found.".to_string());
     };
-    // T196: restore GS full index on load; club employees promoted from index after FT read.
-    collect_snapshot(true, Some(&progress))
+    let mut reader = ProcessReader::open(process_id)
+        .map_err(|code| format!("Could not open FM26 read-only handle (Windows error {code})."))?;
+    let identity = reader
+        .process_path()
+        .as_deref()
+        .map(read_executable_identity)
+        .unwrap_or_default();
+    let Some(profile) = find_entity_map(
+        identity.file_version.as_deref(),
+        identity.product_version.as_deref(),
+        identity.sha256.as_deref(),
+        identity.architecture.as_deref(),
+    ) else {
+        return Err("FM26 build is not supported.".to_string());
+    };
+    let Some(module) = reader.module(&profile.module) else {
+        return Err("The FM26 game module was not available.".to_string());
+    };
+    let mut diagnostics = ExtractionDiagnostics::default();
+    let (selected, _) =
+        resolve_active_human_manager(&mut reader, module, profile, process_id, &mut diagnostics)
+            .map_err(|failure| failure.message)?;
+    let club_id = selected.club_uid.to_string();
+    let mut squad_game_date = None;
+    if let (Some(start), Some(end)) = (
+        reader
+            .read_pointer(selected.team + profile.constants.team_players_start_offset)
+            .filter(|value| *value != 0),
+        reader
+            .read_pointer(selected.team + profile.constants.team_players_end_offset)
+            .filter(|value| *value != 0),
+    ) {
+        let count = ((end.saturating_sub(start)) / 8) as usize;
+        for index in 0..count {
+            let Some(raw_player) = reader
+                .read_pointer(start + (index as u64 * 8))
+                .filter(|value| *value != 0)
+            else {
+                continue;
+            };
+            if let Some(date) =
+                read_fm_date(&mut reader, raw_player + profile.constants.player_current_date_offset)
+            {
+                squad_game_date = Some(date);
+                break;
+            }
+        }
+    }
+    let seeds = HashSet::from([selected.team]);
+    let discovered = discover_managed_club_teams(
+        &mut reader,
+        module,
+        profile,
+        selected.club,
+        selected.club_uid,
+        selected.team,
+        &seeds,
+        true,
+    );
+    let club_teams = club_teams_json(&discovered, selected.team);
+    let mut players = Vec::new();
+    let mut managed_player_ids = HashSet::new();
+    let mut managed_index_records = Vec::new();
+    let mut player_vtable = None;
+    let mut skipped_squad_slots = 0u32;
+    let mut skipped_squad_details = Vec::new();
+    let mut name_fallback_details = Vec::new();
+    let mut promoted = 0usize;
+    for entry in discovered {
+        if entry.team == selected.team || entry.squad_unit == "firstTeam" {
+            continue;
+        }
+        promoted += load_team_roster(
+            &mut reader,
+            module,
+            profile,
+            entry.team,
+            &entry.name,
+            entry.squad_unit,
+            entry.team_uid,
+            &club_id,
+            selected.club_uid,
+            squad_game_date,
+            &mut managed_player_ids,
+            &mut managed_index_records,
+            &mut players,
+            &mut skipped_squad_slots,
+            &mut skipped_squad_details,
+            &mut name_fallback_details,
+            &mut player_vtable,
+        );
+    }
+    Ok(json!({
+        "clubTeams": club_teams,
+        "players": players,
+        "promotedRosterPlayers": promoted,
+        "skippedSlots": skipped_squad_slots,
+        "bytesRead": reader.bytes_read,
+    }))
+}
+
+#[cfg(target_os = "windows")]
+fn debug_probe_player_origin_impl() -> Result<Value, String> {
+    use crate::fm26::player_origin::probe_player_origin_fields;
+
+    let Some((process_id, _)) = find_fm26_process() else {
+        return Err("FM26 process not found.".to_string());
+    };
+    let mut reader = ProcessReader::open(process_id)
+        .map_err(|code| format!("Could not open FM26 read-only handle (Windows error {code})."))?;
+    let identity = reader
+        .process_path()
+        .as_deref()
+        .map(read_executable_identity)
+        .unwrap_or_default();
+    let Some(profile) = find_entity_map(
+        identity.file_version.as_deref(),
+        identity.product_version.as_deref(),
+        identity.sha256.as_deref(),
+        identity.architecture.as_deref(),
+    ) else {
+        return Err("FM26 build is not supported.".to_string());
+    };
+    let Some(module) = reader.module(&profile.module) else {
+        return Err("The FM26 game module was not available.".to_string());
+    };
+    let mut diagnostics = ExtractionDiagnostics::default();
+    let (selected, _) =
+        resolve_active_human_manager(&mut reader, module, profile, process_id, &mut diagnostics)
+            .map_err(|failure| failure.message)?;
+    let players_start = reader
+        .read_pointer(selected.team + profile.constants.team_players_start_offset)
+        .ok_or_else(|| "Managed squad collection was not readable.".to_string())?;
+    let players_end = reader
+        .read_pointer(selected.team + profile.constants.team_players_end_offset)
+        .ok_or_else(|| "Managed squad collection end was not readable.".to_string())?;
+    let player_count = ((players_end.saturating_sub(players_start)) / 8) as usize;
+    let player_vtable = module.base + profile.constants.team_vtable_rva;
+    let _ = player_vtable;
+    let mut samples = Vec::new();
+    for index in 0..player_count.min(80) {
+        let Some(raw_player) = reader
+            .read_pointer(players_start + (index as u64 * 8))
+            .filter(|value| *value != 0)
+        else {
+            continue;
+        };
+        let Some(person) = reader
+            .read_pointer(raw_player + profile.constants.player_person_offset)
+            .filter(|value| *value != 0)
+        else {
+            continue;
+        };
+        let Some(uid) = reader
+            .read_u32(person + profile.constants.entity_uid_offset)
+            .filter(|uid| is_plausible_fm_unique_id(*uid))
+        else {
+            continue;
+        };
+        samples.push((raw_player, uid, person, 0));
+    }
+    Ok(probe_player_origin_fields(&mut reader, profile, &samples))
 }
 
 #[tauri::command]
@@ -285,189 +516,6 @@ fn indexed_player_json(record: &IndexedPlayerRecord) -> Value {
     })
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct MappingLabWindow {
-    pub(crate) object: &'static str,
-    pub(crate) base_address: String,
-    pub(crate) bytes: Vec<u8>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct MappingLabPersonProbe {
-    pub(crate) label: &'static str,
-    pub(crate) base_address: String,
-    pub(crate) uid_at_plus_12: Option<u32>,
-    pub(crate) name: Option<String>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct MappingLabCaptureData {
-    pub(crate) player_id: String,
-    pub(crate) player_name: String,
-    pub(crate) process_id: u32,
-    pub(crate) save_pointer: String,
-    pub(crate) entity_map_profile_id: String,
-    pub(crate) executable_sha256: String,
-    pub(crate) raw_player_address: String,
-    pub(crate) person_embedded_address: String,
-    pub(crate) person_probes: Vec<MappingLabPersonProbe>,
-    pub(crate) windows: Vec<MappingLabWindow>,
-}
-
-#[cfg(target_os = "windows")]
-fn collect_player_memory_windows(
-    reader: &mut ProcessReader,
-    profile: &EntityMapProfile,
-    record: &IndexedPlayerRecord,
-    window_size: usize,
-) -> Result<Vec<MappingLabWindow>, String> {
-    let mut windows = Vec::new();
-    let person_field = record.raw_player_address + profile.constants.player_person_offset;
-    let person_pointer = reader
-        .read_pointer(person_field)
-        .filter(|value| *value != 0 && *value != person_field);
-    let resolved_person =
-        resolve_person_address(reader, record.raw_player_address, profile).unwrap_or(person_field);
-
-    let mut push_window = |object: &'static str, address: u64| -> Result<(), String> {
-        let bytes = reader
-            .read_bytes(address, window_size)
-            .ok_or_else(|| format!("The bounded {object} window was not readable @ {address:#x}."))?;
-        windows.push(MappingLabWindow {
-            object,
-            base_address: hex_address(address),
-            bytes,
-        });
-        Ok(())
-    };
-
-    push_window("player", record.raw_player_address)?;
-    push_window("personEmbedded", person_field)?;
-    push_window("personResolved", resolved_person)?;
-
-    if let Some(person_pointer) = person_pointer {
-        push_window("personPointer", person_pointer)?;
-    }
-
-    if let Some(contract) = record.contract_address {
-        push_window("contract", contract)?;
-    }
-
-    Ok(windows)
-}
-
-#[cfg(target_os = "windows")]
-fn probe_person_candidates(
-    reader: &mut ProcessReader,
-    profile: &EntityMapProfile,
-    raw_player: u64,
-) -> Vec<MappingLabPersonProbe> {
-    let mut probes = Vec::new();
-    let mapped = raw_player + profile.constants.player_person_offset;
-    let mut candidates: Vec<(&'static str, u64)> = vec![("personMapped", mapped)];
-    if let Some(resolved) = resolve_person_address(reader, raw_player, profile) {
-        if resolved != mapped {
-            candidates.push(("personResolved", resolved));
-        }
-    }
-    if let Some(person_pointer) = reader
-        .read_pointer(mapped)
-        .filter(|value| *value != 0 && *value != mapped)
-    {
-        candidates.push(("personPointer", person_pointer));
-    }
-
-    for (label, base) in candidates {
-        let uid = reader
-            .read_u32(base + profile.constants.entity_uid_offset)
-            .filter(|uid| *uid > 0);
-        let name = uid.and_then(|_| {
-            display_name(
-                read_name_field(reader, base + profile.constants.person_first_name_offset),
-                read_name_field(reader, base + profile.constants.person_second_name_offset),
-                read_name_field(reader, base + profile.constants.person_common_name_offset),
-            )
-        });
-        probes.push(MappingLabPersonProbe {
-            label,
-            base_address: hex_address(base),
-            uid_at_plus_12: uid,
-            name,
-        });
-    }
-    probes
-}
-
-#[cfg(target_os = "windows")]
-pub(crate) fn capture_mapping_lab_player(
-    player_id: &str,
-    window_size: usize,
-) -> Result<MappingLabCaptureData, String> {
-    let window_size = window_size.clamp(64, 4096);
-    let index = PLAYER_DATABASE_INDEX
-        .get()
-        .ok_or_else(|| "Load the active save before capturing mapping evidence.".to_string())?
-        .read()
-        .map_err(|_| "The live player index is unavailable.".to_string())?;
-    let record = index
-        .records
-        .get(player_id)
-        .cloned()
-        .or_else(|| {
-            let mut matches = index
-                .records
-                .values()
-                .filter(|record| record.name.eq_ignore_ascii_case(player_id));
-            let first = matches.next()?.clone();
-            matches.next().is_none().then_some(first)
-        })
-        .ok_or_else(|| {
-            "No unique indexed player matched that FM ID or exact player name.".to_string()
-        })?;
-    let process_id = index.process_id;
-    let save_pointer = index.save_pointer;
-    drop(index);
-
-    let mut reader = ProcessReader::open(process_id)
-        .map_err(|code| format!("Read-only FM26 access failed with Windows error {code}."))?;
-    let process_path = reader
-        .process_path()
-        .ok_or_else(|| "The FM26 executable path could not be read.".to_string())?;
-    let identity = read_executable_identity(&process_path);
-    let profile = find_entity_map(
-        identity.file_version.as_deref(),
-        identity.product_version.as_deref(),
-        identity.sha256.as_deref(),
-        identity.architecture.as_deref(),
-    )
-    .ok_or_else(|| "The running FM26 build does not match an exact entity map.".to_string())?;
-    let person_probes = probe_person_candidates(&mut reader, profile, record.raw_player_address);
-    let windows = collect_player_memory_windows(&mut reader, profile, &record, window_size)?;
-    Ok(MappingLabCaptureData {
-        player_id: record.id,
-        player_name: record.name,
-        process_id,
-        save_pointer: hex_address(save_pointer),
-        entity_map_profile_id: profile.id.clone(),
-        executable_sha256: identity.sha256.unwrap_or_default(),
-        raw_player_address: hex_address(record.raw_player_address),
-        person_embedded_address: hex_address(record.person_address),
-        person_probes,
-        windows,
-    })
-}
-
-#[cfg(not(target_os = "windows"))]
-pub(crate) fn capture_mapping_lab_player(
-    _player_id: &str,
-    _window_size: usize,
-) -> Result<MappingLabCaptureData, String> {
-    Err("The FM26 mapping lab requires Windows.".to_string())
-}
-
 fn empty_status() -> ConnectorStatus {
     ConnectorStatus {
         process_detected: false,
@@ -479,6 +527,7 @@ fn empty_status() -> ConnectorStatus {
         state: "process_not_found",
         players_loaded: 0,
         managed_squad_players: 0,
+        club_employees: 0,
         database_players_indexed: 0,
         background_players_indexed: 0,
         visible_players_loaded: 0,
@@ -525,6 +574,7 @@ fn empty_snapshot(mut status: ConnectorStatus, error: String) -> ConnectorSnapsh
         manager_name: None,
         season: None,
         clubs: Vec::new(),
+        club_teams: Vec::new(),
         players: Vec::new(),
         tactic: None,
         tactic_source: "none",
@@ -761,13 +811,20 @@ fn collect_snapshot(
     include_database_index: bool,
     progress: Option<&dyn Fn(&'static str)>,
 ) -> ConnectorSnapshot {
+    let compact = !include_database_index;
+    crate::fmt_log::set_compact(compact);
+    if progress.is_some() {
+        crate::fmt_log::load_stage("collect_snapshot");
+    }
     if let Some(progress) = progress {
         progress("detecting_fm26");
     }
     let Some((process_id, _)) = find_fm26_process() else {
+        crate::fmt_log::load_detail("FM26 process not found");
         let status = empty_status();
         return empty_snapshot(status.clone(), status.message);
     };
+    crate::fmt_log::load_detail(format!("FM26 pid={process_id}"));
 
     let mut status = empty_status();
     status.process_detected = true;
@@ -779,6 +836,7 @@ fn collect_snapshot(
     let mut reader = match ProcessReader::open(process_id) {
         Ok(reader) => reader,
         Err(code) => {
+            crate::fmt_log::load_detail(format!("OpenProcess denied (win32 {code})"));
             status.state = "access_denied";
             status.memory_access = "denied";
             status.windows_error_code = Some(code);
@@ -792,6 +850,7 @@ fn collect_snapshot(
     status.memory_access = "read_only_handle_open";
     status.process_path = reader.process_path();
 
+    crate::fmt_log::load_detail("reading FM executable identity (version match; hash only if needed)");
     let identity = status
         .process_path
         .as_deref()
@@ -808,6 +867,13 @@ fn collect_snapshot(
         identity.sha256.as_deref(),
         identity.architecture.as_deref(),
     ) else {
+        crate::fmt_log::load_detail(format!(
+            "entity map miss build={} product={} arch={:?} sha={:?}",
+            identity.file_version.as_deref().unwrap_or("?"),
+            identity.product_version.as_deref().unwrap_or("?"),
+            identity.architecture,
+            identity.sha256.as_deref().map(|s| &s[..16.min(s.len())])
+        ));
         status.state = "parser_unverified";
         status.entity_map_status = "missing";
         status.failure_stage = Some("exact_build_match".to_string());
@@ -821,7 +887,12 @@ fn collect_snapshot(
     };
     status.entity_map_status = "matched";
     status.entity_map_profile_id = Some(profile.id.clone());
-    status.mapping_coverage = mapping_coverage(profile);
+    status.mapping_coverage = if include_database_index {
+        mapping_coverage(profile)
+    } else {
+        Vec::new()
+    };
+    crate::fmt_log::load_detail(format!("entity map matched profile={}", profile.id));
 
     let Some(module) = reader.module(&profile.module) else {
         status.state = "parser_unverified";
@@ -878,6 +949,7 @@ fn collect_snapshot(
             status.state = "connected";
             status.players_loaded = data.players.len() as u32;
             status.managed_squad_players = data.players.len() as u32;
+            status.club_employees = data.club_employees;
             status.database_players_indexed = data.database_players_indexed;
             status.background_players_indexed = data.background_players_indexed;
             status.visible_players_loaded = data.players.len() as u32;
@@ -907,13 +979,25 @@ fn collect_snapshot(
                 data.database_players_indexed
             );
             status.warnings = data.warnings.clone();
-            status.read_pipeline = build_read_pipeline(&status);
+            status.read_pipeline = if include_database_index {
+                build_read_pipeline(&status)
+            } else {
+                Vec::new()
+            };
+            let summary = format!(
+                "{} players, {} bytes read, scope={}",
+                data.players.len(),
+                reader.bytes_read,
+                data.database_scope
+            );
+            crate::fmt_log::load_done(summary);
             ConnectorSnapshot {
                 status,
                 managed_club_id: Some(data.managed_club_id),
                 manager_name: Some(data.manager_name),
                 season: data.season,
                 clubs: data.clubs,
+                club_teams: data.club_teams,
                 players: data.players,
                 tactic_source: if data.tactic.is_some() {
                     "live-memory"
@@ -1022,6 +1106,288 @@ fn try_resolve_human_manager(
     })
 }
 
+/// Resolve the active human manager from the FM26 registry (largest squad wins).
+#[cfg(target_os = "windows")]
+fn resolve_active_human_manager(
+    reader: &mut ProcessReader,
+    module: ModuleInfo,
+    profile: &EntityMapProfile,
+    process_id: u32,
+    diagnostics: &mut ExtractionDiagnostics,
+) -> Result<(ResolvedHumanManager, Option<String>), ExtractionFailure> {
+    let signature = profile
+        .signatures
+        .iter()
+        .find(|item| item.name == "human_manager_registry")
+        .ok_or_else(|| {
+            ExtractionFailure::new("manager_signature", "The exact build map is incomplete.")
+        })?;
+    let pattern = parse_pattern(&signature.pattern).map_err(|_| {
+        ExtractionFailure::new("entity_map", "The embedded signature pattern is invalid.")
+    })?;
+    let signature_address = {
+        let cached = manager_signature_cache()
+            .lock()
+            .ok()
+            .and_then(|guard| {
+                guard.as_ref().copied().filter(|hit| {
+                    hit.process_id == process_id && hit.module_base == module.base
+                })
+            })
+            .map(|hit| hit.signature_address);
+        if let Some(address) = cached {
+            address
+        } else {
+            let hits = scan_module(reader, module, &pattern)
+                .map_err(|error| ExtractionFailure::new("manager_signature", error.to_string()))?;
+            if hits.len() != 1 {
+                return Err(ExtractionFailure::new(
+                    "manager_signature",
+                    format!(
+                        "The FM26 manager root did not validate uniquely ({} matches).",
+                        hits.len()
+                    ),
+                ));
+            }
+            let address = hits[0];
+            if let Ok(mut guard) = manager_signature_cache().lock() {
+                *guard = Some(CachedManagerSignature {
+                    process_id,
+                    module_base: module.base,
+                    signature_address: address,
+                });
+            }
+            address
+        }
+    };
+    let displacement = reader.read_i32(signature_address + 3).ok_or_else(|| {
+        ExtractionFailure::new(
+            "manager_signature",
+            "The FM26 manager signature could not be read.",
+        )
+    })?;
+    let registry_slot = (signature_address + 7).wrapping_add_signed(displacement as i64);
+    let registry = reader
+        .read_pointer(registry_slot)
+        .filter(|value| *value != 0)
+        .ok_or_else(|| {
+            ExtractionFailure::new(
+                "manager_registry",
+                "No active FM26 manager registry was available.",
+            )
+        })?;
+    diagnostics.entity_root = Some(registry);
+
+    let vector_start = reader
+        .read_pointer(registry + profile.constants.manager_registry_vector_offset)
+        .ok_or_else(|| {
+            ExtractionFailure::new(
+                "manager_registry",
+                "The active manager collection could not be read.",
+            )
+        })?;
+    let vector_end = reader
+        .read_pointer(registry + profile.constants.manager_registry_vector_offset + 8)
+        .ok_or_else(|| {
+            ExtractionFailure::new(
+                "manager_registry",
+                "The active manager collection end could not be read.",
+            )
+        })?;
+    let registry_bytes = vector_end.saturating_sub(vector_start);
+    let registry_count = registry_bytes / 8;
+    if vector_end <= vector_start || registry_bytes % 8 != 0 || !(1..=32).contains(&registry_count)
+    {
+        return Err(ExtractionFailure::new(
+            "manager_registry",
+            format!(
+                "The FM26 manager registry size was invalid ({registry_bytes} bytes)."
+            ),
+        ));
+    }
+
+    let mut resolved = Vec::new();
+    for index in 0..registry_count {
+        let Some(human) = reader
+            .read_pointer(vector_start + index * 8)
+            .filter(|value| *value != 0)
+        else {
+            continue;
+        };
+        if let Some(candidate) = try_resolve_human_manager(reader, module, profile, human) {
+            resolved.push(candidate);
+        }
+    }
+    if resolved.is_empty() {
+        return Err(ExtractionFailure::new(
+            "manager_registry",
+            "No playable human manager validated in the registry.".to_string(),
+        ));
+    }
+    let manager_pick_warning = if resolved.len() == 1 {
+        None
+    } else {
+        let candidates = resolved
+            .iter()
+            .map(|item| {
+                format!(
+                    "{} @ {} ({} squad)",
+                    item.manager_name, item.club_name, item.squad_len
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("; ");
+        let best_index = resolved
+            .iter()
+            .enumerate()
+            .max_by_key(|(_, item)| item.squad_len)
+            .map(|(index, _)| index)
+            .unwrap_or(0);
+        Some(format!(
+            "Multiple managers [{candidates}]; selected {} @ {}.",
+            resolved[best_index].manager_name, resolved[best_index].club_name
+        ))
+    };
+    let best_index = resolved
+        .iter()
+        .enumerate()
+        .max_by_key(|(_, item)| item.squad_len)
+        .map(|(index, _)| index)
+        .unwrap_or(0);
+    Ok((resolved.swap_remove(best_index), manager_pick_warning))
+}
+
+#[cfg(target_os = "windows")]
+fn debug_scan_club_teams_impl() -> Result<Value, String> {
+    let Some((process_id, _)) = find_fm26_process() else {
+        return Err("FM26 process not found.".to_string());
+    };
+    let mut reader = ProcessReader::open(process_id)
+        .map_err(|code| format!("Could not open FM26 read-only handle (Windows error {code})."))?;
+    let identity = reader
+        .process_path()
+        .as_deref()
+        .map(read_executable_identity)
+        .unwrap_or_default();
+    let Some(profile) = find_entity_map(
+        identity.file_version.as_deref(),
+        identity.product_version.as_deref(),
+        identity.sha256.as_deref(),
+        identity.architecture.as_deref(),
+    ) else {
+        return Err("FM26 build is not supported.".to_string());
+    };
+    let Some(module) = reader.module(&profile.module) else {
+        return Err("The FM26 game module was not available.".to_string());
+    };
+    let mut diagnostics = ExtractionDiagnostics::default();
+    let (selected, manager_pick_warning) =
+        resolve_active_human_manager(&mut reader, module, profile, process_id, &mut diagnostics)
+            .map_err(|failure| failure.message)?;
+    let seeds = HashSet::from([selected.team]);
+    let discovered = discover_managed_club_teams(
+        &mut reader,
+        module,
+        profile,
+        selected.club,
+        selected.club_uid,
+        selected.team,
+        &seeds,
+        true,
+    );
+    let teams: Vec<Value> = discovered
+        .into_iter()
+        .map(|entry| {
+            json!({
+                "teamPointer": hex_address(entry.team),
+                "teamUid": entry.team_uid,
+                "label": club_team_label(&entry.name, entry.team_uid),
+                "nameAtClubNameOffset": entry.name,
+                "rosterLen": entry.roster_len,
+                "classifiedUnit": entry.squad_unit,
+                "isManagerFirstTeam": entry.team == selected.team,
+                "rosterPlayers": probe_team_roster_identities(&mut reader, profile, entry.team),
+            })
+        })
+        .collect();
+    Ok(json!({
+        "managedClubUid": selected.club_uid,
+        "managedClubName": selected.club_name,
+        "managerName": selected.manager_name,
+        "managerPickWarning": manager_pick_warning,
+        "bytesRead": reader.bytes_read,
+        "teams": teams,
+    }))
+}
+
+#[cfg(target_os = "windows")]
+fn debug_scan_club_affiliates_impl() -> Result<Value, String> {
+    use crate::fm26::club_affiliates::probe_managed_club_affiliate_graph;
+
+    let Some((process_id, _)) = find_fm26_process() else {
+        return Err("FM26 process not found.".to_string());
+    };
+    let mut reader = ProcessReader::open(process_id)
+        .map_err(|code| format!("Could not open FM26 read-only handle (Windows error {code})."))?;
+    let identity = reader
+        .process_path()
+        .as_deref()
+        .map(read_executable_identity)
+        .unwrap_or_default();
+    let Some(profile) = find_entity_map(
+        identity.file_version.as_deref(),
+        identity.product_version.as_deref(),
+        identity.sha256.as_deref(),
+        identity.architecture.as_deref(),
+    ) else {
+        return Err("FM26 build is not supported.".to_string());
+    };
+    let Some(module) = reader.module(&profile.module) else {
+        return Err("The FM26 game module was not available.".to_string());
+    };
+    let mut diagnostics = ExtractionDiagnostics::default();
+    let (selected, manager_pick_warning) =
+        resolve_active_human_manager(&mut reader, module, profile, process_id, &mut diagnostics)
+            .map_err(|failure| failure.message)?;
+    let seeds = HashSet::from([selected.team]);
+    let discovered = discover_managed_club_teams(
+        &mut reader,
+        module,
+        profile,
+        selected.club,
+        selected.club_uid,
+        selected.team,
+        &seeds,
+        true,
+    );
+    let same_club_teams: Vec<Value> = discovered
+        .iter()
+        .map(|entry| {
+            json!({
+                "teamUid": entry.team_uid,
+                "name": entry.name,
+                "rosterLen": entry.roster_len,
+                "classifiedUnit": entry.squad_unit,
+            })
+        })
+        .collect();
+    let mut graph = probe_managed_club_affiliate_graph(
+        &mut reader,
+        module,
+        profile,
+        selected.club,
+        selected.club_uid,
+        &selected.club_name,
+        &same_club_teams,
+    );
+    if let Some(object) = graph.as_object_mut() {
+        object.insert("managerName".to_string(), json!(selected.manager_name));
+        object.insert("managerPickWarning".to_string(), json!(manager_pick_warning));
+        object.insert("bytesRead".to_string(), json!(reader.bytes_read));
+    }
+    Ok(graph)
+}
+
 /// Club UniqueID + name from a team or club pointer (vtable-validated).
 #[cfg(target_os = "windows")]
 fn resolve_club_from_pointer(
@@ -1066,7 +1432,7 @@ fn resolve_club_from_pointer(
     Some((uid, name))
 }
 
-/// Loan Club from person → loan agreement (FMLE Parent/Loan Club split).
+/// Loan Club from person â†’ loan agreement (FMLE Parent/Loan Club split).
 #[cfg(target_os = "windows")]
 fn read_person_loan_club(
     reader: &mut ProcessReader,
@@ -1121,7 +1487,7 @@ fn is_loaned_out_from_loan_club(loan_club_uid: Option<u32>, managed_club_uid: u3
         .unwrap_or(false)
 }
 
-/// Contract object → employing team pointer.
+/// Contract object â†’ employing team pointer.
 #[cfg(target_os = "windows")]
 fn resolve_contract_team(
     reader: &mut ProcessReader,
@@ -1133,7 +1499,7 @@ fn resolve_contract_team(
         .filter(|value| *value != 0)
 }
 
-/// Team pointer → club UniqueID when vtable-validated.
+/// Team pointer â†’ club UniqueID when vtable-validated.
 #[cfg(target_os = "windows")]
 fn contract_team_club_uid(
     reader: &mut ProcessReader,
@@ -1144,17 +1510,286 @@ fn contract_team_club_uid(
     resolve_club_from_pointer(reader, module, profile, team).map(|(uid, _)| uid)
 }
 
-/// U19 = non-FT contract team at managed club with the most club employees (index-derived).
+/// Team display name â€” shares club name string layout until a dedicated offset locks.
 #[cfg(target_os = "windows")]
-fn pick_u19_team_from_index(
+fn read_team_display_name(
+    reader: &mut ProcessReader,
+    team: u64,
+    profile: &EntityMapProfile,
+) -> Option<String> {
+    let name_pointer = reader
+        .read_pointer(team + profile.constants.club_name_offset)
+        .filter(|value| *value != 0)?;
+    reader.read_length_prefixed_string(name_pointer)
+}
+
+/// FMLE-style squad unit from team object label (Senior / U19 / …), not contract counts.
+#[cfg(target_os = "windows")]
+fn classify_team_squad_unit(
+    team_name: &str,
+    team: u64,
+    first_team: u64,
+    team_uid: u32,
+    club_uid: u32,
+) -> Option<&'static str> {
+    if team == first_team || team_uid == club_uid {
+        return Some("firstTeam");
+    }
+    let normalized = team_name.trim().to_ascii_lowercase();
+    if normalized.contains(" u19") || normalized.ends_with("u19") {
+        return Some("under19s");
+    }
+    if normalized.contains(" u18") || normalized.ends_with("u18") {
+        return Some("under19s");
+    }
+    if normalized.contains(" u17") || normalized.ends_with("u17") {
+        return Some("under19s");
+    }
+    if normalized.contains(" ii") || normalized.ends_with(" ii") {
+        return Some("reserves");
+    }
+    if normalized.contains("senior") {
+        return Some("firstTeam");
+    }
+    None
+}
+
+/// Classify club team when FM labels are missing — satellite teams carry their own entity UID.
+#[cfg(target_os = "windows")]
+fn classify_club_team_squad_unit(
+    team_name: Option<&str>,
+    team: u64,
+    first_team: u64,
+    team_uid: u32,
+    club_uid: u32,
+    roster_len: usize,
+) -> Option<&'static str> {
+    if team == first_team || team_uid == club_uid {
+        return Some("firstTeam");
+    }
+    if let Some(name) = team_name.filter(|value| !value.trim().is_empty()) {
+        if let Some(unit) = classify_team_squad_unit(name, team, first_team, team_uid, club_uid) {
+            return Some(unit);
+        }
+    }
+    if team_uid != club_uid {
+        if roster_len >= 5 {
+            return Some("under19s");
+        }
+        return Some("reserves");
+    }
+    None
+}
+
+#[cfg(target_os = "windows")]
+fn club_team_label(name: &str, team_uid: u32) -> String {
+    if name.trim().is_empty() {
+        format!("team-uid-{team_uid}")
+    } else {
+        name.to_string()
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn probe_team_roster_identities(
+    reader: &mut ProcessReader,
+    profile: &EntityMapProfile,
+    team: u64,
+) -> Vec<Value> {
+    let Some(players_start) = reader
+        .read_pointer(team + profile.constants.team_players_start_offset)
+        .filter(|value| *value != 0)
+    else {
+        return Vec::new();
+    };
+    let Some(players_end) = reader
+        .read_pointer(team + profile.constants.team_players_end_offset)
+        .filter(|value| *value != 0)
+    else {
+        return Vec::new();
+    };
+    if players_end <= players_start || (players_end - players_start) % 8 != 0 {
+        return Vec::new();
+    }
+    let player_count = ((players_end - players_start) / 8) as usize;
+    let mut entries = Vec::with_capacity(player_count);
+    for index in 0..player_count {
+        let slot = players_start + (index as u64 * 8);
+        let Some(raw_player) = reader.read_pointer(slot).filter(|value| *value != 0) else {
+            entries.push(json!({ "slot": index, "reject": "empty_player_pointer" }));
+            continue;
+        };
+        let Some(person) = resolve_person_address(reader, raw_player, profile) else {
+            let mut fallback = json!({
+                "slot": index,
+                "rawPlayerPointer": hex_address(raw_player),
+                "reject": "person_unresolved",
+            });
+            if let Some(uid) = reader
+                .read_u32(raw_player + profile.constants.entity_uid_offset)
+                .filter(|uid| is_plausible_fm_unique_id(*uid))
+            {
+                fallback["playerUidDirect"] = json!(uid);
+                let (name, name_source) = resolve_managed_squad_name(reader, raw_player, profile, uid);
+                fallback["name"] = json!(name);
+                fallback["nameSource"] = json!(name_source);
+            } else if let Some(name) = fm_dossier::player_display_name(
+                &reader
+                    .read_u32(raw_player + profile.constants.entity_uid_offset)
+                    .unwrap_or(0)
+                    .to_string(),
+            ) {
+                fallback["name"] = json!(name);
+                fallback["nameSource"] = json!("dossier-uid-only");
+            }
+            entries.push(fallback);
+            continue;
+        };
+        let uid = reader
+            .read_u32(person + profile.constants.entity_uid_offset)
+            .filter(|uid| is_plausible_fm_unique_id(*uid));
+        let (name, name_source) = uid
+            .map(|player_uid| resolve_managed_squad_name(reader, person, profile, player_uid))
+            .unwrap_or_else(|| ("unknown".to_string(), "missing-uid"));
+        entries.push(json!({
+            "slot": index,
+            "rawPlayerPointer": hex_address(raw_player),
+            "playerUid": uid,
+            "name": name,
+            "nameSource": name_source,
+        }));
+    }
+    entries
+}
+
+#[cfg(target_os = "windows")]
+fn team_roster_len(reader: &mut ProcessReader, profile: &EntityMapProfile, team: u64) -> Option<usize> {
+    let players_start = reader
+        .read_pointer(team + profile.constants.team_players_start_offset)
+        .filter(|value| *value != 0)?;
+    let players_end = reader
+        .read_pointer(team + profile.constants.team_players_end_offset)
+        .filter(|value| *value != 0)?;
+    if players_end <= players_start || (players_end - players_start) % 8 != 0 {
+        return None;
+    }
+    let slots = ((players_end - players_start) / 8) as usize;
+    (1..=200).contains(&slots).then_some(slots)
+}
+
+#[cfg(target_os = "windows")]
+struct DiscoveredClubTeam {
+    team: u64,
+    team_uid: u32,
+    name: String,
+    squad_unit: &'static str,
+    roster_len: usize,
+}
+
+/// Club → Teams: validated team objects linked to the managed club (FMLE tree parity).
+#[cfg(target_os = "windows")]
+fn discover_managed_club_teams(
+    reader: &mut ProcessReader,
+    module: ModuleInfo,
+    profile: &EntityMapProfile,
+    managed_club: u64,
+    managed_club_uid: u32,
+    first_team: u64,
+    index_team_seeds: &HashSet<u64>,
+    scan_heap: bool,
+) -> Vec<DiscoveredClubTeam> {
+    let team_vtable = module.base + profile.constants.team_vtable_rva;
+    let mut candidate_teams: HashSet<u64> = index_team_seeds.clone();
+    if scan_heap {
+        if let Ok(hits) = scan_private_memory_for_pointers(reader, &[team_vtable]) {
+            if let Some(addresses) = hits.get(&team_vtable) {
+                candidate_teams.extend(addresses.iter().copied());
+            }
+        }
+    }
+
+    let mut seen = HashSet::new();
+    let mut discovered = Vec::new();
+    for team in candidate_teams {
+        if team == 0 || !seen.insert(team) {
+            continue;
+        }
+        if validator::validate_vtable(reader, team, team_vtable).is_err() {
+            continue;
+        }
+        let Some(linked_club) = reader
+            .read_pointer(team + profile.constants.team_club_offset)
+            .filter(|value| *value != 0)
+        else {
+            continue;
+        };
+        let club_matches = if linked_club == managed_club {
+            true
+        } else {
+            reader
+                .read_u32(linked_club + profile.constants.entity_uid_offset)
+                .is_some_and(|uid| uid == managed_club_uid)
+        };
+        if !club_matches {
+            continue;
+        }
+        let Some(roster_len) = team_roster_len(reader, profile, team) else {
+            continue;
+        };
+        let name = read_team_display_name(reader, team, profile).unwrap_or_default();
+        let team_uid = reader
+            .read_u32(team + profile.constants.entity_uid_offset)
+            .unwrap_or(0);
+        let Some(squad_unit) = classify_club_team_squad_unit(
+            Some(name.as_str()).filter(|value| !value.trim().is_empty()),
+            team,
+            first_team,
+            team_uid,
+            managed_club_uid,
+            roster_len,
+        ) else {
+            continue;
+        };
+        discovered.push(DiscoveredClubTeam {
+            team,
+            team_uid,
+            name,
+            squad_unit,
+            roster_len,
+        });
+    }
+    discovered.sort_by(|left, right| {
+        right
+            .roster_len
+            .cmp(&left.roster_len)
+            .then_with(|| left.name.cmp(&right.name))
+    });
+    discovered
+}
+
+fn club_teams_json(discovered: &[DiscoveredClubTeam], manager_team: u64) -> Vec<Value> {
+    discovered
+        .iter()
+        .map(|entry| {
+            json!({
+                "teamUid": entry.team_uid.to_string(),
+                "name": entry.name,
+                "rosterLen": entry.roster_len,
+                "squadUnit": entry.squad_unit,
+                "isManagerTeam": entry.team == manager_team,
+            })
+        })
+        .collect()
+}
+
+fn collect_index_club_team_pointers(
     reader: &mut ProcessReader,
     module: ModuleInfo,
     profile: &EntityMapProfile,
     records: &HashMap<String, IndexedPlayerRecord>,
     managed_club_uid: u32,
-    first_team: u64,
-) -> Option<u64> {
-    let mut team_counts: HashMap<u64, usize> = HashMap::new();
+) -> HashSet<u64> {
+    let mut teams = HashSet::new();
     for record in records.values() {
         let Some(contract) = record.contract_address else {
             continue;
@@ -1162,23 +1797,122 @@ fn pick_u19_team_from_index(
         let Some(team) = resolve_contract_team(reader, profile, contract) else {
             continue;
         };
-        let Some(team_club_uid) = contract_team_club_uid(reader, module, profile, team) else {
+        if contract_team_club_uid(reader, module, profile, team).is_some_and(|uid| uid == managed_club_uid)
+        {
+            teams.insert(team);
+        }
+    }
+    teams
+}
+
+#[cfg(target_os = "windows")]
+#[allow(clippy::too_many_arguments)]
+fn load_team_roster(
+    reader: &mut ProcessReader,
+    module: ModuleInfo,
+    profile: &EntityMapProfile,
+    squad_team: u64,
+    team_label: &str,
+    squad_unit: &'static str,
+    squad_team_uid: u32,
+    club_id: &str,
+    club_uid: u32,
+    squad_game_date: Option<FmDate>,
+    managed_player_ids: &mut HashSet<String>,
+    managed_index_records: &mut Vec<IndexedPlayerRecord>,
+    players: &mut Vec<Value>,
+    skipped_squad_slots: &mut u32,
+    skipped_squad_details: &mut Vec<String>,
+    name_fallback_details: &mut Vec<String>,
+    player_vtable: &mut Option<u64>,
+) -> usize {
+    let Some(players_start) = reader
+        .read_pointer(squad_team + profile.constants.team_players_start_offset)
+        .filter(|value| *value != 0)
+    else {
+        return 0;
+    };
+    let Some(players_end) = reader
+        .read_pointer(squad_team + profile.constants.team_players_end_offset)
+        .filter(|value| *value != 0)
+    else {
+        return 0;
+    };
+    if players_end <= players_start
+        || (players_end - players_start) % 8 != 0
+        || !((1..=200).contains(&((players_end - players_start) / 8)))
+    {
+        return 0;
+    }
+    let player_count = ((players_end - players_start) / 8) as usize;
+    let before = players.len();
+    for index in 0..player_count {
+        let Some(raw_player) = reader
+            .read_pointer(players_start + (index as u64 * 8))
+            .filter(|value| *value != 0)
+        else {
+            *skipped_squad_slots += 1;
+            skipped_squad_details.push(format!("{team_label} slot {index}: empty player pointer"));
             continue;
         };
-        if team_club_uid != managed_club_uid {
-            continue;
-        }
-        *team_counts.entry(team).or_insert(0) += 1;
+        push_squad_player_from_raw(
+            reader,
+            module,
+            profile,
+            raw_player,
+            &format!("{team_label} slot {index}"),
+            squad_unit,
+            squad_team_uid,
+            club_id,
+            club_uid,
+            squad_game_date,
+            managed_player_ids,
+            managed_index_records,
+            players,
+            skipped_squad_slots,
+            skipped_squad_details,
+            name_fallback_details,
+            player_vtable,
+        );
     }
-    team_counts
-        .into_iter()
-        .filter(|(team, count)| *team != first_team && *count > 0)
-        .max_by(|(team_a, count_a), (team_b, count_b)| {
-            count_a
-                .cmp(count_b)
-                .then_with(|| team_b.cmp(team_a))
+    players.len().saturating_sub(before)
+}
+
+/// Indexed records whose active contract employs them at `managed_club_uid`.
+#[cfg(target_os = "windows")]
+fn count_managed_club_employees(
+    reader: &mut ProcessReader,
+    module: ModuleInfo,
+    profile: &EntityMapProfile,
+    records: &HashMap<String, IndexedPlayerRecord>,
+    managed_club_uid: u32,
+) -> u32 {
+    records
+        .values()
+        .filter(|record| {
+            let Some(contract) = record.contract_address else {
+                return false;
+            };
+            let Some(team) = resolve_contract_team(reader, profile, contract) else {
+                return false;
+            };
+            contract_team_club_uid(reader, module, profile, team)
+                .is_some_and(|uid| uid == managed_club_uid)
         })
-        .map(|(team, _)| team)
+        .count() as u32
+}
+
+#[cfg(target_os = "windows")]
+fn snapshot_club_employee_count(players: &[Value], managed_club_id: &str) -> u32 {
+    players
+        .iter()
+        .filter(|player| {
+            player
+                .get("clubId")
+                .and_then(Value::as_str)
+                .is_some_and(|club_id| club_id == managed_club_id)
+        })
+        .count() as u32
 }
 
 #[cfg(target_os = "windows")]
@@ -1190,6 +1924,7 @@ fn push_squad_player_from_raw(
     raw_player: u64,
     slot_label: &str,
     squad_unit: &'static str,
+    squad_team_uid: u32,
     club_id: &str,
     club_uid: u32,
     squad_game_date: Option<FmDate>,
@@ -1334,22 +2069,27 @@ fn push_squad_player_from_raw(
         "Role catalogue scoring is deferred on load for speed; open the player after roles are re-enabled or use attributes/CA/PA/HA.".to_string(),
     ];
     let (strengths, weaknesses) = attribute_evidence(&visible_attributes);
+    let compact = crate::fmt_log::compact_payload();
     let validated_at = unix_milliseconds();
-    let attribute_knowledge: serde_json::Map<String, Value> = visible_attributes
-        .iter()
-        .map(|(name, value)| {
-            (
-                name.clone(),
-                json!({
-                    "value": value,
-                    "visibility": "known",
-                    "source": "own-squad",
-                    "confidence": 100,
-                    "lastValidated": validated_at
-                }),
-            )
-        })
-        .collect();
+    let attribute_knowledge: serde_json::Map<String, Value> = if compact {
+        serde_json::Map::new()
+    } else {
+        visible_attributes
+            .iter()
+            .map(|(name, value)| {
+                (
+                    name.clone(),
+                    json!({
+                        "value": value,
+                        "visibility": "known",
+                        "source": "own-squad",
+                        "confidence": 100,
+                        "lastValidated": validated_at
+                    }),
+                )
+            })
+            .collect()
+    };
     let player_id = uid.to_string();
     if managed_player_ids.contains(&player_id) {
         return;
@@ -1417,6 +2157,7 @@ fn push_squad_player_from_raw(
         "weaknesses": weaknesses,
         "clubId": club_id,
         "squadUnit": squad_unit,
+        "squadTeamUid": squad_team_uid.to_string(),
         "loanedOut": loaned_out,
         "loanClubId": loan_club_id,
         "loanClubName": loan_club_name,
@@ -1446,81 +2187,34 @@ fn push_squad_player_from_raw(
         "marketValueAmount": null
         ,"personality": null
         ,"condition": null
-        ,"recommendation": {
-            "minimum": ability_score,
-            "maximum": ability_score,
-            "completeness": 100,
-            "label": if ability_score.is_some() { "full visible-attribute evidence" } else { "not enough evidence" }
-        }
-        ,"knowledge": {
-            "name": { "value": name, "visibility": "known", "source": name_source, "confidence": if name_source == "own-squad" { 100 } else { 85 }, "lastValidated": validated_at },
-            "age": { "value": age, "visibility": "known", "source": "own-squad", "confidence": 100, "lastValidated": validated_at },
-            "nationality": { "value": nationality, "visibility": "known", "source": "own-squad", "confidence": 100, "lastValidated": validated_at },
-            "positions": { "value": positions, "visibility": "known", "source": "own-squad", "confidence": 100, "lastValidated": validated_at },
-            "attributes": attribute_knowledge,
-            "form": { "value": null, "visibility": "unknown", "source": "memory-raw", "confidence": 0, "lastValidated": null },
-            "contract": { "value": null, "visibility": "unknown", "source": "memory-raw", "confidence": 0, "lastValidated": null },
-            "wage": { "value": null, "visibility": "unknown", "source": "memory-raw", "confidence": 0, "lastValidated": null },
-            "value": { "value": null, "visibility": "unknown", "source": "memory-raw", "confidence": 0, "lastValidated": null },
-            "interest": { "value": null, "visibility": "unknown", "source": "memory-raw", "confidence": 0, "lastValidated": null }
-        }
     }));
-}
-
-#[cfg(target_os = "windows")]
-fn promote_club_team_from_index(
-    reader: &mut ProcessReader,
-    module: ModuleInfo,
-    profile: &EntityMapProfile,
-    u19_team: u64,
-    club_id: &str,
-    club_uid: u32,
-    squad_game_date: Option<FmDate>,
-    managed_player_ids: &mut HashSet<String>,
-    managed_index_records: &mut Vec<IndexedPlayerRecord>,
-    players: &mut Vec<Value>,
-    skipped_squad_slots: &mut u32,
-    skipped_squad_details: &mut Vec<String>,
-    name_fallback_details: &mut Vec<String>,
-    player_vtable: &mut Option<u64>,
-) {
-    let index = PLAYER_DATABASE_INDEX.get_or_init(|| RwLock::new(PlayerDatabaseIndex::default()));
-    let records = index
-        .read()
-        .ok()
-        .map(|guard| guard.records.clone())
-        .unwrap_or_default();
-    for record in records.values() {
-        let Some(contract) = record.contract_address else {
-            continue;
-        };
-        let Some(team) = resolve_contract_team(reader, profile, contract) else {
-            continue;
-        };
-        if team != u19_team {
-            continue;
+    if !compact {
+        if let Some(object) = players.last_mut().and_then(Value::as_object_mut) {
+            object.insert(
+                "recommendation".to_string(),
+                json!({
+                    "minimum": ability_score,
+                    "maximum": ability_score,
+                    "completeness": 100,
+                    "label": if ability_score.is_some() { "full visible-attribute evidence" } else { "not enough evidence" }
+                }),
+            );
+            object.insert(
+                "knowledge".to_string(),
+                json!({
+                    "name": { "value": name, "visibility": "known", "source": name_source, "confidence": if name_source == "own-squad" { 100 } else { 85 }, "lastValidated": validated_at },
+                    "age": { "value": age, "visibility": "known", "source": "own-squad", "confidence": 100, "lastValidated": validated_at },
+                    "nationality": { "value": nationality, "visibility": "known", "source": "own-squad", "confidence": 100, "lastValidated": validated_at },
+                    "positions": { "value": positions, "visibility": "known", "source": "own-squad", "confidence": 100, "lastValidated": validated_at },
+                    "attributes": attribute_knowledge,
+                    "form": { "value": null, "visibility": "unknown", "source": "memory-raw", "confidence": 0, "lastValidated": null },
+                    "contract": { "value": null, "visibility": "unknown", "source": "memory-raw", "confidence": 0, "lastValidated": null },
+                    "wage": { "value": null, "visibility": "unknown", "source": "memory-raw", "confidence": 0, "lastValidated": null },
+                    "value": { "value": null, "visibility": "unknown", "source": "memory-raw", "confidence": 0, "lastValidated": null },
+                    "interest": { "value": null, "visibility": "unknown", "source": "memory-raw", "confidence": 0, "lastValidated": null }
+                }),
+            );
         }
-        if managed_player_ids.contains(&record.id) {
-            continue;
-        }
-        push_squad_player_from_raw(
-            reader,
-            module,
-            profile,
-            record.raw_player_address,
-            &format!("index uid {}", record.id),
-            "under19s",
-            club_id,
-            club_uid,
-            squad_game_date,
-            managed_player_ids,
-            managed_index_records,
-            players,
-            skipped_squad_slots,
-            skipped_squad_details,
-            name_fallback_details,
-            player_vtable,
-        );
     }
 }
 
@@ -1555,8 +2249,13 @@ fn extract_live_data(
             })
             .map(|hit| hit.signature_address);
         if let Some(address) = cached {
+            crate::fmt_log::load_detail("manager signature: cache hit");
             address
         } else {
+            crate::fmt_log::load_detail(format!(
+                "manager signature: scanning {} ({} bytes)",
+                profile.module, module.size
+            ));
             let hits = scan_module(reader, module, &pattern)
                 .map_err(|error| ExtractionFailure::new("manager_signature", error.to_string()))?;
             if hits.len() != 1 {
@@ -1569,6 +2268,7 @@ fn extract_live_data(
                 ));
             }
             let address = hits[0];
+            crate::fmt_log::load_detail(format!("manager signature: hit @ {address:#x}"));
             if let Ok(mut guard) = manager_signature_cache().lock() {
                 *guard = Some(CachedManagerSignature {
                     process_id,
@@ -1621,7 +2321,7 @@ fn extract_live_data(
         return Err(ExtractionFailure::new(
             "manager_registry",
             format!(
-                "The FM26 manager registry size was invalid ({registry_bytes} bytes). Expected 1–32 human manager slots."
+                "The FM26 manager registry size was invalid ({registry_bytes} bytes). Expected 1â€“32 human manager slots."
             ),
         ));
     }
@@ -1767,6 +2467,10 @@ fn extract_live_data(
     let mut skipped_squad_slots = 0u32;
     let mut skipped_squad_details: Vec<String> = Vec::new();
     let mut name_fallback_details: Vec<String> = Vec::new();
+    let manager_team_uid = reader
+        .read_u32(team + profile.constants.entity_uid_offset)
+        .filter(|uid| *uid > 0)
+        .unwrap_or(club_uid);
 
     for index in 0..player_count {
         let Some(raw_player) = reader
@@ -1784,6 +2488,7 @@ fn extract_live_data(
             raw_player,
             &format!("slot {index}"),
             "firstTeam",
+            manager_team_uid,
             &club_id,
             club_uid,
             squad_game_date,
@@ -1807,6 +2512,12 @@ fn extract_live_data(
         ));
     }
     diagnostics.last_successful_read = Some("extract_managed_squad".to_string());
+    crate::fmt_log::load_detail(format!(
+        "managed squad: {} players validated ({} slots scanned, {} skipped)",
+        players.len(),
+        player_count,
+        skipped_squad_slots
+    ));
     let managed_tactic_records = managed_index_records.clone();
     let skipped_squad_warning = if skipped_squad_slots > 0 {
         let mut message = format!(
@@ -1819,7 +2530,7 @@ fn extract_live_data(
         }
         if skipped_squad_details.len() > 8 {
             message.push_str(&format!(
-                "\n- … and {} more skipped slot(s)",
+                "\n- â€¦ and {} more skipped slot(s)",
                 skipped_squad_details.len() - 8
             ));
         }
@@ -1860,7 +2571,7 @@ fn extract_live_data(
             seed_vtable,
             module,
             &managed_player_ids,
-            managed_index_records,
+            managed_index_records.clone(),
         ) {
             Ok(indexed) => {
                 if let Some(progress) = progress {
@@ -1886,7 +2597,7 @@ fn extract_live_data(
             ),
         }
     } else {
-        store_player_index(process_id, memory_anchors, managed_index_records);
+        store_player_index(process_id, memory_anchors, managed_index_records.clone());
         (
             managed_player_ids.len() as u32,
             0,
@@ -1897,42 +2608,73 @@ fn extract_live_data(
         )
     };
 
-    let mut u19_promoted = 0usize;
-    if database_index_status == "ready" {
-        if let Some(index_records) = PLAYER_DATABASE_INDEX
+    let mut club_squad_promoted = 0usize;
+    let mut discovered_team_labels: Vec<String> = Vec::new();
+    if let Some(progress) = progress {
+        progress("loading_club_teams");
+    }
+    let mut index_team_seeds = if include_database_index {
+        PLAYER_DATABASE_INDEX
             .get()
             .and_then(|index| index.read().ok())
-            .map(|guard| guard.records.clone())
-        {
-            if let Some(u19_team) = pick_u19_team_from_index(
-                reader,
-                module,
-                profile,
-                &index_records,
-                club_uid,
-                team,
-            ) {
-                let before = players.len();
-                let mut promoted_index_records = Vec::new();
-                promote_club_team_from_index(
+            .map(|guard| {
+                collect_index_club_team_pointers(
                     reader,
                     module,
                     profile,
-                    u19_team,
-                    &club_id,
+                    &guard.records,
                     club_uid,
-                    squad_game_date,
-                    &mut managed_player_ids,
-                    &mut promoted_index_records,
-                    &mut players,
-                    &mut skipped_squad_slots,
-                    &mut skipped_squad_details,
-                    &mut name_fallback_details,
-                    &mut player_vtable,
-                );
-                u19_promoted = players.len().saturating_sub(before);
-            }
+                )
+            })
+            .unwrap_or_default()
+    } else {
+        HashSet::new()
+    };
+    index_team_seeds.insert(team);
+    let discovered_teams = discover_managed_club_teams(
+        reader,
+        module,
+        profile,
+        club,
+        club_uid,
+        team,
+        &index_team_seeds,
+        true,
+    );
+    for entry in &discovered_teams {
+        discovered_team_labels.push(format!(
+            "{} uid {} ({}, {} roster)",
+            entry.name.trim(),
+            entry.team_uid,
+            entry.squad_unit,
+            entry.roster_len
+        ));
+    }
+    let club_teams = club_teams_json(&discovered_teams, team);
+    for entry in discovered_teams {
+        if entry.team == team || entry.squad_unit == "firstTeam" {
+            continue;
         }
+        let label = entry.name.clone();
+        club_squad_promoted += load_team_roster(
+            reader,
+            module,
+            profile,
+            entry.team,
+            &label,
+            entry.squad_unit,
+            entry.team_uid,
+            &club_id,
+            club_uid,
+            squad_game_date,
+            &mut managed_player_ids,
+            &mut managed_index_records,
+            &mut players,
+            &mut skipped_squad_slots,
+            &mut skipped_squad_details,
+            &mut name_fallback_details,
+            &mut player_vtable,
+        );
     }
 
     let season = players
@@ -1945,7 +2687,11 @@ fn extract_live_data(
             object.remove("_season");
         }
     }
-    let dossier_reference = fm_dossier::augment_live_players(&mut players);
+    let dossier_reference = if include_database_index {
+        fm_dossier::augment_live_players(&mut players)
+    } else {
+        None
+    };
     // Do not let Dossier mask a failed/missing memory world index (stock GS load truth).
     let database_players_indexed = if database_index_status == "ready" {
         dossier_reference
@@ -1992,7 +2738,7 @@ fn extract_live_data(
     }
     if let Some(error) = &database_index_error {
         warnings.push(format!(
-            "Wider player database index failed ({error}). Only the managed squad is available — same fallback as stock GlassScout, but the failure reason is now visible."
+            "Wider player database index failed ({error}). Only the managed squad is available â€” same fallback as stock GlassScout, but the failure reason is now visible."
         ));
     } else if include_database_index && database_index_status == "ready" {
         if dossier_reference.is_some() {
@@ -2010,9 +2756,14 @@ fn extract_live_data(
                 .to_string(),
         );
     }
-    if u19_promoted > 0 {
+    if club_squad_promoted > 0 {
         warnings.push(format!(
-            "{u19_promoted} Under-19 squad player(s) promoted from the live club index via contract team (same club as senior)."
+            "{club_squad_promoted} player(s) loaded from satellite club team rosters (UID-classified youth/reserve squads)."
+        ));
+    } else if !discovered_team_labels.is_empty() {
+        warnings.push(format!(
+            "Club team objects discovered ({}) but no satellite roster loaded.",
+            discovered_team_labels.join("; ")
         ));
     }
     if let Some(reference) = &dossier_reference {
@@ -2021,6 +2772,24 @@ fn extract_live_data(
             reference.path.display()
         ));
     }
+    let club_employees = if database_index_status == "ready" {
+        PLAYER_DATABASE_INDEX
+            .get()
+            .and_then(|index| index.read().ok())
+            .map(|guard| {
+                count_managed_club_employees(
+                    reader,
+                    module,
+                    profile,
+                    &guard.records,
+                    club_uid,
+                )
+            })
+            .filter(|count| *count > 0)
+            .unwrap_or_else(|| snapshot_club_employee_count(&players, &club_id))
+    } else {
+        snapshot_club_employee_count(&players, &club_id)
+    };
     let clubs = vec![json!({
         "id": club_id,
         "name": club_name,
@@ -2032,6 +2801,7 @@ fn extract_live_data(
         manager_name,
         season,
         clubs,
+        club_teams,
         players,
         tactic,
         database_players_indexed,
@@ -2041,6 +2811,7 @@ fn extract_live_data(
         database_index_error,
         warnings,
         tactic_manager_pointer,
+        club_employees,
     })
 }
 
@@ -2960,10 +3731,9 @@ fn read_executable_identity(path: &str) -> ExecutableIdentity {
         }
     }
 
-    // Stock GlassScout parity (T134): always SHA-256 the executable for exact map match.
+    let architecture = read_pe_architecture(path);
     let mut identity = ExecutableIdentity {
-        sha256: hash_file(path),
-        architecture: read_pe_architecture(path),
+        architecture: architecture.clone(),
         ..ExecutableIdentity::default()
     };
 
@@ -2992,6 +3762,18 @@ fn read_executable_identity(path: &str) -> ExecutableIdentity {
                     .map(str::to_string);
             }
         }
+    }
+
+    if let Some(known_sha) = executable_sha256_for_versions(
+        identity.file_version.as_deref(),
+        identity.product_version.as_deref(),
+        identity.architecture.as_deref(),
+    ) {
+        identity.sha256 = Some(known_sha.to_string());
+        crate::fmt_log::load_detail("executable identity: version match (skipped full-file SHA-256)");
+    } else {
+        crate::fmt_log::load_detail("executable identity: hashing FM executable for exact map match");
+        identity.sha256 = hash_file(path);
     }
 
     if let Ok(mut cache) = identity_cache().lock() {
@@ -3073,1562 +3855,6 @@ mod tests {
         assert!(!super::is_loaned_out_from_loan_club(Some(920), 920));
         assert!(!super::is_loaned_out_from_loan_club(None, 920));
     }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    #[ignore]
-    fn hunt_ca_join_live() {
-        use std::collections::HashMap;
-
-        use crate::fm26::{
-            ca_history::flatten_current,
-            ca_join::{
-                diagnose_fingerprint, format_all_time_deltas, format_join_line, hunt_squad,
-                SquadTarget,
-            },
-            process::find_fm26_process,
-        };
-
-        let Some((process_id, _)) = find_fm26_process() else {
-            println!("FM26 not running — skip");
-            return;
-        };
-        let snapshot = collect_snapshot(false, None);
-        assert_eq!(
-            snapshot.status.state, "connected",
-            "need connected save: {}",
-            snapshot.status.message
-        );
-        let (anchors, records) = {
-            let index = PLAYER_DATABASE_INDEX
-                .get()
-                .expect("index")
-                .read()
-                .expect("lock");
-            let records: Vec<_> = index
-                .records
-                .values()
-                .filter(|r| r.managed_squad)
-                .cloned()
-                .collect();
-            (index.anchors, records)
-        };
-
-        let mut attr_by_id: HashMap<String, (HashMap<String, u8>, HashMap<String, u8>)> = HashMap::new();
-        for player in &snapshot.players {
-            let Some(id) = player.get("id").and_then(|v| v.as_str()) else {
-                continue;
-            };
-            let visible = player
-                .get("attributes")
-                .and_then(|v| serde_json::from_value::<HashMap<String, u8>>(v.clone()).ok())
-                .unwrap_or_default();
-            let hidden = player
-                .get("hiddenAttributes")
-                .and_then(|v| serde_json::from_value::<HashMap<String, u8>>(v.clone()).ok())
-                .unwrap_or_default();
-            attr_by_id.insert(
-                id.to_string(),
-                (visible.clone(), flatten_current(&visible, &hidden)),
-            );
-        }
-
-        let mut targets: Vec<SquadTarget> = records
-            .into_iter()
-            .filter_map(|r| {
-                let uid = r.id.parse::<u32>().ok()?;
-                let (visible, current) = attr_by_id.get(&r.id).cloned().unwrap_or_default();
-                Some(SquadTarget {
-                    uid,
-                    person: r.person_address,
-                    raw_player: r.raw_player_address,
-                    name: r.name,
-                    visible,
-                    current,
-                })
-            })
-            .collect();
-        targets.sort_by(|a, b| a.name.cmp(&b.name));
-
-        let mut reader = ProcessReader::open(process_id).expect("open fm");
-        println!(
-            "=== CA join hunt ({} managed, cluster scan ~2GB once) ===",
-            targets.len()
-        );
-        let report = hunt_squad(&mut reader, &anchors, &targets);
-
-        for (i, c) in report.clusters.iter().take(6).enumerate() {
-            println!(
-                "  cluster[{i}] {:#x} cards={} history_pts={}",
-                c.base, c.cards, c.history_points
-            );
-        }
-
-        let mut joined = 0usize;
-        let mut max_pts = 0usize;
-        for target in &targets {
-            let Some(hit) = report.joins.get(&target.uid) else {
-                println!("  MISS  {}", target.name);
-                continue;
-            };
-            joined += 1;
-            max_pts = max_pts.max(hit.points.len());
-            println!(
-                "  {}",
-                format_join_line(&target.name, target.uid, hit, &target.current)
-            );
-        }
-        println!("\njoined {joined}/{} (max {max_pts} history pts)", targets.len());
-
-        if joined > 0 {
-            println!("\n=== All-time Δ vs first Progress Report point (compare in FM) ===");
-            for target in &targets {
-                let Some(hit) = report.joins.get(&target.uid) else {
-                    continue;
-                };
-                let deltas = format_all_time_deltas(hit, &target.current);
-                println!("\n## {} (uid={})", target.name, target.uid);
-                println!("strategy={} pack_points={}", hit.strategy, hit.points.len());
-                if deltas.is_empty() {
-                    println!("  (no non-zero attribute movement vs first pack point)");
-                } else {
-                    for (attr, delta) in &deltas {
-                        println!("  {attr}: {delta:+}");
-                    }
-                }
-            }
-        } else {
-            println!("No joins — fingerprint/index miss on all strategies.");
-            let probe_names = ["Assan Ouédraogo", "Domenico Gilson", "Robert Müller"];
-            for name in probe_names {
-                if let Some(t) = targets.iter().find(|x| x.name == name) {
-                    println!("\nNear-miss segments for {name} (lowest L1 = best visible match):");
-                    let segs: Vec<_> = report
-                        .clusters
-                        .iter()
-                        .take(2)
-                        .flat_map(|c| {
-                            let lo = c.base.saturating_sub(8 * 1024 * 1024);
-                            reader
-                                .read_bytes(lo, 4 * 1024 * 1024)
-                                .map(|blob| crate::fm26::ca_join::cluster_segments(&blob, lo))
-                                .unwrap_or_default()
-                        })
-                        .collect();
-                    for (l1, pts, end) in diagnose_fingerprint(&segs, t, 5) {
-                        println!("  L1={l1} pts={pts} end={end:#x}");
-                    }
-                }
-            }
-        }
-        if joined == 0 {
-            println!("\nTip: open Progress Report in FM for a youth, then re-run.");
-        }
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    #[ignore]
-    fn probe_assan_person_index_live() {
-        use std::collections::HashMap;
-
-        use crate::fm26::{
-            ca_history::flatten_current,
-            ca_resolve::probe_person_ca,
-            process::find_fm26_process,
-        };
-
-        let Some((process_id, _)) = find_fm26_process() else {
-            println!("FM26 not running — skip");
-            return;
-        };
-        let snapshot = collect_snapshot(false, None);
-        assert_eq!(
-            snapshot.status.state, "connected",
-            "need connected save: {}",
-            snapshot.status.message
-        );
-
-        let record = {
-            let index = PLAYER_DATABASE_INDEX
-                .get()
-                .expect("index")
-                .read()
-                .expect("lock");
-            index
-                .records
-                .values()
-                .find(|r| r.name == "Assan Ouédraogo")
-                .cloned()
-                .expect("Assan in managed squad")
-        };
-        let anchors = PLAYER_DATABASE_INDEX
-            .get()
-            .expect("index")
-            .read()
-            .expect("lock")
-            .anchors;
-
-        let uid = record.id.parse::<u32>().expect("uid");
-        let mut visible = HashMap::new();
-        let mut hidden = HashMap::new();
-        for player in &snapshot.players {
-            if player.get("id").and_then(|v| v.as_str()) != Some(record.id.as_str()) {
-                continue;
-            }
-            visible = player
-                .get("attributes")
-                .and_then(|v| serde_json::from_value(v.clone()).ok())
-                .unwrap_or_default();
-            hidden = player
-                .get("hiddenAttributes")
-                .and_then(|v| serde_json::from_value(v.clone()).ok())
-                .unwrap_or_default();
-        }
-        let current = flatten_current(&visible, &hidden);
-
-        let mut reader = ProcessReader::open(process_id).expect("open fm");
-        println!(
-            "=== Assan person-index probe (uid={uid} person={:#x} raw={:#x}) ===",
-            record.person_address, record.raw_player_address
-        );
-        let probe = probe_person_ca(
-            &mut reader,
-            &anchors,
-            uid,
-            record.person_address,
-            record.raw_player_address,
-        );
-
-        for (i, c) in probe.clusters.iter().take(6).enumerate() {
-            println!(
-                "  cluster[{i}] {:#x} cards={} history_pts={}",
-                c.base, c.cards, c.history_points
-            );
-        }
-        for hit in probe.pointer_chase.iter().take(8) {
-            println!(
-                "  ptr_chase {} end={:#x} cards={} history_pts={}",
-                hit.label, hit.ptr, hit.cards, hit.history_points
-            );
-        }
-
-        let best_pts = probe
-            .candidates
-            .first()
-            .map(|c| c.points.len())
-            .unwrap_or(0);
-        println!(
-            "\n{} strip candidates (best {best_pts} pack points)",
-            probe.candidates.len()
-        );
-        for cand in probe.candidates.iter().take(12) {
-            println!(
-                "  {:24} pts={} end={:#x}",
-                cand.label,
-                cand.points.len(),
-                cand.strip_end
-            );
-        }
-
-        if let Some(best) = probe.candidates.first().filter(|c| c.points.len() >= 2) {
-            use crate::fm26::ca_history::deltas_from_pack;
-            let (_recent, all_time) = deltas_from_pack(&best.points, &current);
-            println!(
-                "\n## All-time Δ (strategy={} pack_points={}) — compare FM Progress Report",
-                best.label,
-                best.points.len()
-            );
-            let mut moves: Vec<_> = all_time
-                .into_iter()
-                .filter_map(|(k, v)| v.map(|d| (k, d)))
-                .filter(|(_, d)| *d != 0)
-                .collect();
-            moves.sort_by(|a, b| a.0.cmp(&b.0));
-            if moves.is_empty() {
-                println!("  (no non-zero movement vs first pack point)");
-            } else {
-                for (attr, delta) in &moves {
-                    println!("  {attr}: {delta:+}");
-                }
-            }
-            println!("\nFM ground truth (All Time arrows): Long Shots, Tackling, Acceleration, Balance, Jumping Reach, Strength");
-        } else {
-            println!("\nNo strip with ≥2 pack points — person index not cracked yet.");
-        }
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    #[ignore]
-    fn probe_assan_ptr_array_live() {
-        use std::collections::HashMap;
-
-        use crate::fm26::{
-            ca_history::{deltas_from_pack, flatten_current},
-            ca_ptr_array::probe_ptr_array_history,
-            process::find_fm26_process,
-        };
-
-        let Some((process_id, _)) = find_fm26_process() else {
-            println!("FM26 not running — skip");
-            return;
-        };
-        let snapshot = collect_snapshot(false, None);
-        assert_eq!(
-            snapshot.status.state, "connected",
-            "need connected save: {}",
-            snapshot.status.message
-        );
-
-        let record = {
-            let index = PLAYER_DATABASE_INDEX
-                .get()
-                .expect("index")
-                .read()
-                .expect("lock");
-            index
-                .records
-                .values()
-                .find(|r| r.name == "Assan Ouédraogo")
-                .cloned()
-                .expect("Assan in managed squad")
-        };
-
-        let mut visible = HashMap::new();
-        let mut hidden = HashMap::new();
-        for player in &snapshot.players {
-            if player.get("id").and_then(|v| v.as_str()) != Some(record.id.as_str()) {
-                continue;
-            }
-            visible = player
-                .get("attributes")
-                .and_then(|v| serde_json::from_value(v.clone()).ok())
-                .unwrap_or_default();
-            hidden = player
-                .get("hiddenAttributes")
-                .and_then(|v| serde_json::from_value(v.clone()).ok())
-                .unwrap_or_default();
-        }
-        let current = flatten_current(&visible, &hidden);
-
-        let mut reader = ProcessReader::open(process_id).expect("open fm");
-        println!(
-            "=== Assan pointer-array chase (person={:#x} raw={:#x}) ===",
-            record.person_address, record.raw_player_address
-        );
-        let hit = probe_ptr_array_history(
-            &mut reader,
-            record.person_address,
-            record.raw_player_address,
-            &visible,
-        );
-
-        println!("person heap ptrs ({}):", hit.person_ptrs.len());
-        for p in hit.person_ptrs.iter().take(16) {
-            println!("  {p:#x}");
-        }
-
-        if hit.points.is_empty() {
-            println!("\nNo card array found — try Progress Report open on Assan.");
-            return;
-        }
-
-        println!(
-            "\nbest layout: {} pack_points={} newest_l1={}",
-            hit.label,
-            hit.points.len(),
-            hit.newest_l1
-        );
-
-        let (_recent, all_time) = deltas_from_pack(&hit.points, &current);
-        println!("\n## All-time Δ vs first pack point");
-        let mut moves: Vec<_> = all_time
-            .into_iter()
-            .filter_map(|(k, v)| v.map(|d| (k, d)))
-            .filter(|(_, d)| *d != 0)
-            .collect();
-        moves.sort_by(|a, b| a.0.cmp(&b.0));
-        if moves.is_empty() {
-            println!("  (no non-zero movement)");
-        } else {
-            for (attr, delta) in &moves {
-                println!("  {attr}: {delta:+}");
-            }
-        }
-        println!("\nFM All Time arrows: Long Shots, Tackling, Acceleration, Balance, Jumping Reach, Strength");
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    #[ignore]
-    fn probe_assan_person_table_merge_live() {
-        use std::collections::HashMap;
-
-        use crate::fm26::{
-            ca_history::{deltas_from_pack, flatten_current},
-            ca_seed_dump::{
-                merge_person_table_history, print_person_table_merge, wait_for_seeds,
-            },
-            process::find_fm26_process,
-        };
-
-        let Some((process_id, _)) = find_fm26_process() else {
-            println!("FM26 not running — skip");
-            return;
-        };
-        let snapshot = collect_snapshot(false, None);
-        assert_eq!(
-            snapshot.status.state, "connected",
-            "need connected save: {}",
-            snapshot.status.message
-        );
-
-        let record = {
-            let index = PLAYER_DATABASE_INDEX
-                .get()
-                .expect("index")
-                .read()
-                .expect("lock");
-            index
-                .records
-                .values()
-                .find(|r| r.name == "Assan Ouédraogo")
-                .cloned()
-                .expect("Assan in managed squad")
-        };
-
-        let mut visible = HashMap::new();
-        let mut hidden = HashMap::new();
-        for player in &snapshot.players {
-            if player.get("id").and_then(|v| v.as_str()) != Some(record.id.as_str()) {
-                continue;
-            }
-            visible = player
-                .get("attributes")
-                .and_then(|v| serde_json::from_value(v.clone()).ok())
-                .unwrap_or_default();
-            hidden = player
-                .get("hiddenAttributes")
-                .and_then(|v| serde_json::from_value(v.clone()).ok())
-                .unwrap_or_default();
-        }
-        let current = flatten_current(&visible, &hidden);
-
-        let mut reader = ProcessReader::open(process_id).expect("open fm");
-        println!(
-            "=== Assan person-table merge — keep Progress Report open ===\nperson={:#x}",
-            record.person_address
-        );
-        let seeds = wait_for_seeds(
-            &mut reader,
-            record.person_address,
-            record.raw_player_address,
-            15,
-            45_000,
-        );
-        if seeds.len() < 5 {
-            println!("only {} seeds materialized — open Progress Report and re-run", seeds.len());
-            return;
-        }
-
-        let merge = merge_person_table_history(
-            &mut reader,
-            record.person_address,
-            record.raw_player_address,
-            &current,
-            80,
-        );
-        print_person_table_merge(&merge, &current);
-
-        if merge.matched_seeds == 0 {
-            println!("\nNo seeds matched Assan fingerprint (L1≤80) — cards may be shared pool garbage.");
-            let near: Vec<_> = merge
-                .per_seed
-                .iter()
-                .filter_map(|(s, _, l1, _)| l1.map(|l| (*s, l)))
-                .collect();
-            if let Some((s, l)) = near.iter().min_by_key(|(_, l)| *l) {
-                println!("nearest miss: {s:#x} L1={l}");
-            }
-            return;
-        }
-
-        if merge.merged.len() < 2 {
-            println!("\nMatched seeds but only {} distinct snapshot(s) — need ≥2 for all-time Δ.", merge.merged.len());
-            return;
-        }
-
-        let (_recent, all_time) = deltas_from_pack(&merge.merged, &current);
-        println!("\n## All-time Δ (Assan-matched seeds only, L1≤80)");
-        let mut moves: Vec<_> = all_time
-            .into_iter()
-            .filter_map(|(k, v)| v.map(|d| (k, d)))
-            .filter(|(_, d)| *d != 0)
-            .collect();
-        moves.sort_by(|a, b| a.0.cmp(&b.0));
-        if moves.is_empty() {
-            println!("  (no non-zero movement vs first pack point)");
-        } else {
-            for (attr, delta) in &moves {
-                println!("  {attr}: {delta:+}");
-            }
-        }
-        println!("\nFM All Time: Long Shots, Tackling, Acceleration, Balance, Jumping Reach, Strength");
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    #[ignore]
-    fn probe_assan_long_shots_timeline_live() {
-        use crate::fm26::{
-            ca_bench_search::{print_long_shots_timeline, run_assan_long_shots_timeline_search},
-            process::find_fm26_process,
-        };
-
-        let Some((process_id, _)) = find_fm26_process() else {
-            println!("FM26 not running — skip");
-            return;
-        };
-        let snapshot = collect_snapshot(false, None);
-        assert_eq!(snapshot.status.state, "connected");
-
-        let record = {
-            let index = PLAYER_DATABASE_INDEX.get().unwrap().read().unwrap();
-            index
-                .records
-                .values()
-                .find(|r| r.name == "Assan Ouédraogo")
-                .cloned()
-                .expect("Assan")
-        };
-
-        let mut reader = ProcessReader::open(process_id).expect("open");
-        println!(
-            "=== Long Shots timeline hunt [14×8, 13] — Progress Report open ===\n\
-             person={:#x} raw={:#x}",
-            record.person_address, record.raw_player_address
-        );
-        let report = run_assan_long_shots_timeline_search(
-            &mut reader,
-            record.person_address,
-            record.raw_player_address,
-        );
-        print_long_shots_timeline(&report);
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    #[ignore]
-    fn probe_assan_progress_timeline_live() {
-        use crate::fm26::{
-            ca_bench_search::{print_assan_progress_timeline, run_assan_progress_timeline_search},
-            process::find_fm26_process,
-        };
-
-        let Some((process_id, _)) = find_fm26_process() else {
-            println!("FM26 not running — skip");
-            return;
-        };
-        let snapshot = collect_snapshot(false, None);
-        assert_eq!(snapshot.status.state, "connected");
-
-        let record = {
-            let index = PLAYER_DATABASE_INDEX.get().unwrap().read().unwrap();
-            index
-                .records
-                .values()
-                .find(|r| r.name == "Assan Ouédraogo")
-                .cloned()
-                .expect("Assan")
-        };
-
-        let mut reader = ProcessReader::open(process_id).expect("open");
-        println!(
-            "=== Progress timeline hunt — Report open ===\n\
-             LS [14×8,13] + Tac [10×9] + Acc [11×8,10] + Str [10×3,9×6]\n\
-             person={:#x} raw={:#x}",
-            record.person_address, record.raw_player_address
-        );
-        let report = run_assan_progress_timeline_search(
-            &mut reader,
-            record.person_address,
-            record.raw_player_address,
-        );
-        print_assan_progress_timeline(&report);
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    #[ignore]
-    fn probe_game_details_live() {
-        use crate::fm26::{
-            game_details::{
-                hunt_game_details, hunt_game_details_numeric, list_fm24career_saves_on_disk,
-                print_disk_save_candidates, print_game_details, print_numeric_hits,
-            },
-            memory::ProcessReader,
-            offsets::find_entity_map,
-            process::find_fm26_process,
-        };
-
-        let disk = list_fm24career_saves_on_disk();
-        print_disk_save_candidates(&disk);
-
-        let Some((process_id, _)) = find_fm26_process() else {
-            println!("FM26 not running — disk only");
-            return;
-        };
-        let snapshot = collect_snapshot(false, None);
-        assert_eq!(snapshot.status.state, "connected");
-
-        let human = snapshot
-            .status
-            .save_pointer
-            .as_deref()
-            .and_then(|s| u64::from_str_radix(s.trim_start_matches("0x"), 16).ok())
-            .unwrap_or(0);
-        let club = snapshot
-            .clubs
-            .first()
-            .and_then(|c| c.get("name"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("");
-
-        let mut reader = ProcessReader::open(process_id).expect("open");
-        let module = snapshot
-            .status
-            .process_path
-            .as_deref()
-            .and_then(|path| {
-                let identity = read_executable_identity(path);
-                let profile = find_entity_map(
-                    identity.file_version.as_deref(),
-                    identity.product_version.as_deref(),
-                    identity.sha256.as_deref(),
-                    identity.architecture.as_deref(),
-                )?;
-                reader.module(&profile.module)
-            });
-        println!("=== Game Details RAM hunt — keep Game Details screen open ===");
-        let numeric = hunt_game_details_numeric(&mut reader, human);
-        print_numeric_hits(&numeric);
-        let report = hunt_game_details(
-            &mut reader,
-            human,
-            club,
-            module.map(|m| m.base),
-            module.map(|m| m.size).unwrap_or(0),
-        );
-        print_game_details(&report);
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    #[ignore]
-    fn probe_assan_ui_flicker_listen_live() {
-        use crate::fm26::{
-            ca_ui_listen::{listen_ui_flicker, print_ui_listen_summary},
-            process::find_fm26_process,
-        };
-
-        let duration_ms = std::env::var("FMT_UI_LISTEN_MS")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(120_000);
-        let interval_ms = std::env::var("FMT_UI_LISTEN_INTERVAL_MS")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(100);
-
-        let Some((process_id, _)) = find_fm26_process() else {
-            println!("FM26 not running — skip");
-            return;
-        };
-        let snapshot = collect_snapshot(false, None);
-        assert_eq!(snapshot.status.state, "connected");
-
-        let record = {
-            let index = PLAYER_DATABASE_INDEX.get().unwrap().read().unwrap();
-            index
-                .records
-                .values()
-                .find(|r| r.name == "Assan Ouédraogo")
-                .cloned()
-                .expect("Assan")
-        };
-
-        let mut reader = ProcessReader::open(process_id).expect("open");
-        println!(
-            "=== UI flicker memory listen ===\n\
-             Assan Progress Report open → Attributes tab → All Time.\n\
-             person={:#x} raw={:#x}\n\
-             \n\
-             PROTOCOL (single attr first — clearest signal):\n\
-             1. Toggle LONG SHOTS plot on/off ~8 times (1 toggle per 2s)\n\
-             2. Pause 5s\n\
-             3. Repeat for Tackling, Acceleration, Strength\n\
-             \n\
-             Listening {duration_ms}ms @ {interval_ms}ms poll. Env: FMT_UI_LISTEN_MS, FMT_UI_LISTEN_INTERVAL_MS\n",
-            record.person_address,
-            record.raw_player_address,
-        );
-        let report = listen_ui_flicker(
-            &mut reader,
-            record.person_address,
-            record.raw_player_address,
-            duration_ms,
-            interval_ms,
-        );
-        print_ui_listen_summary(&report);
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    #[ignore]
-    fn probe_assan_ls_tac_dual_timeline_live() {
-        use crate::fm26::{
-            ca_bench_search::{print_ls_tac_dual_timeline, run_assan_ls_tac_dual_search},
-            process::find_fm26_process,
-        };
-
-        let Some((process_id, _)) = find_fm26_process() else {
-            println!("FM26 not running — skip");
-            return;
-        };
-        let snapshot = collect_snapshot(false, None);
-        assert_eq!(snapshot.status.state, "connected");
-
-        let record = {
-            let index = PLAYER_DATABASE_INDEX.get().unwrap().read().unwrap();
-            index
-                .records
-                .values()
-                .find(|r| r.name == "Assan Ouédraogo")
-                .cloned()
-                .expect("Assan")
-        };
-
-        let mut reader = ProcessReader::open(process_id).expect("open");
-        println!(
-            "=== LS+Tac dual hunt — Progress Report open ===\n\
-             LS [14×8,13] + Tac [10×9]\n\
-             person={:#x} raw={:#x}",
-            record.person_address, record.raw_player_address
-        );
-        let report = run_assan_ls_tac_dual_search(
-            &mut reader,
-            record.person_address,
-            record.raw_player_address,
-        );
-        print_ls_tac_dual_timeline(&report);
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    #[ignore]
-    fn probe_assan_bench_search_live() {
-        use crate::fm26::{
-            ca_bench_search::{print_bench_report, run_assan_bench_search, BENCH_ATTRS},
-            process::find_fm26_process,
-        };
-
-        let Some((process_id, _)) = find_fm26_process() else {
-            println!("FM26 not running — skip");
-            return;
-        };
-        let snapshot = collect_snapshot(false, None);
-        assert_eq!(
-            snapshot.status.state, "connected",
-            "need connected save: {}",
-            snapshot.status.message
-        );
-
-        let record = {
-            let index = PLAYER_DATABASE_INDEX
-                .get()
-                .expect("index")
-                .read()
-                .expect("lock");
-            index
-                .records
-                .values()
-                .find(|r| r.name == "Assan Ouédraogo")
-                .cloned()
-                .expect("Assan in managed squad")
-        };
-
-        let mut reader = ProcessReader::open(process_id).expect("open fm");
-        println!(
-            "=== Assan benchmark card search (7 attrs, Jan43 vs Sep43) ===\n\
-             Keep Progress Report open. Bench: {}",
-            BENCH_ATTRS.join(", ")
-        );
-        println!(
-            "person={:#x} — if 0 exact hits, retry another player (Assan has split timelines)",
-            record.person_address
-        );
-
-        let report = run_assan_bench_search(
-            &mut reader,
-            record.person_address,
-            record.raw_player_address,
-        );
-        print_bench_report(&report);
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    #[ignore]
-    fn probe_assan_hub_chase_live() {
-        use std::collections::HashMap;
-
-        use crate::fm26::{
-            ca_history::{deltas_from_pack, flatten_current},
-            ca_seed_dump::{chase_development_hub, print_hub_chase, wait_for_seeds},
-            process::find_fm26_process,
-        };
-
-        let Some((process_id, _)) = find_fm26_process() else {
-            println!("FM26 not running — skip");
-            return;
-        };
-        let snapshot = collect_snapshot(false, None);
-        assert_eq!(
-            snapshot.status.state, "connected",
-            "need connected save: {}",
-            snapshot.status.message
-        );
-
-        let record = {
-            let index = PLAYER_DATABASE_INDEX
-                .get()
-                .expect("index")
-                .read()
-                .expect("lock");
-            index
-                .records
-                .values()
-                .find(|r| r.name == "Assan Ouédraogo")
-                .cloned()
-                .expect("Assan in managed squad")
-        };
-        let uid = record.id.parse::<u32>().expect("uid");
-
-        let mut visible = HashMap::new();
-        let mut hidden = HashMap::new();
-        for player in &snapshot.players {
-            if player.get("id").and_then(|v| v.as_str()) != Some(record.id.as_str()) {
-                continue;
-            }
-            visible = player
-                .get("attributes")
-                .and_then(|v| serde_json::from_value(v.clone()).ok())
-                .unwrap_or_default();
-            hidden = player
-                .get("hiddenAttributes")
-                .and_then(|v| serde_json::from_value(v.clone()).ok())
-                .unwrap_or_default();
-        }
-        let current = flatten_current(&visible, &hidden);
-
-        let mut reader = ProcessReader::open(process_id).expect("open fm");
-        println!(
-            "=== Assan hub chase (0x22489aacf24 table) — Progress Report open ===\nperson={:#x} uid={uid}",
-            record.person_address
-        );
-        let seeds = wait_for_seeds(
-            &mut reader,
-            record.person_address,
-            record.raw_player_address,
-            15,
-            45_000,
-        );
-        if seeds.len() < 5 {
-            println!("only {} seeds — open Progress Report and re-run", seeds.len());
-            return;
-        }
-
-        let report = chase_development_hub(
-            &mut reader,
-            &seeds,
-            uid,
-            record.person_address,
-            &current,
-            80,
-        );
-        print_hub_chase(&report);
-
-        if report.merged.len() < 2 {
-            println!("\nNo Assan-matched multi-point timeline from hub (merged={}).", report.merged.len());
-            return;
-        }
-
-        let (_recent, all_time) = deltas_from_pack(&report.merged, &current);
-        println!("\n## All-time Δ (hub chase, L1≤80)");
-        let fm_attrs = [
-            "Long Shots",
-            "Tackling",
-            "Acceleration",
-            "Balance",
-            "Jumping Reach",
-            "Strength",
-        ];
-        for attr in fm_attrs {
-            let d = all_time.get(attr).and_then(|v| *v);
-            println!("  {attr}: {}", d.map(|x| format!("{x:+}")).unwrap_or_else(|| "—".into()));
-        }
-        println!("\n(all non-zero)");
-        for (attr, delta) in all_time
-            .into_iter()
-            .filter_map(|(k, v)| v.map(|d| (k, d)))
-            .filter(|(_, d)| *d != 0)
-        {
-            if !fm_attrs.contains(&attr.as_str()) {
-                println!("  {attr}: {delta:+}");
-            }
-        }
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    #[ignore]
-    fn probe_assan_seed_hex_live() {
-        use std::collections::HashMap;
-
-        use crate::fm26::{
-            ca_history::{deltas_from_pack, flatten_current},
-            ca_seed_dump::{dump_and_analyze_seeds, print_seed_dump_with_visible, wait_for_seeds},
-            process::find_fm26_process,
-        };
-
-        let Some((process_id, _)) = find_fm26_process() else {
-            println!("FM26 not running — skip");
-            return;
-        };
-        let snapshot = collect_snapshot(false, None);
-        assert_eq!(
-            snapshot.status.state, "connected",
-            "need connected save: {}",
-            snapshot.status.message
-        );
-
-        let record = {
-            let index = PLAYER_DATABASE_INDEX
-                .get()
-                .expect("index")
-                .read()
-                .expect("lock");
-            index
-                .records
-                .values()
-                .find(|r| r.name == "Assan Ouédraogo")
-                .cloned()
-                .expect("Assan in managed squad")
-        };
-
-        let mut visible = HashMap::new();
-        let mut hidden = HashMap::new();
-        for player in &snapshot.players {
-            if player.get("id").and_then(|v| v.as_str()) != Some(record.id.as_str()) {
-                continue;
-            }
-            visible = player
-                .get("attributes")
-                .and_then(|v| serde_json::from_value(v.clone()).ok())
-                .unwrap_or_default();
-            hidden = player
-                .get("hiddenAttributes")
-                .and_then(|v| serde_json::from_value(v.clone()).ok())
-                .unwrap_or_default();
-        }
-        let current = flatten_current(&visible, &hidden);
-
-        let mut reader = ProcessReader::open(process_id).expect("open fm");
-        println!(
-            "=== Assan seed hex dump — keep Progress Report open (waiting for seeds) ===\nperson={:#x}",
-            record.person_address
-        );
-        let seeds = wait_for_seeds(
-            &mut reader,
-            record.person_address,
-            record.raw_player_address,
-            20,
-            45_000,
-        );
-        if seeds.len() < 5 {
-            println!("only {} seeds — open Assan Progress Report and re-run", seeds.len());
-            return;
-        }
-
-        let report = dump_and_analyze_seeds(&mut reader, record.person_address, &seeds, &visible);
-        print_seed_dump_with_visible(&report, &mut reader, &visible);
-
-        if let Some((label, points)) = &report.best_layout {
-            if points.len() >= 2 {
-                let (_recent, all_time) = deltas_from_pack(points, &current);
-                println!("\n## All-time Δ ({label})");
-                let mut moves: Vec<_> = all_time
-                    .into_iter()
-                    .filter_map(|(k, v)| v.map(|d| (k, d)))
-                    .filter(|(_, d)| *d != 0)
-                    .collect();
-                moves.sort_by(|a, b| a.0.cmp(&b.0));
-                for (attr, delta) in &moves {
-                    println!("  {attr}: {delta:+}");
-                }
-            }
-        }
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    #[ignore]
-    fn probe_assan_ptr_array_poll_live() {
-        use std::collections::HashMap;
-
-        use crate::fm26::{
-            ca_history::{deltas_from_pack, flatten_current},
-            ca_ptr_array::poll_ptr_array_history,
-            process::find_fm26_process,
-        };
-
-        let Some((process_id, _)) = find_fm26_process() else {
-            println!("FM26 not running — skip");
-            return;
-        };
-        let snapshot = collect_snapshot(false, None);
-        assert_eq!(
-            snapshot.status.state, "connected",
-            "need connected save: {}",
-            snapshot.status.message
-        );
-
-        let record = {
-            let index = PLAYER_DATABASE_INDEX
-                .get()
-                .expect("index")
-                .read()
-                .expect("lock");
-            index
-                .records
-                .values()
-                .find(|r| r.name == "Assan Ouédraogo")
-                .cloned()
-                .expect("Assan in managed squad")
-        };
-
-        let mut visible = HashMap::new();
-        let mut hidden = HashMap::new();
-        for player in &snapshot.players {
-            if player.get("id").and_then(|v| v.as_str()) != Some(record.id.as_str()) {
-                continue;
-            }
-            visible = player
-                .get("attributes")
-                .and_then(|v| serde_json::from_value(v.clone()).ok())
-                .unwrap_or_default();
-            hidden = player
-                .get("hiddenAttributes")
-                .and_then(|v| serde_json::from_value(v.clone()).ok())
-                .unwrap_or_default();
-        }
-        let current = flatten_current(&visible, &hidden);
-
-        let mut reader = ProcessReader::open(process_id).expect("open fm");
-        println!(
-            "=== Assan pointer poll (120s) — close/reopen Progress Report now ===\nperson={:#x}",
-            record.person_address
-        );
-        let (hit, trace) = poll_ptr_array_history(
-            &mut reader,
-            record.person_address,
-            record.raw_player_address,
-            &visible,
-            120_000,
-            2_000,
-        );
-
-        let peak_seeds = trace.iter().map(|s| s.seed_count).max().unwrap_or(0);
-        println!("\npoll done: samples={} peak_seeds={peak_seeds}", trace.len());
-        if !hit.person_ptrs.is_empty() {
-            println!("best seeds:");
-            for p in hit.person_ptrs.iter().take(12) {
-                println!("  {p:#x}");
-            }
-        }
-
-        if hit.points.is_empty() {
-            println!("No card array resolved across poll window.");
-            return;
-        }
-
-        println!(
-            "\nbest: {} pack_points={} newest_l1={}",
-            hit.label,
-            hit.points.len(),
-            hit.newest_l1
-        );
-        let (_recent, all_time) = deltas_from_pack(&hit.points, &current);
-        println!("\n## All-time Δ");
-        let mut moves: Vec<_> = all_time
-            .into_iter()
-            .filter_map(|(k, v)| v.map(|d| (k, d)))
-            .filter(|(_, d)| *d != 0)
-            .collect();
-        moves.sort_by(|a, b| a.0.cmp(&b.0));
-        for (attr, delta) in &moves {
-            println!("  {attr}: {delta:+}");
-        }
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    #[ignore]
-    fn resolve_ca_packs_in_live_memory() {
-        use crate::fm26::process::find_fm26_process;
-
-        if find_fm26_process().is_none() {
-            println!("FM26 not running — skip");
-            return;
-        }
-        let snapshot = collect_snapshot(false, None);
-        assert_eq!(
-            snapshot.status.state, "connected",
-            "need connected save: {}",
-            snapshot.status.message
-        );
-        let mut with_pack = 0usize;
-        let mut best_pts = 0usize;
-        let mut samples: Vec<String> = Vec::new();
-        for player in &snapshot.players {
-            let pts = player
-                .get("caPackPointCount")
-                .and_then(|v| v.as_u64())
-                .unwrap_or(0) as usize;
-            if pts == 0 {
-                continue;
-            }
-            with_pack += 1;
-            best_pts = best_pts.max(pts);
-            let name = player.get("name").and_then(|v| v.as_str()).unwrap_or("?");
-            let id = player.get("id").and_then(|v| v.as_str()).unwrap_or("?");
-            let deltas = player.get("allTimeAttrDeltas").and_then(|v| v.as_object());
-            let non_null = deltas
-                .map(|m| m.values().filter(|v| !v.is_null()).count())
-                .unwrap_or(0);
-            if samples.len() < 6 {
-                samples.push(format!("{name} ({id}): {pts} pts, {non_null} attrs"));
-            }
-        }
-        println!(
-            "CA packs: {with_pack}/{} managed players with history (max {best_pts} pts)",
-            snapshot.players.len()
-        );
-        for line in &samples {
-            println!("  {line}");
-        }
-        if with_pack == 0 {
-            println!("No CA packs resolved — index/uid join still missing.");
-            if let Ok(index) = PLAYER_DATABASE_INDEX.get().expect("index").read() {
-                let squad: Vec<_> = index
-                    .records
-                    .values()
-                    .filter(|r| r.managed_squad)
-                    .map(|r| {
-                        (
-                            r.id.parse::<u32>().unwrap_or(0),
-                            r.person_address,
-                        )
-                    })
-                    .collect();
-                drop(index);
-                let mut reader = ProcessReader::open(find_fm26_process().unwrap().0).ok();
-                if let Some(reader) = reader.as_mut() {
-                    let ctx = crate::fm26::ca_resolve::CaResolveContext::build(
-                        reader,
-                        &PLAYER_DATABASE_INDEX
-                            .get()
-                            .unwrap()
-                            .read()
-                            .unwrap()
-                            .anchors,
-                        &squad,
-                    );
-                    println!(
-                        "  debug: {} clusters, {} cluster_uid hits, {} index ptrs",
-                        ctx.clusters.len(),
-                        ctx.cluster_histories.len(),
-                        ctx.index_strip_end.len()
-                    );
-                    for (i, c) in ctx.clusters.iter().take(3).enumerate() {
-                        println!(
-                            "    cluster[{i}] {:#x} cards={} pts={}",
-                            c.base, c.cards, c.history_points
-                        );
-                    }
-                }
-            }
-        }
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    #[ignore]
-    fn probe_ca_history_in_live_memory() {
-        use crate::fm26::{
-            ca_hunt::{history_from_cluster_uid, run_ca_hunt, uid_in_cluster, uid_near_cluster},
-            ca_probe::{best_probe, probe_ca_for_player},
-            process::find_fm26_process,
-        };
-
-        let Some((process_id, _)) = find_fm26_process() else {
-            println!("FM26 not running — skip");
-            return;
-        };
-        let snapshot = collect_snapshot(false, None);
-        assert_eq!(
-            snapshot.status.state, "connected",
-            "need connected save: {}",
-            snapshot.status.message
-        );
-        let (anchors, managed) = {
-            let index = PLAYER_DATABASE_INDEX
-                .get()
-                .expect("index")
-                .read()
-                .expect("lock");
-            let managed: Vec<_> = index
-                .records
-                .values()
-                .filter(|r| r.managed_squad)
-                .cloned()
-                .collect();
-            (index.anchors, managed)
-        };
-        let mut managed = managed;
-        managed.sort_by(|a, b| a.name.cmp(&b.name));
-
-        let mut reader = ProcessReader::open(process_id).expect("open fm");
-        let sample_uid = managed
-            .first()
-            .and_then(|r| r.id.parse::<u32>().ok())
-            .unwrap_or(0);
-
-        println!("=== CA cluster + pointer hunt (2GB heap scan) ===");
-        let hunt = run_ca_hunt(&mut reader, &anchors, sample_uid);
-        for (i, cluster) in hunt.top_clusters.iter().take(8).enumerate() {
-            let uid_hit = if sample_uid != 0 {
-                uid_in_cluster(&mut reader, sample_uid, cluster)
-            } else {
-                false
-            };
-            let near = if sample_uid != 0 {
-                uid_near_cluster(&mut reader, sample_uid, cluster, 8 * 1024 * 1024).len()
-            } else {
-                0
-            };
-            println!(
-                "  cluster[{i}] base={:#x} cards={} history_pts={} uid_in_win={uid_hit} uid_near_8mb={near}",
-                cluster.base, cluster.cards, cluster.history_points
-            );
-        }
-        for hit in hunt.pointer_chase.iter().take(10) {
-            println!(
-                "  ptr_chase {} ptr={:#x} cards={} history_pts={}",
-                hit.label, hit.ptr, hit.cards, hit.history_points
-            );
-        }
-        for hit in &hunt.anchor_windows {
-            println!(
-                "  anchor_win {} ptr={:#x} cards={} history_pts={}",
-                hit.label, hit.ptr, hit.cards, hit.history_points
-            );
-        }
-
-        let mut any_points = 0usize;
-        let sample = managed.len().min(8);
-        println!(
-            "\n=== per-player person/double probe ({sample}/{} managed) ===",
-            managed.len()
-        );
-        for record in managed.iter().take(sample) {
-            let uid = record.id.parse::<u32>().unwrap_or(0);
-            let strategies = probe_ca_for_player(&mut reader, uid, record.person_address);
-            let best = best_probe(&strategies);
-            let best_pts = best.map(|b| b.points).unwrap_or(0);
-            any_points = any_points.max(best_pts);
-            println!("\n{} uid={} person={:#x}", record.name, uid, record.person_address);
-            for s in &strategies {
-                println!(
-                    "  {:28} points={} gap_tip={:?}",
-                    s.label, s.points, s.gap_tip
-                );
-            }
-            for cluster in hunt.top_clusters.iter().take(3) {
-                let near = uid_near_cluster(&mut reader, uid, cluster, 8 * 1024 * 1024);
-                if !near.is_empty() {
-                    let (cards, pts) = history_from_cluster_uid(&mut reader, uid, cluster);
-                    println!(
-                        "  uid near cluster {:#x}: doubles={} cards={cards} history_pts={pts}",
-                        cluster.base,
-                        near.len()
-                    );
-                }
-            }
-        }
-        println!("\nmax pack points in per-player sample: {any_points}");
-        let best_cluster_pts = hunt
-            .top_clusters
-            .first()
-            .map(|c| c.history_points)
-            .unwrap_or(0);
-        if any_points >= 2 {
-            println!("Per-player CA strip reachable in live RAM.");
-        } else if best_cluster_pts >= 2 {
-            println!(
-                "Shared attrish clusters exist (max {best_cluster_pts} history pts) but per-player join not proven yet."
-            );
-        } else {
-            println!(
-                "CA strip NOT found (player max {any_points}, cluster max {best_cluster_pts})."
-            );
-        }
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    #[ignore]
-    fn debug_live_loaned_out_contract_club() {
-        if find_fm26_process().is_none() {
-            println!("FM26 is not running.");
-            return;
-        }
-        let snapshot = collect_snapshot(false, None);
-        println!(
-            "snapshot state={} club={} players={}",
-            snapshot.status.state,
-            snapshot.managed_club_id.as_deref().unwrap_or("?"),
-            snapshot.players.len()
-        );
-        assert_eq!(snapshot.status.state, "connected");
-        let mut at_club = 0u32;
-        let mut loaned_out = 0u32;
-        for player in &snapshot.players {
-            let loaned = player
-                .get("loanedOut")
-                .and_then(|value| value.as_bool())
-                .unwrap_or(false);
-            let name = player
-                .get("name")
-                .and_then(|value| value.as_str())
-                .unwrap_or("?");
-            if loaned {
-                loaned_out += 1;
-                println!("LOANED_OUT {name}");
-            } else {
-                at_club += 1;
-            }
-        }
-        println!("at_club={at_club} loaned_out={loaned_out}");
-        assert!(
-            loaned_out > 0,
-            "expected at least one outgoing loan on current senior list"
-        );
-        assert_eq!(at_club + loaned_out, snapshot.players.len() as u32);
-        let bora_loaned = snapshot.players.iter().any(|player| {
-            player
-                .get("name")
-                .and_then(|value| value.as_str())
-                .is_some_and(|name| name.contains("Eker"))
-                && player
-                    .get("loanedOut")
-                    .and_then(|value| value.as_bool())
-                    .unwrap_or(false)
-        });
-        assert!(bora_loaned, "Bora Eker must be loanedOut when present on senior list");
-    }
-
-    #[test]
-    fn fm_unique_id_heuristic_accepts_real_ids_and_rejects_misreads() {
-        assert!(super::is_plausible_fm_unique_id(20_001_881_73));
-        assert!(super::is_plausible_fm_unique_id(53_136_627));
-        assert!(super::is_plausible_fm_unique_id(2_000_029_953));
-        assert!(!super::is_plausible_fm_unique_id(168_365_072));
-    }
-
-    #[test]
-    fn managed_squad_validation_reports_specific_position_and_attribute_failures() {
-        let mut positions = vec![0_u8; 15];
-        positions[3] = 21;
-        assert_eq!(
-            super::position_bytes_issue(&positions).as_deref(),
-            Some("position byte 3 = 21 (>20)")
-        );
-
-        let mut attributes = vec![50_u8; super::PLAYER_ATTRIBUTE_NAMES.len()];
-        attributes[41] = 101;
-        assert_eq!(
-            super::attribute_bytes_issue(&attributes).as_deref(),
-            Some("attribute Dirtiness byte 41 = 101 (>100)")
-        );
-    }
-
-    #[test]
-    fn manager_registry_accepts_multi_slot_byte_lengths() {
-        // 1–32 x64 pointers; continue saves with a dormant manager are > 8 bytes.
-        for slots in [1u64, 2, 3, 8, 32] {
-            let bytes = slots * 8;
-            assert_eq!(bytes % 8, 0);
-            assert!((1..=32).contains(&(bytes / 8)));
-        }
-        assert!(!(1..=32).contains(&(0u64)));
-        assert!(!(1..=32).contains(&(33u64)));
-    }
-
-    #[test]
-    fn connector_contract_never_requests_or_advertises_write_access() {
-        assert_eq!(READ_ONLY_PROCESS_ACCESS, 0x1410);
-        assert!(!empty_status().can_write_memory);
-    }
-
-    #[test]
-    fn exact_build_profile_is_embedded_and_read_only() {
-        let index = embedded_entity_map_index();
-        assert_eq!(index.schema_version, 2);
-        assert_eq!(index.profiles.len(), 1);
-        assert_eq!(index.profiles[0].module, "game_plugin.dll");
-        assert_eq!(
-            index.profiles[0].executable_sha256,
-            "3653C97F9CCEC2BE28EDC4FAAE67304B5B6C26733F2F07DEA3E7C591D3B9FF73"
-        );
-        let coverage = mapping_coverage(&index.profiles[0]);
-        assert!(coverage
-            .iter()
-            .any(|section| section.section == "player" && section.validated >= 7));
-        assert!(coverage
-            .iter()
-            .any(|section| section.section == "contract" && section.unmapped >= 4));
-        assert!(coverage
-            .iter()
-            .any(|section| section.section == "recruitment" && section.candidate >= 2));
-    }
-
-    #[test]
-    fn snapshot_has_no_entities_when_fm26_is_not_available() {
-        #[cfg(not(target_os = "windows"))]
-        {
-            let snapshot = connector_snapshot();
-            assert!(snapshot.players.is_empty());
-            assert!(snapshot.clubs.is_empty());
-            assert!(snapshot.tactic.is_none());
-        }
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    #[ignore = "live FM26 integration test; run manually with an active save"]
-    fn running_exact_build_extracts_live_entities_without_hidden_ability_fields() {
-        if find_fm26_process().is_none() {
-            return;
-        }
-        let snapshot = connector_snapshot();
-        assert_eq!(
-            snapshot.status.state, "connected",
-            "{}",
-            snapshot.status.message
-        );
-        assert!(snapshot
-            .manager_name
-            .as_deref()
-            .is_some_and(|name| !name.is_empty()));
-        assert!(snapshot
-            .clubs
-            .first()
-            .and_then(|club| club["name"].as_str())
-            .is_some_and(|name| !name.is_empty()));
-        assert!(
-            snapshot.players.len() >= 11,
-            "expected at least a selected squad, got {}",
-            snapshot.players.len()
-        );
-        assert!(snapshot.tactic.is_none());
-        assert_eq!(snapshot.tactic_source, "none");
-        assert_eq!(snapshot.status.live_memory_tactic_read, "object_not_found");
-        for player in &snapshot.players {
-            let ca = player["currentAbility"].as_u64();
-            let pa = player["potentialAbility"].as_u64();
-            assert!(
-                ca.is_none() || (1..=200).contains(&ca.unwrap()),
-                "CA out of bounds for {}",
-                player["name"]
-            );
-            assert!(
-                pa.is_none() || (1..=200).contains(&pa.unwrap()),
-                "PA out of bounds for {}",
-                player["name"]
-            );
-            assert!(player["attributes"]
-                .as_object()
-                .is_some_and(|value| !value.is_empty()));
-            assert!(player["hiddenAttributes"]
-                .as_object()
-                .is_some_and(|value| !value.is_empty()));
-            assert!(player["personalityAttributes"].is_object());
-            assert_eq!(player["scoutKnowledge"], "fully_known");
-        }
-        if let Some(lars) = snapshot
-            .players
-            .iter()
-            .find(|player| player["id"] == "53179170")
-        {
-            assert_eq!(lars["age"], 30);
-            assert_eq!(lars["dateOfBirth"], "1995-08-13");
-            assert_eq!(lars["nationality"], "Norway");
-            assert_eq!(lars["attributes"]["Aerial Reach"], 15);
-            assert_eq!(lars["attributes"]["Communication"], 12);
-            assert!(lars["attributes"].get("Consistency").is_none());
-            assert!(lars["attributes"].get("Injury Proneness").is_none());
-            assert!(lars["hiddenAttributes"].get("Consistency").is_some());
-            assert!(lars["hiddenAttributes"].get("Injury Proneness").is_some());
-        }
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    #[ignore = "live FM26 integration test; run manually with an active save"]
-    fn full_save_index_exposes_identity_only_background_search_records() {
-        if find_fm26_process().is_none() {
-            return;
-        }
-        let snapshot = collect_snapshot(true, None);
-        assert_eq!(
-            snapshot.status.state, "connected",
-            "{}",
-            snapshot.status.message
-        );
-        assert_eq!(snapshot.status.database_index_status, "ready");
-        assert_eq!(snapshot.status.database_scope, "full-save-index");
-        assert!(snapshot.status.database_players_indexed >= snapshot.status.managed_squad_players);
-        assert!(snapshot.status.background_players_indexed > 0);
-        assert_eq!(snapshot.status.live_memory_tactic_read, "ready");
-        assert!(snapshot.status.tactic_manager_pointer.is_some());
-        let tactic = snapshot.tactic.as_ref().expect("live tactic");
-        assert!(tactic["formation"]
-            .as_str()
-            .is_some_and(|value| !value.is_empty()));
-        assert_eq!(tactic["slots"].as_array().map(Vec::len), Some(11));
-        assert_eq!(snapshot.tactic_source, "live-memory");
-        assert_eq!(
-            snapshot.status.visible_players_loaded,
-            snapshot.players.len() as u32
-        );
-        let visible_results = search_indexed_players("Jøran".to_string());
-        assert!(visible_results
-            .iter()
-            .all(|player| player["visibility"] == "known" || player["visibility"] == "unknown"));
-    }
-
     #[test]
     fn fm_dates_and_age_match_the_current_save_calendar() {
         let birth = FmDate {
@@ -4719,1025 +3945,32 @@ mod tests {
         assert!(field_is_publishable(&validated));
     }
 
-    #[cfg(target_os = "windows")]
     #[test]
-    #[ignore]
-    fn debug_live_tactic_contract_windows() {
-        if find_fm26_process().is_none() {
-            println!("FM26 is not running.");
-            return;
-        }
-        let snapshot = collect_snapshot(true, None);
-        println!(
-            "snapshot state={} message={}",
-            snapshot.status.state, snapshot.status.message
+    fn classify_club_team_by_uid_when_name_missing() {
+        assert_eq!(
+            super::classify_club_team_squad_unit(None, 100, 100, 920, 920, 28),
+            Some("firstTeam")
         );
-        assert_eq!(snapshot.status.state, "connected");
-
-        let index = PLAYER_DATABASE_INDEX
-            .get()
-            .expect("player index")
-            .read()
-            .expect("player index lock");
-        let process_id = index.process_id;
-        let mut managed = index
-            .records
-            .values()
-            .filter(|record| record.managed_squad)
-            .cloned()
-            .collect::<Vec<_>>();
-        managed.sort_by(|left, right| left.name.cmp(&right.name));
-        drop(index);
-        let active_tactic_name_needles = [
-            "Sveingard",
-            "Jelsa",
-            "Sallabegolli",
-            "Osland",
-            "Romvig",
-            "Rabenorolahy",
-            "Sandtorv",
-            "Bergset",
-            "Helgevold",
-            "Thulin",
-            "Marchewka",
-        ];
-        let active_tactic_records = managed
-            .iter()
-            .filter(|record| {
-                active_tactic_name_needles
-                    .iter()
-                    .any(|needle| record.name.contains(needle))
-            })
-            .cloned()
-            .collect::<Vec<_>>();
-
-        let mut reader = ProcessReader::open(process_id).expect("open FM26");
-        let process_path = reader.process_path().expect("process path");
-        let identity = read_executable_identity(&process_path);
-        let profile = find_entity_map(
-            identity.file_version.as_deref(),
-            identity.product_version.as_deref(),
-            identity.sha256.as_deref(),
-            identity.architecture.as_deref(),
-        )
-        .expect("entity map");
-        let module = reader.module(&profile.module).expect("game module");
-        let player_vtable = reader
-            .read_pointer(managed[0].raw_player_address)
-            .expect("player vtable");
-        let tactic_vtable = module.base + profile.constants.tactics_manager_vtable_rva;
-        let mut scan_needles = vec![player_vtable, tactic_vtable];
-        for record in &active_tactic_records {
-            scan_needles.push(record.raw_player_address);
-            scan_needles.push(record.person_address);
-            if let Some(contract_address) = record.contract_address {
-                scan_needles.push(contract_address);
-            }
-        }
-        let mut hits = scan_private_memory_for_pointers(&mut reader, &scan_needles)
-            .expect("scan private memory");
-        let player_hits = hits.remove(&player_vtable).unwrap_or_default();
-        let tactic_hits = hits.remove(&tactic_vtable).unwrap_or_default();
-        println!(
-            "player_vtable={} hits={} tactic_vtable={} hits={:?}",
-            hex_address(player_vtable),
-            player_hits.len(),
-            hex_address(tactic_vtable),
-            tactic_hits
-                .iter()
-                .take(8)
-                .map(|value| hex_address(*value))
-                .collect::<Vec<_>>()
+        assert_eq!(
+            super::classify_club_team_squad_unit(None, 200, 100, 2_000_069_496, 920, 18),
+            Some("under19s")
         );
-        println!("active tactic player pointer hits:");
-        let mut clustered_hits = Vec::new();
-        for record in &active_tactic_records {
-            for (kind, pointer) in [
-                ("raw", Some(record.raw_player_address)),
-                ("person", Some(record.person_address)),
-                ("contract", record.contract_address),
-            ] {
-                let Some(pointer) = pointer else {
-                    continue;
-                };
-                let found = hits.remove(&pointer).unwrap_or_default();
-                println!(
-                    "  {} {} {kind}={} hits={}",
-                    record.id,
-                    record.name,
-                    hex_address(pointer),
-                    found.len()
-                );
-                for address in found.into_iter().take(64) {
-                    clustered_hits.push((address, format!("{kind}:{} {}", record.id, record.name)));
-                }
-            }
-        }
-        clustered_hits.sort_by_key(|(address, _)| *address);
-        let mut page_counts: HashMap<u64, Vec<String>> = HashMap::new();
-        for (address, label) in clustered_hits {
-            page_counts
-                .entry(address & !0xfff)
-                .or_default()
-                .push(format!("{}@{}", label, hex_address(address)));
-        }
-        let mut clusters = page_counts.into_iter().collect::<Vec<_>>();
-        clusters.sort_by(|left, right| right.1.len().cmp(&left.1.len()));
-        println!("active tactic pointer clusters:");
-        for (page, labels) in clusters
-            .into_iter()
-            .take(30)
-            .filter(|(_, labels)| labels.len() >= 2)
-        {
-            println!(
-                "  page={} count={} {:?}",
-                hex_address(page),
-                labels.len(),
-                labels
-            );
-        }
-
-        if let Some(tactic_object) = tactic_hits.first().copied() {
-            let bytes = reader
-                .read_bytes(tactic_object, 8192)
-                .expect("tactic manager window");
-            println!("tactic_object={}", hex_address(tactic_object));
-            println!("small tactic i32/u32 values:");
-            for offset in (0..bytes.len()).step_by(4) {
-                let signed = i32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap());
-                let unsigned = u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap());
-                if (-1..=100).contains(&signed) {
-                    println!("  off={offset:04X} i32={signed} u32={unsigned}");
-                }
-            }
-            println!("tactic pointer-like fields:");
-            for offset in (0..2048).step_by(8) {
-                let pointer = u64::from_le_bytes(bytes[offset..offset + 8].try_into().unwrap());
-                if (0x10000000000..0x0000_8000_0000_0000).contains(&pointer) {
-                    let first_u32 = reader.read_u32(pointer).unwrap_or_default();
-                    let first_ptr = reader.read_pointer(pointer).unwrap_or_default();
-                    println!(
-                        "  off={offset:04X} ptr={} first_u32={} first_ptr={}",
-                        hex_address(pointer),
-                        first_u32,
-                        hex_address(first_ptr)
-                    );
-                }
-            }
-
-            let large_bytes = reader
-                .read_bytes(tactic_object, 0x8000)
-                .expect("large tactic manager window");
-            println!("managed players for tactic matching:");
-            for record in &managed {
-                println!(
-                    "  {} {} raw={} person={} contract={}",
-                    record.id,
-                    record.name,
-                    hex_address(record.raw_player_address),
-                    hex_address(record.person_address),
-                    record
-                        .contract_address
-                        .map(hex_address)
-                        .unwrap_or_else(|| "none".to_string())
-                );
-            }
-            print_player_reference_hits("tactic-manager", tactic_object, &large_bytes, &managed);
-            print_role_like_runs("tactic-manager", tactic_object, &large_bytes);
-
-            let mut child_targets = Vec::new();
-            for offset in (0..0x1000).step_by(8) {
-                let pointer =
-                    u64::from_le_bytes(large_bytes[offset..offset + 8].try_into().unwrap());
-                if (0x10000000000..0x0000_8000_0000_0000).contains(&pointer)
-                    && !child_targets.contains(&pointer)
-                {
-                    child_targets.push(pointer);
-                }
-            }
-            println!("tactic child pointer probes:");
-            for (index, target) in child_targets.into_iter().take(96).enumerate() {
-                let Some(child_bytes) = reader.read_bytes(target, 0x1000) else {
-                    continue;
-                };
-                let label = format!("child#{index:02}");
-                let player_hits = count_player_reference_hits(target, &child_bytes, &managed);
-                let role_hits = count_role_like_runs(&child_bytes);
-                if player_hits > 0 || role_hits > 0 {
-                    println!(
-                        "  {label} base={} player_hits={} role_runs={}",
-                        hex_address(target),
-                        player_hits,
-                        role_hits
-                    );
-                    print_player_reference_hits(&label, target, &child_bytes, &managed);
-                    print_role_like_runs(&label, target, &child_bytes);
-                }
-            }
-        }
-
-        println!("managed contract windows:");
-        for record in managed.iter().take(12) {
-            let Some(contract) = record.contract_address else {
-                println!("{} {} no contract", record.id, record.name);
-                continue;
-            };
-            let bytes = reader.read_bytes(contract, 1024).expect("contract window");
-            let mut small_values = Vec::new();
-            let mut date_candidates = Vec::new();
-            for offset in (0..bytes.len()).step_by(4) {
-                let signed = i32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap());
-                let unsigned = u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap());
-                if (0..=5_000_000).contains(&signed) {
-                    small_values.push(format!("{offset:03X}:{signed}"));
-                }
-                let day = u16::from_le_bytes(bytes[offset..offset + 2].try_into().unwrap());
-                let year = u16::from_le_bytes(bytes[offset + 2..offset + 4].try_into().unwrap());
-                if (1..=366).contains(&day) && (2026..=2045).contains(&year) {
-                    date_candidates.push(format!("{offset:03X}:{year}-{day} raw={unsigned}"));
-                }
-            }
-            println!(
-                "{} {} contract={} vtable={} dates=[{}] values=[{}]",
-                record.id,
-                record.name,
-                hex_address(contract),
-                hex_address(reader.read_pointer(contract).unwrap_or_default()),
-                date_candidates.join(", "),
-                small_values.join(" ")
-            );
-        }
+        assert_eq!(
+            super::classify_club_team_squad_unit(None, 300, 100, 2_000_394_357, 920, 1),
+            Some("reserves")
+        );
     }
 
-    #[cfg(target_os = "windows")]
-    fn print_player_reference_hits(
-        label: &str,
-        base: u64,
-        bytes: &[u8],
-        records: &[IndexedPlayerRecord],
-    ) {
-        for offset in (0..bytes.len().saturating_sub(8)).step_by(8) {
-            let pointer = u64::from_le_bytes(bytes[offset..offset + 8].try_into().unwrap());
-            for record in records {
-                if pointer == record.raw_player_address {
-                    println!(
-                        "    {label}+{offset:04X}: raw_player -> {} {}",
-                        record.id, record.name
-                    );
-                }
-                if pointer == record.person_address {
-                    println!(
-                        "    {label}+{offset:04X}: person -> {} {}",
-                        record.id, record.name
-                    );
-                }
-                if Some(pointer) == record.contract_address {
-                    println!(
-                        "    {label}+{offset:04X}: contract -> {} {}",
-                        record.id, record.name
-                    );
-                }
-            }
-        }
-        for offset in (0..bytes.len().saturating_sub(4)).step_by(4) {
-            let uid = u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap());
-            for record in records {
-                if record.id.parse::<u32>().ok() == Some(uid) {
-                    println!(
-                        "    {label}+{offset:04X}: uid -> {} {}",
-                        record.id, record.name
-                    );
-                }
-            }
-        }
-        let _ = base;
-    }
-
-    #[cfg(target_os = "windows")]
-    fn count_player_reference_hits(
-        _base: u64,
-        bytes: &[u8],
-        records: &[IndexedPlayerRecord],
-    ) -> usize {
-        let mut hits = 0;
-        for offset in (0..bytes.len().saturating_sub(8)).step_by(8) {
-            let pointer = u64::from_le_bytes(bytes[offset..offset + 8].try_into().unwrap());
-            hits += records
-                .iter()
-                .filter(|record| {
-                    pointer == record.raw_player_address
-                        || pointer == record.person_address
-                        || Some(pointer) == record.contract_address
-                })
-                .count();
-        }
-        for offset in (0..bytes.len().saturating_sub(4)).step_by(4) {
-            let uid = u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap());
-            hits += records
-                .iter()
-                .filter(|record| record.id.parse::<u32>().ok() == Some(uid))
-                .count();
-        }
-        hits
-    }
-
-    #[cfg(target_os = "windows")]
-    fn print_role_like_runs(label: &str, base: u64, bytes: &[u8]) {
-        let expected_roles = [1_u32, 3, 7, 8, 10, 14, 22, 25, 26, 38];
-        for start in (0..bytes.len().saturating_sub(64)).step_by(4) {
-            let mut values = Vec::new();
-            for offset in (start..start + 64).step_by(4) {
-                let value = u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap());
-                values.push(value);
-            }
-            let bounded = values
-                .iter()
-                .filter(|value| **value <= 45 || **value == u32::MAX)
-                .count();
-            let role_matches = values
-                .iter()
-                .filter(|value| expected_roles.contains(value))
-                .count();
-            let non_zero = values.iter().filter(|value| **value != 0).count();
-            if bounded >= 12 && role_matches >= 3 && non_zero >= 5 {
-                let absolute = base + start as u64;
-                println!(
-                    "    {label}+{start:04X} abs={} values={:?}",
-                    hex_address(absolute),
-                    values
-                );
-            }
-        }
-    }
-
-    #[cfg(target_os = "windows")]
     #[test]
-    #[ignore = "live FM26 height probe; needs active save + known cm labels"]
-    fn probe_height_offsets_against_known_squad_labels() {
-        use std::collections::HashMap;
-        use std::fs;
-
-        let targets: HashMap<&str, u8> = HashMap::from([
-            ("Sam Kizza", 193),
-            ("Nathan Jones", 192),
-            ("Elias Hossmang", 183),
-            ("Felix Heynke", 181),
-            ("Lorenzo Heilbrom", 198),
-        ]);
-
-        let (process_id, _) = find_fm26_process().expect("fm.exe");
-        let mut reader = ProcessReader::open(process_id).expect("OpenProcess");
-        let process_path = reader.process_path().expect("path");
-        let identity = read_executable_identity(&process_path);
-        let profile = find_entity_map(
-            identity.file_version.as_deref(),
-            identity.product_version.as_deref(),
-            identity.sha256.as_deref(),
-            identity.architecture.as_deref(),
-        )
-        .expect("entity map");
-        let module = reader.module(&profile.module).expect("game_plugin.dll");
-        let signature = profile
-            .signatures
-            .iter()
-            .find(|item| item.name == "human_manager_registry")
-            .expect("signature");
-        let pattern = parse_pattern(&signature.pattern).expect("pattern");
-        let hits = scan_module(&mut reader, module, &pattern).expect("scan");
-        assert_eq!(hits.len(), 1, "unique manager signature");
-        let signature_address = hits[0];
-        let displacement = reader.read_i32(signature_address + 3).expect("disp");
-        let registry_slot = (signature_address + 7).wrapping_add_signed(displacement as i64);
-        let registry = reader.read_pointer(registry_slot).filter(|v| *v != 0).expect("registry");
-        let vector_start = reader
-            .read_pointer(registry + profile.constants.manager_registry_vector_offset)
-            .expect("vector start");
-        let vector_end = reader
-            .read_pointer(registry + profile.constants.manager_registry_vector_offset + 8)
-            .expect("vector end");
-        let registry_count = (vector_end - vector_start) / 8;
-        let mut resolved = Vec::new();
-        for index in 0..registry_count {
-            let human = match reader
-                .read_pointer(vector_start + index * 8)
-                .filter(|value| *value != 0)
-            {
-                Some(value) => value,
-                None => continue,
-            };
-            if let Some(candidate) = try_resolve_human_manager(&mut reader, module, profile, human) {
-                resolved.push(candidate);
-            }
-        }
-        let selected = resolved
-            .into_iter()
-            .max_by_key(|item| item.squad_len)
-            .expect("human manager");
-        println!(
-            "manager={} club={} squad={}",
-            selected.manager_name, selected.club_name, selected.squad_len
-        );
-
-        let players_start = reader
-            .read_pointer(selected.team + profile.constants.team_players_start_offset)
-            .expect("players start");
-        let players_end = reader
-            .read_pointer(selected.team + profile.constants.team_players_end_offset)
-            .expect("players end");
-        let squad_len = ((players_end - players_start) / 8) as usize;
-
-        struct Cap {
-            name: String,
-            cm: u8,
-            person: Vec<u8>,
-            player: Vec<u8>,
-        }
-        let mut caps = Vec::new();
-        let mut seen = Vec::new();
-        for slot in 0..squad_len {
-            let raw_player = match reader.read_pointer(players_start + (slot as u64) * 8) {
-                Some(value) if value != 0 => value,
-                _ => continue,
-            };
-            let person = raw_player + profile.constants.player_person_offset;
-            let name = match display_name(
-                read_name_field(&mut reader, person + profile.constants.person_first_name_offset),
-                read_name_field(&mut reader, person + profile.constants.person_second_name_offset),
-                read_name_field(&mut reader, person + profile.constants.person_common_name_offset),
-            ) {
-                Some(value) => value,
-                None => continue,
-            };
-            seen.push(name.clone());
-            let Some(&cm) = targets.get(name.as_str()) else {
-                continue;
-            };
-            let person_bytes = reader.read_bytes(person, 256).expect("person window");
-            let player_bytes = reader.read_bytes(raw_player, 768).expect("player window");
-            println!("captured {name} cm={cm}");
-            caps.push(Cap {
-                name,
-                cm,
-                person: person_bytes,
-                player: player_bytes,
-            });
-        }
-
-        let missing: Vec<_> = targets
-            .keys()
-            .copied()
-            .filter(|name| !caps.iter().any(|cap| cap.name == *name))
-            .collect();
-        if !missing.is_empty() {
-            println!("MISSING {missing:?}");
-            for want in &missing {
-                let needle = want.split_whitespace().last().unwrap_or(want).to_ascii_lowercase();
-                let approx: Vec<_> = seen
-                    .iter()
-                    .filter(|name| name.to_ascii_lowercase().contains(&needle))
-                    .take(8)
-                    .collect();
-                println!("  approx for {want}: {approx:?}");
-            }
-        }
-        assert!(
-            caps.len() >= 3,
-            "need >=3 labelled captures, got {}",
-            caps.len()
-        );
-
-        println!("\n=== per-player person u8 == cm ===");
-        for cap in &caps {
-            let offs: Vec<_> = cap
-                .person
-                .iter()
-                .enumerate()
-                .filter_map(|(i, b)| (*b == cap.cm).then_some(i))
-                .collect();
-            println!("  {}: {:?}", cap.name, offs);
-        }
-        println!("=== per-player player u8 == cm ===");
-        for cap in &caps {
-            let offs: Vec<_> = cap
-                .player
-                .iter()
-                .enumerate()
-                .filter_map(|(i, b)| (*b == cap.cm).then_some(i))
-                .collect();
-            println!("  {}: {:?}", cap.name, offs);
-        }
-
-        println!("\n=== consensus (all captured labels) ===");
-        for (obj, getter) in [
-            ("person", (|c: &Cap| c.person.as_slice()) as fn(&Cap) -> &[u8]),
-            ("player", (|c: &Cap| c.player.as_slice()) as fn(&Cap) -> &[u8]),
-        ] {
-            let len = getter(&caps[0]).len();
-            let mut u8_hits = Vec::new();
-            let mut u16_cm_hits = Vec::new();
-            let mut u16_mm_hits = Vec::new();
-            for off in 0..len {
-                if caps.iter().all(|cap| {
-                    getter(cap).get(off).copied() == Some(cap.cm)
-                }) {
-                    u8_hits.push(off);
-                }
-            }
-            for off in 0..len.saturating_sub(1) {
-                let all_cm = caps.iter().all(|cap| {
-                    let bytes = getter(cap);
-                    u16::from_le_bytes([bytes[off], bytes[off + 1]]) == u16::from(cap.cm)
-                });
-                if all_cm {
-                    u16_cm_hits.push(off);
-                }
-                let all_mm = caps.iter().all(|cap| {
-                    let bytes = getter(cap);
-                    u16::from_le_bytes([bytes[off], bytes[off + 1]]) == u16::from(cap.cm) * 10
-                });
-                if all_mm {
-                    u16_mm_hits.push(off);
-                }
-            }
-            println!("{obj} u8 cm: {u8_hits:?}");
-            println!("{obj} u16 cm: {u16_cm_hits:?}");
-            println!("{obj} u16 mm: {u16_mm_hits:?}");
-        }
-
-        println!("\n=== person+0x70..0xB0 ===");
-        for cap in &caps {
-            let region = &cap.person[0x70..0xB0];
-            let hex: String = region
-                .iter()
-                .map(|b| format!("{b:02x}"))
-                .collect::<Vec<_>>()
-                .join(" ");
-            println!("  {:20} {hex}", cap.name);
-        }
-
-        let payload = caps
-            .iter()
-            .map(|cap| {
-                json!({
-                    "name": cap.name,
-                    "cm": cap.cm,
-                    "personHex": cap.person.iter().map(|b| format!("{b:02x}")).collect::<String>(),
-                    "playerHex": cap.player.iter().map(|b| format!("{b:02x}")).collect::<String>(),
-                })
-            })
-            .collect::<Vec<_>>();
-        let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../tmp/height-probe-captures.json");
-        if let Some(parent) = path.parent() {
-            let _ = fs::create_dir_all(parent);
-        }
-        fs::write(&path, serde_json::to_string_pretty(&payload).unwrap()).unwrap();
-        println!("wrote {}", path.display());
-    }
-
+    #[ignore = "live FM26 RAM probe"]
     #[cfg(target_os = "windows")]
-    fn count_role_like_runs(bytes: &[u8]) -> usize {
-        let expected_roles = [1_u32, 3, 7, 8, 10, 14, 22, 25, 26, 38];
-        let mut runs = 0;
-        for start in (0..bytes.len().saturating_sub(64)).step_by(4) {
-            let mut values = Vec::new();
-            for offset in (start..start + 64).step_by(4) {
-                values.push(u32::from_le_bytes(
-                    bytes[offset..offset + 4].try_into().unwrap(),
-                ));
-            }
-            let bounded = values
-                .iter()
-                .filter(|value| **value <= 45 || **value == u32::MAX)
-                .count();
-            let role_matches = values
-                .iter()
-                .filter(|value| expected_roles.contains(value))
-                .count();
-            let non_zero = values.iter().filter(|value| **value != 0).count();
-            if bounded >= 12 && role_matches >= 3 && non_zero >= 5 {
-                runs += 1;
-            }
+    fn debug_scan_club_teams_live() {
+        let result = super::debug_scan_club_teams_impl();
+        if let Ok(value) = &result {
+            eprintln!("{}", serde_json::to_string_pretty(value).unwrap_or_default());
         }
-        runs
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    #[ignore = "manual foot band probe; run with --ignored --nocapture"]
-    fn foot_probe_managed_squad_for_bands() {
-        use crate::fm26::parser::preferred_foot_label;
-
-        if find_fm26_process().is_none() {
-            eprintln!("FM not running");
-            return;
-        }
-        let snapshot = connector_snapshot();
-        if snapshot.status.state != "connected" {
-            eprintln!("not connected: {}", snapshot.status.message);
-            return;
-        }
-        let Some(managed) = snapshot.managed_club_id.as_deref() else {
-            eprintln!("no managed club");
-            return;
-        };
-        let mut rows = Vec::new();
-        for player in &snapshot.players {
-            if player.get("clubId").and_then(|value| value.as_str()) != Some(managed) {
-                continue;
-            }
-            let name = player["name"].as_str().unwrap_or("?");
-            let left = player["leftFoot"].as_u64().unwrap_or(0) as u8;
-            let right = player["rightFoot"].as_u64().unwrap_or(0) as u8;
-            let fmt = preferred_foot_label(left, right);
-            let ca = player["currentAbility"].as_u64().unwrap_or(0);
-            rows.push((name.to_string(), left, right, fmt.to_string(), ca));
-        }
-        rows.sort_by(|a, b| b.4.cmp(&a.4).then(a.0.cmp(&b.0)));
-        println!("MANAGED_SQUAD {} players", rows.len());
-        for (name, left, right, fmt, ca) in rows {
-            let diff = left.abs_diff(right);
-            let tag = if left == right {
-                "EQUAL"
-            } else if diff <= 3 {
-                "NEAR"
-            } else {
-                "FAR"
-            };
-            println!("{tag}\t{name}\tL{left}\tR{right}\tFMT={fmt}\tCA={ca}");
-        }
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    #[ignore = "manual GK rating probe; run with --ignored --nocapture"]
-    fn gk_rating_probe_managed_squad() {
-        if find_fm26_process().is_none() {
-            eprintln!("FM not running");
-            return;
-        }
-        let snapshot = connector_snapshot();
-        if snapshot.status.state != "connected" {
-            eprintln!("not connected: {}", snapshot.status.message);
-            return;
-        }
-        let Some(managed) = snapshot.managed_club_id.as_deref() else {
-            eprintln!("no managed club");
-            return;
-        };
-
-        const CORE: [&str; 11] = [
-            "Aerial Reach",
-            "Command of Area",
-            "Communication",
-            "Eccentricity",
-            "Handling",
-            "Kicking",
-            "One on Ones",
-            "Punching",
-            "Reflexes",
-            "Rushing Out",
-            "Throwing",
-        ];
-
-        let mut rows = Vec::new();
-        for player in &snapshot.players {
-            if player.get("clubId").and_then(|value| value.as_str()) != Some(managed) {
-                continue;
-            }
-            let name = player["name"].as_str().unwrap_or("?");
-            let positions = player["positions"]
-                .as_array()
-                .map(|arr| {
-                    arr.iter()
-                        .filter_map(|v| v.as_str())
-                        .collect::<Vec<_>>()
-                        .join("/")
-                })
-                .unwrap_or_default();
-            let is_gk = positions.split('/').any(|p| p.trim() == "GK");
-            let live_rating = player["goalkeeperRating"].as_u64();
-            let attrs = player["attributes"].as_object();
-            let mut core_vals = Vec::new();
-            if let Some(map) = attrs {
-                for key in CORE {
-                    if let Some(v) = map.get(key).and_then(|v| v.as_u64()) {
-                        core_vals.push(v as u8);
-                    }
-                }
-            }
-            if core_vals.is_empty() {
-                continue;
-            }
-            let max_v = *core_vals.iter().max().unwrap();
-            let sum: u32 = core_vals.iter().map(|v| u32::from(*v)).sum();
-            let mean = sum as f64 / core_vals.len() as f64;
-            let mean_round = mean.round() as u8;
-            let mean_half = (mean / 2.0).round() as u8;
-            let mut sorted = core_vals.clone();
-            sorted.sort_unstable();
-            let top3 = &sorted[sorted.len().saturating_sub(3)..];
-            let top3_mean =
-                (top3.iter().map(|v| u32::from(*v)).sum::<u32>() as f64 / top3.len() as f64).round()
-                    as u8;
-            let ca = player["currentAbility"].as_u64().unwrap_or(0);
-            let ft = attrs
-                .and_then(|m| m.get("First Touch"))
-                .and_then(|v| v.as_u64())
-                .unwrap_or(0);
-            let pass = attrs
-                .and_then(|m| m.get("Passing"))
-                .and_then(|v| v.as_u64())
-                .unwrap_or(0);
-            rows.push((
-                is_gk,
-                name.to_string(),
-                positions,
-                live_rating,
-                max_v,
-                mean_round,
-                mean_half,
-                top3_mean,
-                ca,
-                ft,
-                pass,
-                core_vals,
-            ));
-        }
-        rows.sort_by(|a, b| b.4.cmp(&a.4).then(b.8.cmp(&a.8)).then(a.1.cmp(&b.1)));
-        println!("GK_RATING_PROBE outfield first (FMT liveRating=positions[0] cap10)");
-        println!(
-            "tag\tname\tpos\tlive\tmax\tmean\tmean/2\ttop3\tCA\tFT\tPas\tcore"
-        );
-        for (is_gk, name, positions, live, max_v, mean_r, mean_h, top3, ca, ft, pass, core) in
-            &rows
-        {
-            if *is_gk {
-                continue;
-            }
-            let core_s = core
-                .iter()
-                .map(|v| v.to_string())
-                .collect::<Vec<_>>()
-                .join(",");
-            println!(
-                "OF\t{name}\t{positions}\t{live:?}\t{max_v}\t{mean_r}\t{mean_h}\t{top3}\t{ca}\t{ft}\t{pass}\t[{core_s}]"
-            );
-        }
-        println!("--- keepers (skip for /10 UI) ---");
-        for (is_gk, name, positions, live, max_v, mean_r, mean_h, top3, ca, ft, pass, core) in
-            &rows
-        {
-            if !*is_gk {
-                continue;
-            }
-            let core_s = core
-                .iter()
-                .map(|v| v.to_string())
-                .collect::<Vec<_>>()
-                .join(",");
-            println!(
-                "GK\t{name}\t{positions}\t{live:?}\t{max_v}\t{mean_r}\t{mean_h}\t{top3}\t{ca}\t{ft}\t{pass}\t[{core_s}]"
-            );
-        }
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    #[ignore = "manual GK rating offset hunt; run with --ignored --nocapture"]
-    fn gk_rating_offset_hunt() {
-        use std::collections::{HashMap, HashSet};
-
-        if find_fm26_process().is_none() {
-            eprintln!("FM not running");
-            return;
-        }
-        let snapshot = connector_snapshot();
-        if snapshot.status.state != "connected" {
-            eprintln!("not connected: {}", snapshot.status.message);
-            return;
-        }
-
-        let labels: HashMap<&str, u8> = HashMap::from([
-            ("Pietro Miraglia", 4),
-            ("Stephen Segun", 3),
-            ("Josef Tusjak", 3),
-            ("Felix Heynke", 3),
-            ("Mate Kolarek", 3),
-            ("Corvin Garbe", 2),
-            ("Jordan Dobler", 2),
-        ]);
-
-        let mut per_player: Vec<(String, u8, Vec<u8>, Vec<u8>)> = Vec::new();
-        for player in &snapshot.players {
-            let name = player["name"].as_str().unwrap_or("");
-            let Some(&fm) = labels.get(name) else {
-                continue;
-            };
-            let id = player["id"].as_str().unwrap_or(name);
-            let dump = match capture_mapping_lab_player(id, 1024) {
-                Ok(dump) => dump,
-                Err(err) => {
-                    eprintln!("capture failed for {name}: {err}");
-                    continue;
-                }
-            };
-            let mut player_bytes = None;
-            let mut person_bytes = None;
-            for window in &dump.windows {
-                if window.object == "player" {
-                    player_bytes = Some(window.bytes.clone());
-                }
-                if window.object == "person" || window.object == "personEmbedded" {
-                    person_bytes = Some(window.bytes.clone());
-                }
-            }
-            let Some(player_bytes) = player_bytes else {
-                eprintln!("no player window for {name}");
-                continue;
-            };
-            println!(
-                "captured {name} fm={fm} player_len={} person_len={}",
-                player_bytes.len(),
-                person_bytes.as_ref().map(|b| b.len()).unwrap_or(0)
-            );
-            // raw attrs + extras for offline formula search
-            if player_bytes.len() >= 351 + 54 {
-                let raw = &player_bytes[351..351 + 54];
-                let pick = |i: usize| raw[i];
-                let disp = |v: u8| (((u16::from(v) + 2) / 5) as u8).clamp(1, 20);
-                println!(
-                    "  extras FT={} Pas={} Agi={} JR={} Str={} Bal={} Ant={} Dec={} Pos={} Cmp={} Con={}",
-                    disp(pick(22)),
-                    disp(pick(7)),
-                    disp(pick(46)),
-                    disp(pick(39)),
-                    disp(pick(36)),
-                    disp(pick(42)),
-                    disp(pick(17)),
-                    disp(pick(18)),
-                    disp(pick(20)),
-                    disp(pick(52)),
-                    disp(pick(53)),
-                );
-                println!(
-                    "  raw_scale fm*5={} fm*10={}",
-                    fm.saturating_mul(5),
-                    fm.saturating_mul(10)
-                );
-            }
-            per_player.push((
-                name.to_string(),
-                fm,
-                player_bytes,
-                person_bytes.unwrap_or_default(),
-            ));
-        }
-
-        if per_player.len() < 2 {
-            eprintln!("need >=2 captures");
-            return;
-        }
-
-        let min_player_len = per_player.iter().map(|p| p.2.len()).min().unwrap_or(0);
-
-        // Exact u8 == fm
-        let mut candidates: HashSet<usize> = (0..min_player_len).collect();
-        for (_, fm, bytes, _) in &per_player {
-            candidates.retain(|off| bytes.get(*off).copied() == Some(*fm));
-        }
-        println!("PLAYER_U8 ==fm : {}", candidates.len());
-
-        // u8 == fm*5 (raw-attr style)
-        let mut cand_x5: HashSet<usize> = (0..min_player_len).collect();
-        for (_, fm, bytes, _) in &per_player {
-            let target = fm.saturating_mul(5);
-            cand_x5.retain(|off| bytes.get(*off).copied() == Some(target));
-        }
-        println!("PLAYER_U8 ==fm*5 : {}", cand_x5.len());
-        let mut sorted: Vec<usize> = cand_x5.into_iter().collect();
-        sorted.sort_unstable();
-        for off in &sorted {
-            println!("  player+{off}");
-        }
-
-        // u16 LE == fm
-        let mut cand_u16 = Vec::new();
-        for off in 0..min_player_len.saturating_sub(1) {
-            let ok = per_player.iter().all(|(_, fm, bytes, _)| {
-                let v = u16::from_le_bytes([bytes[off], bytes[off + 1]]);
-                v == u16::from(*fm)
-            });
-            if ok {
-                cand_u16.push(off);
-            }
-        }
-        println!("PLAYER_U16LE ==fm : {}", cand_u16.len());
-        for off in cand_u16.iter().take(40) {
-            println!("  player+{off}");
-        }
-
-        // u16 LE == fm*5
-        let mut cand_u16_x5 = Vec::new();
-        for off in 0..min_player_len.saturating_sub(1) {
-            let ok = per_player.iter().all(|(_, fm, bytes, _)| {
-                let v = u16::from_le_bytes([bytes[off], bytes[off + 1]]);
-                v == u16::from(fm.saturating_mul(5))
-            });
-            if ok {
-                cand_u16_x5.push(off);
-            }
-        }
-        println!("PLAYER_U16LE ==fm*5 : {}", cand_u16_x5.len());
-        for off in cand_u16_x5.iter().take(40) {
-            println!("  player+{off}");
-        }
-
-        let min_person = per_player
-            .iter()
-            .map(|p| p.3.len())
-            .filter(|l| *l > 0)
-            .min()
-            .unwrap_or(0);
-        if min_person > 0 {
-            let mut person_cand: HashSet<usize> = (0..min_person).collect();
-            for (_, fm, _, person) in &per_player {
-                person_cand.retain(|off| person.get(*off).copied() == Some(*fm));
-            }
-            println!("PERSON_U8 ==fm : {}", person_cand.len());
-            let mut person_x5: HashSet<usize> = (0..min_person).collect();
-            for (_, fm, _, person) in &per_player {
-                let target = fm.saturating_mul(5);
-                person_x5.retain(|off| person.get(*off).copied() == Some(target));
-            }
-            println!("PERSON_U8 ==fm*5 : {}", person_x5.len());
-            let mut sorted: Vec<usize> = person_x5.into_iter().collect();
-            sorted.sort_unstable();
-            for off in sorted.iter().take(40) {
-                println!("  person+{off}");
-            }
-        }
-    }
-
-    #[cfg(target_os = "windows")]
-    #[test]
-    #[ignore = "manual: dump live player object to tmp/; FM must be running with save loaded"]
-    fn dump_player_168365072_object() {
-        use std::{fs, path::PathBuf};
-
-        if find_fm26_process().is_none() {
-            eprintln!("FM not running — skipping dump");
-            return;
-        }
-        let snapshot = connector_snapshot();
-        if snapshot.status.state != "connected" {
-            eprintln!("not connected: {}", snapshot.status.message);
-            return;
-        }
-        let dump = capture_mapping_lab_player("168365072", 1024).expect("capture");
-        let out_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../tmp");
-        fs::create_dir_all(&out_dir).expect("tmp dir");
-        let json_path = out_dir.join("player-dump-168365072.json");
-        fs::write(
-            &json_path,
-            serde_json::to_vec_pretty(&dump).expect("encode dump"),
-        )
-        .expect("write json");
-
-        let mut text = String::new();
-        text.push_str(&format!(
-            "player_id={} name={}\nraw_player={} person_embedded={}\n\n",
-            dump.player_id, dump.player_name, dump.raw_player_address, dump.person_embedded_address
-        ));
-        for probe in &dump.person_probes {
-            text.push_str(&format!(
-                "probe {} @ {} uid+12={:?} name={:?}\n",
-                probe.label, probe.base_address, probe.uid_at_plus_12, probe.name
-            ));
-        }
-        for window in &dump.windows {
-            text.push_str(&format!(
-                "\n=== {} @ {} ({} bytes) ===\n",
-                window.object,
-                window.base_address,
-                window.bytes.len()
-            ));
-            for (offset, chunk) in window.bytes.chunks(16).enumerate() {
-                let base = offset * 16;
-                let hex: String = chunk
-                    .iter()
-                    .map(|byte| format!("{byte:02X}"))
-                    .collect::<Vec<_>>()
-                    .join(" ");
-                text.push_str(&format!("{base:04X}  {hex}\n"));
-            }
-        }
-        let txt_path = out_dir.join("player-dump-168365072.txt");
-        fs::write(&txt_path, text).expect("write txt");
-        println!(
-            "Wrote {} and {}",
-            json_path.display(),
-            txt_path.display()
-        );
+        let value = result.expect("debug_scan_club_teams failed");
+        assert!(!value["teams"].as_array().unwrap_or(&vec![]).is_empty());
     }
 }
+

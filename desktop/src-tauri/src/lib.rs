@@ -5,8 +5,8 @@ mod connector;
 mod data;
 mod fm26;
 mod fm_dossier;
+mod fmt_log;
 mod graphics;
-mod mapping_lab;
 mod player_face;
 mod visibility;
 
@@ -29,15 +29,17 @@ pub fn run() {
                 .build(),
         )
         .invoke_handler(tauri::generate_handler![
+            fmt_log::fmt_terminal_log,
             connector::connector_status,
             connector::connector_snapshot,
             connector::load_active_save,
+            connector::load_club_satellite_squads,
+            connector::debug_scan_club_teams,
+            connector::debug_scan_club_affiliates,
+            connector::debug_probe_player_origin,
             connector::search_indexed_players,
             connector::indexed_players_by_ids,
             connector::indexed_player_profile,
-            mapping_lab::mapping_lab_status,
-            mapping_lab::mapping_lab_capture,
-            mapping_lab::mapping_lab_compare,
             player_face::club_logo_data,
             player_face::faces_status,
             player_face::faces_update_cache,

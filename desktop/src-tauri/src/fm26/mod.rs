@@ -1,8 +1,10 @@
+pub(crate) mod club_affiliates;
 pub(crate) mod memory;
 pub(crate) mod offsets;
 pub(crate) mod parser;
 pub(crate) mod permissions;
 pub(crate) mod process;
+pub(crate) mod player_origin;
 pub(crate) mod roles;
 pub(crate) mod scanner;
 pub(crate) mod structs;
