@@ -224,6 +224,14 @@ pub fn run_debug_scan_club_affiliates() -> Result<Value, String> {
     debug_scan_club_affiliates_impl()
 }
 
+#[cfg(all(
+    any(feature = "probe", feature = "affiliate_flags_probe"),
+    target_os = "windows"
+))]
+pub fn run_debug_probe_affiliate_flags() -> Result<Value, String> {
+    debug_probe_affiliate_flags_impl()
+}
+
 #[cfg(all(feature = "probe", target_os = "windows"))]
 pub fn run_debug_scan_club_teams() -> Result<Value, String> {
     debug_scan_club_teams_impl()
@@ -1572,6 +1580,56 @@ fn debug_scan_club_affiliates_impl() -> Result<Value, String> {
         object.insert("bytesRead".to_string(), json!(reader.bytes_read));
     }
     Ok(graph)
+}
+
+#[cfg(all(
+    any(feature = "probe", feature = "affiliate_flags_probe"),
+    target_os = "windows"
+))]
+fn debug_probe_affiliate_flags_impl() -> Result<Value, String> {
+    use crate::fm26::affiliate_links::probe_affiliate_squad_flag_slots;
+
+    let Some((process_id, _)) = find_fm26_process() else {
+        return Err("FM26 process not found.".to_string());
+    };
+    let mut reader = ProcessReader::open(process_id)
+        .map_err(|code| format!("Could not open FM26 read-only handle (Windows error {code})."))?;
+    let identity = reader
+        .process_path()
+        .as_deref()
+        .map(read_executable_identity)
+        .unwrap_or_default();
+    let Some(profile) = find_entity_map(
+        identity.file_version.as_deref(),
+        identity.product_version.as_deref(),
+        identity.sha256.as_deref(),
+        identity.architecture.as_deref(),
+    ) else {
+        return Err("FM26 build is not supported.".to_string());
+    };
+    let Some(module) = reader.module(&profile.module) else {
+        return Err("The FM26 game module was not available.".to_string());
+    };
+    let mut diagnostics = ExtractionDiagnostics::default();
+    let (selected, manager_pick_warning) =
+        resolve_active_human_manager(&mut reader, module, profile, process_id, &mut diagnostics)
+            .map_err(|failure| failure.message)?;
+    let mut report = probe_affiliate_squad_flag_slots(
+        &mut reader,
+        module,
+        profile,
+        selected.club,
+        selected.club_uid,
+    );
+    if let Some(object) = report.as_object_mut() {
+        object.insert("managedClubName".to_string(), json!(selected.club_name));
+        object.insert("managerName".to_string(), json!(selected.manager_name));
+        object.insert(
+            "managerPickWarning".to_string(),
+            json!(manager_pick_warning),
+        );
+    }
+    Ok(report)
 }
 
 /// Club UniqueID + name from a team or club pointer (vtable-validated).

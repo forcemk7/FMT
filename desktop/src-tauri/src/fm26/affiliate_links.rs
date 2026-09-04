@@ -1,8 +1,10 @@
 use serde_json::{json, Value};
 
+use super::blob_scan::diff_hex_blobs;
+
 #[cfg(target_os = "windows")]
 use super::{
-    blob_scan::{find_u32_hits_in_blob, pointer_hits_in_bytes, relationship_candidates_wide},
+    blob_scan::{find_u32_hits_in_blob, pointer_hits_in_bytes, relationship_candidates_wide, u8_grid_around},
     memory::{ModuleInfo, ProcessReader},
     offsets::EntityMapProfile,
     scanner::scan_private_memory_for_pointers_in_range,
@@ -995,6 +997,109 @@ pub(crate) fn discover_bteam_affiliate_clubs(
     found
 }
 
+/// RE-only: dump every managed-club link-vector slot (`@0x8E8`) for FMLE affiliate-flag A/B.
+///
+/// FMLE UI labels (Main / Permanent / Players Move Freely, …) are editable fields — not proven
+/// memory names. Toggle **one** LE control on an affiliate, re-run this probe, diff `structBytesHex`
+/// (or use `diff_hex_blobs`) to lock the byte(s) that mark squad-tab reserves.
+#[cfg(target_os = "windows")]
+pub(crate) fn probe_affiliate_squad_flag_slots(
+    reader: &mut ProcessReader,
+    module: ModuleInfo,
+    profile: &EntityMapProfile,
+    managed_club: u64,
+    managed_club_uid: u32,
+) -> Value {
+    let mut slots = Vec::new();
+    for slot in 0..BTEAM_LINK_POINTER_SLOTS as u64 {
+        let field = MANAGED_CLUB_BTEAM_LINK_VECTOR_OFFSET + slot * 8;
+        let link_struct = reader.read_pointer(managed_club + field).unwrap_or(0);
+        if link_struct == 0 {
+            slots.push(json!({
+                "slot": slot,
+                "fieldOffsetHex": format!("0x{field:X}"),
+                "linkStructPointer": "0x0",
+                "empty": true,
+            }));
+            continue;
+        }
+        let blob = reader
+            .read_bytes(link_struct, AFFILIATE_LINK_STRUCT_PROBE_BYTES)
+            .unwrap_or_default();
+        let club_at_locked = reader
+            .read_pointer(link_struct + AFFILIATE_LINK_STRUCT_CLUB_POINTER_OFFSET)
+            .unwrap_or(0);
+        let club_identity = (club_at_locked != 0)
+            .then(|| read_club_identity(reader, module, profile, club_at_locked))
+            .flatten();
+        let club_ptr_hits = if club_at_locked != 0 {
+            pointer_hits_in_bytes(&blob, club_at_locked)
+        } else {
+            Vec::new()
+        };
+        let anchor = club_ptr_hits
+            .first()
+            .copied()
+            .unwrap_or(AFFILIATE_LINK_STRUCT_CLUB_POINTER_OFFSET as usize);
+        let feeder_catalog = link_struct_is_feeder_catalog(reader, module, profile, &blob);
+        slots.push(json!({
+            "slot": slot,
+            "fieldOffsetHex": format!("0x{field:X}"),
+            "linkStructPointer": format!("0x{link_struct:X}"),
+            "clubPointerAtLocked0x160": format!("0x{club_at_locked:X}"),
+            "clubUid": club_identity.as_ref().map(|(uid, _)| *uid),
+            "clubName": club_identity.as_ref().map(|(_, name)| name.clone()),
+            "feederCatalogMultiClub": feeder_catalog,
+            "clubPointerHitsInStruct": club_ptr_hits,
+            "flagGridAnchorOffset": anchor,
+            "u8GridAroundClubPointer": u8_grid_around(&blob, anchor, 64),
+            "u32GridAroundClubPointer": relationship_candidates_wide(&blob, anchor),
+            "structBytesHex": blob
+                .iter()
+                .map(|byte| format!("{byte:02x}"))
+                .collect::<String>(),
+            "structBytesLen": blob.len(),
+        }));
+    }
+    json!({
+        "status": "affiliate-squad-flag-slots",
+        "purpose": "FMLE A/B: toggle one editable affiliate field, re-probe, diff structBytesHex",
+        "hypothesis": "Squad-tab separate-club reserves are affiliate link structs whose flag bytes FMLE edits as Main/Permanent/Players Move Freely (UI labels only — lock bytes, not strings)",
+        "managedClubPointer": format!("0x{managed_club:X}"),
+        "managedClubUid": managed_club_uid,
+        "linkVectorOffset": format!("0x{MANAGED_CLUB_BTEAM_LINK_VECTOR_OFFSET:X}"),
+        "lockedClubPointerOffset": format!("0x{AFFILIATE_LINK_STRUCT_CLUB_POINTER_OFFSET:X}"),
+        "slots": slots,
+        "humanProtocol": [
+            "1. npm run probe:affiliate-flags > before.json (FM save loaded)",
+            "2. FMLE: open one affiliate (prefer Schalke II); toggle ONE checkbox only",
+            "3. npm run probe:affiliate-flags > after.json",
+            "4. python desktop/scripts/diff-affiliate-flag-dumps.py before.json after.json",
+            "5. Lock offset(s) that flip on squad-tab affiliates and stay off on feeders",
+        ],
+        "bytesRead": reader.bytes_read,
+    })
+}
+
+#[cfg(not(target_os = "windows"))]
+pub(crate) fn probe_affiliate_squad_flag_slots(
+    _reader: &mut super::memory::ProcessReader,
+    _module: super::memory::ModuleInfo,
+    _profile: &super::offsets::EntityMapProfile,
+    _managed_club: u64,
+    _managed_club_uid: u32,
+) -> Value {
+    json!({ "status": "windows_only" })
+}
+
+/// Offline helper for unit tests / scripts — re-export blob_scan diff.
+pub(crate) fn diff_affiliate_struct_hex(before_hex: &str, after_hex: &str) -> Value {
+    json!({
+        "changes": diff_hex_blobs(before_hex, after_hex),
+        "changeCount": diff_hex_blobs(before_hex, after_hex).len(),
+    })
+}
+
 /// RE-only: given a verified B-team club object (from Board / FMLE / prior lock), find every
 /// structural edge from the managed club that points at it — direct fields, link-vector
 /// slots, and club-pointer offsets inside those link structs. No production use.
@@ -1357,7 +1462,7 @@ pub(crate) fn probe_lock_affiliate_link_layout(
 #[cfg(test)]
 mod tests {
     use super::{
-        bteam_satellite_team_matches, squad_unit_from_team_type,
+        bteam_satellite_team_matches, diff_affiliate_struct_hex, squad_unit_from_team_type,
         AFFILIATE_LINK_STRUCT_CLUB_POINTER_OFFSET, BTEAM_LINK_POINTER_SLOTS,
         BTEAM_SATELLITE_ROSTER_MAX, BTEAM_SATELLITE_ROSTER_MIN,
         MANAGED_CLUB_BTEAM_LINK_VECTOR_OFFSET, TEAM_NAME_OFFSET, TEAM_SHORT_NAME_OFFSET,
@@ -1437,5 +1542,14 @@ mod tests {
         // Layout adjacency: TeamType sits before Club@0x30 / Players@0x38 (FM22→FM26).
         assert_eq!(profile.constants.team_club_offset, 0x30);
         assert_eq!(profile.constants.team_players_start_offset, 0x38);
+    }
+
+    #[test]
+    fn affiliate_struct_hex_diff_lists_flips() {
+        let report = diff_affiliate_struct_hex("00ff11", "00aa11");
+        assert_eq!(report["changeCount"], 1);
+        assert_eq!(report["changes"][0]["offset"], 1);
+        assert_eq!(report["changes"][0]["before"], 0xff);
+        assert_eq!(report["changes"][0]["after"], 0xaa);
     }
 }

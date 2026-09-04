@@ -10,6 +10,7 @@
     "desktop:dev": "tauri dev",
     "desktop:stable": "tauri dev --no-watch",
     "desktop:build": "tauri build",
+    "probe:affiliate-flags": "cargo run --manifest-path src-tauri/Cargo.toml --features affiliate_flags_probe --bin fmt-probe -- affiliate-flags",
     "lint": "eslint .",
     "test": "vitest run"
   },
