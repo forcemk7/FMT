@@ -41,4 +41,4 @@ Squad cards show `—` for age when DOB is present because in-game current date 
 - Promoted `gameDate` (YYYY-MM-DD) from player/squad current-date onto the live snapshot alongside `season`
 - Renamed Advanced diagnostics → Diagnostics; ordered fields by load time; surfaced collected status/snapshot values previously missing from the panel
 - Verified: `cargo check` (connector), vitest `fmt-terminal-log` (types); UI field present in Settings
-- Commit: (filled after git)
+- Commit: `0db0fa6`
