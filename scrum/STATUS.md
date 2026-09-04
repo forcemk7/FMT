@@ -1,16 +1,16 @@
 ﻿# Status
 
-Last updated: 2026-09-04 (T203 done — affiliate flag A/B probe ready for human FMLE lock)
+Last updated: 2026-09-04 (T204 done — Squad status filters + Settings rosterLen)
 
 ## Now
 
 **Human FMLE A/B** — run `probe:affiliate-flags` before/after one LE toggle; diff dumps; lock squad-tab vs feeder bytes. Then follow-up ticket to wire filter.
 
-**Human QA** — Schalke / Leicester: First + same-club youth via Club.Teams. Separate-club II still out until flag lock + wire.
+**Human QA** — Schalke / Leicester: First + same-club youth via Club.Teams. Separate-club II still out until flag lock + wire. Squad filters: At club / On loan / Loaned out on toolbar.
 
 **T190 parked** — blocked on RAM lock for Live Editor Save ID before save-copy CA path.
 
-**Deferred:** T139 theme. T162 trophy cabinet. T124 quiet dev launch.
+**Deferred:** T139 theme. T162 trophy cabinet. T124 quiet dev launch. Club.Teams tab label polish (name-only until then). Loop D = FMLE-class **read** core (world tables → then managed club); full archive `.cursor/rules/fm-live-read.mdc`.
 
 ## Board
 
@@ -27,6 +27,7 @@ Last updated: 2026-09-04 (T203 done — affiliate flag A/B probe ready for human
 
 ## Recently done
 
+- **T204** Squad — status filters + rosterLen in Settings (tab paren counts → filter row)
 - **T203** RE — affiliate squad-tab flag bytes (FMLE A/B probe + diff; production unwired)
 - **T202** Squad face-cache freshness — remap `from=` / source mtime revalidation on warm
 - **T201** Production load — Club.Teams only; drop B-team heuristic + heap fallback; first-team-first order

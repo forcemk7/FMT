@@ -1,4 +1,4 @@
-import type { LivePlayer } from "@/domain/adapters";
+import type { LiveClubTeam, LivePlayer } from "@/domain/adapters";
 
 /** GM Sell lane: PA − CA at or below this (CA≈PA). */
 export const MOVE_ON_HEADROOM_MAX = 8;
@@ -8,6 +8,15 @@ export const GM_DEVELOPMENT_AGE_MAX = 24;
 export type GmAdvice = "sell" | "loan";
 
 export type SquadUnit = "firstTeam" | "under19s" | "reserves";
+
+/** All players employed by the managed club (any squad unit; includes loans). */
+export function countClubEmployees(
+  players: Array<Pick<LivePlayer, "clubId">>,
+  managedClubId: string | null | undefined,
+): number {
+  if (!managedClubId) return 0;
+  return players.filter((player) => player.clubId === managedClubId).length;
+}
 
 /** Managed-club players available for match squads (excludes outgoing loans). */
 export function isAtClubSquadPlayer(
@@ -21,6 +30,80 @@ export function isAtClubSquadPlayer(
   return unit === squadUnit;
 }
 
+/** At-club player on a specific FM team object roster. */
+export function isAtClubTeamPlayer(
+  player: Pick<LivePlayer, "clubId" | "loanedOut" | "squadTeamUid">,
+  managedClubId: string | null | undefined,
+  teamUid: string | null | undefined,
+): boolean {
+  if (!managedClubId || !teamUid || player.clubId !== managedClubId) return false;
+  if (player.loanedOut === true) return false;
+  if (player.loanedIn === true) return false;
+  return player.squadTeamUid === teamUid;
+}
+
+/** Any managed-club player on a team roster (at club, loaned in, or loaned out). */
+export function isOnClubTeamRosterPlayer(
+  player: Pick<LivePlayer, "clubId" | "squadTeamUid">,
+  managedClubId: string | null | undefined,
+  teamUid: string | null | undefined,
+): boolean {
+  if (!managedClubId || !teamUid || player.clubId !== managedClubId) return false;
+  return player.squadTeamUid === teamUid;
+}
+
+export type SquadRosterStatus = "atClub" | "loanedIn" | "loanedOut";
+
+export function squadRosterStatus(
+  player: Pick<LivePlayer, "clubId" | "loanedOut" | "loanedIn">,
+  managedClubId: string | null | undefined,
+): SquadRosterStatus | null {
+  if (!managedClubId || player.clubId !== managedClubId) return null;
+  if (player.loanedOut === true) return "loanedOut";
+  if (player.loanedIn === true) return "loanedIn";
+  return "atClub";
+}
+
+export type SquadTeamRosterCounts = {
+  atClub: number;
+  loanedIn: number;
+  loanedOut: number;
+};
+
+export function countSquadTeamRoster(
+  players: Array<
+    Pick<LivePlayer, "clubId" | "loanedOut" | "loanedIn" | "squadTeamUid">
+  >,
+  managedClubId: string | null | undefined,
+  teamUid: string | null | undefined,
+): SquadTeamRosterCounts {
+  const counts: SquadTeamRosterCounts = { atClub: 0, loanedIn: 0, loanedOut: 0 };
+  for (const player of players) {
+    if (!isOnClubTeamRosterPlayer(player, managedClubId, teamUid)) continue;
+    const status = squadRosterStatus(player, managedClubId);
+    if (status === "atClub") counts.atClub += 1;
+    else if (status === "loanedIn") counts.loanedIn += 1;
+    else if (status === "loanedOut") counts.loanedOut += 1;
+  }
+  return counts;
+}
+
+export const ALL_SQUAD_ROSTER_STATUSES: readonly SquadRosterStatus[] = [
+  "atClub",
+  "loanedIn",
+  "loanedOut",
+];
+
+/** True when the player's roster status is one of the enabled Squad filters. */
+export function playerMatchesSquadRosterFilters(
+  player: Pick<LivePlayer, "clubId" | "loanedOut" | "loanedIn">,
+  managedClubId: string | null | undefined,
+  enabled: ReadonlySet<SquadRosterStatus>,
+): boolean {
+  const status = squadRosterStatus(player, managedClubId);
+  return status != null && enabled.has(status);
+}
+
 export function countAtClubSquadUnit(
   players: Array<Pick<LivePlayer, "clubId" | "loanedOut" | "squadUnit">>,
   managedClubId: string | null | undefined,
@@ -32,6 +115,33 @@ export function countAtClubSquadUnit(
 }
 
 /** Managed-club players currently out on loan (Squad honesty complement). */
+export function countClubEmployeesOnLoan(
+  players: Array<Pick<LivePlayer, "clubId" | "loanedOut">>,
+  managedClubId: string | null | undefined,
+): number {
+  if (!managedClubId) return 0;
+  return players.filter(
+    (player) => player.clubId === managedClubId && player.loanedOut === true,
+  ).length;
+}
+
+/** Managed-club player at any squad unit (excludes outgoing loans). */
+export function isAtClubEmployee(
+  player: Pick<LivePlayer, "clubId" | "loanedOut">,
+  managedClubId: string | null | undefined,
+): boolean {
+  if (!managedClubId || player.clubId !== managedClubId) return false;
+  return player.loanedOut !== true;
+}
+
+export function countClubEmployeesAtClub(
+  players: Array<Pick<LivePlayer, "clubId" | "loanedOut">>,
+  managedClubId: string | null | undefined,
+): number {
+  if (!managedClubId) return 0;
+  return players.filter((player) => isAtClubEmployee(player, managedClubId)).length;
+}
+
 export function isLoanedOutSquadPlayer(
   player: Pick<LivePlayer, "clubId" | "loanedOut">,
   managedClubId: string | null | undefined,
@@ -134,18 +244,121 @@ export function formatPlayerPositions(
   return `${head} (${secondary.join(" / ")})`;
 }
 
-/** Group by best (primary) position only — not secondary slots. */
-export function groupPlayerPosition(player: LivePlayer): PositionGroup {
-  const positions = player.positions.map((position) => position.toUpperCase());
-  if (positions.some((position) => /\bGK\b/.test(position))) return "Goalkeepers";
-  if (positions.some((position) => /\bDC\b|\bCB\b/.test(position))) return "Centre-backs";
-  if (positions.some((position) => /\bDL\b|\bDR\b|\bLB\b|\bRB\b|\bWB/.test(position))) return "Full-backs / wing-backs";
-  if (positions.some((position) => /\bDM\b|\bDMC\b/.test(position))) return "Defensive midfielders";
-  if (positions.some((position) => /\bMC\b|\bCM\b/.test(position))) return "Central midfielders";
-  if (positions.some((position) => /\bAMC\b|\bAM\b/.test(position))) return "Attacking midfielders";
-  if (positions.some((position) => /\bAML\b|\bAMR\b|\bLW\b|\bRW\b/.test(position))) return "Wingers";
-  if (positions.some((position) => /\bST\b|\bCF\b/.test(position))) return "Strikers";
+const POSITION_CODE_GROUP: Record<string, PositionGroup> = {
+  GK: "Goalkeepers",
+  SW: "Centre-backs",
+  DC: "Centre-backs",
+  CB: "Centre-backs",
+  DL: "Full-backs / wing-backs",
+  DR: "Full-backs / wing-backs",
+  LB: "Full-backs / wing-backs",
+  RB: "Full-backs / wing-backs",
+  WBL: "Full-backs / wing-backs",
+  WBR: "Full-backs / wing-backs",
+  DM: "Defensive midfielders",
+  DMC: "Defensive midfielders",
+  MC: "Central midfielders",
+  CM: "Central midfielders",
+  AMC: "Attacking midfielders",
+  AM: "Attacking midfielders",
+  ML: "Wingers",
+  MR: "Wingers",
+  AML: "Wingers",
+  AMR: "Wingers",
+  LW: "Wingers",
+  RW: "Wingers",
+  ST: "Strikers",
+  CF: "Strikers",
+};
+
+const GROUP_MATCH_ORDER: PositionGroup[] = [
+  "Goalkeepers",
+  "Centre-backs",
+  "Full-backs / wing-backs",
+  "Defensive midfielders",
+  "Central midfielders",
+  "Attacking midfielders",
+  "Wingers",
+  "Strikers",
+];
+
+function collectPositionCodes(
+  values: Array<string | null | undefined>,
+): string[] {
+  const seen = new Set<string>();
+  const codes: string[] = [];
+  for (const value of values) {
+    const code = value?.trim().toUpperCase();
+    if (!code || seen.has(code)) continue;
+    seen.add(code);
+    codes.push(code);
+  }
+  return codes;
+}
+
+function primaryPositionCodesForGrouping(
+  player: Pick<LivePlayer, "positions" | "bestCalculatedPosition">,
+): string[] {
+  return collectPositionCodes([
+    player.bestCalculatedPosition,
+    ...(player.positions ?? []),
+  ]);
+}
+
+function positionCodesForGrouping(
+  player: Pick<LivePlayer, "positions" | "secondaryPositions" | "bestCalculatedPosition">,
+): string[] {
+  const primary = primaryPositionCodesForGrouping(player);
+  if (primary.length > 0) return primary;
+  return collectPositionCodes(player.secondaryPositions ?? []);
+}
+
+function groupForPositionCode(code: string): PositionGroup | null {
+  return POSITION_CODE_GROUP[code] ?? null;
+}
+
+/** Group by best position slot only; secondaries are display-only unless no primary exists. */
+export function groupPlayerPosition(
+  player: Pick<LivePlayer, "positions" | "secondaryPositions" | "bestCalculatedPosition">,
+): PositionGroup {
+  const codes = positionCodesForGrouping(player);
+  for (const group of GROUP_MATCH_ORDER) {
+    if (codes.some((code) => groupForPositionCode(code) === group)) {
+      return group;
+    }
+  }
   return "Utility / other players";
+}
+
+/** FM team object label for squad tabs — in-game name only; never invent Senior/Youth/Reserves. */
+export function squadTeamDisplayName(
+  team: Pick<LiveClubTeam, "name" | "teamUid">,
+): string {
+  const trimmed = team.name.trim();
+  if (trimmed) return trimmed;
+  return `Team ${team.teamUid}`;
+}
+
+/** Squad desk tab label — display name only (status counts live on filters). */
+export function squadTeamTabLabel(
+  team: Pick<LiveClubTeam, "name" | "teamUid">,
+): string {
+  return squadTeamDisplayName(team);
+}
+
+const SQUAD_UNIT_SORT: Record<SquadUnit, number> = {
+  firstTeam: 0,
+  under19s: 1,
+  reserves: 2,
+};
+
+export function sortClubTeamsForSquadDesk(teams: LiveClubTeam[]): LiveClubTeam[] {
+  return [...teams].sort((left, right) => {
+    const unit = SQUAD_UNIT_SORT[left.squadUnit] - SQUAD_UNIT_SORT[right.squadUnit];
+    if (unit !== 0) return unit;
+    if (right.rosterLen !== left.rosterLen) return right.rosterLen - left.rosterLen;
+    return squadTeamDisplayName(left).localeCompare(squadTeamDisplayName(right));
+  });
 }
 
 export function groupSquad(players: LivePlayer[]) {

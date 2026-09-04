@@ -1,22 +1,13 @@
 "use client";
 
-import { ChevronDown, Cpu, Database, GitBranch, LockKeyhole, RefreshCw, Sigma } from "lucide-react";
+import { ChevronDown, Cpu, Database, GitBranch, LockKeyhole, RefreshCw, Sigma, Users } from "lucide-react";
 import type { LiveFootballSnapshot } from "@/domain/adapters";
-import {
-  captureMappingEvidence,
-  compareMappingEvidence,
-  getMappingLabStatus,
-  type MappingLabCaptureResult,
-  type MappingLabComparisonResult,
-  type MappingLabStatus,
-} from "@/domain/adapters";
 import { FRONTEND_CALCULATION_CARDS } from "@/domain/has-score";
+import { sortClubTeamsForSquadDesk, squadTeamDisplayName } from "@/domain/live-data";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { GraphicsPacksPanel } from "@/components/graphics-packs-panel";
-import { AttrColorsPanel } from "@/components/attr-colors-panel";
 import { getVersion } from "@tauri-apps/api/app";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 function readable(value: string | null | undefined) {
   if (!value) return "None";
@@ -41,6 +32,12 @@ function frontendCalculationsSummary() {
   return `${live} live`;
 }
 
+function memorySafetyLabel(access: string) {
+  if (access === "not_checked") return "Not checked";
+  if (access.includes("read")) return "Read-only";
+  return readable(access);
+}
+
 export function SettingsScreen({
   snapshot,
   checking,
@@ -52,41 +49,23 @@ export function SettingsScreen({
 }) {
   const status = snapshot.status;
   const pipeline = status.readPipeline ?? [];
-  const [mappingLab, setMappingLab] = useState<MappingLabStatus | null>(null);
-  const [mappingTarget, setMappingTarget] = useState("");
-  const [mappingLabel, setMappingLabel] = useState("");
-  const [capture, setCapture] = useState<MappingLabCaptureResult | null>(null);
-  const [captureError, setCaptureError] = useState<string | null>(null);
-  const [firstSnapshot, setFirstSnapshot] = useState("");
-  const [secondSnapshot, setSecondSnapshot] = useState("");
-  const [comparison, setComparison] = useState<MappingLabComparisonResult | null>(null);
   const [appVersion, setAppVersion] = useState<string | null>(null);
-
-  useEffect(() => {
-    getMappingLabStatus().then(setMappingLab).catch(() => setMappingLab(null));
-  }, []);
+  const clubTeams = useMemo(
+    () =>
+      sortClubTeamsForSquadDesk(
+        (snapshot.clubTeams ?? []).filter(
+          (team) => team.rosterLen > 0 || team.isManagerTeam,
+        ),
+      ),
+    [snapshot.clubTeams],
+  );
+  const connected =
+    snapshot.status.state === "connected" && Boolean(snapshot.managedClubId);
 
   useEffect(() => {
     if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return;
     getVersion().then(setAppVersion).catch(() => setAppVersion(null));
   }, []);
-
-  const captureEvidence = async () => {
-    setCaptureError(null);
-    try {
-      setCapture(await captureMappingEvidence(mappingTarget, mappingLabel));
-    } catch (error) {
-      setCaptureError(error instanceof Error ? error.message : String(error));
-    }
-  };
-  const compareEvidence = async () => {
-    setCaptureError(null);
-    try {
-      setComparison(await compareMappingEvidence(firstSnapshot, secondSnapshot));
-    } catch (error) {
-      setCaptureError(error instanceof Error ? error.message : String(error));
-    }
-  };
 
   return (
     <main className="screen settings-screen">
@@ -101,9 +80,15 @@ export function SettingsScreen({
       </div>
       <section className="settings-list">
         <article><Database /><div><strong>Active FM26 game</strong><span>{status.processDetected ? "Football Manager 26 detected" : "Waiting for FM26"}</span></div><Button variant="outline" onClick={onRefresh} disabled={checking}><RefreshCw data-icon="inline-start" className={checking ? "spin" : undefined} />Load Active Save</Button></article>
-        <article><LockKeyhole /><div><strong>Memory safety</strong><span>Query and read access only. FMT cannot write to FM26.</span></div><b>{status.memoryAccess.replaceAll("_", " ")}</b></article>
+        <article>
+          <LockKeyhole />
+          <div>
+            <strong>Memory safety</strong>
+            <span>Query and read access only. FMT cannot write to FM26.</span>
+          </div>
+          <b>{memorySafetyLabel(status.memoryAccess)}</b>
+        </article>
         <GraphicsPacksPanel />
-        <AttrColorsPanel />
 
         <details className="settings-expand" id="backend-read-pipeline">
           <summary>
@@ -128,16 +113,10 @@ export function SettingsScreen({
               )) : (
                 <article data-state="pending">
                   <span>Pending</span>
-                  <strong>No pipeline yet</strong>
-                  <p>Run the active-save read to collect backend stage diagnostics.</p>
+                  <strong>Compact squad load</strong>
+                  <p>Run the active-save read to load managed-club squads from live memory.</p>
                 </article>
               )}
-            </div>
-            <div className="settings-expand-actions">
-              <Button variant="outline" onClick={onRefresh} disabled={checking}>
-                <RefreshCw data-icon="inline-start" className={checking ? "spin" : undefined} />
-                Re-run read
-              </Button>
             </div>
           </div>
         </details>
@@ -166,11 +145,41 @@ export function SettingsScreen({
             </div>
           </div>
         </details>
+
+        <details className="settings-expand" id="club-team-roster-lens">
+          <summary>
+            <Users aria-hidden="true" />
+            <div>
+              <strong>Club team roster lengths</strong>
+              <span>FM vector rosterLen per Club.Teams entry (dev)</span>
+            </div>
+            <span className="settings-expand-meta">
+              <b>{connected && clubTeams.length ? `${clubTeams.length} teams` : "—"}</b>
+              <ChevronDown className="settings-expand-chevron" aria-hidden="true" />
+            </span>
+          </summary>
+          <div className="settings-expand-body">
+            {connected && clubTeams.length ? (
+              <dl className="settings-club-roster-lens">
+                {clubTeams.map((team) => (
+                  <div key={team.teamUid}>
+                    <dt>{squadTeamDisplayName(team)}</dt>
+                    <dd>{team.rosterLen}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : (
+              <p className="settings-club-roster-empty">
+                Load an active save to see Club.Teams rosterLen values.
+              </p>
+            )}
+          </div>
+        </details>
       </section>
 
-      <details className="advanced-diagnostics">
+        <details className="advanced-diagnostics">
         <summary><span><Cpu />Advanced diagnostics</span><ChevronDown /></summary>
-        <p>Technical connection and visibility-gate details for troubleshooting supported FM26 builds.</p>
+        <p>Technical connection details for troubleshooting supported FM26 builds.</p>
         <dl>
           <div><dt>Process</dt><dd>{status.processDetected ? `Detected · PID ${status.processId}` : "Not detected"}</dd></div>
           <div><dt>Executable</dt><dd>{status.processPath ?? "Unavailable"}</dd></div>
@@ -188,44 +197,14 @@ export function SettingsScreen({
           <div><dt>Active manager</dt><dd>{status.savePointer ?? "Unavailable"}</dd></div>
           <div><dt>Managed club</dt><dd>{status.managedClubPointer ?? "Unavailable"}</dd></div>
           <div><dt>Squad collection</dt><dd>{status.playerCollectionPointer ?? "Unavailable"}</dd></div>
-          <div><dt>Database index</dt><dd>{status.databaseIndexStatus.replaceAll("_", " ")}</dd></div>
-          <div><dt>Database scope</dt><dd>{status.databaseScope.replaceAll("-", " ")}</dd></div>
-          <div><dt>Managed squad players</dt><dd>{status.managedSquadPlayers}</dd></div>
-          <div><dt>Player records indexed</dt><dd>{status.databasePlayersIndexed}</dd></div>
-          <div><dt>Background records gated</dt><dd>{status.backgroundPlayersIndexed}</dd></div>
-          <div><dt>Readable player profiles</dt><dd>{status.visiblePlayersLoaded}</dd></div>
-          <div><dt>Fully scouted players</dt><dd>{status.fullyScoutedPlayers}</dd></div>
-          <div><dt>Partial scout reports</dt><dd>{status.partialScoutReports}</dd></div>
-          <div><dt>Live memory tactic read</dt><dd>{status.liveMemoryTacticRead ?? "disabled"}</dd></div>
-          <div><dt>Tactic manager</dt><dd>{status.tacticManagerPointer ?? "Unavailable"}</dd></div>
-          <div><dt>Tactic source</dt><dd>{snapshot.tacticSource.replaceAll("_", " ")}</dd></div>
+          <div><dt>Load scope</dt><dd>{status.databaseScope.replaceAll("-", " ")}</dd></div>
+          <div><dt>Squad players loaded</dt><dd>{status.managedSquadPlayers}</dd></div>
+          <div><dt>Club employees</dt><dd>{status.clubEmployees || status.managedSquadPlayers}</dd></div>
           <div><dt>Last successful read</dt><dd>{readable(status.lastSuccessfulRead)}</dd></div>
           <div><dt>Failure stage</dt><dd>{readable(status.failureStage)}</dd></div>
           <div><dt>Windows error</dt><dd>{status.windowsErrorCode ?? "None"}</dd></div>
           <div className="diagnostic-hash"><dt>Executable SHA-256</dt><dd>{status.executableSha256 ?? "Unavailable"}</dd></div>
         </dl>
-        <section className="mapping-coverage">
-          <header><strong>Exact-build mapping coverage</strong><span>Only validated fields enter the live product.</span></header>
-          {(status.mappingCoverage ?? []).map((item) => (
-            <article key={item.section}>
-              <strong>{item.section}</strong>
-              <span className="coverage-good">{item.validated} validated</span>
-              <span className="coverage-watch">{item.candidate} candidates</span>
-              <span>{item.unmapped} unmapped</span>
-            </article>
-          ))}
-        </section>
-        {mappingLab?.enabled ? (
-          <section className="mapping-lab-panel">
-            <header><strong>Developer Mapping Lab</strong><span>Read-only · bounded to {mappingLab.maximumWindowBytes} bytes per object</span></header>
-            <p>{mappingLab.message}</p>
-            <div><Input aria-label="Mapping player" placeholder="Exact player name or FM ID" value={mappingTarget} onChange={(event) => setMappingTarget(event.target.value)} /><Input aria-label="Mapping evidence label" placeholder="Controlled state label" value={mappingLabel} onChange={(event) => setMappingLabel(event.target.value)} /><Button variant="outline" disabled={!mappingTarget.trim()} onClick={captureEvidence}>Capture local evidence</Button></div>
-            {capture ? <small>Saved {capture.windowsCaptured} windows ({capture.bytesCaptured} bytes) to {capture.evidenceFile}</small> : null}
-            <div><Input aria-label="First snapshot ID" placeholder="First snapshot ID" value={firstSnapshot} onChange={(event) => setFirstSnapshot(event.target.value)} /><Input aria-label="Second snapshot ID" placeholder="Second snapshot ID" value={secondSnapshot} onChange={(event) => setSecondSnapshot(event.target.value)} /><Button variant="outline" disabled={!firstSnapshot || !secondSnapshot} onClick={compareEvidence}>Compare snapshots</Button></div>
-            {comparison ? <small>Diff: {comparison.changedBytes} changed, {comparison.unchangedBytes} unchanged bytes. Evidence: {comparison.evidenceFile}</small> : null}
-            {captureError ? <small className="mapping-lab-error">{captureError}</small> : null}
-          </section>
-        ) : null}
         <div className="advanced-diagnostic-message"><strong>Connector result</strong><span>{status.message}</span></div>
       </details>
     </main>

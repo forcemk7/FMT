@@ -1,13 +1,23 @@
 import { describe, expect, it } from "vitest";
 import {
   countAtClubSquadUnit,
+  countClubEmployees,
+  countClubEmployeesAtClub,
+  countClubEmployeesOnLoan,
+  countSquadTeamRoster,
   gmAdvice,
   GM_DEVELOPMENT_AGE_MAX,
+  groupPlayerPosition,
+  isAtClubEmployee,
   isAtClubSquadPlayer,
+  isAtClubTeamPlayer,
   isHoydProspect,
   isLoanedOutSquadPlayer,
   MOVE_ON_HEADROOM_MAX,
+  playerMatchesSquadRosterFilters,
+  sortClubTeamsForSquadDesk,
   squadMedianCA,
+  squadTeamTabLabel,
 } from "./live-data";
 
 describe("isAtClubSquadPlayer", () => {
@@ -39,6 +49,161 @@ describe("isAtClubSquadPlayer", () => {
     expect(isAtClubSquadPlayer({ clubId: "920", loanedOut: false }, null)).toBe(
       false,
     );
+  });
+
+  it("keeps B-team affiliate reserves at club when loanedOut is false", () => {
+    expect(
+      isAtClubSquadPlayer(
+        { clubId: "920", loanedOut: false, squadUnit: "reserves", squadTeamUid: "3609393" },
+        "920",
+        "reserves",
+      ),
+    ).toBe(true);
+    expect(
+      isAtClubTeamPlayer(
+        { clubId: "920", loanedOut: false, squadTeamUid: "3609393" },
+        "920",
+        "3609393",
+      ),
+    ).toBe(true);
+  });
+});
+
+describe("isAtClubEmployee", () => {
+  it("keeps managed at-club players in any squad unit", () => {
+    expect(
+      isAtClubEmployee({ clubId: "920", loanedOut: false }, "920"),
+    ).toBe(true);
+    expect(
+      isAtClubEmployee({ clubId: "920", loanedOut: false, squadUnit: "under19s" } as never, "920"),
+    ).toBe(true);
+    expect(isAtClubEmployee({ clubId: "920", loanedOut: null }, "920")).toBe(true);
+  });
+
+  it("drops outgoing loans and other clubs", () => {
+    expect(isAtClubEmployee({ clubId: "920", loanedOut: true }, "920")).toBe(false);
+    expect(isAtClubEmployee({ clubId: "912", loanedOut: false }, "920")).toBe(false);
+    expect(isAtClubEmployee({ clubId: "920", loanedOut: false }, null)).toBe(false);
+  });
+});
+
+describe("countClubEmployees", () => {
+  it("counts all managed-club rows regardless of loan or unit", () => {
+    const players = [
+      { clubId: "920", loanedOut: false, squadUnit: "firstTeam" as const },
+      { clubId: "920", loanedOut: true, squadUnit: "under19s" as const },
+      { clubId: "912", loanedOut: false, squadUnit: "under19s" as const },
+    ];
+    expect(countClubEmployees(players, "920")).toBe(2);
+  });
+});
+
+describe("groupPlayerPosition", () => {
+  it("maps sweeper primary to centre-backs", () => {
+    expect(groupPlayerPosition({ positions: ["SW"], secondaryPositions: [] } as never)).toBe(
+      "Centre-backs",
+    );
+  });
+
+  it("maps MR primary to wingers", () => {
+    expect(
+      groupPlayerPosition({ positions: ["MR"], secondaryPositions: ["AMR"], bestCalculatedPosition: "MR" } as never),
+    ).toBe("Wingers");
+  });
+
+  it("uses secondary MR when best calculated slot is unmapped", () => {
+    expect(
+      groupPlayerPosition({ positions: [], secondaryPositions: ["MR"], bestCalculatedPosition: null } as never),
+    ).toBe("Wingers");
+  });
+
+  it("groups by primary DM even when CB and LB are secondaries", () => {
+    expect(
+      groupPlayerPosition({
+        positions: ["DM"],
+        secondaryPositions: ["CB", "LB"],
+        bestCalculatedPosition: "DM",
+      } as never),
+    ).toBe("Defensive midfielders");
+  });
+});
+
+describe("squadTeamTabLabel", () => {
+  it("uses the in-game team name only", () => {
+    expect(squadTeamTabLabel({ name: "FC Schalke 04 U19", teamUid: "1" })).toBe(
+      "FC Schalke 04 U19",
+    );
+  });
+
+  it("falls back to team uid when FM team name is empty", () => {
+    expect(squadTeamTabLabel({ name: "  ", teamUid: "2000069496" })).toBe(
+      "Team 2000069496",
+    );
+  });
+});
+
+describe("countSquadTeamRoster", () => {
+  it("counts at-club, loaned in, and loaned out on the same team roster", () => {
+    const players = [
+      { clubId: "920", squadTeamUid: "1", loanedOut: false, loanedIn: false },
+      { clubId: "920", squadTeamUid: "1", loanedOut: true, loanedIn: false },
+      { clubId: "920", squadTeamUid: "1", loanedOut: false, loanedIn: true },
+      { clubId: "920", squadTeamUid: "2", loanedOut: false, loanedIn: false },
+    ];
+    expect(countSquadTeamRoster(players, "920", "1")).toEqual({
+      atClub: 1,
+      loanedIn: 1,
+      loanedOut: 1,
+    });
+  });
+});
+
+describe("playerMatchesSquadRosterFilters", () => {
+  it("keeps players whose status is enabled", () => {
+    const atClub = { clubId: "920", loanedOut: false, loanedIn: false };
+    const loanedIn = { clubId: "920", loanedOut: false, loanedIn: true };
+    const loanedOut = { clubId: "920", loanedOut: true, loanedIn: false };
+    expect(
+      playerMatchesSquadRosterFilters(atClub, "920", new Set(["atClub"])),
+    ).toBe(true);
+    expect(
+      playerMatchesSquadRosterFilters(loanedIn, "920", new Set(["atClub"])),
+    ).toBe(false);
+    expect(
+      playerMatchesSquadRosterFilters(
+        loanedOut,
+        "920",
+        new Set(["loanedOut", "loanedIn"]),
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects other clubs and empty filter sets", () => {
+    expect(
+      playerMatchesSquadRosterFilters(
+        { clubId: "912", loanedOut: false, loanedIn: false },
+        "920",
+        new Set(["atClub"]),
+      ),
+    ).toBe(false);
+    expect(
+      playerMatchesSquadRosterFilters(
+        { clubId: "920", loanedOut: false, loanedIn: false },
+        "920",
+        new Set(),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("sortClubTeamsForSquadDesk", () => {
+  it("orders senior before youth before reserves", () => {
+    const sorted = sortClubTeamsForSquadDesk([
+      { name: "Res", squadUnit: "reserves", rosterLen: 8, teamUid: "3", isManagerTeam: false },
+      { name: "U19", squadUnit: "under19s", rosterLen: 22, teamUid: "2", isManagerTeam: false },
+      { name: "Senior", squadUnit: "firstTeam", rosterLen: 28, teamUid: "1", isManagerTeam: true },
+    ]);
+    expect(sorted.map((team) => team.squadUnit)).toEqual(["firstTeam", "under19s", "reserves"]);
   });
 });
 
