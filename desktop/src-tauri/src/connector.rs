@@ -232,7 +232,10 @@ pub fn run_debug_probe_affiliate_flags() -> Result<Value, String> {
     debug_probe_affiliate_flags_impl()
 }
 
-#[cfg(all(feature = "probe", target_os = "windows"))]
+#[cfg(all(
+    any(feature = "probe", feature = "affiliate_flags_probe"),
+    target_os = "windows"
+))]
 pub fn run_debug_scan_club_teams() -> Result<Value, String> {
     debug_scan_club_teams_impl()
 }
@@ -1334,7 +1337,10 @@ fn debug_probe_club_team_anchors_impl() -> Result<Value, String> {
     Ok(report)
 }
 
-#[cfg(all(feature = "probe", target_os = "windows"))]
+#[cfg(all(
+    any(feature = "probe", feature = "affiliate_flags_probe"),
+    target_os = "windows"
+))]
 fn debug_scan_club_teams_impl() -> Result<Value, String> {
     let Some((process_id, _)) = find_fm26_process() else {
         return Err("FM26 process not found.".to_string());
@@ -1838,24 +1844,18 @@ fn probe_team_roster_identities(
             entries.push(json!({ "slot": index, "reject": "empty_player_pointer" }));
             continue;
         };
-        let Some(person) = resolve_person_address(reader, raw_player, profile) else {
-            let mut fallback = json!({
+        let Some(resolved) = resolve_person_and_player_base(reader, raw_player, profile) else {
+            let vtable = reader.read_pointer(raw_player);
+            entries.push(json!({
                 "slot": index,
                 "rawPlayerPointer": hex_address(raw_player),
-                "reject": "person_unresolved",
-            });
-            if let Some(uid) = reader
-                .read_u32(raw_player + profile.constants.entity_uid_offset)
-                .filter(|uid| is_plausible_fm_unique_id(*uid))
-            {
-                fallback["playerUidDirect"] = json!(uid);
-                let (name, name_source) = resolve_managed_squad_name(reader, raw_player, profile, uid);
-                fallback["name"] = json!(name);
-                fallback["nameSource"] = json!(name_source);
-            }
-            entries.push(fallback);
+                "vtable": vtable.map(hex_address),
+                "reject": "non_person_roster_slot",
+                "note": "FSS person-class/PLAO resolve failed; shared module vtable slots are non-player roster entries, not silent First XI drops",
+            }));
             continue;
         };
+        let person = resolved.person;
         let uid = reader
             .read_u32(person + profile.constants.entity_uid_offset)
             .filter(|uid| is_plausible_fm_unique_id(*uid));
@@ -1865,6 +1865,9 @@ fn probe_team_roster_identities(
         entries.push(json!({
             "slot": index,
             "rawPlayerPointer": hex_address(raw_player),
+            "personPointer": hex_address(person),
+            "playerBasePointer": hex_address(resolved.player_base),
+            "personClassDelta": person.wrapping_sub(resolved.player_base),
             "playerUid": uid,
             "name": name,
             "nameSource": name_source,
@@ -2079,16 +2082,22 @@ fn push_squad_player_from_raw(
         }
     };
     player_vtable.get_or_insert(vtable);
-    let person = match resolve_person_address(reader, raw_player, profile) {
+    let resolved = match resolve_person_and_player_base(reader, raw_player, profile) {
         Some(value) => value,
         None => {
             *skipped_squad_slots += 1;
+            let vtable = reader
+                .read_pointer(raw_player)
+                .map(hex_address)
+                .unwrap_or_else(|| "unreadable".to_string());
             skipped_squad_details.push(format!(
-                "{slot_label}: person object not resolved @ {raw_player:#x}"
+                "{slot_label}: non-person roster slot @ {raw_player:#x} (vtable {vtable})"
             ));
             return;
         }
     };
+    let person = resolved.person;
+    let player_base = resolved.player_base;
     let uid = match reader
         .read_u32(person + profile.constants.entity_uid_offset)
         .filter(|uid| is_plausible_fm_unique_id(*uid))
@@ -2103,7 +2112,7 @@ fn push_squad_player_from_raw(
         }
     };
     let position_bytes = match reader.read_bytes(
-        raw_player + profile.constants.player_positions_offset,
+        player_base + profile.constants.player_positions_offset,
         POSITION_NAMES.len(),
     ) {
         Some(bytes) => bytes,
@@ -2127,7 +2136,7 @@ fn push_squad_player_from_raw(
         return;
     }
     let attribute_bytes = match reader.read_bytes(
-        raw_player + profile.constants.player_attributes_offset,
+        player_base + profile.constants.player_attributes_offset,
         PLAYER_ATTRIBUTE_NAMES.len(),
     ) {
         Some(bytes) => bytes,
@@ -2154,7 +2163,7 @@ fn push_squad_player_from_raw(
     let goalkeeper_rating = goalkeeper_rating_from_positions(&position_bytes);
     let birth_date = read_fm_date(reader, person + profile.constants.person_birth_date_offset);
     let own_current_date =
-        read_fm_date(reader, raw_player + profile.constants.player_current_date_offset);
+        read_fm_date(reader, player_base + profile.constants.player_current_date_offset);
     let current_date = own_current_date.or(squad_game_date);
     let age = birth_date
         .zip(current_date)
@@ -2176,16 +2185,16 @@ fn push_squad_player_from_raw(
         .unwrap_or_default();
     let personality_attributes = personality_attribute_map(&personality_bytes);
     let current_ability = reader
-        .read_u16(raw_player + profile.constants.player_ca_offset)
+        .read_u16(player_base + profile.constants.player_ca_offset)
         .filter(|value| (1..=200).contains(value));
     let potential_ability = reader
-        .read_u16(raw_player + profile.constants.player_pa_offset)
+        .read_u16(player_base + profile.constants.player_pa_offset)
         .filter(|value| (1..=200).contains(value));
     let left_foot = display_attribute(attribute_bytes[24]);
     let right_foot = display_attribute(attribute_bytes[25]);
     let preferred_foot = preferred_foot_label(left_foot, right_foot);
     let height_cm = reader
-        .read_bytes(raw_player + profile.constants.player_height_offset, 1)
+        .read_bytes(player_base + profile.constants.player_height_offset, 1)
         .and_then(|bytes| bytes.first().copied())
         .filter(|value| (140..=220).contains(value));
     let ability_score = calculated_position
@@ -2583,11 +2592,16 @@ fn extract_live_data(
                 else {
                     continue;
                 };
-                if let Some(date) =
-                    read_fm_date(reader, raw_player + profile.constants.player_current_date_offset)
+                if let Some(resolved) =
+                    resolve_person_and_player_base(reader, raw_player, profile)
                 {
-                    squad_game_date = Some(date);
-                    break;
+                    if let Some(date) = read_fm_date(
+                        reader,
+                        resolved.player_base + profile.constants.player_current_date_offset,
+                    ) {
+                        squad_game_date = Some(date);
+                        break;
+                    }
                 }
             }
         }
@@ -3000,6 +3014,24 @@ fn is_plausible_fm_unique_id(uid: u32) -> bool {
     (20_000_000..=99_999_999).contains(&uid) || (1_900_000_000..=2_200_000_000).contains(&uid)
 }
 
+/// FSS / AppCake person-class dynamic offsets. Player block (entity-map player_*) = PLAO =
+/// `person − class_offset`. `playerPersonOffset` (648 / 0x288) is the Player class value.
+#[cfg(target_os = "windows")]
+const PERSON_CLASS_OFFSETS_FSS: &[u64] = &[
+    0x288, // Player
+    0x380, // PlayerStaff
+    0x100, // Staff
+    0x450, // HumanManager
+];
+
+#[cfg(target_os = "windows")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ResolvedSquadPerson {
+    person: u64,
+    /// Base for entity-map `player_*` offsets (FSS PLAO).
+    player_base: u64,
+}
+
 #[cfg(target_os = "windows")]
 fn is_heap_person_pointer(value: u64) -> bool {
     (0x10_000..0x0000_7FF0_0000_0000).contains(&value) && value.is_multiple_of(8)
@@ -3011,13 +3043,13 @@ fn person_identity_valid(
     person: u64,
     profile: &EntityMapProfile,
 ) -> bool {
-    let Some(uid) = reader
+    let Some(_uid) = reader
         .read_u32(person + profile.constants.entity_uid_offset)
         .filter(|uid| is_plausible_fm_unique_id(*uid))
     else {
         return false;
     };
-    if display_name(
+    display_name(
         read_name_field(
             reader,
             person + profile.constants.person_first_name_offset,
@@ -3032,10 +3064,160 @@ fn person_identity_valid(
         ),
     )
     .is_some()
+}
+
+#[cfg(target_os = "windows")]
+fn player_block_looks_readable(
+    reader: &mut ProcessReader,
+    player_base: u64,
+    profile: &EntityMapProfile,
+) -> bool {
+    if reader
+        .read_u16(player_base + profile.constants.player_ca_offset)
+        .is_some_and(|ca| (1..=200).contains(&ca))
     {
         return true;
     }
+    if let Some(bytes) = reader.read_bytes(
+        player_base + profile.constants.player_positions_offset,
+        POSITION_NAMES.len(),
+    ) {
+        return position_bytes_issue(&bytes).is_none();
+    }
     false
+}
+
+#[cfg(target_os = "windows")]
+fn person_class_offsets(profile: &EntityMapProfile) -> Vec<u64> {
+    let mut offsets = Vec::with_capacity(PERSON_CLASS_OFFSETS_FSS.len() + 1);
+    offsets.push(profile.constants.player_person_offset);
+    for &offset in PERSON_CLASS_OFFSETS_FSS {
+        if !offsets.contains(&offset) {
+            offsets.push(offset);
+        }
+    }
+    offsets
+}
+
+#[cfg(target_os = "windows")]
+fn try_resolve_from_plao(
+    reader: &mut ProcessReader,
+    player_base: u64,
+    class_offset: u64,
+    profile: &EntityMapProfile,
+) -> Option<ResolvedSquadPerson> {
+    let person = player_base.saturating_add(class_offset);
+    if person_identity_valid(reader, person, profile) {
+        return Some(ResolvedSquadPerson {
+            person,
+            player_base,
+        });
+    }
+    if let Some(person_pointer) = reader
+        .read_pointer(person)
+        .filter(|value| is_heap_person_pointer(*value))
+    {
+        if person_identity_valid(reader, person_pointer, profile) {
+            return Some(ResolvedSquadPerson {
+                person: person_pointer,
+                player_base,
+            });
+        }
+    }
+    None
+}
+
+/// Resolve roster `raw_player` → person + PLAO using FSS person-class offsets.
+///
+/// Team player vectors usually store PLAO (Player @ +0x288). Some slots store Person
+/// or PlayerStaff PLAO (+0x380); the old resolver only tried `raw + playerPersonOffset`
+/// and a scan that started at that offset, so First XI PlayerStaff / person pointers
+/// became silent `person_unresolved` drops.
+#[cfg(target_os = "windows")]
+fn resolve_person_and_player_base(
+    reader: &mut ProcessReader,
+    raw_player: u64,
+    profile: &EntityMapProfile,
+) -> Option<ResolvedSquadPerson> {
+    let class_offsets = person_class_offsets(profile);
+
+    for &class_offset in &class_offsets {
+        if let Some(resolved) = try_resolve_from_plao(reader, raw_player, class_offset, profile) {
+            return Some(resolved);
+        }
+    }
+
+    if person_identity_valid(reader, raw_player, profile) {
+        for &class_offset in &class_offsets {
+            let player_base = raw_player.saturating_sub(class_offset);
+            if player_base == 0 || !is_heap_person_pointer(player_base) {
+                continue;
+            }
+            if player_block_looks_readable(reader, player_base, profile) {
+                return Some(ResolvedSquadPerson {
+                    person: raw_player,
+                    player_base,
+                });
+            }
+        }
+        if player_block_looks_readable(reader, raw_player, profile) {
+            return Some(ResolvedSquadPerson {
+                person: raw_player,
+                player_base: raw_player,
+            });
+        }
+    }
+
+    let scan_end = 1024u64.saturating_sub(16);
+    let mut offset = 0u64;
+    while offset <= scan_end {
+        let candidate = raw_player.saturating_add(offset);
+        if person_identity_valid(reader, candidate, profile) {
+            if class_offsets.contains(&offset) {
+                return Some(ResolvedSquadPerson {
+                    person: candidate,
+                    player_base: raw_player,
+                });
+            }
+            for &class_offset in &class_offsets {
+                let player_base = candidate.saturating_sub(class_offset);
+                if player_base != 0
+                    && is_heap_person_pointer(player_base)
+                    && player_block_looks_readable(reader, player_base, profile)
+                {
+                    return Some(ResolvedSquadPerson {
+                        person: candidate,
+                        player_base,
+                    });
+                }
+            }
+            return Some(ResolvedSquadPerson {
+                person: candidate,
+                player_base: raw_player,
+            });
+        }
+        if let Some(person_pointer) = reader
+            .read_pointer(candidate)
+            .filter(|value| is_heap_person_pointer(*value))
+        {
+            if person_identity_valid(reader, person_pointer, profile) {
+                return Some(ResolvedSquadPerson {
+                    person: person_pointer,
+                    player_base: raw_player,
+                });
+            }
+            // Nested PLAO: roster slot points at a wrapper; inner pointer is the real player block.
+            for &class_offset in &class_offsets {
+                if let Some(resolved) =
+                    try_resolve_from_plao(reader, person_pointer, class_offset, profile)
+                {
+                    return Some(resolved);
+                }
+            }
+        }
+        offset += 8;
+    }
+    None
 }
 
 #[cfg(target_os = "windows")]
@@ -3044,28 +3226,7 @@ fn resolve_person_address(
     raw_player: u64,
     profile: &EntityMapProfile,
 ) -> Option<u64> {
-    let mapped = raw_player + profile.constants.player_person_offset;
-    if person_identity_valid(reader, mapped, profile) {
-        return Some(mapped);
-    }
-    if let Some(person_pointer) = reader
-        .read_pointer(mapped)
-        .filter(|value| is_heap_person_pointer(*value))
-    {
-        if person_identity_valid(reader, person_pointer, profile) {
-            return Some(person_pointer);
-        }
-    }
-    let scan_end = 1024u64.saturating_sub(16);
-    let mut offset = profile.constants.player_person_offset;
-    while offset <= scan_end {
-        let candidate = raw_player + offset;
-        if candidate != mapped && person_identity_valid(reader, candidate, profile) {
-            return Some(candidate);
-        }
-        offset += 8;
-    }
-    None
+    resolve_person_and_player_base(reader, raw_player, profile).map(|resolved| resolved.person)
 }
 
 #[cfg(target_os = "windows")]
@@ -3381,6 +3542,20 @@ mod tests {
             ),
             Some("under19s")
         );
+    }
+
+    #[test]
+    #[cfg(target_os = "windows")]
+    fn fss_person_class_offsets_match_entity_map_player_person() {
+        // FSS Player class dynamic offset == entity-map playerPersonOffset (PLAO = person − 0x288).
+        assert_eq!(super::PERSON_CLASS_OFFSETS_FSS[0], 0x288);
+        assert_eq!(super::PERSON_CLASS_OFFSETS_FSS[1], 0x380);
+        let profile = crate::fm26::offsets::embedded_entity_map_index()
+            .profiles
+            .first()
+            .expect("profile");
+        assert_eq!(profile.constants.player_person_offset, 0x288);
+        assert!(super::PERSON_CLASS_OFFSETS_FSS.contains(&profile.constants.player_person_offset));
     }
 
     #[test]

@@ -1,24 +1,21 @@
 ﻿# Status
 
-Last updated: 2026-09-04 (T207 done — Squad back restore)
+Last updated: 2026-09-04 (T205 done — FSS PLAO person resolve + honest non-person slots)
 
 ## Now
 
-**T205 in_progress (auto)** — fix roster `person_unresolved` drops via FSS person-class / PLAO on Club.Teams path.
-
 **T206 ready (P2)** — tab labels as in-game; TeamType + known team name fields when club-name collision.
 
-**Human FMLE A/B** — affiliate flags for separate-club II (after T205/T206).
+**Human FMLE A/B** — affiliate flags for separate-club II (after T206).
 
 **T190 parked** — Save ID in RAM before save-copy CA path.
 
-**Deferred:** T139 theme. T162 trophy cabinet. T124 quiet dev launch. Loop D full-world **load** still parked; archive `.cursor/rules/fm-live-read.mdc` is the knowledge store for T205/T206.
+**Deferred:** T139 theme. T162 trophy cabinet. T124 quiet dev launch. Loop D full-world **load** still parked; archive `.cursor/rules/fm-live-read.mdc` is the knowledge store.
 
 ## Board
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
-| T205 | Roster — fix person_unresolved drops (First XI) | in_progress | 1 | owner: auto |
 | T206 | Club.Teams — in-game team display names | ready | 2 | TeamType / name collision; no world index |
 | T190 | Development all-time from Progress Report CA strip | blocked | 2 | **parked** — need Save ID in RAM before `.fm` pick |
 | T124 | Quiet dev launch | ready | 9 | behind Loop A |
@@ -31,7 +28,7 @@ Last updated: 2026-09-04 (T207 done — Squad back restore)
 
 ## Recently done
 
-- **T207** Squad — restore team tab + scroll on profile Back
+- **T205** Roster — FSS person-class/PLAO resolve; non-person roster slots honest (not missing First XI)
 - **T204** Squad — status filters + rosterLen in Settings (tab paren counts → filter row)
 - **T203** RE — affiliate squad-tab flag bytes (FMLE A/B probe + diff; production unwired)
 - **T202** Squad face-cache freshness — remap `from=` / source mtime revalidation on warm

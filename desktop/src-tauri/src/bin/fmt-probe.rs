@@ -1,9 +1,9 @@
-//! RE probe CLI. T203 ships `affiliate-flags` only (FMLE A/B on link-vector structs).
+//! RE / QA probe CLI.
 
 use std::{env, io::Write, process::ExitCode};
 
 fn main() -> ExitCode {
-    let usage = "Usage: fmt-probe affiliate-flags\n  Dump managed-club @0x8E8 link structs for FMLE flag A/B.";
+    let usage = "Usage: fmt-probe <command>\n  affiliate-flags\n  club-teams";
     let Some(command) = env::args().nth(1) else {
         eprintln!("{usage}");
         return ExitCode::from(2);
@@ -13,6 +13,7 @@ fn main() -> ExitCode {
 
     let result = match command.as_str() {
         "affiliate-flags" => glassscout_fm26_lib::connector::run_debug_probe_affiliate_flags(),
+        "club-teams" => glassscout_fm26_lib::connector::run_debug_scan_club_teams(),
         other => {
             eprintln!("Unknown command '{other}'.\n{usage}");
             return ExitCode::from(2);
@@ -21,7 +22,10 @@ fn main() -> ExitCode {
 
     match result {
         Ok(value) => {
-            println!("{}", serde_json::to_string_pretty(&value).unwrap_or_else(|err| err.to_string()));
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&value).unwrap_or_else(|err| err.to_string())
+            );
             ExitCode::SUCCESS
         }
         Err(message) => {
