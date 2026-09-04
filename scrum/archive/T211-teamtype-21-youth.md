@@ -35,4 +35,4 @@ Loop A: Melbourne Victory FM shows **Youths** (15) under Club.Teams; FMT kept Fi
 - Mapped `21|22` → `under19s` + label `Youth` (22 moved from `reserves` so Youth shells share the youth unit).
 - Probe instrumentation: `rawClubTeamsBeforeClassify` on club-teams debug path.
 - Verified: `cargo test --lib team_type_` (3 ok); live Melbourne probe → kept Youth 15 `under19s`.
-- Commit: (filled after git)
+- Commit: `8a1d6bd`
