@@ -124,8 +124,8 @@ pub(crate) fn squad_unit_from_team_type(team_type: u8) -> Option<&'static str> {
         1 | 2 | 3 | 13 | 14 | 15 | 16 | 17 | 30 => Some("reserves"),
         // U23 / U21 / U19 / U18 / U20
         9 | 10 | 11 | 12 | 18 => Some("under19s"),
-        // Youth evaluation / intake shells
-        22 => Some("reserves"),
+        // Youth shells (FM26 Melbourne Youths = 21; FMScout-era 22 also Youth)
+        21 | 22 => Some("under19s"),
         _ => None,
     }
 }
@@ -150,7 +150,7 @@ pub(crate) fn team_type_display_label(team_type: u8) -> Option<&'static str> {
         16 => Some("Team 2"),
         17 => Some("Team 3"),
         18 => Some("U20"),
-        22 => Some("Youth"),
+        21 | 22 => Some("Youth"),
         30 => Some("Dutch Reserves"),
         _ => None,
     }
@@ -1576,7 +1576,8 @@ mod tests {
         assert_eq!(squad_unit_from_team_type(12), Some("under19s"));
         assert_eq!(squad_unit_from_team_type(1), Some("reserves"));
         assert_eq!(squad_unit_from_team_type(15), Some("reserves"));
-        assert_eq!(squad_unit_from_team_type(22), Some("reserves"));
+        assert_eq!(squad_unit_from_team_type(21), Some("under19s"));
+        assert_eq!(squad_unit_from_team_type(22), Some("under19s"));
         assert_eq!(squad_unit_from_team_type(255), None);
     }
 
@@ -1587,6 +1588,8 @@ mod tests {
         assert_eq!(team_type_display_label(11), Some("U19"));
         assert_eq!(team_type_display_label(12), Some("U18"));
         assert_eq!(team_type_display_label(15), Some("II"));
+        assert_eq!(team_type_display_label(21), Some("Youth"));
+        assert_eq!(team_type_display_label(22), Some("Youth"));
         assert_eq!(team_type_display_label(255), None);
     }
 

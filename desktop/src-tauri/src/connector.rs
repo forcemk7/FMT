@@ -1368,6 +1368,39 @@ fn debug_scan_club_teams_impl() -> Result<Value, String> {
         resolve_active_human_manager(&mut reader, module, profile, process_id, &mut diagnostics)
             .map_err(|failure| failure.message)?;
     let seeds = HashSet::from([selected.team]);
+    let seeds_vec: Vec<u64> = seeds.iter().copied().collect();
+    let heap_anchors = [selected.club, selected.team];
+    let raw_from_club: Vec<Value> = discover_teams_for_club(
+        &mut reader,
+        module,
+        profile,
+        selected.club,
+        selected.club_uid,
+        &heap_anchors,
+        &seeds_vec,
+    )
+    .into_iter()
+    .map(|team| {
+        let classified = classify_club_team_squad_unit(
+            Some(team.name.as_str()).filter(|value| !value.trim().is_empty()),
+            team.team,
+            selected.team,
+            team.team_uid,
+            selected.club_uid,
+            team.roster_len,
+            team.team_type,
+        );
+        json!({
+            "teamPointer": hex_address(team.team),
+            "teamUid": team.team_uid,
+            "name": team.name,
+            "rosterLen": team.roster_len,
+            "teamType": team.team_type,
+            "classifiedUnit": classified,
+            "kept": classified.is_some(),
+        })
+    })
+    .collect();
     let discovered = discover_managed_club_teams(
         &mut reader,
         module,
@@ -1385,8 +1418,8 @@ fn debug_scan_club_teams_impl() -> Result<Value, String> {
                 "teamPointer": hex_address(entry.team),
                 "teamUid": entry.team_uid,
                 "label": entry.name.clone(),
-                "nameAtClubNameOffset": entry.name,
                 "rosterLen": entry.roster_len,
+                "teamType": entry.team_type,
                 "classifiedUnit": entry.squad_unit,
                 "isManagerFirstTeam": entry.team == selected.team,
                 "rosterPlayers": probe_team_roster_identities(&mut reader, profile, entry.team),
@@ -1399,6 +1432,7 @@ fn debug_scan_club_teams_impl() -> Result<Value, String> {
         "managerName": selected.manager_name,
         "managerPickWarning": manager_pick_warning,
         "bytesRead": reader.bytes_read,
+        "rawClubTeamsBeforeClassify": raw_from_club,
         "teams": teams,
     }))
 }
