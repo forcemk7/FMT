@@ -260,6 +260,7 @@ export function normalizeLiveSnapshot(
   return {
     managedClubId: snapshot.managedClubId ?? null,
     managerName: snapshot.managerName ?? null,
+    gameDate: snapshot.gameDate ?? null,
     season: snapshot.season ?? null,
     clubs: snapshot.clubs ?? [],
     clubTeams: snapshot.clubTeams ?? [],
@@ -277,6 +278,8 @@ export type LiveFootballSnapshot = {
   status: LiveConnectorStatus;
   managedClubId: string | null;
   managerName: string | null;
+  /** In-game calendar date (YYYY-MM-DD) used for ages; null when current-date unread. */
+  gameDate: string | null;
   season: string | null;
   clubs: LiveClub[];
   clubTeams: LiveClubTeam[];
@@ -373,6 +376,7 @@ export const fm26LiveAdapter: FootballDataAdapter = {
         status: desktopRequiredStatus,
         managedClubId: null,
         managerName: null,
+        gameDate: null,
         season: null,
         clubs: [],
         clubTeams: [],
@@ -394,6 +398,7 @@ export const fm26LiveAdapter: FootballDataAdapter = {
         status: { ...desktopRequiredStatus, state: "access_denied", memoryAccess: "denied", message },
         managedClubId: null,
         managerName: null,
+        gameDate: null,
         season: null,
         clubs: [],
         clubTeams: [],

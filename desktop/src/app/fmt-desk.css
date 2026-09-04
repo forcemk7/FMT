@@ -254,7 +254,7 @@ body.fmt-shell .player-dossier,
 body.fmt-shell .settings-list,
 body.fmt-shell .screen-panel,
 body.fmt-shell .dash-widget,
-body.fmt-shell .advanced-diagnostics,
+body.fmt-shell .diagnostics,
 body.fmt-shell .read-pipeline-grid article {
   background: var(--panel) !important;
   border: 1px solid var(--hairline) !important;
@@ -580,16 +580,16 @@ body.fmt-shell .graphics-pack-grid .graphics-pack-path {
   word-break: break-all;
   white-space: pre-wrap;
 }
-body.fmt-shell .advanced-diagnostics summary span {
+body.fmt-shell .diagnostics summary span {
   color: var(--text);
 }
-body.fmt-shell .advanced-diagnostics dt {
+body.fmt-shell .diagnostics dt {
   color: var(--text-dim);
 }
-body.fmt-shell .advanced-diagnostics dd {
+body.fmt-shell .diagnostics dd {
   color: var(--text);
 }
-body.fmt-shell .advanced-diagnostics > p {
+body.fmt-shell .diagnostics > p {
   color: var(--text-muted);
 }
 body.fmt-shell .mapping-coverage > header {

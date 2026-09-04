@@ -71,6 +71,7 @@ const initialSnapshot: LiveFootballSnapshot = {
   status: initialStatus,
   managedClubId: null,
   managerName: null,
+  gameDate: null,
   season: null,
   clubs: [],
   players: [],

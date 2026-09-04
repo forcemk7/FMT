@@ -99,6 +99,8 @@ pub struct ConnectorSnapshot {
     status: ConnectorStatus,
     managed_club_id: Option<String>,
     manager_name: Option<String>,
+    /// Calendar date used for age (YYYY-MM-DD) from player/squad current-date.
+    game_date: Option<String>,
     season: Option<String>,
     clubs: Vec<Value>,
     club_teams: Vec<Value>,
@@ -154,6 +156,7 @@ struct ExtractionDiagnostics {
 struct LiveData {
     managed_club_id: String,
     manager_name: String,
+    game_date: Option<String>,
     season: Option<String>,
     clubs: Vec<Value>,
     club_teams: Vec<Value>,
@@ -434,6 +437,7 @@ fn empty_snapshot(mut status: ConnectorStatus, error: String) -> ConnectorSnapsh
         status,
         managed_club_id: None,
         manager_name: None,
+        game_date: None,
         season: None,
         clubs: Vec::new(),
         club_teams: Vec::new(),
@@ -853,6 +857,7 @@ fn collect_snapshot(progress: Option<&dyn Fn(&'static str)>) -> ConnectorSnapsho
                 status,
                 managed_club_id: Some(data.managed_club_id),
                 manager_name: Some(data.manager_name),
+                game_date: data.game_date,
                 season: data.season,
                 clubs: data.clubs,
                 club_teams: data.club_teams,
@@ -2210,6 +2215,7 @@ fn push_squad_player_from_raw(
         .zip(current_date)
         .and_then(|(birth, current)| calculate_age(birth, current));
     let date_of_birth = birth_date.and_then(format_fm_date);
+    let game_date = current_date.and_then(format_fm_date);
     let season = current_date.map(|date| {
         let next_year = date.year.saturating_add(1);
         format!("{}/{}", date.year, next_year % 100)
@@ -2305,6 +2311,7 @@ fn push_squad_player_from_raw(
         "id": player_id,
         "name": name.clone(),
         "_season": season,
+        "_gameDate": game_date,
         "age": age,
         "dateOfBirth": date_of_birth,
         "nationality": nationality.clone(),
@@ -2782,14 +2789,22 @@ fn extract_live_data(
     let database_scope = "managed-squad";
     let database_index_error: Option<String> = None;
 
-    let season = players
-        .first()
-        .and_then(|player| player.get("_season"))
-        .and_then(Value::as_str)
-        .map(str::to_string);
+    let game_date = players.iter().find_map(|player| {
+        player
+            .get("_gameDate")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+    });
+    let season = players.iter().find_map(|player| {
+        player
+            .get("_season")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+    });
     for player in &mut players {
         if let Some(object) = player.as_object_mut() {
             object.remove("_season");
+            object.remove("_gameDate");
         }
     }
     let tactic: Option<Value> = None;
@@ -2827,6 +2842,7 @@ fn extract_live_data(
     Ok(LiveData {
         managed_club_id: club_uid.to_string(),
         manager_name,
+        game_date,
         season,
         clubs,
         club_teams,

@@ -1,21 +1,24 @@
 ﻿# Status
 
-Last updated: 2026-09-04 (T211 done — TeamType 21 Youth)
+Last updated: 2026-09-04 (T213 done — Diagnostics + in-game date; T212 still in_progress)
 
 ## Now
 
-**Human:** Reload FMT on Melbourne — expect First 21 + Youth 15. Compare FM Youths 15. NPL still missing (affiliate, with Schalke II). Then next club QA.
+**T212** Load managed affiliate squads (II / NPL) — cursor-agent. Filter = Main+Permanent+Players Move Freely (Melbourne confirms same pattern). Wire into production Club.Teams path.
+
+**Human:** Melbourne NPL **PASS** (total 55). Load Schalke FM24Continue — expect First + U19 + II. NPL/II tab labels later.
 
 **T208** Five-band attr tones — Super deferred; await archive confirm.
 
 **T190 parked** — Save ID in RAM before save-copy CA path.
 
-**Deferred:** T210 Squad card/list density. T139 theme. T162 trophy cabinet. T124 quiet dev launch. Loop D full-world load parked.
+**Deferred:** T210 Squad card/list density. T139 theme. T162 trophy cabinet. T124 quiet dev launch. Empty Youth(0) tab. Loop D full-world load parked.
 
 ## Board
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
+| T212 | Load managed affiliate squads (II / NPL) | in_progress | 1 | cursor-agent — Main+Permanent+PMF |
 | T208 | Five-band attr tones + hot-amber super | in_progress | 2 | cursor-agent — Super deferred; await archive confirm |
 | T190 | Development all-time from Progress Report CA strip | blocked | 2 | **parked** |
 | T209 | Squad — roster status as single select | ready | 5 | after T208; multi→single |
@@ -30,6 +33,7 @@ Last updated: 2026-09-04 (T211 done — TeamType 21 Youth)
 
 ## Recently done
 
+- **T213** Diagnostics — rename, game date, load-order fields
 - **T211** Club.Teams — map TeamType 21 (Youth; Melbourne Youths 15)
 - **T206** Club.Teams — in-game team display names (TeamType when name equals club; keep real `… U19`)
 - **T207** Roster — load all First Team Players slots (UID floor; Liverpool 39=39)
