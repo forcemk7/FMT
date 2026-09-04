@@ -1,10 +1,12 @@
 ﻿# Status
 
-Last updated: 2026-09-04 (T200 done — Club.Teams + TeamType locked)
+Last updated: 2026-09-04 (T201 done — production load locked Club.Teams only)
 
 ## Now
 
-**Human verify T200** — load Schalke + Leicester (or any PL) with FM open: Squad `clubTeams` should list First + youth via Club.Teams; check `teamType` bytes vs FM labels. Separate-club German II still affiliate residual.
+**Human QA** — Schalke / Leicester / other saves: First + same-club youth via Club.Teams; no German II until affiliate-flag RE. Expect honest warning about separate-club reserves.
+
+**Next RE (not filed)** — Affiliate Main + Permanent + Players Move Freely → reserve club → Club.Teams (general, not Germany-only).
 
 **T190 parked** — blocked on RAM lock for Live Editor Save ID before save-copy CA path.
 
@@ -21,10 +23,11 @@ Last updated: 2026-09-04 (T200 done — Club.Teams + TeamType locked)
 
 ## Cancelled / superseded
 
-- **T199** Reserves — B-team affiliate rosters — **cancelled** (never filed). Controllable teams = Club.Teams + TeamType (T200).
+- **T199** Reserves — B-team affiliate rosters — **cancelled** (never filed). Controllable teams = Club.Teams + TeamType (T200). Separate-club II = future affiliate-flag ticket.
 
 ## Recently done
 
+- **T201** Production load — Club.Teams only; drop B-team heuristic + heap fallback; first-team-first order
 - **T200** Lock Club.Teams (`club+0x18/+0x20`) + TeamType (`team+0x28`); production vector-first team discovery
 - **T198** Club affiliate graph RE — `debug_scan_club_affiliates` forward/back links + relationship u32 candidates
 - **T196** U19 squad — GS full index on load + contract-team U19 promote + Squad subtabs

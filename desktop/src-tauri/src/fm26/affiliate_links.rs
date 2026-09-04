@@ -343,8 +343,8 @@ fn teams_for_club(
     profile: &EntityMapProfile,
     club: u64,
     club_uid: u32,
-    heap_anchors: &[u64],
-    extra_team_seeds: &[u64],
+    _heap_anchors: &[u64],
+    _extra_team_seeds: &[u64],
     alternate_link_clubs: &[(u64, u32)],
 ) -> Vec<AffiliateTeamDiscovery> {
     let mut link_clubs = vec![(club, club_uid)];
@@ -354,59 +354,8 @@ fn teams_for_club(
         }
     }
 
-    // Primary: Club.Teams vector (T200). Heap window is fallback only.
+    // Locked path only (T200/T201): Club.Teams MSVC vector. No heap-window fallback.
     let mut teams = teams_from_club_teams_vector(reader, module, profile, club, &link_clubs);
-    if !teams.is_empty() {
-        teams.sort_by(|left, right| {
-            right
-                .roster_len
-                .cmp(&left.roster_len)
-                .then_with(|| left.name.cmp(&right.name))
-        });
-        return teams;
-    }
-
-    let team_vtable = module.base + profile.constants.team_vtable_rva;
-    let mut candidate_teams = std::collections::HashSet::new();
-    candidate_teams.extend(extra_team_seeds.iter().copied());
-    seed_team_candidates_from_club_blob(reader, club, &mut candidate_teams);
-    let mut anchors: Vec<u64> = heap_anchors.to_vec();
-    anchors.push(club);
-    seed_team_candidates_near_anchors(reader, module, profile, &anchors, &mut candidate_teams);
-
-    let mut seen = std::collections::HashSet::new();
-    for team in candidate_teams {
-        if team == 0 || !seen.insert(team) {
-            continue;
-        }
-        if validator::validate_vtable(reader, team, team_vtable).is_err() {
-            continue;
-        }
-        let Some(linked_club) = reader
-            .read_pointer(team + profile.constants.team_club_offset)
-            .filter(|value| *value != 0)
-        else {
-            continue;
-        };
-        if !team_links_any_club(reader, profile, linked_club, &link_clubs) {
-            continue;
-        }
-        let Some(roster_len) = team_roster_len(reader, profile, team) else {
-            continue;
-        };
-        let team_uid = reader
-            .read_u32(team + profile.constants.entity_uid_offset)
-            .unwrap_or(0);
-        let name = read_team_display_name(reader, team, profile);
-        let team_type = reader.read_u8(team + profile.constants.team_type_offset);
-        teams.push(AffiliateTeamDiscovery {
-            team,
-            team_uid,
-            name,
-            roster_len,
-            team_type,
-        });
-    }
     teams.sort_by(|left, right| {
         right
             .roster_len
