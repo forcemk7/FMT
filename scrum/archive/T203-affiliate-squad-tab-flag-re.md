@@ -67,4 +67,4 @@ Same-club sides are locked (Club.Teams). Separate-club reserves (German II and e
 
 ### Commit
 
-_(SHA after commit)_
+`262300e` — T203: FMLE A/B probe for affiliate squad-tab flag bytes
