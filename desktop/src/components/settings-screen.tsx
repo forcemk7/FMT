@@ -59,6 +59,11 @@ export function SettingsScreen({
       ),
     [snapshot.clubTeams],
   );
+  const managedClubName = useMemo(() => {
+    const clubId = snapshot.managedClubId;
+    if (!clubId) return null;
+    return snapshot.clubs.find((club) => club.id === clubId)?.name ?? null;
+  }, [snapshot.clubs, snapshot.managedClubId]);
   const connected =
     snapshot.status.state === "connected" && Boolean(snapshot.managedClubId);
 
@@ -163,7 +168,7 @@ export function SettingsScreen({
               <dl className="settings-club-roster-lens">
                 {clubTeams.map((team) => (
                   <div key={team.teamUid}>
-                    <dt>{squadTeamDisplayName(team)}</dt>
+                    <dt>{squadTeamDisplayName(team, managedClubName)}</dt>
                     <dd>{team.rosterLen}</dd>
                   </div>
                 ))}

@@ -17,6 +17,7 @@ import {
   playerMatchesSquadRosterFilters,
   sortClubTeamsForSquadDesk,
   squadMedianCA,
+  squadTeamDisplayName,
   squadTeamTabLabel,
 } from "./live-data";
 
@@ -204,6 +205,39 @@ describe("sortClubTeamsForSquadDesk", () => {
       { name: "Senior", squadUnit: "firstTeam", rosterLen: 28, teamUid: "1", isManagerTeam: true },
     ]);
     expect(sorted.map((team) => team.squadUnit)).toEqual(["firstTeam", "under19s", "reserves"]);
+  });
+});
+
+describe("squadTeamDisplayName", () => {
+  it("keeps a distinct FM team string (Schalke U19)", () => {
+    expect(
+      squadTeamDisplayName(
+        { name: "FC Schalke 04 U19", teamUid: "2", teamType: 11 },
+        "FC Schalke 04",
+      ),
+    ).toBe("FC Schalke 04 U19");
+  });
+
+  it("disambiguates English club-name collisions via TeamType", () => {
+    expect(
+      squadTeamDisplayName({ name: "Liverpool", teamUid: "676", teamType: 0 }, "Liverpool"),
+    ).toBe("First Team");
+    expect(
+      squadTeamDisplayName({ name: "Liverpool", teamUid: "2", teamType: 10 }, "Liverpool"),
+    ).toBe("U21");
+    expect(
+      squadTeamDisplayName({ name: "liverpool", teamUid: "3", teamType: 12 }, "Liverpool"),
+    ).toBe("U18");
+  });
+
+  it("uses TeamType when the FM string is empty", () => {
+    expect(
+      squadTeamDisplayName({ name: "", teamUid: "99", teamType: 11 }, "Leicester City"),
+    ).toBe("U19");
+  });
+
+  it("falls back to Team uid when name and type are missing", () => {
+    expect(squadTeamDisplayName({ name: "", teamUid: "42" })).toBe("Team 42");
   });
 });
 

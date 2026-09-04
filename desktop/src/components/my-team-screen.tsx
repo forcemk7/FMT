@@ -320,6 +320,11 @@ export function MyTeamScreen({
       ),
     [snapshot.clubTeams],
   );
+  const managedClubName = useMemo(() => {
+    const clubId = snapshot.managedClubId;
+    if (!clubId) return null;
+    return snapshot.clubs.find((club) => club.id === clubId)?.name ?? null;
+  }, [snapshot.clubs, snapshot.managedClubId]);
   const rosterCountsByTeamUid = useMemo(() => {
     const counts = new Map<string, ReturnType<typeof countSquadTeamRoster>>();
     for (const team of clubTeams) {
@@ -579,7 +584,7 @@ export function MyTeamScreen({
                     setSelectedTeamUid(team.teamUid);
                   }}
                 >
-                  {squadTeamTabLabel(team)}
+                  {squadTeamTabLabel(team, managedClubName)}
                 </button>
               );
             })}

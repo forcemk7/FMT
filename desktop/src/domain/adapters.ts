@@ -16,6 +16,8 @@ export type LiveConnectorStatus = {
   state: ConnectionState;
   playersLoaded: number;
   managedSquadPlayers: number;
+  /** Contract-employed at managed club (index join); honesty metric before squad-unit split. */
+  clubEmployees: number;
   databasePlayersIndexed: number;
   backgroundPlayersIndexed: number;
   visiblePlayersLoaded: number;
@@ -100,8 +102,17 @@ export type LivePlayer = {
   clubName?: string | null;
   /** Managed-club squad unit when mapped from live read (T196). */
   squadUnit?: "firstTeam" | "under19s" | "reserves" | null;
+  /** FM team object UID for the roster this player was loaded from. */
+  squadTeamUid?: string | null;
+  /** Highest familiarity position slot from the live 15-byte blob (single code). */
+  bestCalculatedPosition?: string | null;
   /** Owned by managed club but currently out on loan (not available for match squads). */
   loanedOut?: boolean | null;
+  /** On managed squad roster but employed by another club (incoming loan). */
+  loanedIn?: boolean | null;
+  /** Parent club when `loanedIn` (incoming loan employer). */
+  employerClubId?: string | null;
+  employerClubName?: string | null;
   /** Loan destination club when `loanedOut` (FMLE Loan Club). */
   loanClubId?: string | null;
   loanClubName?: string | null;
@@ -134,7 +145,6 @@ export type LivePlayer = {
   scoutConfidence?: number | null;
   lastScoutedDate?: string | null;
   reportReliability?: string | null;
-  bestCalculatedPosition?: string | null;
   truePrice?: number | null;
   fairPriceRange?: [number, number] | null;
   valuationLabel?: "undervalued" | "fair" | "overpriced" | "unavailable";
@@ -234,12 +244,42 @@ export type LiveTactic = {
 
 export type TacticSource = "none" | "live-memory";
 
+export type LiveClubTeam = {
+  teamUid: string;
+  name: string;
+  rosterLen: number;
+  squadUnit: "firstTeam" | "under19s" | "reserves";
+  /** Raw FM TeamType byte when known (FMScout enum). */
+  teamType?: number | null;
+  isManagerTeam: boolean;
+};
+
+export function normalizeLiveSnapshot(
+  snapshot: Partial<LiveFootballSnapshot> & Pick<LiveFootballSnapshot, "status">,
+): LiveFootballSnapshot {
+  return {
+    managedClubId: snapshot.managedClubId ?? null,
+    managerName: snapshot.managerName ?? null,
+    season: snapshot.season ?? null,
+    clubs: snapshot.clubs ?? [],
+    clubTeams: snapshot.clubTeams ?? [],
+    players: snapshot.players ?? [],
+    tactic: snapshot.tactic ?? null,
+    tacticSource: snapshot.tacticSource ?? "none",
+    dataError: snapshot.dataError ?? null,
+    dataSource: snapshot.dataSource ?? "none",
+    dataWarnings: snapshot.dataWarnings ?? [],
+    status: snapshot.status,
+  };
+}
+
 export type LiveFootballSnapshot = {
   status: LiveConnectorStatus;
   managedClubId: string | null;
   managerName: string | null;
   season: string | null;
   clubs: LiveClub[];
+  clubTeams: LiveClubTeam[];
   players: LivePlayer[];
   tactic: LiveTactic | null;
   tacticSource: TacticSource;
@@ -270,6 +310,7 @@ const desktopRequiredStatus: LiveConnectorStatus = {
   state: "parser_unverified",
   playersLoaded: 0,
   managedSquadPlayers: 0,
+  clubEmployees: 0,
   databasePlayersIndexed: 0,
   backgroundPlayersIndexed: 0,
   visiblePlayersLoaded: 0,
@@ -328,140 +369,44 @@ export const fm26LiveAdapter: FootballDataAdapter = {
   },
   async getSnapshot() {
     if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) {
-      return {
+      return normalizeLiveSnapshot({
         status: desktopRequiredStatus,
         managedClubId: null,
         managerName: null,
         season: null,
         clubs: [],
+        clubTeams: [],
         players: [],
         tactic: null,
         tacticSource: "none",
         dataError: desktopRequiredStatus.message,
         dataSource: "none",
         dataWarnings: desktopRequiredStatus.warnings,
-      };
+      });
     }
 
     try {
       const { invoke } = await import("@tauri-apps/api/core");
-      return await invoke<LiveFootballSnapshot>("load_active_save");
+      return normalizeLiveSnapshot(await invoke<LiveFootballSnapshot>("load_active_save"));
     } catch (error) {
       const message = error instanceof Error ? error.message : "The desktop connector could not be reached.";
-      return {
+      return normalizeLiveSnapshot({
         status: { ...desktopRequiredStatus, state: "access_denied", memoryAccess: "denied", message },
         managedClubId: null,
         managerName: null,
         season: null,
         clubs: [],
+        clubTeams: [],
         players: [],
         tactic: null,
         tacticSource: "none",
         dataError: message,
         dataSource: "none",
         dataWarnings: [message],
-      };
+      });
     }
   },
 };
-
-export type IndexedPlayerSearchResult = {
-  id: string;
-  name: string;
-  age?: number | null;
-  nationality?: string | null;
-  clubId?: string | null;
-  clubName?: string | null;
-  positions: string[];
-  managedSquad: boolean;
-  visibility: "known" | "unknown";
-  scoutKnowledge: "fully_known" | "partly_known" | "unknown";
-  scoutConfidence: number;
-  bestRole?: string | null;
-  roleFit?: number | null;
-  value?: string | null;
-  wage?: string | null;
-  contractStatus?: string | null;
-  contractRemaining?: string | null;
-  averageRating?: number | null;
-  minutesPlayed?: number | null;
-  goals?: number | null;
-  assists?: number | null;
-  transferInterest?: string | null;
-  loanInterest?: string | null;
-  transferAvailable?: boolean | null;
-  loanAvailable?: boolean | null;
-  notForSale?: boolean | null;
-  per90?: Record<string, number | null>;
-  rawStats?: Record<string, number | null>;
-  inPossessionFit?: number | null;
-  outOfPossessionFit?: number | null;
-  projectedInPossessionFit?: number | null;
-  projectedOutOfPossessionFit?: number | null;
-  efficiencyScore?: number | null;
-  marketValueAmount?: number | null;
-};
-
-export async function searchIndexedPlayers(query: string): Promise<IndexedPlayerSearchResult[]> {
-  if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return [];
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<IndexedPlayerSearchResult[]>("search_indexed_players", { query });
-}
-
-export async function indexedPlayersByIds(playerIds: string[]): Promise<IndexedPlayerSearchResult[]> {
-  if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window) || playerIds.length === 0) return [];
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<IndexedPlayerSearchResult[]>("indexed_players_by_ids", { playerIds });
-}
-
-export async function indexedPlayerProfile(playerId: string): Promise<LivePlayer | null> {
-  if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return null;
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<LivePlayer | null>("indexed_player_profile", { playerId });
-}
-
-export type MappingLabStatus = {
-  enabled: boolean;
-  readOnly: boolean;
-  maximumWindowBytes: number;
-  evidenceDirectory: string | null;
-  message: string;
-};
-
-export type MappingLabCaptureResult = {
-  success: boolean;
-  snapshotId: string;
-  evidenceFile: string;
-  playerId: string;
-  playerName: string;
-  windowsCaptured: number;
-  bytesCaptured: number;
-};
-
-export async function getMappingLabStatus(): Promise<MappingLabStatus | null> {
-  if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return null;
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<MappingLabStatus>("mapping_lab_status");
-}
-
-export async function captureMappingEvidence(playerId: string, label: string): Promise<MappingLabCaptureResult> {
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<MappingLabCaptureResult>("mapping_lab_capture", { playerId, label, windowSize: 1024 });
-}
-
-export type MappingLabComparisonResult = {
-  success: boolean;
-  firstSnapshotId: string;
-  secondSnapshotId: string;
-  changedBytes: number;
-  unchangedBytes: number;
-  evidenceFile: string;
-};
-
-export async function compareMappingEvidence(firstSnapshotId: string, secondSnapshotId: string): Promise<MappingLabComparisonResult> {
-  const { invoke } = await import("@tauri-apps/api/core");
-  return invoke<MappingLabComparisonResult>("mapping_lab_compare", { firstSnapshotId, secondSnapshotId });
-}
 
 export const realLifeAdapter: FutureRealLifeAdapter = {
   kind: "real-life-future",

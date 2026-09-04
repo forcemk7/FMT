@@ -130,6 +130,55 @@ pub(crate) fn squad_unit_from_team_type(team_type: u8) -> Option<&'static str> {
     }
 }
 
+/// Fine-grained FMScout TeamType → UI label (tabs / Settings).
+///
+/// Only used when the team display string is empty or equals the club name.
+/// Real distinct FM strings (e.g. `FC Schalke 04 U19`) win over these labels.
+pub(crate) fn team_type_display_label(team_type: u8) -> Option<&'static str> {
+    match team_type {
+        0 => Some("First Team"),
+        1 => Some("Reserves"),
+        2 => Some("A"),
+        3 => Some("B"),
+        9 => Some("U23"),
+        10 => Some("U21"),
+        11 => Some("U19"),
+        12 => Some("U18"),
+        13 => Some("C"),
+        14 => Some("Amateur"),
+        15 => Some("II"),
+        16 => Some("Team 2"),
+        17 => Some("Team 3"),
+        18 => Some("U20"),
+        22 => Some("Youth"),
+        30 => Some("Dutch Reserves"),
+        _ => None,
+    }
+}
+
+/// Squad tab / Settings label: prefer a distinct FM team string; otherwise TeamType.
+pub(crate) fn resolve_team_tab_label(
+    raw_name: &str,
+    club_name: &str,
+    team_type: Option<u8>,
+    team_uid: u32,
+) -> String {
+    let trimmed = raw_name.trim();
+    let club = club_name.trim();
+    let collides =
+        trimmed.is_empty() || (!club.is_empty() && trimmed.eq_ignore_ascii_case(club));
+    if !collides {
+        return trimmed.to_string();
+    }
+    if let Some(label) = team_type.and_then(team_type_display_label) {
+        return label.to_string();
+    }
+    if !trimmed.is_empty() {
+        return trimmed.to_string();
+    }
+    format!("team-uid-{team_uid}")
+}
+
 /// Max teams in a club Teams vector (First + youth sides; not world table).
 const MAX_CLUB_TEAMS_VECTOR: usize = 32;
 
@@ -1462,7 +1511,8 @@ pub(crate) fn probe_lock_affiliate_link_layout(
 #[cfg(test)]
 mod tests {
     use super::{
-        bteam_satellite_team_matches, diff_affiliate_struct_hex, squad_unit_from_team_type,
+        bteam_satellite_team_matches, diff_affiliate_struct_hex, resolve_team_tab_label,
+        squad_unit_from_team_type, team_type_display_label,
         AFFILIATE_LINK_STRUCT_CLUB_POINTER_OFFSET, BTEAM_LINK_POINTER_SLOTS,
         BTEAM_SATELLITE_ROSTER_MAX, BTEAM_SATELLITE_ROSTER_MIN,
         MANAGED_CLUB_BTEAM_LINK_VECTOR_OFFSET, TEAM_NAME_OFFSET, TEAM_SHORT_NAME_OFFSET,
@@ -1528,6 +1578,44 @@ mod tests {
         assert_eq!(squad_unit_from_team_type(15), Some("reserves"));
         assert_eq!(squad_unit_from_team_type(22), Some("reserves"));
         assert_eq!(squad_unit_from_team_type(255), None);
+    }
+
+    #[test]
+    fn team_type_display_labels_match_fmscout_enum() {
+        assert_eq!(team_type_display_label(0), Some("First Team"));
+        assert_eq!(team_type_display_label(10), Some("U21"));
+        assert_eq!(team_type_display_label(11), Some("U19"));
+        assert_eq!(team_type_display_label(12), Some("U18"));
+        assert_eq!(team_type_display_label(15), Some("II"));
+        assert_eq!(team_type_display_label(255), None);
+    }
+
+    #[test]
+    fn resolve_team_tab_label_prefers_distinct_fm_string() {
+        assert_eq!(
+            resolve_team_tab_label("FC Schalke 04 U19", "FC Schalke 04", Some(11), 1),
+            "FC Schalke 04 U19"
+        );
+        assert_eq!(
+            resolve_team_tab_label("Liverpool", "Liverpool", Some(0), 676),
+            "First Team"
+        );
+        assert_eq!(
+            resolve_team_tab_label("Liverpool", "Liverpool", Some(10), 2),
+            "U21"
+        );
+        assert_eq!(
+            resolve_team_tab_label("liverpool", "Liverpool", Some(12), 3),
+            "U18"
+        );
+        assert_eq!(
+            resolve_team_tab_label("", "Leicester City", Some(11), 99),
+            "U19"
+        );
+        assert_eq!(
+            resolve_team_tab_label("", "", None, 42),
+            "team-uid-42"
+        );
     }
 
     #[test]

@@ -330,20 +330,72 @@ export function groupPlayerPosition(
   return "Utility / other players";
 }
 
-/** FM team object label for squad tabs — in-game name only; never invent Senior/Youth/Reserves. */
+/** FMScout TeamType → tab label when the FM string is empty or equals the club name. */
+export function teamTypeDisplayLabel(teamType: number | null | undefined): string | null {
+  switch (teamType) {
+    case 0:
+      return "First Team";
+    case 1:
+      return "Reserves";
+    case 2:
+      return "A";
+    case 3:
+      return "B";
+    case 9:
+      return "U23";
+    case 10:
+      return "U21";
+    case 11:
+      return "U19";
+    case 12:
+      return "U18";
+    case 13:
+      return "C";
+    case 14:
+      return "Amateur";
+    case 15:
+      return "II";
+    case 16:
+      return "Team 2";
+    case 17:
+      return "Team 3";
+    case 18:
+      return "U20";
+    case 22:
+      return "Youth";
+    case 30:
+      return "Dutch Reserves";
+    default:
+      return null;
+  }
+}
+
+/**
+ * FM team object label for squad tabs / Settings.
+ * Prefer a distinct in-game team string; when empty or equal to the club name,
+ * disambiguate via TeamType (never invent Senior/Youth that contradict type).
+ */
 export function squadTeamDisplayName(
-  team: Pick<LiveClubTeam, "name" | "teamUid">,
+  team: Pick<LiveClubTeam, "name" | "teamUid" | "teamType">,
+  managedClubName?: string | null,
 ): string {
   const trimmed = team.name.trim();
+  const club = managedClubName?.trim() ?? "";
+  const collides =
+    trimmed.length === 0 || (club.length > 0 && trimmed.toLowerCase() === club.toLowerCase());
+  if (!collides) return trimmed;
+  const fromType = teamTypeDisplayLabel(team.teamType);
+  if (fromType) return fromType;
   if (trimmed) return trimmed;
   return `Team ${team.teamUid}`;
 }
 
-/** Squad desk tab label — display name only (status counts live on filters). */
+/** Squad desk tab label — same helper as Settings rosterLen rows. */
 export function squadTeamTabLabel(
-  team: Pick<LiveClubTeam, "name" | "teamUid">,
+  team: Pick<LiveClubTeam, "name" | "teamUid" | "teamType">,
+  managedClubName?: string | null,
 ): string {
-  return squadTeamDisplayName(team);
+  return squadTeamDisplayName(team, managedClubName);
 }
 
 const SQUAD_UNIT_SORT: Record<SquadUnit, number> = {

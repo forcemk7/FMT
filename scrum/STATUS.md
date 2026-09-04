@@ -1,12 +1,10 @@
 ﻿# Status
 
-Last updated: 2026-09-04 (T207 done — First Team 39=39 via UID floor)
+Last updated: 2026-09-04 (T206 done — Club.Teams display names via TeamType)
 
 ## Now
 
-**T206 ready (P1)** — Club.Teams in-game tab labels (was behind T207).
-
-**Human:** reload Liverpool in FMT — First Team should show 39 including Szoboszlai.
+**Human:** reload Liverpool — First Team count 39 (T207) + tab labels distinct (T206). Schalke should keep real `… U19` string.
 
 **T190 parked** — Save ID in RAM before save-copy CA path.
 
@@ -16,7 +14,6 @@ Last updated: 2026-09-04 (T207 done — First Team 39=39 via UID floor)
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
-| T206 | Club.Teams — in-game team display names | ready | 1 | was P2 behind T207 |
 | T190 | Development all-time from Progress Report CA strip | blocked | 2 | **parked** |
 | T124 | Quiet dev launch | ready | 9 | behind Loop A |
 | T139 | FMT visual theme | deferred | — | overlapped |
@@ -28,6 +25,7 @@ Last updated: 2026-09-04 (T207 done — First Team 39=39 via UID floor)
 
 ## Recently done
 
+- **T206** Club.Teams — in-game team display names (TeamType when name equals club; keep real `… U19`)
 - **T207** Roster — load all First Team Players slots (UID floor; Liverpool 39=39)
 - **T205** Roster — FSS person-class/PLAO resolve
 - **T204** Squad — status filters + rosterLen in Settings
@@ -43,12 +41,12 @@ Last updated: 2026-09-04 (T207 done — First Team 39=39 via UID floor)
 - **T191** Loans age + loan club
 - **T189** Loans desk
 - **T188** Attr deltas in load pipeline
-- **T187** Attr history v2
-- **T186** Development plot
-- **T185** Development content chrome
-- **T182** Live Squad at-club
-- **T184** Development desk compact
+- **T187** Invalidate attr history poisoned by old rounding (v2 store)
+- **T186** Development plot color match, hover values, all-time Δ layout fix
+- **T185** Development content = plot + desk only (zero chrome)
+- **T182** Live Squad = at-club match squad only (`loanedOut` via person loan agreement)
+- **T184** Development desk compact single-page (all-time Δ desk + plot)
 
 ## Loop
 
-FM → FMT Dashboard/Squad → player Attributes / Development → Loans → GM → HoYD → (later) Tactic / TD / world.
+FM → FMT Dashboard/Squad → player Attributes / Development → Loans (outgoing) → GM (Sell / Loan vs avg CA) → HoYD (high-PA groom) → (later) Tactic / TD / world.
