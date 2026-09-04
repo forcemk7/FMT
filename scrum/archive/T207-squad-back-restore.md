@@ -37,4 +37,4 @@ Loop A: browse a non-senior club team → open player → Back. Today Back drops
 - Root cause: Squad remount wiped `selectedTeamUid` + `.app-main` scroll.
 - Shipped in-memory `squad-desk-session` (team uid + scroll); stash scroll on player open before profile clamps main; restore on layout; tab switch resets scroll.
 - Verified: `npx vitest run src/domain/squad-desk-session.test.ts` (2 pass). Manual: U19/B-team → player → Back should keep tab + scroll.
-- Commit: _(filled after git)_
+- Commit: `405a0c4`
