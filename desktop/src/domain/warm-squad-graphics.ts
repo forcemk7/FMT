@@ -32,10 +32,11 @@ export function warmSquadGraphics(snapshot: LiveFootballSnapshot) {
   if (playerIds.length) {
     void invoke("faces_update_cache", { playerIds })
       .then(() => {
-        // Cutout is fast; newgen XML scan can take several seconds.
+        // Cutout is fast; newgen XML scan + remap revalidation can take several seconds.
         window.setTimeout(() => clearPlayerFaceMemoryCache(), 800);
         window.setTimeout(() => clearPlayerFaceMemoryCache(), 2500);
         window.setTimeout(() => clearPlayerFaceMemoryCache(), 8000);
+        window.setTimeout(() => clearPlayerFaceMemoryCache(), 15000);
       })
       .catch(() => undefined);
   }

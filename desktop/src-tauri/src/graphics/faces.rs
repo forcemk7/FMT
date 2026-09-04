@@ -5,6 +5,7 @@ use std::{
     path::{Path, PathBuf},
     sync::OnceLock,
     thread,
+    time::SystemTime,
 };
 
 use super::config_xml::{attribute_value, safe_relative_asset_path};
@@ -243,12 +244,20 @@ pub(crate) fn resolve_face_path(player_id: &str, icon: bool) -> Option<PathBuf> 
     copy_into_cache(player_id, icon, &source).or(Some(source))
 }
 
+fn cache_stem(player_id: &str, icon: bool) -> String {
+    if icon {
+        format!("icon_{player_id}")
+    } else {
+        player_id.to_string()
+    }
+}
+
 fn resolve_cached_face(player_id: &str, icon: bool) -> Option<PathBuf> {
     let dir = face_cache_dir();
     let stems = if icon {
-        vec![format!("icon_{player_id}"), player_id.to_string()]
+        vec![cache_stem(player_id, true), cache_stem(player_id, false)]
     } else {
-        vec![player_id.to_string(), format!("icon_{player_id}")]
+        vec![cache_stem(player_id, false), cache_stem(player_id, true)]
     };
     for stem in stems {
         for extension in ["png", "jpg", "jpeg", "webp"] {
@@ -261,7 +270,69 @@ fn resolve_cached_face(player_id: &str, icon: bool) -> Option<PathBuf> {
     None
 }
 
-fn copy_into_cache(player_id: &str, icon: bool, source: &Path) -> Option<PathBuf> {
+fn face_sidecar_path(cache_dir: &Path, stem: &str) -> PathBuf {
+    cache_dir.join(format!("{stem}.src"))
+}
+
+fn read_face_identity(cache_dir: &Path, stem: &str) -> Option<String> {
+    let raw = fs::read_to_string(face_sidecar_path(cache_dir, stem)).ok()?;
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        None
+    } else {
+        Some(trimmed.to_string())
+    }
+}
+
+fn write_face_identity(cache_dir: &Path, stem: &str, identity: &str) {
+    let _ = fs::write(face_sidecar_path(cache_dir, stem), identity);
+}
+
+fn clear_cached_face_variants(cache_dir: &Path, stem: &str) {
+    for extension in ["png", "jpg", "jpeg", "webp"] {
+        let _ = fs::remove_file(cache_dir.join(format!("{stem}.{extension}")));
+    }
+}
+
+fn cutout_source_identity(source: &Path) -> String {
+    format!("file:{}", source.to_string_lossy())
+}
+
+fn mapped_source_identity(from: &str) -> String {
+    format!("map:{from}")
+}
+
+/// Cache is stale when missing, identity changed (recycled UID remap), or source bytes differ.
+fn face_needs_refresh(
+    cache_len: Option<u64>,
+    cache_modified: Option<SystemTime>,
+    source_len: u64,
+    source_modified: Option<SystemTime>,
+    stored_identity: Option<&str>,
+    live_identity: &str,
+) -> bool {
+    if cache_len.is_none() {
+        return true;
+    }
+    if stored_identity != Some(live_identity) {
+        return true;
+    }
+    if cache_len != Some(source_len) {
+        return true;
+    }
+    match (source_modified, cache_modified) {
+        (Some(src), Some(cached)) if src > cached => true,
+        (Some(_), None) => true,
+        _ => false,
+    }
+}
+
+fn sync_face_into_cache(
+    player_id: &str,
+    icon: bool,
+    source: &Path,
+    identity: &str,
+) -> Option<PathBuf> {
     let meta = source.metadata().ok()?;
     if !meta.is_file() || meta.len() == 0 || meta.len() > MAX_IMAGE_BYTES {
         return None;
@@ -276,23 +347,68 @@ fn copy_into_cache(player_id: &str, icon: bool, source: &Path) -> Option<PathBuf
     }
     let dir = face_cache_dir();
     fs::create_dir_all(&dir).ok()?;
-    let stem = if icon {
-        format!("icon_{player_id}")
-    } else {
-        player_id.to_string()
-    };
+    let stem = cache_stem(player_id, icon);
     let dest = dir.join(format!("{stem}.{ext}"));
+    let stored = read_face_identity(&dir, &stem);
+    let cache_meta = dest.metadata().ok().filter(|m| m.is_file());
+    let stale = face_needs_refresh(
+        cache_meta.as_ref().map(|m| m.len()),
+        cache_meta.as_ref().and_then(|m| m.modified().ok()),
+        meta.len(),
+        meta.modified().ok(),
+        stored.as_deref(),
+        identity,
+    );
+    // Other extension may still be the hit `resolve_cached_face` returns.
+    let other_hit = resolve_cached_face(player_id, icon).filter(|p| p != &dest);
+    if !stale && other_hit.is_none() {
+        return Some(dest);
+    }
+    clear_cached_face_variants(&dir, &stem);
     fs::copy(source, &dest).ok()?;
+    write_face_identity(&dir, &stem, identity);
     Some(dest)
 }
 
-fn resolve_live_face_path(player_id: &str, icon: bool) -> Option<PathBuf> {
-    // Hot path: O(1) open face_{id}.* in known megapack dirs only.
-    // Never build/parse config.xml indexes here — that froze the UI on first miss.
+fn copy_into_cache(player_id: &str, icon: bool, source: &Path) -> Option<PathBuf> {
+    sync_face_into_cache(player_id, icon, source, &cutout_source_identity(source))
+}
+
+fn pack_path_is_newgen(path: &Path) -> bool {
+    path.to_string_lossy()
+        .to_ascii_lowercase()
+        .contains("newgen")
+}
+
+#[derive(Clone)]
+struct FaceDirBuckets {
+    main: Vec<PathBuf>,
+    newgen: Vec<PathBuf>,
+}
+
+fn cached_face_dir_buckets() -> FaceDirBuckets {
+    static BUCKETS: OnceLock<FaceDirBuckets> = OnceLock::new();
+    BUCKETS
+        .get_or_init(|| {
+            let mut main = Vec::new();
+            let mut newgen = Vec::new();
+            for dir in discover_face_dirs(&default_graphics_root()) {
+                if pack_path_is_newgen(&dir) {
+                    newgen.push(dir);
+                } else {
+                    main.push(dir);
+                }
+            }
+            FaceDirBuckets { main, newgen }
+        })
+        .clone()
+}
+
+fn resolve_live_face_path_in_dirs(player_id: &str, icon: bool, dirs: &[PathBuf]) -> Option<PathBuf> {
     if icon {
         return None;
     }
-    for dir in cached_face_dirs() {
+    for dir in dirs {
         for stem in [
             format!("face_{player_id}"),
             format!("iconface_{player_id}"),
@@ -309,11 +425,12 @@ fn resolve_live_face_path(player_id: &str, icon: bool) -> Option<PathBuf> {
     None
 }
 
-fn cached_face_dirs() -> Vec<PathBuf> {
-    static FACE_DIRS: OnceLock<Vec<PathBuf>> = OnceLock::new();
-    FACE_DIRS
-        .get_or_init(|| discover_face_dirs(&default_graphics_root()))
-        .clone()
+/// Search cutout dirs in install order: main face packs first, then newgen-named packs.
+/// Player origin (database vs game-generated) is not guessed from UID — pack search only.
+fn resolve_live_face_path(player_id: &str, icon: bool) -> Option<PathBuf> {
+    let buckets = cached_face_dir_buckets();
+    resolve_live_face_path_in_dirs(player_id, icon, &buckets.main)
+        .or_else(|| resolve_live_face_path_in_dirs(player_id, icon, &buckets.newgen))
 }
 
 fn parse_person_portrait_record(line: &str) -> Option<(String, String)> {
@@ -360,8 +477,13 @@ fn valid_image_file(path: &Path) -> bool {
         })
 }
 
+struct MappedFaceSource {
+    from: String,
+    path: PathBuf,
+}
+
 /// One-pass scan of pack-root maps for the requested UIDs only (background warm).
-fn scan_mapped_face_configs(wanted: &HashSet<String>) -> HashMap<String, PathBuf> {
+fn scan_mapped_face_configs(wanted: &HashSet<String>) -> HashMap<String, MappedFaceSource> {
     let mut found = HashMap::new();
     if wanted.is_empty() {
         return found;
@@ -387,7 +509,13 @@ fn scan_mapped_face_configs(wanted: &HashSet<String>) -> HashMap<String, PathBuf
                 continue;
             };
             if let Some(path) = resolve_mapped_image(&pack_root, &relative) {
-                found.insert(uid, path);
+                found.insert(
+                    uid,
+                    MappedFaceSource {
+                        from,
+                        path,
+                    },
+                );
             }
         }
     }
@@ -409,12 +537,12 @@ pub fn warm_faces_for_players(player_ids: &[String], icon: bool) -> FaceWarmResu
         thread::spawn(move || {
             let mut pending = Vec::new();
             for id in ids {
-                if resolve_cached_face(&id, icon_flag).is_some() {
-                    continue;
-                }
                 if let Some(source) = resolve_live_face_path(&id, icon_flag) {
-                    let _ = copy_into_cache(&id, icon_flag, &source);
+                    let identity = cutout_source_identity(&source);
+                    let _ = sync_face_into_cache(&id, icon_flag, &source, &identity);
                 } else if !icon_flag {
+                    // Re-check mapped packs even when cache already has a UID hit
+                    // (recycled newgen remaps change `from=` under the same id).
                     pending.push(id);
                 }
             }
@@ -424,8 +552,9 @@ pub fn warm_faces_for_players(player_ids: &[String], icon: bool) -> FaceWarmResu
             let wanted: HashSet<String> = pending.iter().cloned().collect();
             let mapped = scan_mapped_face_configs(&wanted);
             for id in pending {
-                if let Some(source) = mapped.get(&id) {
-                    let _ = copy_into_cache(&id, false, source);
+                if let Some(hit) = mapped.get(&id) {
+                    let identity = mapped_source_identity(&hit.from);
+                    let _ = sync_face_into_cache(&id, false, &hit.path, &identity);
                 }
             }
         });
@@ -451,6 +580,7 @@ pub(crate) fn image_mime(path: &Path) -> Option<&'static str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
 
     #[test]
     fn only_supported_image_types_receive_a_mime() {
@@ -469,6 +599,73 @@ mod tests {
         assert_eq!(
             parse_person_portrait_record(regen),
             Some(("CentralEurope/PP12CentralEurope0853".into(), "100679936".into()))
+        );
+    }
+
+    #[test]
+    fn face_needs_refresh_when_mapped_identity_changes() {
+        let now = SystemTime::now();
+        assert!(face_needs_refresh(
+            Some(100),
+            Some(now),
+            100,
+            Some(now),
+            Some("map:CentralEurope/OldFace"),
+            "map:CentralEurope/NewFace",
+        ));
+        assert!(!face_needs_refresh(
+            Some(100),
+            Some(now),
+            100,
+            Some(now),
+            Some("map:CentralEurope/SameFace"),
+            "map:CentralEurope/SameFace",
+        ));
+    }
+
+    #[test]
+    fn face_needs_refresh_when_source_newer_or_size_differs() {
+        let older = SystemTime::now() - Duration::from_secs(60);
+        let newer = SystemTime::now();
+        assert!(face_needs_refresh(
+            Some(100),
+            Some(older),
+            100,
+            Some(newer),
+            Some("file:C:/faces/face_1.png"),
+            "file:C:/faces/face_1.png",
+        ));
+        assert!(face_needs_refresh(
+            Some(100),
+            Some(newer),
+            120,
+            Some(newer),
+            Some("file:C:/faces/face_1.png"),
+            "file:C:/faces/face_1.png",
+        ));
+        assert!(!face_needs_refresh(
+            Some(100),
+            Some(newer),
+            100,
+            Some(older),
+            Some("file:C:/faces/face_1.png"),
+            "file:C:/faces/face_1.png",
+        ));
+        assert!(face_needs_refresh(
+            None,
+            None,
+            100,
+            Some(newer),
+            None,
+            "map:CentralEurope/PP12",
+        ));
+    }
+
+    #[test]
+    fn mapped_source_identity_prefixes_from_path() {
+        assert_eq!(
+            mapped_source_identity("CentralEurope/PP12CentralEurope0853"),
+            "map:CentralEurope/PP12CentralEurope0853"
         );
     }
 
@@ -505,6 +702,12 @@ mod tests {
         }
         let wanted = HashSet::from(["100679936".to_string()]);
         let found = scan_mapped_face_configs(&wanted);
-        assert_eq!(found.get("100679936"), Some(&sample));
+        let hit = found.get("100679936").expect("mapped face for sample uid");
+        assert_eq!(hit.path, sample);
+        assert_eq!(hit.from, "CentralEurope/PP12CentralEurope0853");
+        assert_eq!(
+            mapped_source_identity(&hit.from),
+            "map:CentralEurope/PP12CentralEurope0853"
+        );
     }
 }
