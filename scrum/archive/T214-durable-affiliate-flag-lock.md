@@ -38,7 +38,7 @@ T212 loads II/NPL via parent-edge + name/roster satellite. That will break when 
 - **Production:** type walk first; T212 satellite merge for NPL / unmapped reserves; Normal/Good Relations/Likely never tabs; unmapped bytes → Diagnostics `affiliationTypes` coverage + `Map AffiliationType 0xNN` warnings / tab reminder.
 - **Residual:** Main/Permanent/Players Move Freely bytes still open; Sub/B/C/2/3/Feeder/etc. unmapped — expand allow-list when found; NPL still via satellite until its type byte is known.
 - Cancel A/B locked the edge (inbox processing shrinks `+0x118` by cancelled count). PGE multi-type edit on one save unstable — deferred to discover-as-you-go.
-- Commit: see git log `T214: …`
+- Commit: `b4bf074` `T214: wire club+0x118 type filter + map reminders`
 
 ## Blockers
 
