@@ -1,21 +1,25 @@
 ﻿# Status
 
-Last updated: 2026-09-04 (T204 done — Squad status filters + Settings rosterLen)
+Last updated: 2026-09-04 (T207 done — Squad back restore)
 
 ## Now
 
-**Human FMLE A/B** — run `probe:affiliate-flags` before/after one LE toggle; diff dumps; lock squad-tab vs feeder bytes. Then follow-up ticket to wire filter.
+**T205 in_progress (auto)** — fix roster `person_unresolved` drops via FSS person-class / PLAO on Club.Teams path.
 
-**Human QA** — Schalke / Leicester: First + same-club youth via Club.Teams. Separate-club II still out until flag lock + wire. Squad filters: At club / On loan / Loaned out on toolbar.
+**T206 ready (P2)** — tab labels as in-game; TeamType + known team name fields when club-name collision.
 
-**T190 parked** — blocked on RAM lock for Live Editor Save ID before save-copy CA path.
+**Human FMLE A/B** — affiliate flags for separate-club II (after T205/T206).
 
-**Deferred:** T139 theme. T162 trophy cabinet. T124 quiet dev launch. Club.Teams tab label polish (name-only until then). Loop D = FMLE-class **read** core (world tables → then managed club); full archive `.cursor/rules/fm-live-read.mdc`.
+**T190 parked** — Save ID in RAM before save-copy CA path.
+
+**Deferred:** T139 theme. T162 trophy cabinet. T124 quiet dev launch. Loop D full-world **load** still parked; archive `.cursor/rules/fm-live-read.mdc` is the knowledge store for T205/T206.
 
 ## Board
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
+| T205 | Roster — fix person_unresolved drops (First XI) | in_progress | 1 | owner: auto |
+| T206 | Club.Teams — in-game team display names | ready | 2 | TeamType / name collision; no world index |
 | T190 | Development all-time from Progress Report CA strip | blocked | 2 | **parked** — need Save ID in RAM before `.fm` pick |
 | T124 | Quiet dev launch | ready | 9 | behind Loop A |
 | T139 | FMT visual theme | deferred | — | overlapped |
@@ -27,6 +31,7 @@ Last updated: 2026-09-04 (T204 done — Squad status filters + Settings rosterLe
 
 ## Recently done
 
+- **T207** Squad — restore team tab + scroll on profile Back
 - **T204** Squad — status filters + rosterLen in Settings (tab paren counts → filter row)
 - **T203** RE — affiliate squad-tab flag bytes (FMLE A/B probe + diff; production unwired)
 - **T202** Squad face-cache freshness — remap `from=` / source mtime revalidation on warm

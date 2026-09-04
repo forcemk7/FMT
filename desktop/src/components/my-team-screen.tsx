@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
 import type { LiveFootballSnapshot, LivePlayer } from "@/domain/adapters";
 import { abilityToneFromScore } from "@/domain/attribute-tone";
 import { formatHasScore, hasBand, liveHasScore } from "@/domain/has-score";
@@ -22,8 +22,15 @@ import {
   type GmAdvice,
   type SquadRosterStatus,
   type SquadTeamRosterCounts,
-  ALL_SQUAD_ROSTER_STATUSES,
 } from "@/domain/live-data";
+import {
+  getSquadDeskScrollTop,
+  getSquadDeskSelectedTeamUid,
+  readAppMainScrollTop,
+  setSquadDeskScrollTop,
+  setSquadDeskSelectedTeamUid,
+  writeAppMainScrollTop,
+} from "@/domain/squad-desk-session";
 import { ClubLogo } from "@/components/club-logo";
 import { LiveDataState } from "@/components/live-data-state";
 import { HasBreakdownGridFromPlayer } from "@/components/has-breakdown-grid";
@@ -327,24 +334,81 @@ export function MyTeamScreen({
     clubTeams.find((team) => team.isManagerTeam)?.teamUid ??
     clubTeams[0]?.teamUid ??
     null;
-  const [selectedTeamUid, setSelectedTeamUid] = useState<string | null>(defaultTeamUid);
+  const [selectedTeamUid, setSelectedTeamUid] = useState<string | null>(() => {
+    if (!squadDeskMode) return defaultTeamUid;
+    const remembered = getSquadDeskSelectedTeamUid();
+    return remembered ?? defaultTeamUid;
+  });
   const [enabledRosterStatuses, setEnabledRosterStatuses] = useState(
-    () => new Set<SquadRosterStatus>(ALL_SQUAD_ROSTER_STATUSES),
+    () => new Set<SquadRosterStatus>(["atClub"]),
   );
   useEffect(() => {
     setSelectedTeamUid((current) => {
-      if (current && clubTeams.some((team) => team.teamUid === current)) {
-        return current;
+      const candidate =
+        current && clubTeams.some((team) => team.teamUid === current)
+          ? current
+          : squadDeskMode
+            ? getSquadDeskSelectedTeamUid()
+            : null;
+      if (candidate && clubTeams.some((team) => team.teamUid === candidate)) {
+        return candidate;
       }
       return defaultTeamUid;
     });
-  }, [clubTeams, defaultTeamUid]);
+  }, [clubTeams, defaultTeamUid, squadDeskMode]);
+  useEffect(() => {
+    if (!squadDeskMode) return;
+    setSquadDeskSelectedTeamUid(selectedTeamUid);
+  }, [selectedTeamUid, squadDeskMode]);
+  useLayoutEffect(() => {
+    if (!squadDeskMode) return;
+    const top = getSquadDeskScrollTop();
+    if (top <= 0) return;
+    writeAppMainScrollTop(top);
+    const frame = window.requestAnimationFrame(() => writeAppMainScrollTop(top));
+    return () => window.cancelAnimationFrame(frame);
+  }, [squadDeskMode]);
+  useEffect(() => {
+    if (!squadDeskMode) return;
+    const main = document.querySelector(".app-main");
+    if (!(main instanceof HTMLElement)) return;
+    const onScroll = () => setSquadDeskScrollTop(main.scrollTop);
+    main.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      setSquadDeskScrollTop(readAppMainScrollTop());
+      main.removeEventListener("scroll", onScroll);
+    };
+  }, [squadDeskMode]);
   const selectedTeam =
     clubTeams.find((team) => team.teamUid === selectedTeamUid) ?? clubTeams[0] ?? null;
   const selectedTeamCounts =
     (selectedTeam
       ? rosterCountsByTeamUid.get(selectedTeam.teamUid)
       : null) ?? { atClub: 0, loanedIn: 0, loanedOut: 0 };
+  const availableRosterFilters = useMemo(
+    () =>
+      SQUAD_ROSTER_FILTER_OPTIONS.filter(
+        ({ countKey }) => selectedTeamCounts[countKey] > 0,
+      ),
+    [
+      selectedTeamCounts.atClub,
+      selectedTeamCounts.loanedIn,
+      selectedTeamCounts.loanedOut,
+    ],
+  );
+  useEffect(() => {
+    const available = new Set(
+      availableRosterFilters.map(({ status }) => status),
+    );
+    setEnabledRosterStatuses((current) => {
+      const kept = new Set(
+        [...current].filter((status) => available.has(status)),
+      );
+      if (kept.size > 0) return kept;
+      if (available.size === 0) return kept;
+      return new Set(available);
+    });
+  }, [availableRosterFilters, selectedTeam?.teamUid]);
   const teamRoster = useMemo(
     () =>
       snapshot.players.filter((player) => {
@@ -433,23 +497,35 @@ export function MyTeamScreen({
       : hoydMode
         ? "No high-PA groom prospects (age ≤24) vs squad median CA."
         : selectedTeam && squad.length === 0
-          ? enabledRosterStatuses.size === 0
-            ? "No roster status filters selected."
-            : selectedTeamCounts.atClub +
-                  selectedTeamCounts.loanedIn +
-                  selectedTeamCounts.loanedOut >
-                0
-              ? "No players match the selected roster filters."
-              : `No players loaded for ${selectedTeam.name.trim() || "this team"} — check FM squad screen vs FMT read.`
+          ? selectedTeamCounts.atClub +
+                selectedTeamCounts.loanedIn +
+                selectedTeamCounts.loanedOut >
+              0
+            ? "No players match the selected roster filters."
+            : `No players loaded for ${selectedTeam.name.trim() || "this team"} — check FM squad screen vs FMT read.`
           : null;
 
   function toggleRosterStatus(status: SquadRosterStatus) {
     setEnabledRosterStatuses((current) => {
       const next = new Set(current);
-      if (next.has(status)) next.delete(status);
-      else next.add(status);
+      if (next.has(status)) {
+        const enabledVisible = availableRosterFilters.filter(({ status: option }) =>
+          next.has(option),
+        );
+        if (enabledVisible.length <= 1) return current;
+        next.delete(status);
+      } else {
+        next.add(status);
+      }
       return next;
     });
+  }
+
+  function openPlayerFromDesk(playerId: string) {
+    if (squadDeskMode) {
+      setSquadDeskScrollTop(readAppMainScrollTop());
+    }
+    onOpenPlayer(playerId);
   }
 
   function renderPositionMatrix(players: LivePlayer[], showLoanClub: boolean) {
@@ -469,7 +545,7 @@ export function MyTeamScreen({
               <SquadPlayerCard
                 key={player.id}
                 player={player}
-                onOpenPlayer={onOpenPlayer}
+                onOpenPlayer={openPlayerFromDesk}
                 showLoanClub={showLoanClub}
                 rosterStatus={squadRosterStatus(player, snapshot.managedClubId)}
               />
@@ -496,34 +572,47 @@ export function MyTeamScreen({
                   role="tab"
                   aria-selected={active}
                   className={`squad-unit-tab${active ? " is-active" : ""}`}
-                  onClick={() => setSelectedTeamUid(team.teamUid)}
+                  onClick={() => {
+                    if (team.teamUid === selectedTeamUid) return;
+                    setSquadDeskScrollTop(0);
+                    writeAppMainScrollTop(0);
+                    setSelectedTeamUid(team.teamUid);
+                  }}
                 >
                   {squadTeamTabLabel(team)}
                 </button>
               );
             })}
           </div>
-          <div className="squad-roster-filters" role="group" aria-label="Roster status">
-            {SQUAD_ROSTER_FILTER_OPTIONS.map(({ status, label, countKey }) => {
-              const checked = enabledRosterStatuses.has(status);
-              const count = selectedTeamCounts[countKey];
-              return (
-                <label
-                  key={status}
-                  className={`squad-roster-filter${checked ? " is-checked" : ""}`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    onChange={() => toggleRosterStatus(status)}
-                  />
-                  <span>
-                    {label} <b>{count}</b>
-                  </span>
-                </label>
-              );
-            })}
-          </div>
+          {availableRosterFilters.length > 0 ? (
+            <div className="squad-roster-filters" role="group" aria-label="Roster status">
+              {availableRosterFilters.map(({ status, label, countKey }) => {
+                const checked = enabledRosterStatuses.has(status);
+                const count = selectedTeamCounts[countKey];
+                const lastChecked =
+                  checked &&
+                  availableRosterFilters.filter(({ status: option }) =>
+                    enabledRosterStatuses.has(option),
+                  ).length <= 1;
+                return (
+                  <label
+                    key={status}
+                    className={`squad-roster-filter${checked ? " is-checked" : ""}${lastChecked ? " is-locked" : ""}`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={lastChecked}
+                      onChange={() => toggleRosterStatus(status)}
+                    />
+                    <span>
+                      {label} <b>{count}</b>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="planner-heading">
