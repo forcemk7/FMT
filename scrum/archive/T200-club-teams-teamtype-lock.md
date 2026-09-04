@@ -63,4 +63,4 @@ Player field reads are good enough for Loop A. FMT still cannot honestly list **
 
 **Verify:** `cargo test --lib team_type_maps|club_teams_and_team_type|classify_club_team_by_uid` — 3/3 ok.
 
-Commit: _(filled after git)_
+Commit: `c32401c34635abc6c7ecd6dea8431b308647ae43`
