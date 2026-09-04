@@ -1374,6 +1374,7 @@ fn debug_scan_club_teams_impl() -> Result<Value, String> {
         profile,
         selected.club,
         selected.club_uid,
+        &selected.club_name,
         selected.team,
         &seeds,
     );
@@ -1383,7 +1384,7 @@ fn debug_scan_club_teams_impl() -> Result<Value, String> {
             json!({
                 "teamPointer": hex_address(entry.team),
                 "teamUid": entry.team_uid,
-                "label": club_team_label(&entry.name, entry.team_uid),
+                "label": entry.name.clone(),
                 "nameAtClubNameOffset": entry.name,
                 "rosterLen": entry.roster_len,
                 "classifiedUnit": entry.squad_unit,
@@ -1557,6 +1558,7 @@ fn debug_scan_club_affiliates_impl() -> Result<Value, String> {
         profile,
         selected.club,
         selected.club_uid,
+        &selected.club_name,
         selected.team,
         &seeds,
     );
@@ -1807,12 +1809,13 @@ fn classify_club_team_squad_unit(
 }
 
 #[cfg(target_os = "windows")]
-fn club_team_label(name: &str, team_uid: u32) -> String {
-    if name.trim().is_empty() {
-        format!("team-uid-{team_uid}")
-    } else {
-        name.to_string()
-    }
+fn club_team_label(
+    name: &str,
+    club_name: &str,
+    team_type: Option<u8>,
+    team_uid: u32,
+) -> String {
+    crate::fm26::affiliate_links::resolve_team_tab_label(name, club_name, team_type, team_uid)
 }
 
 #[cfg(target_os = "windows")]
@@ -1845,13 +1848,11 @@ fn probe_team_roster_identities(
             continue;
         };
         let Some(resolved) = resolve_person_and_player_base(reader, raw_player, profile) else {
-            let vtable = reader.read_pointer(raw_player);
             entries.push(json!({
                 "slot": index,
                 "rawPlayerPointer": hex_address(raw_player),
-                "vtable": vtable.map(hex_address),
-                "reject": "non_person_roster_slot",
-                "note": "FSS person-class/PLAO resolve failed; shared module vtable slots are non-player roster entries, not silent First XI drops",
+                "vtable": reader.read_pointer(raw_player).map(hex_address),
+                "reject": "person_unresolved",
             }));
             continue;
         };
@@ -1909,6 +1910,7 @@ fn discover_managed_club_teams(
     profile: &EntityMapProfile,
     managed_club: u64,
     managed_club_uid: u32,
+    managed_club_name: &str,
     first_team: u64,
     index_team_seeds: &HashSet<u64>,
 ) -> Vec<DiscoveredClubTeam> {
@@ -1938,7 +1940,12 @@ fn discover_managed_club_teams(
         discovered.push(DiscoveredClubTeam {
             team: team.team,
             team_uid: team.team_uid,
-            name: club_team_label(&team.name, team.team_uid),
+            name: club_team_label(
+                &team.name,
+                managed_club_name,
+                team.team_type,
+                team.team_uid,
+            ),
             squad_unit,
             roster_len: team.roster_len,
             team_type: team.team_type,
@@ -2091,7 +2098,7 @@ fn push_squad_player_from_raw(
                 .map(hex_address)
                 .unwrap_or_else(|| "unreadable".to_string());
             skipped_squad_details.push(format!(
-                "{slot_label}: non-person roster slot @ {raw_player:#x} (vtable {vtable})"
+                "{slot_label}: person unresolved @ {raw_player:#x} (vtable {vtable})"
             ));
             return;
         }
@@ -2550,6 +2557,7 @@ fn extract_live_data(
         profile,
         club,
         club_uid,
+        &club_name,
         team,
         &index_team_seeds,
     );
@@ -3011,7 +3019,9 @@ fn display_name(
 }
 
 fn is_plausible_fm_unique_id(uid: u32) -> bool {
-    (20_000_000..=99_999_999).contains(&uid) || (1_900_000_000..=2_200_000_000).contains(&uid)
+    // FM DB IDs often sit below 20M (e.g. Szoboszlai 16202373). Newgens use ~2.0B.
+    // Keep a floor so heap noise (0, 32762, …) stays out; person_identity_valid also requires a name.
+    (1_000_000..=99_999_999).contains(&uid) || (1_900_000_000..=2_200_000_000).contains(&uid)
 }
 
 /// FSS / AppCake person-class dynamic offsets. Player block (entity-map player_*) = PLAO =
@@ -3556,6 +3566,17 @@ mod tests {
             .expect("profile");
         assert_eq!(profile.constants.player_person_offset, 0x288);
         assert!(super::PERSON_CLASS_OFFSETS_FSS.contains(&profile.constants.player_person_offset));
+    }
+
+    #[test]
+    fn plausible_uid_accepts_sub_20m_db_ids() {
+        // Liverpool First Team slot that failed T205/T207: Dominik Szoboszlai @ 16202373.
+        assert!(super::is_plausible_fm_unique_id(16_202_373));
+        assert!(super::is_plausible_fm_unique_id(28_091_347));
+        assert!(super::is_plausible_fm_unique_id(2_000_011_147));
+        assert!(!super::is_plausible_fm_unique_id(0));
+        assert!(!super::is_plausible_fm_unique_id(32_762));
+        assert!(!super::is_plausible_fm_unique_id(999_999));
     }
 
     #[test]

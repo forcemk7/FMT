@@ -1,53 +1,54 @@
 ﻿# Status
 
-Last updated: 2026-09-04 (T205 done — FSS PLAO person resolve + honest non-person slots)
+Last updated: 2026-09-04 (T207 done — First Team 39=39 via UID floor)
 
 ## Now
 
-**T206 ready (P2)** — tab labels as in-game; TeamType + known team name fields when club-name collision.
+**T206 ready (P1)** — Club.Teams in-game tab labels (was behind T207).
 
-**Human FMLE A/B** — affiliate flags for separate-club II (after T206).
+**Human:** reload Liverpool in FMT — First Team should show 39 including Szoboszlai.
 
 **T190 parked** — Save ID in RAM before save-copy CA path.
 
-**Deferred:** T139 theme. T162 trophy cabinet. T124 quiet dev launch. Loop D full-world **load** still parked; archive `.cursor/rules/fm-live-read.mdc` is the knowledge store.
+**Deferred:** T139 theme. T162 trophy cabinet. T124 quiet dev launch. Loop D full-world load parked.
 
 ## Board
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
-| T206 | Club.Teams — in-game team display names | ready | 2 | TeamType / name collision; no world index |
-| T190 | Development all-time from Progress Report CA strip | blocked | 2 | **parked** — need Save ID in RAM before `.fm` pick |
+| T206 | Club.Teams — in-game team display names | ready | 1 | was P2 behind T207 |
+| T190 | Development all-time from Progress Report CA strip | blocked | 2 | **parked** |
 | T124 | Quiet dev launch | ready | 9 | behind Loop A |
 | T139 | FMT visual theme | deferred | — | overlapped |
 | T162 | Player trophy cabinet | deferred | — | backlog |
 
 ## Cancelled / superseded
 
-- **T199** Reserves — B-team affiliate rosters — **cancelled** (never filed). Controllable teams = Club.Teams + TeamType (T200). Separate-club II = T203+.
+- **T199** Reserves — B-team affiliate rosters — **cancelled**. Separate-club II = T203+.
 
 ## Recently done
 
-- **T205** Roster — FSS person-class/PLAO resolve; non-person roster slots honest (not missing First XI)
-- **T204** Squad — status filters + rosterLen in Settings (tab paren counts → filter row)
-- **T203** RE — affiliate squad-tab flag bytes (FMLE A/B probe + diff; production unwired)
-- **T202** Squad face-cache freshness — remap `from=` / source mtime revalidation on warm
-- **T201** Production load — Club.Teams only; drop B-team heuristic + heap fallback; first-team-first order
-- **T200** Lock Club.Teams (`club+0x18/+0x20`) + TeamType (`team+0x28`); production vector-first team discovery
-- **T198** Club affiliate graph RE — `debug_scan_club_affiliates` forward/back links + relationship u32 candidates
-- **T196** U19 squad — GS full index on load + contract-team U19 promote + Squad subtabs
-- **T194** GM advises Sell vs Loan from squad avg CA
-- **T193** Loans club logo pill + profile logo = active (loan) club
-- **T192** GM desk = Squad twin filtered to move-on (PA≤140, headroom≤8)
-- **T191** Loans age + loan club honesty (game-date fallback + Loan club on desk/profile)
-- **T189** Loans desk = outgoing `loanedOut` players (Squad twin)
-- **T188** Attr deltas in load pipeline (recent → Attributes, all-time → Development)
-- **T187** Invalidate attr history poisoned by old rounding (v2 store)
-- **T186** Development plot color match, hover values, all-time Δ layout fix
-- **T185** Development content = plot + desk only (zero chrome)
-- **T182** Live Squad = at-club match squad only (`loanedOut` via person loan agreement)
-- **T184** Development desk compact single-page (all-time Δ desk + plot)
+- **T207** Roster — load all First Team Players slots (UID floor; Liverpool 39=39)
+- **T205** Roster — FSS person-class/PLAO resolve
+- **T204** Squad — status filters + rosterLen in Settings
+- **T203** RE — affiliate squad-tab flag bytes (probe; unwired)
+- **T202** Squad face-cache freshness
+- **T201** Production load — Club.Teams only
+- **T200** Lock Club.Teams + TeamType
+- **T198** Club affiliate graph RE
+- **T196** U19 squad live read
+- **T194** GM Sell vs Loan
+- **T193** Loans club logo pill
+- **T192** GM desk move-on
+- **T191** Loans age + loan club
+- **T189** Loans desk
+- **T188** Attr deltas in load pipeline
+- **T187** Attr history v2
+- **T186** Development plot
+- **T185** Development content chrome
+- **T182** Live Squad at-club
+- **T184** Development desk compact
 
 ## Loop
 
-FM → FMT Dashboard/Squad → player Attributes / Development → Loans (outgoing) → GM (Sell / Loan vs avg CA) → HoYD (high-PA groom) → (later) Tactic / TD / world.
+FM → FMT Dashboard/Squad → player Attributes / Development → Loans → GM → HoYD → (later) Tactic / TD / world.
