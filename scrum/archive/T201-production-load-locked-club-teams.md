@@ -50,4 +50,4 @@ After T200, production still ran unfinished B-team affiliate heuristics and a he
 
 **Verify:** `classify_club_team_by_uid`, `team_type_maps`, `club_teams_and_team_type` — ok.
 
-Commit: _(after git)_
+Commit: `79c09c4c6ef9316b7a7fb32d32cd802b6721a3f2`
