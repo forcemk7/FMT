@@ -41,4 +41,4 @@ Newgen remaps recycle UIDs; pack `from=` / face files update but FMT `face-cache
 
 ## Progress
 
-Shipped: warm re-resolves cutout + mapped sources; `.src` sidecar holds `map:{from}` or `file:{path}`; refresh on identity/mtime/size change; clears sibling extensions so stale format hits cannot win. UI nudge at 15s after warm. Verified: `cargo test --lib graphics::faces` 7/7 ok.
+Shipped: warm re-resolves cutout + mapped sources; `.src` sidecar holds `map:{from}` or `file:{path}`; refresh on identity/mtime/size change; clears sibling extensions so stale format hits cannot win. UI nudge at 15s after warm. Verified: `cargo test --lib graphics::faces` 7/7 ok. Commit `c6b17fd`.
