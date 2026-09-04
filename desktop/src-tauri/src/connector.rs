@@ -173,6 +173,8 @@ struct LiveData {
     warnings: Vec<String>,
     tactic_manager_pointer: Option<u64>,
     club_employees: u32,
+    /// Managed club+0x118 affiliation type census (Diagnostics).
+    affiliation_types: Option<Value>,
 }
 
 struct ExtractionFailure {
@@ -225,9 +227,60 @@ pub async fn load_active_save(app: tauri::AppHandle) -> ConnectorSnapshot {
     }
 }
 
-#[cfg(all(feature = "probe", target_os = "windows"))]
+#[cfg(all(
+    any(feature = "probe", feature = "affiliate_flags_probe"),
+    target_os = "windows"
+))]
 pub fn run_debug_scan_club_affiliates() -> Result<Value, String> {
     debug_scan_club_affiliates_impl()
+}
+
+#[cfg(all(
+    any(feature = "probe", feature = "affiliate_flags_probe"),
+    target_os = "windows"
+))]
+pub fn run_debug_probe_affiliate_containers() -> Result<Value, String> {
+    debug_probe_affiliate_containers_impl()
+}
+
+#[cfg(all(
+    any(feature = "probe", feature = "affiliate_flags_probe"),
+    target_os = "windows"
+))]
+pub fn run_debug_probe_agreement_table() -> Result<Value, String> {
+    debug_probe_agreement_table_impl()
+}
+
+#[cfg(all(
+    any(feature = "probe", feature = "affiliate_flags_probe"),
+    target_os = "windows"
+))]
+pub fn run_debug_probe_pge_affiliation_sign() -> Result<Value, String> {
+    debug_probe_pge_affiliation_sign_impl()
+}
+
+#[cfg(all(
+    any(feature = "probe", feature = "affiliate_flags_probe"),
+    target_os = "windows"
+))]
+pub fn run_debug_probe_editor_affiliations() -> Result<Value, String> {
+    debug_probe_editor_affiliations_impl()
+}
+
+#[cfg(all(
+    any(feature = "probe", feature = "affiliate_flags_probe"),
+    target_os = "windows"
+))]
+pub fn run_debug_probe_duisburg_type_ab(save_label: &str) -> Result<Value, String> {
+    debug_probe_duisburg_type_ab_impl(save_label)
+}
+
+#[cfg(all(
+    any(feature = "probe", feature = "affiliate_flags_probe"),
+    target_os = "windows"
+))]
+pub fn run_debug_probe_affiliation_type_census() -> Result<Value, String> {
+    debug_probe_affiliation_type_census_impl()
 }
 
 #[cfg(all(
@@ -841,6 +894,23 @@ fn collect_snapshot(progress: Option<&dyn Fn(&'static str)>) -> ConnectorSnapsho
                 reader.bytes_read
             );
             status.warnings = data.warnings.clone();
+            if let Some(report) = data.affiliation_types.as_ref() {
+                let mapped = report
+                    .get("mappedLinkCount")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(0) as u32;
+                let unmapped = report
+                    .get("unmappedTypeBytes")
+                    .and_then(Value::as_array)
+                    .map(|a| a.len() as u32)
+                    .unwrap_or(0);
+                status.mapping_coverage.push(MappingCoverage {
+                    section: "affiliationTypes".to_string(),
+                    validated: mapped,
+                    candidate: 0,
+                    unmapped,
+                });
+            }
             let data_warnings = status.warnings.clone();
             status.read_pipeline = Vec::new();
             let bytes_per_player = if data.players.is_empty() {
@@ -1434,7 +1504,7 @@ fn debug_scan_club_teams_impl() -> Result<Value, String> {
             })
         })
         .collect();
-    let affiliates = discover_bteam_affiliate_clubs(
+    let discovery = discover_bteam_affiliate_clubs(
         &mut reader,
         module,
         profile,
@@ -1442,6 +1512,7 @@ fn debug_scan_club_teams_impl() -> Result<Value, String> {
         selected.club_uid,
         selected.team,
     );
+    let affiliates = &discovery.affiliates;
     let affiliate_teams: Vec<Value> = affiliates
         .iter()
         .flat_map(|affiliate| {
@@ -1458,6 +1529,8 @@ fn debug_scan_club_teams_impl() -> Result<Value, String> {
                 json!({
                     "affiliateClubUid": affiliate.club_uid,
                     "affiliateClubName": affiliate.club_name,
+                    "affiliationType": affiliate.affiliation_type,
+                    "affiliationTypeLabel": affiliate.affiliation_type_label,
                     "teamUid": team.team_uid,
                     "name": team.name,
                     "rosterLen": team.roster_len,
@@ -1474,11 +1547,14 @@ fn debug_scan_club_teams_impl() -> Result<Value, String> {
         "bytesRead": reader.bytes_read,
         "rawClubTeamsBeforeClassify": raw_from_club,
         "teams": teams,
+        "affiliationTypes": discovery.affiliation_type_report,
         "squadTabAffiliates": affiliates.iter().map(|a| json!({
             "clubUid": a.club_uid,
             "clubName": a.club_name,
             "linkKind": format!("{:?}", a.link_kind),
             "linkStructPointer": a.link_struct_pointer.map(hex_address),
+            "affiliationType": a.affiliation_type,
+            "affiliationTypeLabel": a.affiliation_type_label,
         })).collect::<Vec<_>>(),
         "squadTabAffiliateTeams": affiliate_teams,
     }))
@@ -1603,7 +1679,10 @@ fn debug_probe_bteam_intake_impl() -> Result<Value, String> {
     ))
 }
 
-#[cfg(all(feature = "probe", target_os = "windows"))]
+#[cfg(all(
+    any(feature = "probe", feature = "affiliate_flags_probe"),
+    target_os = "windows"
+))]
 fn debug_scan_club_affiliates_impl() -> Result<Value, String> {
     use crate::fm26::club_affiliates::probe_managed_club_affiliate_graph;
 
@@ -1675,6 +1754,236 @@ fn debug_scan_club_affiliates_impl() -> Result<Value, String> {
     any(feature = "probe", feature = "affiliate_flags_probe"),
     target_os = "windows"
 ))]
+fn debug_probe_affiliate_containers_impl() -> Result<Value, String> {
+    use crate::fm26::club_affiliates::probe_affiliate_container_hunt;
+
+    let Some((process_id, _)) = find_fm26_process() else {
+        return Err("FM26 process not found.".to_string());
+    };
+    let mut reader = ProcessReader::open(process_id)
+        .map_err(|code| format!("Could not open FM26 read-only handle (Windows error {code})."))?;
+    let identity = reader
+        .process_path()
+        .as_deref()
+        .map(read_executable_identity)
+        .unwrap_or_default();
+    let Some(profile) = find_entity_map(
+        identity.file_version.as_deref(),
+        identity.product_version.as_deref(),
+        identity.sha256.as_deref(),
+        identity.architecture.as_deref(),
+    ) else {
+        return Err("FM26 build is not supported.".to_string());
+    };
+    let Some(module) = reader.module(&profile.module) else {
+        return Err("The FM26 game module was not available.".to_string());
+    };
+    let mut diagnostics = ExtractionDiagnostics::default();
+    let (selected, manager_pick_warning) =
+        resolve_active_human_manager(&mut reader, module, profile, process_id, &mut diagnostics)
+            .map_err(|failure| failure.message)?;
+    let mut report = probe_affiliate_container_hunt(
+        &mut reader,
+        module,
+        profile,
+        selected.club,
+        selected.club_uid,
+        &selected.club_name,
+    );
+    if let Some(object) = report.as_object_mut() {
+        object.insert("managerName".to_string(), json!(selected.manager_name));
+        object.insert("managerPickWarning".to_string(), json!(manager_pick_warning));
+        object.insert("bytesRead".to_string(), json!(reader.bytes_read));
+    }
+    Ok(report)
+}
+
+#[cfg(all(
+    any(feature = "probe", feature = "affiliate_flags_probe"),
+    target_os = "windows"
+))]
+fn debug_probe_agreement_table_impl() -> Result<Value, String> {
+    use crate::fm26::agreement_table::probe_agreement_table;
+
+    let Some((process_id, _)) = find_fm26_process() else {
+        return Err("FM26 process not found.".to_string());
+    };
+    let mut reader = ProcessReader::open(process_id)
+        .map_err(|code| format!("Could not open FM26 read-only handle (Windows error {code})."))?;
+    let identity = reader
+        .process_path()
+        .as_deref()
+        .map(read_executable_identity)
+        .unwrap_or_default();
+    let Some(profile) = find_entity_map(
+        identity.file_version.as_deref(),
+        identity.product_version.as_deref(),
+        identity.sha256.as_deref(),
+        identity.architecture.as_deref(),
+    ) else {
+        return Err("FM26 build is not supported.".to_string());
+    };
+    let Some(module) = reader.module(&profile.module) else {
+        return Err("The FM26 game module was not available.".to_string());
+    };
+    let mut diagnostics = ExtractionDiagnostics::default();
+    let (selected, manager_pick_warning) =
+        resolve_active_human_manager(&mut reader, module, profile, process_id, &mut diagnostics)
+            .map_err(|failure| failure.message)?;
+    let mut report = probe_agreement_table(
+        &mut reader,
+        module,
+        profile,
+        selected.club,
+        selected.club_uid,
+        &selected.club_name,
+    );
+    if let Some(object) = report.as_object_mut() {
+        object.insert("managerName".to_string(), json!(selected.manager_name));
+        object.insert("managerPickWarning".to_string(), json!(manager_pick_warning));
+    }
+    Ok(report)
+}
+
+#[cfg(all(
+    any(feature = "probe", feature = "affiliate_flags_probe"),
+    target_os = "windows"
+))]
+fn debug_probe_affiliation_type_census_impl() -> Result<Value, String> {
+    use crate::fm26::affiliation_type_census::probe_affiliation_type_census;
+
+    let Some((process_id, _)) = find_fm26_process() else {
+        return Err("FM26 process not found.".to_string());
+    };
+    let mut reader = ProcessReader::open(process_id)
+        .map_err(|code| format!("Could not open FM26 read-only handle (Windows error {code})."))?;
+    let identity = reader
+        .process_path()
+        .as_deref()
+        .map(read_executable_identity)
+        .unwrap_or_default();
+    let Some(profile) = find_entity_map(
+        identity.file_version.as_deref(),
+        identity.product_version.as_deref(),
+        identity.sha256.as_deref(),
+        identity.architecture.as_deref(),
+    ) else {
+        return Err("FM26 build is not supported.".to_string());
+    };
+    let Some(module) = reader.module(&profile.module) else {
+        return Err("The FM26 game module was not available.".to_string());
+    };
+    Ok(probe_affiliation_type_census(&mut reader, module, &profile))
+}
+
+#[cfg(all(
+    any(feature = "probe", feature = "affiliate_flags_probe"),
+    target_os = "windows"
+))]
+fn debug_probe_duisburg_type_ab_impl(save_label: &str) -> Result<Value, String> {
+    use crate::fm26::duisburg_type_ab::probe_duisburg_type_ab;
+
+    let Some((process_id, _)) = find_fm26_process() else {
+        return Err("FM26 process not found.".to_string());
+    };
+    let mut reader = ProcessReader::open(process_id)
+        .map_err(|code| format!("Could not open FM26 read-only handle (Windows error {code})."))?;
+    let identity = reader
+        .process_path()
+        .as_deref()
+        .map(read_executable_identity)
+        .unwrap_or_default();
+    let Some(profile) = find_entity_map(
+        identity.file_version.as_deref(),
+        identity.product_version.as_deref(),
+        identity.sha256.as_deref(),
+        identity.architecture.as_deref(),
+    ) else {
+        return Err("FM26 build is not supported.".to_string());
+    };
+    let Some(module) = reader.module(&profile.module) else {
+        return Err("The FM26 game module was not available.".to_string());
+    };
+    let mut diagnostics = ExtractionDiagnostics::default();
+    let (selected, manager_pick_warning) =
+        resolve_active_human_manager(&mut reader, module, profile, process_id, &mut diagnostics)
+            .map_err(|failure| failure.message)?;
+    let mut report = probe_duisburg_type_ab(
+        &mut reader,
+        module,
+        profile,
+        selected.club,
+        selected.club_uid,
+        &selected.club_name,
+        save_label,
+    );
+    if let Some(object) = report.as_object_mut() {
+        object.insert("managerName".to_string(), json!(selected.manager_name));
+        object.insert("managerPickWarning".to_string(), json!(manager_pick_warning));
+        object.insert("bytesRead".to_string(), json!(reader.bytes_read));
+    }
+    Ok(report)
+}
+
+#[cfg(all(
+    any(feature = "probe", feature = "affiliate_flags_probe"),
+    target_os = "windows"
+))]
+fn debug_probe_editor_affiliations_impl() -> Result<Value, String> {
+    crate::fm26::editor_affiliations::probe_editor_affiliations()
+}
+
+#[cfg(all(
+    any(feature = "probe", feature = "affiliate_flags_probe"),
+    target_os = "windows"
+))]
+fn debug_probe_pge_affiliation_sign_impl() -> Result<Value, String> {
+    use crate::fm26::pge_affiliation_sign::probe_pge_affiliation_signatures;
+
+    let Some((process_id, _)) = find_fm26_process() else {
+        return Err("FM26 process not found.".to_string());
+    };
+    let mut reader = ProcessReader::open(process_id)
+        .map_err(|code| format!("Could not open FM26 read-only handle (Windows error {code})."))?;
+    let identity = reader
+        .process_path()
+        .as_deref()
+        .map(read_executable_identity)
+        .unwrap_or_default();
+    let Some(profile) = find_entity_map(
+        identity.file_version.as_deref(),
+        identity.product_version.as_deref(),
+        identity.sha256.as_deref(),
+        identity.architecture.as_deref(),
+    ) else {
+        return Err("FM26 build is not supported.".to_string());
+    };
+    let Some(module) = reader.module(&profile.module) else {
+        return Err("The FM26 game module was not available.".to_string());
+    };
+    let mut diagnostics = ExtractionDiagnostics::default();
+    let (selected, manager_pick_warning) =
+        resolve_active_human_manager(&mut reader, module, profile, process_id, &mut diagnostics)
+            .map_err(|failure| failure.message)?;
+    let mut report = probe_pge_affiliation_signatures(
+        &mut reader,
+        module,
+        profile,
+        selected.club,
+        selected.club_uid,
+        &selected.club_name,
+    );
+    if let Some(object) = report.as_object_mut() {
+        object.insert("managerName".to_string(), json!(selected.manager_name));
+        object.insert("managerPickWarning".to_string(), json!(manager_pick_warning));
+    }
+    Ok(report)
+}
+
+#[cfg(all(
+    any(feature = "probe", feature = "affiliate_flags_probe"),
+    target_os = "windows"
+))]
 fn debug_probe_affiliate_flags_impl() -> Result<Value, String> {
     use crate::fm26::affiliate_links::probe_affiliate_squad_flag_slots;
 
@@ -1709,6 +2018,7 @@ fn debug_probe_affiliate_flags_impl() -> Result<Value, String> {
         profile,
         selected.club,
         selected.club_uid,
+        selected.team,
     );
     if let Some(object) = report.as_object_mut() {
         object.insert("managedClubName".to_string(), json!(selected.club_name));
@@ -1985,6 +2295,8 @@ struct DiscoveredClubTeam {
     squad_unit: &'static str,
     roster_len: usize,
     team_type: Option<u8>,
+    affiliation_type: Option<u8>,
+    affiliation_type_label: Option<String>,
 }
 
 /// Club → Teams: validated team objects linked to the managed club (FMLE tree parity).
@@ -2034,6 +2346,8 @@ fn discover_managed_club_teams(
             squad_unit,
             roster_len: team.roster_len,
             team_type: team.team_type,
+            affiliation_type: None,
+            affiliation_type_label: None,
         });
     }
     discovered
@@ -2049,6 +2363,8 @@ fn club_teams_json(discovered: &[DiscoveredClubTeam], manager_team: u64) -> Vec<
                 "rosterLen": entry.roster_len,
                 "squadUnit": entry.squad_unit,
                 "teamType": entry.team_type,
+                "affiliationType": entry.affiliation_type,
+                "affiliationTypeLabel": entry.affiliation_type_label,
                 "isManagerTeam": entry.team == manager_team,
             })
         })
@@ -2178,6 +2494,8 @@ fn load_bteam_affiliate_rosters(
                 squad_unit,
                 roster_len: team.roster_len,
                 team_type: team.team_type,
+                affiliation_type: affiliate.affiliation_type,
+                affiliation_type_label: affiliate.affiliation_type_label.clone(),
             });
             labels.push(format!(
                 "{} (affiliate) uid {} ({}, {} roster)",
@@ -2416,11 +2734,11 @@ fn push_squad_player_from_raw(
         .zip(current_date)
         .and_then(|(birth, current)| calculate_age(birth, current));
     let date_of_birth = birth_date.and_then(format_fm_date);
-    let game_date = current_date.and_then(format_fm_date);
-    let season = current_date.map(|date| {
-        let next_year = date.year.saturating_add(1);
-        format!("{}/{}", date.year, next_year % 100)
-    });
+    // Season and calendar date are one pair — never emit season alone.
+    let (game_date, season) = match current_date.and_then(calendar_pair) {
+        Some((game_date, season)) => (Some(game_date), Some(season)),
+        None => (None, None),
+    };
     let nationality = read_nationality(reader, person, profile);
     let nationality_id = read_nation_id(reader, person, profile);
     let visible_attributes = visible_attribute_map(&attribute_bytes);
@@ -2783,10 +3101,10 @@ fn extract_live_data(
     diagnostics.last_successful_read = Some("validate_managed_club".to_string());
 
     let club_id = club_uid.to_string();
-    // Squad-tab separate-club reserves (II / NPL): parent-edge affiliates that are not
-    // inline feeders. FMLE labels this class Main+Permanent+Players Move Freely.
-    let bteam_affiliates =
+    // Squad-tab separate-club reserves (II / NPL): club+0x118 type filter + T212 satellite bridge.
+    let bteam_discovery =
         discover_bteam_affiliate_clubs(reader, module, profile, club, club_uid, team);
+    let bteam_affiliates = &bteam_discovery.affiliates;
     let affiliate_reserve_club_uids: HashSet<u32> =
         bteam_affiliates.iter().map(|entry| entry.club_uid).collect();
 
@@ -3021,18 +3339,17 @@ fn extract_live_data(
     let database_scope = "managed-squad";
     let database_index_error: Option<String> = None;
 
-    let game_date = players.iter().find_map(|player| {
-        player
-            .get("_gameDate")
-            .and_then(Value::as_str)
-            .map(str::to_string)
-    });
-    let season = players.iter().find_map(|player| {
-        player
-            .get("_season")
-            .and_then(Value::as_str)
-            .map(str::to_string)
-    });
+    let (game_date, season) = squad_game_date
+        .and_then(calendar_pair)
+        .or_else(|| {
+            players.iter().find_map(|player| {
+                let game_date = player.get("_gameDate")?.as_str()?.to_string();
+                let season = player.get("_season")?.as_str()?.to_string();
+                Some((game_date, season))
+            })
+        })
+        .map(|(game_date, season)| (Some(game_date), Some(season)))
+        .unwrap_or((None, None));
     for player in &mut players {
         if let Some(object) = player.as_object_mut() {
             object.remove("_season");
@@ -3059,6 +3376,27 @@ fn extract_live_data(
             bteam_affiliates.len(),
             bteam_promoted
         ));
+    }
+    if let Some(report) = bteam_discovery.affiliation_type_report.as_ref() {
+        if let Some(reminders) = report.get("unmappedReminders").and_then(Value::as_array) {
+            for reminder in reminders {
+                if let Some(text) = reminder.as_str() {
+                    warnings.push(format!(
+                        "{text} — seen on managed club+0x118; label in PGE when you find the partner."
+                    ));
+                }
+            }
+        }
+        let mapped = report
+            .get("mappedLinkCount")
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+        let links = report.get("linkCount").and_then(Value::as_u64).unwrap_or(0);
+        if links > 0 {
+            warnings.push(format!(
+                "Affiliation types on club+0x118: {mapped}/{links} links mapped (Squad tabs use II Club 0x08; Normal/Good Relations/Likely Friendly excluded)."
+            ));
+        }
     }
     if club_squad_promoted > 0 {
         warnings.push(format!(
@@ -3094,6 +3432,7 @@ fn extract_live_data(
         warnings,
         tactic_manager_pointer: None,
         club_employees,
+        affiliation_types: bteam_discovery.affiliation_type_report,
     })
 }
 
@@ -3204,6 +3543,18 @@ fn attribute_evidence(attributes: &HashMap<String, u8>) -> (Vec<String>, Vec<Str
 
 fn is_leap_year(year: u16) -> bool {
     year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
+}
+
+fn season_label(date: FmDate) -> String {
+    let next_year = date.year.saturating_add(1);
+    format!("{}/{}", date.year, next_year % 100)
+}
+
+/// Calendar YYYY-MM-DD + season label, or None if the day-of-year cannot be mapped.
+/// Callers must not emit season without a formatted game date.
+fn calendar_pair(date: FmDate) -> Option<(String, String)> {
+    let game_date = format_fm_date(date)?;
+    Some((game_date, season_label(date)))
 }
 
 fn month_day(date: FmDate) -> Option<(u8, u8)> {
@@ -3740,6 +4091,10 @@ mod tests {
         assert_eq!(format_fm_date(birth).as_deref(), Some("1995-08-13"));
         assert_eq!(format_fm_date(current).as_deref(), Some("2026-05-30"));
         assert_eq!(calculate_age(birth, current), Some(30));
+        assert_eq!(
+            calendar_pair(current),
+            Some(("2026-05-30".to_string(), "2026/27".to_string()))
+        );
     }
 
     #[test]

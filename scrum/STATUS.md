@@ -1,16 +1,16 @@
 ﻿# Status
 
-Last updated: 2026-09-04 (T212 done — managed affiliate II/NPL)
+Last updated: 2026-09-04 (T214 done — club+0x118 type filter + map reminders)
 
 ## Now
 
-**Human:** Schalke + Melbourne affiliate squads **PASS** (totals 79 / 55). Affiliate tab label still “First Team” — later. Empty Youth(0) OK.
+**Board clear of T214.** Next: pick highest-priority `ready` ticket (T209 after T208, or ask HQ).
 
 **T208** Five-band attr tones — Super deferred; await archive confirm.
 
 **T190 parked** — Save ID in RAM before save-copy CA path.
 
-**Deferred:** T210 Squad card/list density. T139 theme. T162 trophy cabinet. T124 quiet dev launch. Empty Youth(0) tab. Loop D full-world load parked.
+**Deferred:** T215 Diagnostics source-of-truth skeleton + live fill. T210 Squad card/list density. T139 theme. T162 trophy cabinet. T124 quiet dev launch. Empty Youth(0) tab. Loop D full-world load parked — catalog `scrum/FM-ECOSYSTEM.md`.
 
 ## Board
 
@@ -21,6 +21,7 @@ Last updated: 2026-09-04 (T212 done — managed affiliate II/NPL)
 | T209 | Squad — roster status as single select | ready | 5 | after T208; multi→single |
 | T124 | Quiet dev launch | ready | 9 | behind Loop A |
 | T210 | Squad — card / list density toggle | deferred | — | not now; after T209 if unfrozen |
+| T215 | Diagnostics — source-of-truth skeleton + live fill | deferred | — | after product loops; quality/compress phase |
 | T139 | FMT visual theme | deferred | — | overlapped |
 | T162 | Player trophy cabinet | deferred | — | backlog |
 
@@ -30,6 +31,7 @@ Last updated: 2026-09-04 (T212 done — managed affiliate II/NPL)
 
 ## Recently done
 
+- **T214** Lock durable Squad-tab affiliate discovery (`club+0x118` + type `+0x30`; T212 bridge for NPL)
 - **T212** Load managed affiliate squads (Schalke II + Melbourne NPL; totals 79/55)
 - **T213** Diagnostics — rename, game date, load-order fields
 - **T211** Club.Teams — map TeamType 21 (Youth; Melbourne Youths 15)
@@ -57,4 +59,4 @@ Last updated: 2026-09-04 (T212 done — managed affiliate II/NPL)
 
 ## Loop
 
-FM → FMT Dashboard/Squad → player Attributes / Development → Loans (outgoing) → GM (Sell / Loan vs avg CA) → HoYD (high-PA groom) → (later) Tactic / TD / world.
+Loop A funded. Loop B = Dashboard. Loop C: Loans + GM + HoYD live; Tactic/TD Later. Loop D parked.

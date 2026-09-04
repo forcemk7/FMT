@@ -251,6 +251,10 @@ export type LiveClubTeam = {
   squadUnit: "firstTeam" | "under19s" | "reserves";
   /** Raw FM TeamType byte when known (FMScout enum). */
   teamType?: number | null;
+  /** Wrapper +0x30 Affiliation Type when discovered via club+0x118. */
+  affiliationType?: number | null;
+  /** PGE label or `Map AffiliationType 0xNN` reminder. */
+  affiliationTypeLabel?: string | null;
   isManagerTeam: boolean;
 };
 

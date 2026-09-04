@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  affiliationTypeDisplayLabel,
   countAtClubSquadUnit,
   countClubEmployees,
   countClubEmployeesAtClub,
@@ -18,6 +19,7 @@ import {
   sortClubTeamsForSquadDesk,
   squadMedianCA,
   squadTeamDisplayName,
+  squadTeamLoadedCount,
   squadTeamTabLabel,
 } from "./live-data";
 
@@ -130,16 +132,33 @@ describe("groupPlayerPosition", () => {
 });
 
 describe("squadTeamTabLabel", () => {
-  it("uses the in-game team name only", () => {
-    expect(squadTeamTabLabel({ name: "FC Schalke 04 U19", teamUid: "1" })).toBe(
-      "FC Schalke 04 U19",
-    );
+  it("appends loaded roster size (at club + on loan + loaned out)", () => {
+    expect(
+      squadTeamTabLabel(
+        { name: "FC Schalke 04 U19", teamUid: "1", teamType: 11 },
+        null,
+        { atClub: 19, loanedIn: 0, loanedOut: 3 },
+      ),
+    ).toBe("U19 (22)");
+    expect(
+      squadTeamTabLabel(
+        { name: "AFC Bournemouth", teamUid: "3", teamType: 12 },
+        "AFC Bournemouth",
+        { atClub: 19, loanedIn: 0, loanedOut: 0 },
+      ),
+    ).toBe("U18 (19)");
   });
 
-  it("falls back to team uid when FM team name is empty", () => {
-    expect(squadTeamTabLabel({ name: "  ", teamUid: "2000069496" })).toBe(
-      "Team 2000069496",
+  it("omits count when roster counts are unavailable", () => {
+    expect(squadTeamTabLabel({ name: "  ", teamUid: "2000778591" })).toBe(
+      "Map TeamType (?): uid-2000778591",
     );
+  });
+});
+
+describe("squadTeamLoadedCount", () => {
+  it("sums all three status filters", () => {
+    expect(squadTeamLoadedCount({ atClub: 19, loanedIn: 1, loanedOut: 4 })).toBe(24);
   });
 });
 
@@ -209,16 +228,16 @@ describe("sortClubTeamsForSquadDesk", () => {
 });
 
 describe("squadTeamDisplayName", () => {
-  it("keeps a distinct FM team string (Schalke U19)", () => {
+  it("uses TeamType even when FM has a distinct string", () => {
     expect(
       squadTeamDisplayName(
         { name: "FC Schalke 04 U19", teamUid: "2", teamType: 11 },
         "FC Schalke 04",
       ),
-    ).toBe("FC Schalke 04 U19");
+    ).toBe("U19");
   });
 
-  it("disambiguates English club-name collisions via TeamType", () => {
+  it("maps English TeamType bytes to labels", () => {
     expect(
       squadTeamDisplayName({ name: "Liverpool", teamUid: "676", teamType: 0 }, "Liverpool"),
     ).toBe("First Team");
@@ -230,14 +249,31 @@ describe("squadTeamDisplayName", () => {
     ).toBe("U18");
   });
 
-  it("uses TeamType when the FM string is empty", () => {
+  it("reminds to map unmapped or missing TeamType", () => {
     expect(
-      squadTeamDisplayName({ name: "", teamUid: "99", teamType: 11 }, "Leicester City"),
-    ).toBe("U19");
+      squadTeamDisplayName({ name: "FC Schalke 04 U19", teamUid: "2", teamType: 55 }),
+    ).toBe("Map TeamType 55");
+    expect(
+      squadTeamDisplayName({ name: "FC Schalke 04 U19", teamUid: "2" }, "FC Schalke 04"),
+    ).toBe("Map TeamType (?): FC Schalke 04 U19");
+    expect(squadTeamDisplayName({ name: "", teamUid: "42" })).toBe(
+      "Map TeamType (?): uid-42",
+    );
   });
 
-  it("falls back to Team uid when name and type are missing", () => {
-    expect(squadTeamDisplayName({ name: "", teamUid: "42" })).toBe("Team 42");
+  it("surfaces Map AffiliationType when affiliate type is unmapped", () => {
+    expect(
+      squadTeamDisplayName({
+        name: "Mystery Reserve",
+        teamUid: "9",
+        teamType: 15,
+        affiliationType: 0x2a,
+        affiliationTypeLabel: "Map AffiliationType 0x2A",
+      }),
+    ).toBe("Map AffiliationType 0x2A");
+    expect(
+      affiliationTypeDisplayLabel(0x08, null),
+    ).toBe("II Club");
   });
 });
 

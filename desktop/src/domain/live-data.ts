@@ -70,6 +70,11 @@ export type SquadTeamRosterCounts = {
   loanedOut: number;
 };
 
+/** Loaded players on a team tab = filter totals (not raw Team.Players vector length). */
+export function squadTeamLoadedCount(counts: SquadTeamRosterCounts): number {
+  return counts.atClub + counts.loanedIn + counts.loanedOut;
+}
+
 export function countSquadTeamRoster(
   players: Array<
     Pick<LivePlayer, "clubId" | "loanedOut" | "loanedIn" | "squadTeamUid">
@@ -330,7 +335,7 @@ export function groupPlayerPosition(
   return "Utility / other players";
 }
 
-/** FMScout TeamType → tab label when the FM string is empty or equals the club name. */
+/** FMScout TeamType → default squad tab label (or map reminder). */
 export function teamTypeDisplayLabel(teamType: number | null | undefined): string | null {
   switch (teamType) {
     case 0:
@@ -361,41 +366,78 @@ export function teamTypeDisplayLabel(teamType: number | null | undefined): strin
       return "Team 3";
     case 18:
       return "U20";
+    case 21:
     case 22:
       return "Youth";
     case 30:
       return "Dutch Reserves";
     default:
+      if (typeof teamType === "number") return `Map TeamType ${teamType}`;
       return null;
   }
 }
 
-/**
- * FM team object label for squad tabs / Settings.
- * Prefer a distinct in-game team string; when empty or equal to the club name,
- * disambiguate via TeamType (never invent Senior/Youth that contradict type).
- */
-export function squadTeamDisplayName(
-  team: Pick<LiveClubTeam, "name" | "teamUid" | "teamType">,
-  managedClubName?: string | null,
-): string {
-  const trimmed = team.name.trim();
-  const club = managedClubName?.trim() ?? "";
-  const collides =
-    trimmed.length === 0 || (club.length > 0 && trimmed.toLowerCase() === club.toLowerCase());
-  if (!collides) return trimmed;
-  const fromType = teamTypeDisplayLabel(team.teamType);
-  if (fromType) return fromType;
-  if (trimmed) return trimmed;
-  return `Team ${team.teamUid}`;
+/** PGE Affiliation Type byte (wrapper +0x30) → label or map reminder. */
+export function affiliationTypeDisplayLabel(
+  affiliationType: number | null | undefined,
+  affiliationTypeLabel?: string | null,
+): string | null {
+  if (affiliationTypeLabel?.trim()) return affiliationTypeLabel.trim();
+  if (typeof affiliationType !== "number") return null;
+  switch (affiliationType) {
+    case 0x01:
+      return "Normal Affiliated Club";
+    case 0x08:
+      return "II Club";
+    case 0x10:
+      return "Good Relations";
+    case 0x11:
+      return "Likely Friendly";
+    default:
+      return `Map AffiliationType 0x${affiliationType.toString(16).padStart(2, "0").toUpperCase()}`;
+  }
 }
 
-/** Squad desk tab label — same helper as Settings rosterLen rows. */
-export function squadTeamTabLabel(
-  team: Pick<LiveClubTeam, "name" | "teamUid" | "teamType">,
-  managedClubName?: string | null,
+/**
+ * Squad tab / Settings display name: TeamType label by default.
+ * Missing/unmapped type → reminder so the team still shows.
+ * Affiliate clubs may carry AffiliationType map reminders instead.
+ */
+export function squadTeamDisplayName(
+  team: Pick<
+    LiveClubTeam,
+    "name" | "teamUid" | "teamType" | "affiliationType" | "affiliationTypeLabel"
+  >,
+  _managedClubName?: string | null,
 ): string {
-  return squadTeamDisplayName(team, managedClubName);
+  const fromAffiliation = affiliationTypeDisplayLabel(
+    team.affiliationType,
+    team.affiliationTypeLabel,
+  );
+  if (fromAffiliation?.startsWith("Map AffiliationType")) return fromAffiliation;
+  const fromType = teamTypeDisplayLabel(team.teamType);
+  if (fromType) return fromType;
+  if (fromAffiliation) return fromAffiliation;
+  const trimmed = team.name.trim();
+  if (trimmed) return `Map TeamType (?): ${trimmed}`;
+  return `Map TeamType (?): uid-${team.teamUid}`;
+}
+
+/**
+ * Squad desk tab label — display name + loaded roster size
+ * (at club + on loan + loaned out). Raw Team.Players `rosterLen` stays in Settings.
+ */
+export function squadTeamTabLabel(
+  team: Pick<
+    LiveClubTeam,
+    "name" | "teamUid" | "teamType" | "affiliationType" | "affiliationTypeLabel"
+  >,
+  managedClubName?: string | null,
+  rosterCounts?: SquadTeamRosterCounts | null,
+): string {
+  const name = squadTeamDisplayName(team, managedClubName);
+  if (!rosterCounts) return name;
+  return `${name} (${squadTeamLoadedCount(rosterCounts)})`;
 }
 
 const SQUAD_UNIT_SORT: Record<SquadUnit, number> = {

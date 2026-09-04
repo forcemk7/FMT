@@ -93,6 +93,16 @@ pub(crate) struct AffiliateClubDiscovery {
     pub club_name: String,
     pub link_kind: AffiliateLinkKind,
     pub link_struct_pointer: Option<u64>,
+    /// Wrapper `+0x30` when discovered via `club+0x118` type walk.
+    pub affiliation_type: Option<u8>,
+    pub affiliation_type_label: Option<String>,
+}
+
+#[derive(Debug, Clone, Default)]
+pub(crate) struct BteamAffiliateDiscovery {
+    pub affiliates: Vec<AffiliateClubDiscovery>,
+    /// Full `+0x118` census for Diagnostics (mapped + unmapped reminders).
+    pub affiliation_type_report: Option<Value>,
 }
 
 #[derive(Debug, Clone)]
@@ -545,6 +555,8 @@ fn try_push_bteam_affiliate(
         club_name,
         link_kind: AffiliateLinkKind::BTeam,
         link_struct_pointer,
+        affiliation_type: None,
+        affiliation_type_label: None,
     });
 }
 
@@ -828,6 +840,8 @@ fn discover_bteam_from_managed_club_blob(
             club_name,
             link_kind: AffiliateLinkKind::BTeam,
             link_struct_pointer: None,
+            affiliation_type: None,
+            affiliation_type_label: None,
         });
     }
     found
@@ -996,15 +1010,16 @@ fn discover_bteam_from_heap_satellite_teams(
 
 /// B-team affiliate discovery (German reserves / separate club entity).
 ///
-/// **Production ladder** (Schalke 04 validated 2026-08-31):
+/// **Production ladder** (T214):
+/// 0. **`club+0x118` type walk** — Squad-tab types only (`0x08` II Club for now).
 /// 1. Link vector @ +0x8E8 — graph walk; skips feeder catalogs (>1 club pointer / struct).
-/// 2. **Satellite team heap scan** — primary path on Schalke: team vtable window anchored on
-///    managed club + first team → team links to affiliate club → `bteam_satellite_team_matches`.
+/// 2. **Satellite team heap scan** — T212 bridge for NPL / unmapped reserve types.
 /// 3. Indirect managed-club pointers → link struct with managed UID/pointer + single club.
 /// 4. Heap backrefs to managed club pointer inside link structs.
 /// 5. Managed club blob direct club pointers with parent edge.
 ///
-/// Feeders/friendlies excluded via inline UID on managed blob (64KB). No save-specific UID needles.
+/// Known non-squad types (`0x01` Normal, `0x10` Good Relations, `0x11` Likely Friendly) never
+/// become Squad tabs. Unmapped `+0x30` values are reported for Diagnostics map reminders.
 #[cfg(target_os = "windows")]
 pub(crate) fn discover_bteam_affiliate_clubs(
     reader: &mut ProcessReader,
@@ -1013,24 +1028,71 @@ pub(crate) fn discover_bteam_affiliate_clubs(
     managed_club: u64,
     managed_club_uid: u32,
     first_team: u64,
-) -> Vec<AffiliateClubDiscovery> {
+) -> BteamAffiliateDiscovery {
+    use super::affiliation_types::{
+        affiliation_type_map_reminder, affiliation_walk_to_json, resolve_club_ptr_by_uid,
+        walk_club_affiliation_links,
+    };
+
+    let walk = walk_club_affiliation_links(reader, managed_club);
+    let affiliation_type_report = Some(affiliation_walk_to_json(&walk));
+
     let mut seen_uids = std::collections::HashSet::new();
-    let mut found = discover_bteam_from_link_vector(
+    let mut found = Vec::new();
+
+    for link in &walk.links {
+        if !link.squad_tab {
+            continue;
+        }
+        if link.partner_uid == managed_club_uid || !seen_uids.insert(link.partner_uid) {
+            continue;
+        }
+        let Some((club, club_name)) =
+            resolve_club_ptr_by_uid(reader, module, profile, link.partner_uid)
+        else {
+            crate::fmt_log::load_detail(format!(
+                "affiliation type 0x{:02X}: partner uid {} not resolved in club table",
+                link.type_byte, link.partner_uid
+            ));
+            continue;
+        };
+        let label = link
+            .mapped_label
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| affiliation_type_map_reminder(link.type_byte));
+        crate::fmt_log::load_detail(format!(
+            "affiliation +0x118 type 0x{:02X} ({label}) → club uid {}",
+            link.type_byte, link.partner_uid
+        ));
+        found.push(AffiliateClubDiscovery {
+            club,
+            club_uid: link.partner_uid,
+            club_name,
+            link_kind: AffiliateLinkKind::BTeam,
+            link_struct_pointer: Some(link.wrapper),
+            affiliation_type: Some(link.type_byte),
+            affiliation_type_label: Some(label),
+        });
+    }
+
+    // T212 bridge: always merge satellite reserves (e.g. Melbourne NPL) not yet typed.
+    found.extend(discover_bteam_from_heap_satellite_teams(
         reader,
         module,
         profile,
         managed_club,
         managed_club_uid,
+        first_team,
         &mut seen_uids,
-    );
+    ));
+
     if found.is_empty() {
-        found = discover_bteam_from_heap_satellite_teams(
+        found = discover_bteam_from_link_vector(
             reader,
             module,
             profile,
             managed_club,
             managed_club_uid,
-            first_team,
             &mut seen_uids,
         );
     }
@@ -1064,14 +1126,16 @@ pub(crate) fn discover_bteam_affiliate_clubs(
             &mut seen_uids,
         );
     }
-    found
+
+    BteamAffiliateDiscovery {
+        affiliates: found,
+        affiliation_type_report,
+    }
 }
 
-/// RE-only: dump every managed-club link-vector slot (`@0x8E8`) for FMLE affiliate-flag A/B.
-///
-/// FMLE UI labels (Main / Permanent / Players Move Freely, …) are editable fields — not proven
-/// memory names. Toggle **one** LE control on an affiliate, re-run this probe, diff `structBytesHex`
-/// (or use `diff_hex_blobs`) to lock the byte(s) that mark squad-tab reserves.
+/// RE-only: dump managed-club `@0x8E8` slots **and** heap link structs whose club@0x160 is a
+/// Squad-tab reserve affiliate (found via discover ladder). Use for FMLE A/B when II/NPL are
+/// not on the 8-slot vector.
 #[cfg(target_os = "windows")]
 pub(crate) fn probe_affiliate_squad_flag_slots(
     reader: &mut ProcessReader,
@@ -1079,6 +1143,7 @@ pub(crate) fn probe_affiliate_squad_flag_slots(
     profile: &EntityMapProfile,
     managed_club: u64,
     managed_club_uid: u32,
+    first_team: u64,
 ) -> Value {
     let mut slots = Vec::new();
     for slot in 0..BTEAM_LINK_POINTER_SLOTS as u64 {
@@ -1093,62 +1158,219 @@ pub(crate) fn probe_affiliate_squad_flag_slots(
             }));
             continue;
         }
-        let blob = reader
-            .read_bytes(link_struct, AFFILIATE_LINK_STRUCT_PROBE_BYTES)
-            .unwrap_or_default();
-        let club_at_locked = reader
-            .read_pointer(link_struct + AFFILIATE_LINK_STRUCT_CLUB_POINTER_OFFSET)
-            .unwrap_or(0);
-        let club_identity = (club_at_locked != 0)
-            .then(|| read_club_identity(reader, module, profile, club_at_locked))
-            .flatten();
-        let club_ptr_hits = if club_at_locked != 0 {
-            pointer_hits_in_bytes(&blob, club_at_locked)
-        } else {
-            Vec::new()
-        };
-        let anchor = club_ptr_hits
-            .first()
-            .copied()
-            .unwrap_or(AFFILIATE_LINK_STRUCT_CLUB_POINTER_OFFSET as usize);
-        let feeder_catalog = link_struct_is_feeder_catalog(reader, module, profile, &blob);
-        slots.push(json!({
-            "slot": slot,
-            "fieldOffsetHex": format!("0x{field:X}"),
-            "linkStructPointer": format!("0x{link_struct:X}"),
-            "clubPointerAtLocked0x160": format!("0x{club_at_locked:X}"),
-            "clubUid": club_identity.as_ref().map(|(uid, _)| *uid),
-            "clubName": club_identity.as_ref().map(|(_, name)| name.clone()),
-            "feederCatalogMultiClub": feeder_catalog,
-            "clubPointerHitsInStruct": club_ptr_hits,
-            "flagGridAnchorOffset": anchor,
-            "u8GridAroundClubPointer": u8_grid_around(&blob, anchor, 64),
-            "u32GridAroundClubPointer": relationship_candidates_wide(&blob, anchor),
-            "structBytesHex": blob
-                .iter()
-                .map(|byte| format!("{byte:02x}"))
-                .collect::<String>(),
-            "structBytesLen": blob.len(),
-        }));
+        slots.push(dump_affiliate_link_struct_for_flags(
+            reader,
+            module,
+            profile,
+            link_struct,
+            Some(slot),
+            format!("link vector slot {slot}"),
+        ));
     }
+
+    // II / NPL often live off @0x8E8 — find link structs by club@0x160 → discovered affiliate.
+    let discovery = discover_bteam_affiliate_clubs(
+        reader,
+        module,
+        profile,
+        managed_club,
+        managed_club_uid,
+        first_team,
+    );
+    let affiliates = discovery.affiliates;
+    let mut heap_link_structs = Vec::new();
+    let mut seen_structs = std::collections::HashSet::new();
+    for affiliate in &affiliates {
+        for link_struct in find_link_structs_for_affiliate_club(
+            reader,
+            module,
+            profile,
+            managed_club,
+            managed_club_uid,
+            affiliate.club,
+            affiliate.club_uid,
+        ) {
+            if !seen_structs.insert(link_struct) {
+                continue;
+            }
+            heap_link_structs.push(dump_affiliate_link_struct_for_flags(
+                reader,
+                module,
+                profile,
+                link_struct,
+                None,
+                format!(
+                    "heap→club@0x160 uid {} ({})",
+                    affiliate.club_uid,
+                    affiliate.club_name.trim()
+                ),
+            ));
+        }
+    }
+
     json!({
         "status": "affiliate-squad-flag-slots",
-        "purpose": "FMLE A/B: toggle one editable affiliate field, re-probe, diff structBytesHex",
+        "purpose": "FMLE A/B: toggle one editable affiliate field, re-probe, diff structBytesHex (prefer heapLinkStructs when II/NPL missing from slots)",
         "hypothesis": "Squad-tab separate-club reserves are affiliate link structs whose flag bytes FMLE edits as Main/Permanent/Players Move Freely (UI labels only — lock bytes, not strings)",
         "managedClubPointer": format!("0x{managed_club:X}"),
         "managedClubUid": managed_club_uid,
         "linkVectorOffset": format!("0x{MANAGED_CLUB_BTEAM_LINK_VECTOR_OFFSET:X}"),
         "lockedClubPointerOffset": format!("0x{AFFILIATE_LINK_STRUCT_CLUB_POINTER_OFFSET:X}"),
         "slots": slots,
+        "discoveredSquadTabAffiliates": affiliates.iter().map(|a| json!({
+            "clubUid": a.club_uid,
+            "clubName": a.club_name,
+            "clubPointer": format!("0x{:X}", a.club),
+            "linkStructPointer": a.link_struct_pointer.map(|p| format!("0x{p:X}")),
+        })).collect::<Vec<_>>(),
+        "heapLinkStructs": heap_link_structs,
         "humanProtocol": [
-            "1. npm run probe:affiliate-flags > before.json (FM save loaded)",
-            "2. FMLE: open one affiliate (prefer Schalke II); toggle ONE checkbox only",
+            "1. npm run probe:affiliate-flags > before.json (FM save loaded; FMLE on Affiliates)",
+            "2. FMLE: select Squad-tab reserve (II / NPL); toggle ONE checkbox only (Permanent first)",
             "3. npm run probe:affiliate-flags > after.json",
             "4. python desktop/scripts/diff-affiliate-flag-dumps.py before.json after.json",
-            "5. Lock offset(s) that flip on squad-tab affiliates and stay off on feeders",
+            "5. Prefer heapLinkStructs diffs when slots[] have no II/NPL; lock offset(s) for Main+Permanent+PMF",
         ],
         "bytesRead": reader.bytes_read,
     })
+}
+
+#[cfg(target_os = "windows")]
+fn dump_affiliate_link_struct_for_flags(
+    reader: &mut ProcessReader,
+    module: ModuleInfo,
+    profile: &EntityMapProfile,
+    link_struct: u64,
+    slot: Option<u64>,
+    source: String,
+) -> Value {
+    let blob = reader
+        .read_bytes(link_struct, AFFILIATE_LINK_STRUCT_PROBE_BYTES)
+        .unwrap_or_default();
+    let club_at_locked = reader
+        .read_pointer(link_struct + AFFILIATE_LINK_STRUCT_CLUB_POINTER_OFFSET)
+        .unwrap_or(0);
+    let club_identity = (club_at_locked != 0)
+        .then(|| read_club_identity(reader, module, profile, club_at_locked))
+        .flatten();
+    let club_ptr_hits = if club_at_locked != 0 {
+        pointer_hits_in_bytes(&blob, club_at_locked)
+    } else {
+        Vec::new()
+    };
+    let anchor = club_ptr_hits
+        .first()
+        .copied()
+        .unwrap_or(AFFILIATE_LINK_STRUCT_CLUB_POINTER_OFFSET as usize);
+    let feeder_catalog = link_struct_is_feeder_catalog(reader, module, profile, &blob);
+    json!({
+        "slot": slot,
+        "source": source,
+        "linkStructPointer": format!("0x{link_struct:X}"),
+        "clubPointerAtLocked0x160": format!("0x{club_at_locked:X}"),
+        "clubUid": club_identity.as_ref().map(|(uid, _)| *uid),
+        "clubName": club_identity.as_ref().map(|(_, name)| name.clone()),
+        "feederCatalogMultiClub": feeder_catalog,
+        "clubPointerHitsInStruct": club_ptr_hits,
+        "flagGridAnchorOffset": anchor,
+        "u8GridAroundClubPointer": u8_grid_around(&blob, anchor, 64),
+        "u32GridAroundClubPointer": relationship_candidates_wide(&blob, anchor),
+        "structBytesHex": blob
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>(),
+        "structBytesLen": blob.len(),
+    })
+}
+
+/// Heap search: pointers to `affiliate_club` treated as club@0x160 → candidate link structs.
+/// Centers on both managed and affiliate clubs (II/NPL often sit outside the managed ±8MB window).
+#[cfg(target_os = "windows")]
+fn find_link_structs_for_affiliate_club(
+    reader: &mut ProcessReader,
+    module: ModuleInfo,
+    profile: &EntityMapProfile,
+    managed_club: u64,
+    managed_club_uid: u32,
+    affiliate_club: u64,
+    affiliate_club_uid: u32,
+) -> Vec<u64> {
+    let window = BTEAM_CLUB_HEAP_WINDOW_BYTES.saturating_mul(4); // ±32MB
+    let mut ranges = vec![
+        (
+            managed_club.saturating_sub(window),
+            managed_club.saturating_add(window),
+        ),
+        (
+            affiliate_club.saturating_sub(window),
+            affiliate_club.saturating_add(window),
+        ),
+    ];
+    // Dedup overlapping ranges coarsely.
+    ranges.sort_by_key(|r| r.0);
+    let mut found = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    for (scan_min, scan_max) in ranges {
+        if scan_max <= scan_min {
+            continue;
+        }
+        let Ok(hits) = scan_private_memory_for_pointers_in_range(
+            reader,
+            &[affiliate_club],
+            scan_min,
+            scan_max,
+        ) else {
+            continue;
+        };
+        let Some(ref_addrs) = hits.get(&affiliate_club) else {
+            continue;
+        };
+        for ref_addr in ref_addrs {
+            if *ref_addr < scan_min || *ref_addr > scan_max {
+                continue;
+            }
+            // Try locked club-pointer field first; also try a few common alignments.
+            for delta in [
+                AFFILIATE_LINK_STRUCT_CLUB_POINTER_OFFSET,
+                0x158,
+                0x168,
+                0x150,
+                0x170,
+                0x100,
+                0x80,
+                0x40,
+                0x20,
+                0x10,
+                0x8,
+                0x0,
+            ] {
+                let link_struct = ref_addr.saturating_sub(delta);
+                if !seen.insert(link_struct) {
+                    continue;
+                }
+                let Some(blob) =
+                    reader.read_bytes(link_struct, AFFILIATE_LINK_STRUCT_PROBE_BYTES)
+                else {
+                    continue;
+                };
+                if pointer_hits_in_bytes(&blob, affiliate_club).is_empty()
+                    && find_u32_hits_in_blob(&blob, affiliate_club_uid).is_empty()
+                {
+                    continue;
+                }
+                let proves_managed = !pointer_hits_in_bytes(&blob, managed_club).is_empty()
+                    || !find_u32_hits_in_blob(&blob, managed_club_uid).is_empty();
+                // Keep candidates even without managed proof for FMLE A/B — filter later.
+                let _ = (module, profile, proves_managed);
+                if read_club_identity(reader, module, profile, affiliate_club)
+                    .is_some_and(|(uid, _)| uid == affiliate_club_uid)
+                {
+                    found.push(link_struct);
+                }
+            }
+        }
+    }
+    found
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -1158,6 +1380,129 @@ pub(crate) fn probe_affiliate_squad_flag_slots(
     _profile: &super::offsets::EntityMapProfile,
     _managed_club: u64,
     _managed_club_uid: u32,
+    _first_team: u64,
+) -> Value {
+    json!({ "status": "windows_only" })
+}
+
+/// Probe-only: for known board affiliates (II + feeders), find club@0x160 link structs and
+/// byte-diff II vs each feeder. Used by T214 after UID resolve.
+#[cfg(target_os = "windows")]
+pub(crate) fn probe_board_affiliate_link_flag_diff(
+    reader: &mut ProcessReader,
+    module: ModuleInfo,
+    profile: &EntityMapProfile,
+    managed_club: u64,
+    managed_club_uid: u32,
+    board: &[(u32, u64, &str, &str)], // uid, pointer, name, category
+) -> Value {
+    let mut dumps = Vec::new();
+    for &(uid, club, name, category) in board {
+        eprintln!(
+            "affiliate-containers: link-struct hunt for {name} ({category} uid={uid})"
+        );
+        let structs = find_link_structs_for_affiliate_club(
+            reader,
+            module,
+            profile,
+            managed_club,
+            managed_club_uid,
+            club,
+            uid,
+        );
+        eprintln!(
+            "affiliate-containers: {name} → {} link-struct candidates",
+            structs.len()
+        );
+        let mut struct_dumps = Vec::new();
+        for (index, link_struct) in structs.into_iter().take(4).enumerate() {
+            let mut dump = dump_affiliate_link_struct_for_flags(
+                reader,
+                module,
+                profile,
+                link_struct,
+                Some(index as u64),
+                format!("{category}:{name}"),
+            );
+            if let Some(object) = dump.as_object_mut() {
+                object.insert("fmLabel".to_string(), json!(name));
+                object.insert("category".to_string(), json!(category));
+                object.insert("expectedClubUid".to_string(), json!(uid));
+                let blob = reader
+                    .read_bytes(link_struct, AFFILIATE_LINK_STRUCT_PROBE_BYTES)
+                    .unwrap_or_default();
+                object.insert(
+                    "mentionsManagedClub".to_string(),
+                    json!(
+                        !pointer_hits_in_bytes(&blob, managed_club).is_empty()
+                            || !find_u32_hits_in_blob(&blob, managed_club_uid).is_empty()
+                    ),
+                );
+            }
+            struct_dumps.push(dump);
+        }
+        dumps.push(json!({
+            "fmLabel": name,
+            "category": category,
+            "clubUid": uid,
+            "clubPointer": format!("0x{club:X}"),
+            "linkStructCount": struct_dumps.len(),
+            "linkStructs": struct_dumps,
+        }));
+    }
+
+    let ii_hex = dumps
+        .iter()
+        .find(|entry| entry.get("category").and_then(Value::as_str) == Some("bteam"))
+        .and_then(|entry| entry.get("linkStructs").and_then(Value::as_array))
+        .and_then(|items| items.first())
+        .and_then(|item| item.get("structBytesHex").and_then(Value::as_str));
+
+    let mut diffs = Vec::new();
+    if let Some(ii_hex) = ii_hex {
+        for entry in &dumps {
+            if entry.get("category").and_then(Value::as_str) != Some("feeder") {
+                continue;
+            }
+            let Some(feeder_hex) = entry
+                .get("linkStructs")
+                .and_then(Value::as_array)
+                .and_then(|items| items.first())
+                .and_then(|item| item.get("structBytesHex").and_then(Value::as_str))
+            else {
+                continue;
+            };
+            let changes = diff_hex_blobs(ii_hex, feeder_hex);
+            diffs.push(json!({
+                "fmLabel": entry.get("fmLabel"),
+                "clubUid": entry.get("clubUid"),
+                "changeCount": changes.len(),
+                "changes": changes.into_iter().take(48).collect::<Vec<_>>(),
+            }));
+        }
+    }
+
+    json!({
+        "status": "board_affiliate_link_flag_diff",
+        "purpose": "Diff II vs feeder affiliation link structs (club@0x160) for Type/Main/Permanent/PMF candidates",
+        "boardDumps": dumps,
+        "iiVersusFeederDiffs": diffs,
+        "notes": [
+            "@0x8E8 Relationship catalogs (Münster/Hannover) are not this path.",
+            "Prefer linkStructs with mentionsManagedClub=true.",
+            "Stable deltas across multiple feeders are Type/flag lock candidates.",
+        ],
+    })
+}
+
+#[cfg(not(target_os = "windows"))]
+pub(crate) fn probe_board_affiliate_link_flag_diff(
+    _reader: &mut super::memory::ProcessReader,
+    _module: super::memory::ModuleInfo,
+    _profile: &super::offsets::EntityMapProfile,
+    _managed_club: u64,
+    _managed_club_uid: u32,
+    _board: &[(u32, u64, &str, &str)],
 ) -> Value {
     json!({ "status": "windows_only" })
 }
@@ -1375,8 +1720,15 @@ pub(crate) fn probe_lock_affiliate_link_layout(
     managed_club_uid: u32,
     feeder_uids: &[u32],
 ) -> Value {
-    let bteam_clubs =
-        discover_bteam_affiliate_clubs(reader, module, profile, managed_club, managed_club_uid, 0);
+    let bteam_clubs = discover_bteam_affiliate_clubs(
+        reader,
+        module,
+        profile,
+        managed_club,
+        managed_club_uid,
+        0,
+    )
+    .affiliates;
     let mut bteam_struct_dumps = Vec::new();
     for affiliate in &bteam_clubs {
         let Some(link_struct) = affiliate.link_struct_pointer else {
@@ -1468,7 +1820,7 @@ pub(crate) fn probe_lock_affiliate_link_layout(
         })).collect::<Vec<_>>(),
         "bteamLinkStructDumps": bteam_struct_dumps,
         "feederInlineUidHits": feeder_hits,
-        "productionPath": "discover_bteam_affiliate_clubs (link-vector → satellite-team → indirect-struct → backref → managed-blob) → discover_teams_for_affiliate_club → load_team_roster(reserves); satellite-team primary on Schalke",
+        "productionPath": "discover_bteam_affiliate_clubs (club+0x118 type → satellite-team → link-vector → …) → discover_teams_for_affiliate_club → load_team_roster(reserves)",
         "satelliteTeamLock": {
             "rosterMin": BTEAM_SATELLITE_ROSTER_MIN,
             "rosterMax": BTEAM_SATELLITE_ROSTER_MAX,
@@ -1487,8 +1839,8 @@ pub(crate) fn discover_bteam_affiliate_clubs(
     _managed_club: u64,
     _managed_club_uid: u32,
     _first_team: u64,
-) -> Vec<AffiliateClubDiscovery> {
-    Vec::new()
+) -> BteamAffiliateDiscovery {
+    BteamAffiliateDiscovery::default()
 }
 
 #[cfg(not(target_os = "windows"))]

@@ -1,11 +1,17 @@
 pub(crate) mod affiliate_links;
+pub(crate) mod affiliation_type_census;
+pub(crate) mod affiliation_types;
+pub(crate) mod agreement_table;
 pub(crate) mod blob_scan;
 pub(crate) mod club_affiliates;
+pub(crate) mod duisburg_type_ab;
+pub(crate) mod editor_affiliations;
 pub(crate) mod executable;
 pub(crate) mod memory;
 pub(crate) mod offsets;
 pub(crate) mod parser;
 pub(crate) mod permissions;
+pub(crate) mod pge_affiliation_sign;
 pub(crate) mod process;
 pub(crate) mod roles;
 pub(crate) mod scanner;
