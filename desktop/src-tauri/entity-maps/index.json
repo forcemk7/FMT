@@ -40,6 +40,11 @@
         "teamPlayersEndOffset": 64,
         "clubVtableRva": 72066328,
         "clubNameOffset": 192,
+        "clubTeamsStartOffset": 24,
+        "clubTeamsEndOffset": 32,
+        "teamNameOffset": 24,
+        "teamShortNameOffset": 32,
+        "teamTypeOffset": 40,
         "entityUidOffset": 12,
         "playerPersonOffset": 648,
         "playerPositionsOffset": 336,
@@ -84,6 +89,18 @@
           "playerInterest": { "offset": null, "source": "club-person relation", "valueType": "enum", "transform": null, "status": "candidate", "confidence": 0.25, "validations": ["FM26 Interested/Doubtful filter states captured for player 2000478798", "3072 player/person/contract bytes remained unchanged, confirming the value is relationship-owned", "relation owner not yet validated"] },
           "transferAvailability": { "offset": null, "source": "contract-or-transfer relation", "valueType": "flags", "transform": null, "status": "unmapped", "confidence": 0.0, "validations": [] }
         },
+        "club": {
+          "teamsStart": { "offset": 24, "source": "club", "valueType": "pointer", "transform": "Club.Teams vector begin", "status": "validated", "confidence": 0.95, "validations": ["Schalke+Leicester club+0x18 reboot-stable; same team UIDs after reload with different heap pointers", "Schalke slots First/U19/intake; Leicester three contiguous same-club teams"] },
+          "teamsEnd": { "offset": 32, "source": "club", "valueType": "pointer", "transform": "Club.Teams vector end", "status": "validated", "confidence": 0.9, "validations": ["MSVC begin/end adjacent to +0x18; Leicester 3*8 and Schalke 4*8 (gap slot) fit end-start"] }
+        },
+        "team": {
+          "name": { "offset": 24, "source": "team", "valueType": "fm-string-pointer", "transform": "full display label", "status": "validated", "confidence": 0.95, "validations": ["Schalke U19 team+0x18 -> FC Schalke 04 U19", "Schalke II team+0x18 -> FC Schalke 04 II", "first team falls back to linked club name when empty"] },
+          "shortName": { "offset": 32, "source": "team", "valueType": "fm-string-pointer", "transform": "short display label", "status": "validated", "confidence": 0.9, "validations": ["Schalke U19 team+0x20 -> Schalke 04 U19"] },
+          "teamType": { "offset": 40, "source": "team", "valueType": "u8", "transform": "FMScout TeamType enum → firstTeam/under19s/reserves", "status": "validated", "confidence": 0.92, "validations": ["FM22 AppCake TeamType@0x28 with Club@0x30 Players@0x38; FM26 entity-map already locked Club@48 Players@56", "classifies nameless Leicester youth without II/U19 string heuristics"] },
+          "clubPointer": { "offset": 48, "source": "team", "valueType": "pointer", "transform": "club object", "status": "validated", "confidence": 1.0, "validations": ["managed team resolves managed club UID 920"] },
+          "rosterStart": { "offset": 56, "source": "team", "valueType": "pointer", "transform": "player pointer vector start", "status": "validated", "confidence": 1.0, "validations": ["senior roster length matches FM26 squad"] },
+          "rosterEnd": { "offset": 64, "source": "team", "valueType": "pointer", "transform": "player pointer vector end", "status": "validated", "confidence": 1.0, "validations": ["end-start divisible by 8; 1..200 slots"] }
+        },
         "tactic": {
           "managerObject": { "offset": 74061456, "source": "module-vtable-rva", "valueType": "vtable", "transform": "unique private object scan", "status": "validated", "confidence": 0.92, "validations": ["TACTICS_MANAGER RTTI matched", "unique object observed in active save", "selected XI block resolves managed-player person pointers"] },
           "formation": { "offset": 980, "source": "tactics-manager", "valueType": "u32 enum", "transform": "FM26 metadata formation catalogue; code 4 -> Formation433DMWide -> 4-1-2-3 DM Wide", "status": "validated", "confidence": 0.9, "validations": ["offset 0x03D4 read code 4 while FM26 UI displayed 4-1-2-3 DM Wide", "global-metadata.dat formation enum names extracted for this build"] },
@@ -92,6 +109,12 @@
           "duties": { "offset": null, "source": "tactics-manager plus FM26 metadata duty bitmasks", "valueType": "u64 bitmask packet", "transform": "validate defend/support/attack/stopper/cover/float masks before publishing", "status": "candidate", "confidence": 0.45, "validations": ["FM26 global-metadata.dat duty masks extracted", "duties are only displayed when the live packet resolves per slot"] },
           "outOfPossessionRoles": { "offset": null, "source": "FM26 metadata OOPRoleID bitmasks", "valueType": "u64 bitmask catalogue", "transform": "catalogue mapped; live phase layout packet still requires validation", "status": "candidate", "confidence": 0.5, "validations": ["39 out-of-possession role masks extracted from current FM26 metadata"] },
           "teamInstructions": { "offset": null, "source": "tactics-manager", "valueType": "flags", "transform": null, "status": "unmapped", "confidence": 0.0, "validations": [] }
+        },
+        "affiliate": {
+          "feederInlineUidScanBytes": { "offset": 65536, "source": "managed-club", "valueType": "u32[]", "transform": "feeder/friendly club UIDs embedded inline ~0x1700", "status": "validated", "confidence": 0.9, "validations": ["6 feeder + 15 friendly UID hits in Schalke managed club 512KB", "Schalke II uid 3609393 absent from inline list"] },
+          "linkVectorOffset": { "offset": 2280, "source": "managed-club", "valueType": "pointer[8]", "transform": "heap link struct per slot; stride 8", "status": "validated", "confidence": 0.85, "validations": ["slots 0-2 are feeder catalogs (multi club pointer)", "club @ +0x160 not Schalke II on current save"] },
+          "linkStructClubPointerOffset": { "offset": 352, "source": "heap-link-struct", "valueType": "pointer", "transform": "affiliate club object", "status": "candidate", "confidence": 0.6, "validations": ["locked RE offset 0x160; stale on Schalke save — production uses satellite team scan"] },
+          "bteamDiscovery": { "offset": null, "source": "heap-team-scan", "valueType": "graph-walk", "transform": "64MB vtable window from managed club + first team; team→affiliate club; name contains parent + ' II'; roster 28-38", "status": "validated", "confidence": 0.88, "validations": ["Schalke 04 II club uid 3609393 roster 33", "excludes Bayern II via parent-name filter", "FMT squad 54→87"] }
         }
       }
     }

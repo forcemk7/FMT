@@ -1,12 +1,10 @@
 ﻿# Status
 
-Last updated: 2026-08-30 (T198 done — affiliate graph RAM probe)
+Last updated: 2026-09-04 (T200 done — Club.Teams + TeamType locked)
 
 ## Now
 
-**Human verify T198** — Schalke save: invoke `debug_scan_club_affiliates`, compare `backLinksToManagedClub` vs FM Board → Affiliated Clubs (B Team vs Feeder types → `relationshipCandidates` u32).
-
-**T199 ready** — load reserve rosters from typed B-team affiliates (blocked on T198 human compare).
+**Human verify T200** — load Schalke + Leicester (or any PL) with FM open: Squad `clubTeams` should list First + youth via Club.Teams; check `teamType` bytes vs FM labels. Separate-club German II still affiliate residual.
 
 **T190 parked** — blocked on RAM lock for Live Editor Save ID before save-copy CA path.
 
@@ -16,14 +14,18 @@ Last updated: 2026-08-30 (T198 done — affiliate graph RAM probe)
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
-| T199 | Reserves — B-team affiliate rosters | ready | 1 | after T198 human RE lock |
 | T190 | Development all-time from Progress Report CA strip | blocked | 2 | **parked** — need Save ID in RAM before `.fm` pick |
 | T124 | Quiet dev launch | ready | 9 | behind Loop A |
 | T139 | FMT visual theme | deferred | — | overlapped |
 | T162 | Player trophy cabinet | deferred | — | backlog |
 
+## Cancelled / superseded
+
+- **T199** Reserves — B-team affiliate rosters — **cancelled** (never filed). Controllable teams = Club.Teams + TeamType (T200).
+
 ## Recently done
 
+- **T200** Lock Club.Teams (`club+0x18/+0x20`) + TeamType (`team+0x28`); production vector-first team discovery
 - **T198** Club affiliate graph RE — `debug_scan_club_affiliates` forward/back links + relationship u32 candidates
 - **T196** U19 squad — GS full index on load + contract-team U19 promote + Squad subtabs
 - **T194** GM advises Sell vs Loan from squad avg CA

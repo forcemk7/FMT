@@ -2,6 +2,34 @@
 use super::permissions::READ_ONLY_PROCESS_ACCESS;
 
 const MAX_STRING_BYTES: usize = 192;
+const MAX_UTF16_STRING_UNITS: usize = MAX_STRING_BYTES / 2;
+
+fn decode_length_prefixed_utf8(length: usize, bytes: &[u8]) -> Option<String> {
+    if length == 0 || length > MAX_STRING_BYTES || bytes.len() < length {
+        return None;
+    }
+    let value = String::from_utf8(bytes[..length].to_vec()).ok()?;
+    if value.chars().any(char::is_control) {
+        return None;
+    }
+    Some(value)
+}
+
+fn decode_length_prefixed_utf16_le(length: usize, bytes: &[u8]) -> Option<String> {
+    let byte_len = length.checked_mul(2)?;
+    if length == 0 || length > MAX_UTF16_STRING_UNITS || bytes.len() < byte_len {
+        return None;
+    }
+    let units = bytes[..byte_len]
+        .chunks_exact(2)
+        .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]]))
+        .collect::<Vec<_>>();
+    let value = String::from_utf16(&units).ok()?;
+    if value.chars().any(char::is_control) {
+        return None;
+    }
+    Some(value)
+}
 
 #[cfg(target_os = "windows")]
 #[derive(Clone, Copy)]
@@ -100,6 +128,55 @@ impl ProcessReader {
         None
     }
 
+    pub(crate) fn modules(&mut self) -> Vec<(String, ModuleInfo)> {
+        let mut modules = vec![std::ptr::null_mut(); 2048];
+        let mut needed = 0_u32;
+        if unsafe {
+            EnumProcessModulesEx(
+                self.handle,
+                modules.as_mut_ptr(),
+                (modules.len() * std::mem::size_of::<Handle>()) as u32,
+                &mut needed,
+                0x03,
+            )
+        } == 0
+        {
+            self.last_error = Some(unsafe { GetLastError() });
+            return Vec::new();
+        }
+        let count = (needed as usize / std::mem::size_of::<Handle>()).min(modules.len());
+        let mut listed = Vec::new();
+        for module in modules.into_iter().take(count) {
+            let mut name = [0_u16; 1024];
+            let name_length = unsafe {
+                GetModuleBaseNameW(self.handle, module, name.as_mut_ptr(), name.len() as u32)
+            };
+            if name_length == 0 {
+                continue;
+            }
+            let mut info = NativeModuleInfo::default();
+            if unsafe {
+                GetModuleInformation(
+                    self.handle,
+                    module,
+                    &mut info,
+                    std::mem::size_of::<NativeModuleInfo>() as u32,
+                )
+            } == 0
+            {
+                continue;
+            }
+            listed.push((
+                String::from_utf16_lossy(&name[..name_length as usize]),
+                ModuleInfo {
+                    base: info.base_of_dll as u64,
+                    size: info.size_of_image as usize,
+                },
+            ));
+        }
+        listed
+    }
+
     pub(crate) fn read_bytes(&mut self, address: u64, size: usize) -> Option<Vec<u8>> {
         let mut buffer = vec![0_u8; size];
         let mut bytes_read = 0_usize;
@@ -130,6 +207,10 @@ impl ProcessReader {
             .map(|bytes| u16::from_le_bytes(bytes.try_into().expect("two bytes")))
     }
 
+    pub(crate) fn read_u8(&mut self, address: u64) -> Option<u8> {
+        self.read_bytes(address, 1).map(|bytes| bytes[0])
+    }
+
     pub(crate) fn read_u32(&mut self, address: u64) -> Option<u32> {
         self.read_bytes(address, 4)
             .map(|bytes| u32::from_le_bytes(bytes.try_into().expect("four bytes")))
@@ -146,14 +227,50 @@ impl ProcessReader {
             return None;
         }
         let bytes = self.read_bytes(address + 4, length)?;
-        let value = String::from_utf8(bytes).ok()?;
-        if value.chars().any(char::is_control) {
+        decode_length_prefixed_utf8(length, &bytes)
+    }
+
+    pub(crate) fn read_length_prefixed_utf16_string(&mut self, address: u64) -> Option<String> {
+        let length = self.read_u32(address)? as usize;
+        if length == 0 || length > MAX_UTF16_STRING_UNITS {
             return None;
         }
-        Some(value)
+        let byte_len = length.checked_mul(2)?;
+        let bytes = self.read_bytes(address + 4, byte_len)?;
+        decode_length_prefixed_utf16_le(length, &bytes)
+    }
+
+    /// FM `fm-string-pointer`: try UTF-8 then UTF-16 length-prefixed payloads.
+    pub(crate) fn read_fm_string_at(&mut self, address: u64) -> Option<String> {
+        self.read_length_prefixed_string(address)
+            .or_else(|| self.read_length_prefixed_utf16_string(address))
+    }
+
+    /// Person/club name field: double indirection first, then single (club-name style).
+    pub(crate) fn read_fm_string_pointer(&mut self, field: u64) -> Option<String> {
+        let entry = self.read_pointer(field)?;
+        if entry == 0 {
+            return None;
+        }
+        if let Some(text) = self.read_pointer(entry).filter(|value| *value != 0) {
+            if let Some(value) = self.read_fm_string_at(text) {
+                return Some(value);
+            }
+        }
+        self.read_fm_string_at(entry)
     }
 
     pub(crate) fn readable_private_regions(&mut self, max_scan_bytes: usize) -> Vec<MemoryRegion> {
+        self.readable_private_regions_filtered(max_scan_bytes, None, None)
+    }
+
+    /// Walk private committed regions, optionally bounded by VA range.
+    pub(crate) fn readable_private_regions_filtered(
+        &mut self,
+        max_scan_bytes: usize,
+        min_base: Option<u64>,
+        max_base: Option<u64>,
+    ) -> Vec<MemoryRegion> {
         const MEM_COMMIT: u32 = 0x1000;
         const MEM_PRIVATE: u32 = 0x20000;
         const PAGE_NOACCESS: u32 = 0x01;
@@ -183,7 +300,13 @@ impl ProcessReader {
             let readable = info.state == MEM_COMMIT
                 && info.memory_type == MEM_PRIVATE
                 && info.protect & (PAGE_NOACCESS | PAGE_GUARD) == 0;
-            if readable && considered.saturating_add(size) <= max_scan_bytes {
+            let region_end = base.saturating_add(size as u64);
+            // Region overlap — not `region.base in range` (large heap VMAs start below the window).
+            let overlaps = min_base
+                .map(|lo| region_end > lo)
+                .unwrap_or(true)
+                && max_base.map(|hi| base < hi).unwrap_or(true);
+            if readable && overlaps && considered.saturating_add(size) <= max_scan_bytes {
                 regions.push(MemoryRegion { base, size });
                 considered = considered.saturating_add(size);
             }
@@ -278,4 +401,31 @@ unsafe extern "system" {
         module_info: *mut NativeModuleInfo,
         size: u32,
     ) -> i32;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{decode_length_prefixed_utf16_le, decode_length_prefixed_utf8};
+
+    #[test]
+    fn decode_length_prefixed_utf8_accepts_plain_ascii() {
+        let bytes = b"Patrick Berg".to_vec();
+        assert_eq!(
+            decode_length_prefixed_utf8(bytes.len(), &bytes).as_deref(),
+            Some("Patrick Berg")
+        );
+    }
+
+    #[test]
+    fn decode_length_prefixed_utf16_le_accepts_wide_names() {
+        let units = "Berg".encode_utf16().collect::<Vec<_>>();
+        let mut bytes = Vec::new();
+        for unit in units {
+            bytes.extend_from_slice(&unit.to_le_bytes());
+        }
+        assert_eq!(
+            decode_length_prefixed_utf16_le(4, &bytes).as_deref(),
+            Some("Berg")
+        );
+    }
 }

@@ -87,6 +87,14 @@ pub(crate) struct MapConstants {
     pub(crate) team_players_end_offset: u64,
     pub(crate) club_vtable_rva: u64,
     pub(crate) club_name_offset: u64,
+    /// Club.Teams MSVC vector begin pointer (club object field).
+    pub(crate) club_teams_start_offset: u64,
+    /// Club.Teams MSVC vector end pointer (adjacent to begin).
+    pub(crate) club_teams_end_offset: u64,
+    pub(crate) team_name_offset: u64,
+    pub(crate) team_short_name_offset: u64,
+    /// TeamType u8 (FMScout enum). Adjacent to Club@0x30 / Players@0x38 on FM22→FM26.
+    pub(crate) team_type_offset: u64,
     pub(crate) entity_uid_offset: u64,
     pub(crate) player_person_offset: u64,
     pub(crate) player_positions_offset: u64,
@@ -107,6 +115,21 @@ pub(crate) fn embedded_entity_map_index() -> &'static EntityMapIndex {
     INDEX.get_or_init(|| {
         serde_json::from_str(include_str!("../../entity-maps/index.json"))
             .expect("embedded entity-map index must be valid JSON")
+    })
+}
+
+/// Known SHA for a locked profile ? avoids hashing multi-GB `fm.exe` when versions match.
+pub(crate) fn executable_sha256_for_versions(
+    file_version: Option<&str>,
+    product_version: Option<&str>,
+    architecture: Option<&str>,
+) -> Option<&'static str> {
+    let index = embedded_entity_map_index();
+    index.profiles.iter().find_map(|profile| {
+        (file_version == Some(profile.file_version.as_str())
+            && product_version == Some(profile.product_version.as_str())
+            && architecture == Some(profile.architecture.as_str()))
+        .then_some(profile.executable_sha256.as_str())
     })
 }
 

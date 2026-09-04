@@ -1,4 +1,4 @@
-﻿use serde::Serialize;
+use serde::Serialize;
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 use std::{
@@ -6,14 +6,18 @@ use std::{
     fs::File,
     io::Read,
     path::Path,
-    sync::{Mutex, OnceLock, RwLock},
+    sync::{Arc, Mutex, OnceLock},
     time::SystemTime,
 };
 use tauri::Emitter;
 
 use crate::{
-    data::players::{IndexedPlayerRecord, LiveMemoryAnchors, PlayerDatabaseIndex},
+        data::players::PlayerDatabaseIndex,
         fm26::{
+        affiliate_links::{
+            discover_bteam_affiliate_clubs, discover_teams_for_affiliate_club, discover_teams_for_club,
+            AffiliateClubDiscovery,
+        },
         memory::{ModuleInfo, ProcessReader},
         offsets::{
             executable_sha256_for_versions, find_entity_map, mapping_coverage, EntityMapProfile,
@@ -25,17 +29,15 @@ use crate::{
             visible_attribute_map,
         },
         permissions::{can_write_memory, READ_ONLY_PROCESS_ACCESS_LABEL},
-        process::find_fm26_process,
+        process::{find_fm26_process, find_fmle_process},
         roles::{
             decode_role_duty_mask, duty_definition_for_mask,
             role_catalogue_status, role_definition_for_mask, role_supports_slot,
         },
-        scanner::{parse_pattern, scan_module, scan_private_memory_for_pointers},
+        scanner::{parse_pattern, scan_module},
         structs::{FmDate, PLAYER_ATTRIBUTE_NAMES, POSITION_NAMES},
-        tactics::tactic_formation_template,
         validator,
-    },
-    fm_dossier,
+    }
 };
 
 #[derive(Clone, Serialize)]
@@ -173,7 +175,31 @@ struct LiveData {
     club_employees: u32,
 }
 
-static PLAYER_DATABASE_INDEX: OnceLock<RwLock<PlayerDatabaseIndex>> = OnceLock::new();
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DatabasePlayerSearchHit {
+    id: String,
+    name: String,
+    positions: Vec<String>,
+    managed_squad: bool,
+}
+
+static PLAYER_DATABASE_INDEX: OnceLock<Mutex<Option<Arc<PlayerDatabaseIndex>>>> = OnceLock::new();
+
+fn player_database_index_slot() -> &'static Mutex<Option<Arc<PlayerDatabaseIndex>>> {
+    PLAYER_DATABASE_INDEX.get_or_init(|| Mutex::new(None))
+}
+
+#[cfg(target_os = "windows")]
+fn store_player_database_index(index: PlayerDatabaseIndex) {
+    if let Ok(mut guard) = player_database_index_slot().lock() {
+        *guard = Some(Arc::new(index));
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn store_player_database_index(_index: PlayerDatabaseIndex) {}
+
 
 struct ExtractionFailure {
     stage: &'static str,
@@ -193,12 +219,12 @@ impl ExtractionFailure {
 
 #[tauri::command]
 pub fn connector_status() -> ConnectorStatus {
-    collect_snapshot(false, None).status
+    collect_snapshot(None).status
 }
 
 #[tauri::command]
 pub fn connector_snapshot() -> ConnectorSnapshot {
-    collect_snapshot(false, None)
+    collect_snapshot(None)
 }
 
 #[tauri::command]
@@ -210,8 +236,8 @@ pub async fn load_active_save(app: tauri::AppHandle) -> ConnectorSnapshot {
             crate::fmt_log::load_progress(stage);
             let _ = app_emit.emit("fmt-load-progress", stage);
         };
-        // Fast path: managed squad only — no full-save memory scan or dossier merge.
-        collect_snapshot(false, Some(&progress))
+        // Managed squad + full player registry index for database search.
+        collect_snapshot(Some(&progress))
     })
     .await
     {
@@ -225,295 +251,186 @@ pub async fn load_active_save(app: tauri::AppHandle) -> ConnectorSnapshot {
     }
 }
 
-/// Live RAM probe: managed club affiliate graph (forward/back club links + affiliate teams).
 #[tauri::command]
-pub fn debug_scan_club_affiliates() -> Result<Value, String> {
-    #[cfg(not(target_os = "windows"))]
-    {
-        return Err("Club affiliate scan requires the Windows FM26 connector.".to_string());
+pub fn search_database_players(query: String, limit: Option<u32>) -> Vec<DatabasePlayerSearchHit> {
+    let needle = query.trim().to_lowercase();
+    if needle.is_empty() {
+        return Vec::new();
     }
-    #[cfg(target_os = "windows")]
+    let cap = limit.unwrap_or(20).clamp(1, 50) as usize;
+    let guard = match player_database_index_slot().lock() {
+        Ok(guard) => guard,
+        Err(_) => return Vec::new(),
+    };
+    let Some(index) = guard.as_ref() else {
+        return Vec::new();
+    };
+    let mut hits: Vec<DatabasePlayerSearchHit> = index
+        .records
+        .values()
+        .filter(|record| record.name.to_lowercase().contains(&needle))
+        .map(|record| DatabasePlayerSearchHit {
+            id: record.id.clone(),
+            name: record.name.clone(),
+            positions: record.positions.clone(),
+            managed_squad: record.managed_squad,
+        })
+        .collect();
+    hits.sort_by(|left, right| {
+        left.name
+            .cmp(&right.name)
+            .then_with(|| left.managed_squad.cmp(&right.managed_squad).reverse())
+    });
+    hits.truncate(cap);
+    hits
+}
+
+#[cfg(all(feature = "probe", target_os = "windows"))]
+pub fn run_debug_scan_club_affiliates() -> Result<Value, String> {
     debug_scan_club_affiliates_impl()
 }
 
-/// Live RAM probe: club-linked teams with roster player UID/name samples.
-#[tauri::command]
-pub fn debug_scan_club_teams() -> Result<Value, String> {
-    #[cfg(not(target_os = "windows"))]
-    {
-        return Err("Club team scan requires the Windows FM26 connector.".to_string());
-    }
-    #[cfg(target_os = "windows")]
+#[cfg(all(feature = "probe", target_os = "windows"))]
+pub fn run_debug_scan_club_teams() -> Result<Value, String> {
     debug_scan_club_teams_impl()
 }
 
-/// Background pass: heap-scan club satellite teams (U19 etc.) after the fast first load.
-#[tauri::command]
-pub async fn load_club_satellite_squads() -> Result<Value, String> {
-    #[cfg(not(target_os = "windows"))]
-    {
-        return Err("Club satellite squad load requires the Windows FM26 connector.".to_string());
-    }
-    #[cfg(target_os = "windows")]
-    {
-        tauri::async_runtime::spawn_blocking(load_club_satellite_squads_impl)
-            .await
-            .map_err(|error| format!("Satellite squad worker failed: {error}"))
-            .and_then(|result| result)
-    }
-}
-
-/// Compare person/player bytes between database and high-UID managed squad samples.
-#[tauri::command]
-pub fn debug_probe_player_origin() -> Result<Value, String> {
-    #[cfg(not(target_os = "windows"))]
-    {
-        return Err("Player origin probe requires the Windows FM26 connector.".to_string());
-    }
-    #[cfg(target_os = "windows")]
+#[cfg(all(feature = "probe", target_os = "windows"))]
+pub fn run_debug_probe_player_origin() -> Result<Value, String> {
     debug_probe_player_origin_impl()
 }
 
-#[cfg(target_os = "windows")]
-fn load_club_satellite_squads_impl() -> Result<Value, String> {
-    let Some((process_id, _)) = find_fm26_process() else {
-        return Err("FM26 process not found.".to_string());
-    };
-    let mut reader = ProcessReader::open(process_id)
-        .map_err(|code| format!("Could not open FM26 read-only handle (Windows error {code})."))?;
-    let identity = reader
-        .process_path()
-        .as_deref()
-        .map(read_executable_identity)
-        .unwrap_or_default();
-    let Some(profile) = find_entity_map(
-        identity.file_version.as_deref(),
-        identity.product_version.as_deref(),
-        identity.sha256.as_deref(),
-        identity.architecture.as_deref(),
-    ) else {
-        return Err("FM26 build is not supported.".to_string());
-    };
-    let Some(module) = reader.module(&profile.module) else {
-        return Err("The FM26 game module was not available.".to_string());
-    };
-    let mut diagnostics = ExtractionDiagnostics::default();
-    let (selected, _) =
-        resolve_active_human_manager(&mut reader, module, profile, process_id, &mut diagnostics)
-            .map_err(|failure| failure.message)?;
-    let club_id = selected.club_uid.to_string();
-    let mut squad_game_date = None;
-    if let (Some(start), Some(end)) = (
-        reader
-            .read_pointer(selected.team + profile.constants.team_players_start_offset)
-            .filter(|value| *value != 0),
-        reader
-            .read_pointer(selected.team + profile.constants.team_players_end_offset)
-            .filter(|value| *value != 0),
-    ) {
-        let count = ((end.saturating_sub(start)) / 8) as usize;
-        for index in 0..count {
-            let Some(raw_player) = reader
-                .read_pointer(start + (index as u64 * 8))
-                .filter(|value| *value != 0)
-            else {
-                continue;
-            };
-            if let Some(date) =
-                read_fm_date(&mut reader, raw_player + profile.constants.player_current_date_offset)
-            {
-                squad_game_date = Some(date);
-                break;
-            }
-        }
-    }
-    let seeds = HashSet::from([selected.team]);
-    let discovered = discover_managed_club_teams(
-        &mut reader,
-        module,
-        profile,
-        selected.club,
-        selected.club_uid,
-        selected.team,
-        &seeds,
-        true,
-    );
-    let club_teams = club_teams_json(&discovered, selected.team);
-    let mut players = Vec::new();
-    let mut managed_player_ids = HashSet::new();
-    let mut managed_index_records = Vec::new();
-    let mut player_vtable = None;
-    let mut skipped_squad_slots = 0u32;
-    let mut skipped_squad_details = Vec::new();
-    let mut name_fallback_details = Vec::new();
-    let mut promoted = 0usize;
-    for entry in discovered {
-        if entry.team == selected.team || entry.squad_unit == "firstTeam" {
-            continue;
-        }
-        promoted += load_team_roster(
-            &mut reader,
-            module,
-            profile,
-            entry.team,
-            &entry.name,
-            entry.squad_unit,
-            entry.team_uid,
-            &club_id,
-            selected.club_uid,
-            squad_game_date,
-            &mut managed_player_ids,
-            &mut managed_index_records,
-            &mut players,
-            &mut skipped_squad_slots,
-            &mut skipped_squad_details,
-            &mut name_fallback_details,
-            &mut player_vtable,
-        );
-    }
-    Ok(json!({
-        "clubTeams": club_teams,
-        "players": players,
-        "promotedRosterPlayers": promoted,
-        "skippedSlots": skipped_squad_slots,
-        "bytesRead": reader.bytes_read,
-    }))
+#[cfg(all(feature = "probe", target_os = "windows"))]
+pub fn run_debug_probe_team_names() -> Result<Value, String> {
+    debug_probe_team_names_impl()
 }
 
-#[cfg(target_os = "windows")]
-fn debug_probe_player_origin_impl() -> Result<Value, String> {
-    use crate::fm26::player_origin::probe_player_origin_fields;
-
-    let Some((process_id, _)) = find_fm26_process() else {
-        return Err("FM26 process not found.".to_string());
-    };
-    let mut reader = ProcessReader::open(process_id)
-        .map_err(|code| format!("Could not open FM26 read-only handle (Windows error {code})."))?;
-    let identity = reader
-        .process_path()
-        .as_deref()
-        .map(read_executable_identity)
-        .unwrap_or_default();
-    let Some(profile) = find_entity_map(
-        identity.file_version.as_deref(),
-        identity.product_version.as_deref(),
-        identity.sha256.as_deref(),
-        identity.architecture.as_deref(),
-    ) else {
-        return Err("FM26 build is not supported.".to_string());
-    };
-    let Some(module) = reader.module(&profile.module) else {
-        return Err("The FM26 game module was not available.".to_string());
-    };
-    let mut diagnostics = ExtractionDiagnostics::default();
-    let (selected, _) =
-        resolve_active_human_manager(&mut reader, module, profile, process_id, &mut diagnostics)
-            .map_err(|failure| failure.message)?;
-    let players_start = reader
-        .read_pointer(selected.team + profile.constants.team_players_start_offset)
-        .ok_or_else(|| "Managed squad collection was not readable.".to_string())?;
-    let players_end = reader
-        .read_pointer(selected.team + profile.constants.team_players_end_offset)
-        .ok_or_else(|| "Managed squad collection end was not readable.".to_string())?;
-    let player_count = ((players_end.saturating_sub(players_start)) / 8) as usize;
-    let player_vtable = module.base + profile.constants.team_vtable_rva;
-    let _ = player_vtable;
-    let mut samples = Vec::new();
-    for index in 0..player_count.min(80) {
-        let Some(raw_player) = reader
-            .read_pointer(players_start + (index as u64 * 8))
-            .filter(|value| *value != 0)
-        else {
-            continue;
-        };
-        let Some(person) = reader
-            .read_pointer(raw_player + profile.constants.player_person_offset)
-            .filter(|value| *value != 0)
-        else {
-            continue;
-        };
-        let Some(uid) = reader
-            .read_u32(person + profile.constants.entity_uid_offset)
-            .filter(|uid| is_plausible_fm_unique_id(*uid))
-        else {
-            continue;
-        };
-        samples.push((raw_player, uid, person, 0));
-    }
-    Ok(probe_player_origin_fields(&mut reader, profile, &samples))
+#[cfg(all(feature = "probe", target_os = "windows"))]
+pub fn run_debug_probe_team_names_fixture() -> Result<Value, String> {
+    debug_probe_team_names_fixture_impl()
 }
 
-#[tauri::command]
-pub fn search_indexed_players(query: String) -> Vec<Value> {
-    let dossier_results = fm_dossier::search_players(&query, 500);
-    if !dossier_results.is_empty() {
-        return dossier_results;
-    }
-    let normalized = query.trim().to_lowercase();
-    let Some(index) = PLAYER_DATABASE_INDEX.get() else {
-        return Vec::new();
-    };
-    let Ok(index) = index.read() else {
-        return Vec::new();
-    };
-    let _identity = (index.process_id, index.save_pointer);
-    let mut results: Vec<Value> = index
-        .records
-        .values()
-        .filter(|record| {
-            normalized.is_empty()
-                || record.name.to_lowercase().contains(&normalized)
-                || record
-                    .positions
-                    .iter()
-                    .any(|position| position.to_lowercase().contains(&normalized))
-        })
-        .map(indexed_player_json)
-        .collect();
-    results.sort_by(|left, right| {
-        left["name"]
-            .as_str()
-            .unwrap_or_default()
-            .cmp(right["name"].as_str().unwrap_or_default())
-    });
-    results.truncate(500);
-    results
+#[cfg(all(feature = "probe", target_os = "windows"))]
+pub fn run_debug_probe_bteam_intake() -> Result<Value, String> {
+    debug_probe_bteam_intake_impl()
 }
 
-#[tauri::command]
-pub fn indexed_players_by_ids(player_ids: Vec<String>) -> Vec<Value> {
-    let dossier_results = fm_dossier::players_by_ids(&player_ids);
-    if !dossier_results.is_empty() {
-        return dossier_results;
-    }
-    let Some(index) = PLAYER_DATABASE_INDEX.get() else {
-        return Vec::new();
-    };
-    let Ok(index) = index.read() else {
-        return Vec::new();
-    };
-    player_ids
-        .iter()
-        .filter_map(|id| index.records.get(id))
-        .map(indexed_player_json)
-        .collect()
+#[cfg(all(feature = "probe", target_os = "windows"))]
+pub fn run_debug_probe_club_team_anchors() -> Result<Value, String> {
+    debug_probe_club_team_anchors_impl()
 }
 
-#[tauri::command]
-pub fn indexed_player_profile(player_id: String) -> Option<Value> {
-    fm_dossier::player_profile(&player_id)
+#[cfg(all(feature = "probe", target_os = "windows"))]
+pub fn run_debug_fmle_peek(address: u64, byte_len: usize) -> Result<Value, String> {
+    Ok(crate::fm26::fmle_scan::peek_fmle_address(address, byte_len))
 }
 
-fn indexed_player_json(record: &IndexedPlayerRecord) -> Value {
-    json!({
-        "id": record.id,
-        "name": record.name,
-        "positions": record.positions,
-        "managedSquad": record.managed_squad,
-        "visibility": if record.visibility_safe { "known" } else { "unknown" },
-        "scoutKnowledge": if record.visibility_safe { "fully_known" } else { "unknown" },
-        "scoutConfidence": if record.visibility_safe { 100 } else { 0 }
+#[cfg(all(feature = "probe", target_os = "windows"))]
+pub fn run_debug_fmle_watch_load(duration_secs: u64, expected_count: u32) -> Result<Value, String> {
+    Ok(crate::fm26::fmle_scan::watch_fmle_load(duration_secs, expected_count))
+}
+
+#[cfg(all(feature = "probe", target_os = "windows"))]
+pub fn run_debug_fmle_count_backrefs(
+    count_address: Option<u64>,
+    expected_count: Option<u32>,
+) -> Result<Value, String> {
+    Ok(crate::fm26::fmle_scan::probe_fmle_count_backrefs(count_address, expected_count))
+}
+
+#[cfg(all(feature = "probe", target_os = "windows"))]
+pub fn run_debug_fmle_pointer_chain(start_address: u64, max_hops: usize) -> Result<Value, String> {
+    Ok(crate::fm26::fmle_scan::probe_fmle_pointer_chain(start_address, max_hops))
+}
+
+#[cfg(all(feature = "probe", target_os = "windows"))]
+pub fn run_debug_fmle_module_scan(anchor_address: Option<u64>) -> Result<Value, String> {
+    Ok(crate::fm26::fmle_scan::probe_fmle_module_scan(anchor_address))
+}
+
+#[cfg(all(feature = "probe", target_os = "windows"))]
+pub fn run_debug_fmle_serialized_re() -> Result<Value, String> {
+    Ok(crate::fm26::fmle_scan::probe_fmle_serialized_re())
+}
+
+#[cfg(all(feature = "probe", target_os = "windows"))]
+pub fn run_debug_fmle_trace_global(global_rva: u64) -> Result<Value, String> {
+    Ok(crate::fm26::fmle_scan::probe_fmle_trace_global(global_rva))
+}
+
+#[cfg(all(feature = "probe", target_os = "windows"))]
+pub fn run_debug_fmle_bfs_index(max_depth: usize) -> Result<Value, String> {
+    Ok(crate::fm26::fmle_scan::probe_fmle_bfs_index(max_depth))
+}
+
+#[cfg(all(feature = "probe", target_os = "windows"))]
+pub fn run_debug_fm_vector_signature(known_count_address: Option<u64>) -> Result<Value, String> {
+    Ok(crate::fm26::index_signature::probe_fm_vector_signature(known_count_address))
+}
+
+#[cfg(all(feature = "probe", target_os = "windows"))]
+pub fn run_debug_fm_watch_count(duration_secs: u64, expected_count: u32) -> Result<Value, String> {
+    Ok(crate::fm26::index_signature::watch_fm_count_load(duration_secs, expected_count))
+}
+
+#[cfg(all(feature = "probe", target_os = "windows"))]
+pub fn run_debug_fm_trace_global(global_rva: u64) -> Result<Value, String> {
+    Ok(crate::fm26::index_signature::probe_fm_trace_global(global_rva))
+}
+
+#[cfg(all(feature = "probe", target_os = "windows"))]
+pub fn run_debug_fm_module_scan(anchor_address: Option<u64>) -> Result<Value, String> {
+    Ok(crate::fm26::index_signature::probe_fm_module_scan(anchor_address))
+}
+
+#[cfg(all(feature = "probe", target_os = "windows"))]
+pub fn run_debug_fm_parent_walk(parent_address: u64, max_hops: usize) -> Result<Value, String> {
+    Ok(crate::fm26::index_signature::probe_fm_parent_walk(parent_address, max_hops))
+}
+
+#[cfg(all(feature = "probe", target_os = "windows"))]
+pub fn run_debug_fm_count_walk(count_address: u64, max_hops: usize) -> Result<Value, String> {
+    Ok(crate::fm26::index_signature::probe_fm_count_walk(count_address, max_hops))
+}
+
+#[cfg(all(feature = "probe", target_os = "windows"))]
+pub fn run_debug_fm_count_signature() -> Result<Value, String> {
+    Ok(crate::fm26::index_signature::probe_fm_count_signature())
+}
+
+#[cfg(all(feature = "probe", target_os = "windows"))]
+pub fn run_debug_fmle_read_count() -> Result<Value, String> {
+    Ok(match crate::fm26::fmle_index::read_database_player_count() {
+        Some(read) => serde_json::to_value(read).unwrap_or_else(|_| json!({ "status": "ok" })),
+        None => json!({
+            "status": "not_loaded",
+            "fmleRunning": crate::fm26::fmle_index::fmle_is_running(),
+        }),
     })
+}
+
+#[cfg(all(feature = "probe", target_os = "windows"))]
+pub fn run_debug_probe_fmle_index() -> Result<Value, String> {
+    debug_probe_fmle_index_impl()
+}
+
+#[cfg(all(feature = "probe", target_os = "windows"))]
+pub fn run_debug_probe_player_registry() -> Result<Value, String> {
+    debug_probe_player_registry_impl()
+}
+
+#[cfg(all(feature = "probe", target_os = "windows"))]
+pub fn run_debug_probe_managed_squad_skips() -> Result<Value, String> {
+    let snapshot = collect_snapshot(None);
+    Ok(json!({
+        "manager": snapshot.manager_name,
+        "club": snapshot.clubs.first().cloned(),
+        "playersLoaded": snapshot.players.len(),
+        "managedSquadPlayers": snapshot.status.managed_squad_players,
+        "message": snapshot.status.message,
+        "dataWarnings": snapshot.data_warnings,
+        "statusWarnings": snapshot.status.warnings,
+    }))
 }
 
 fn empty_status() -> ConnectorStatus {
@@ -807,11 +724,8 @@ fn build_read_pipeline(status: &ConnectorStatus) -> Vec<ReadPipelineStage> {
 }
 
 #[cfg(target_os = "windows")]
-fn collect_snapshot(
-    include_database_index: bool,
-    progress: Option<&dyn Fn(&'static str)>,
-) -> ConnectorSnapshot {
-    let compact = !include_database_index;
+fn collect_snapshot(progress: Option<&dyn Fn(&'static str)>) -> ConnectorSnapshot {
+    let compact = true;
     crate::fmt_log::set_compact(compact);
     if progress.is_some() {
         crate::fmt_log::load_stage("collect_snapshot");
@@ -887,11 +801,7 @@ fn collect_snapshot(
     };
     status.entity_map_status = "matched";
     status.entity_map_profile_id = Some(profile.id.clone());
-    status.mapping_coverage = if include_database_index {
-        mapping_coverage(profile)
-    } else {
-        Vec::new()
-    };
+    status.mapping_coverage = Vec::new();
     crate::fmt_log::load_detail(format!("entity map matched profile={}", profile.id));
 
     let Some(module) = reader.module(&profile.module) else {
@@ -929,7 +839,6 @@ fn collect_snapshot(
         profile,
         &mut diagnostics,
         process_id,
-        include_database_index,
         progress,
     );
     status.bytes_read = reader.bytes_read;
@@ -969,25 +878,29 @@ fn collect_snapshot(
             status.tactic_manager_pointer = data.tactic_manager_pointer.map(hex_address);
             status.last_sync = Some(unix_milliseconds());
             status.message = format!(
-                "Live FM26 read connected: active club {}, {} managed-squad players from memory, {} indexed player records. See the data pipeline for mapped and unmapped fields.",
+                "Live FM26 read connected: active club {}, {} squad players, {} database players indexed ({} bytes read).",
                 data.clubs
                     .first()
                     .and_then(|club| club.get("name"))
                     .and_then(Value::as_str)
                     .unwrap_or("the managed club"),
                 data.players.len(),
-                data.database_players_indexed
+                data.database_players_indexed,
+                reader.bytes_read
             );
             status.warnings = data.warnings.clone();
-            status.read_pipeline = if include_database_index {
-                build_read_pipeline(&status)
+            let data_warnings = status.warnings.clone();
+            status.read_pipeline = Vec::new();
+            let bytes_per_player = if data.players.is_empty() {
+                reader.bytes_read
             } else {
-                Vec::new()
+                reader.bytes_read / data.players.len()
             };
             let summary = format!(
-                "{} players, {} bytes read, scope={}",
+                "{} players, {} bytes read (~{} B/player), scope={}",
                 data.players.len(),
                 reader.bytes_read,
+                bytes_per_player,
                 data.database_scope
             );
             crate::fmt_log::load_done(summary);
@@ -1007,7 +920,7 @@ fn collect_snapshot(
                 tactic: data.tactic,
                 data_error: data.database_index_error,
                 data_source: "live-memory",
-                data_warnings: data.warnings,
+                data_warnings,
             }
         }
         Err(failure) => {
@@ -1024,10 +937,7 @@ fn collect_snapshot(
 }
 
 #[cfg(not(target_os = "windows"))]
-fn collect_snapshot(
-    _include_database_index: bool,
-    _progress: Option<&dyn Fn(&'static str)>,
-) -> ConnectorSnapshot {
+fn collect_snapshot(_progress: Option<&dyn Fn(&'static str)>) -> ConnectorSnapshot {
     let mut status = empty_status();
     status.message = "The live FM26 connector requires the installed Windows app.".to_string();
     empty_snapshot(status.clone(), status.message)
@@ -1257,7 +1167,232 @@ fn resolve_active_human_manager(
     Ok((resolved.swap_remove(best_index), manager_pick_warning))
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(all(feature = "probe", target_os = "windows"))]
+fn debug_probe_player_origin_impl() -> Result<Value, String> {
+    use crate::fm26::player_origin::probe_player_origin_fields;
+
+    let Some((process_id, _)) = find_fm26_process() else {
+        return Err("FM26 process not found.".to_string());
+    };
+    let mut reader = ProcessReader::open(process_id)
+        .map_err(|code| format!("Could not open FM26 read-only handle (Windows error {code})."))?;
+    let identity = reader
+        .process_path()
+        .as_deref()
+        .map(read_executable_identity)
+        .unwrap_or_default();
+    let Some(profile) = find_entity_map(
+        identity.file_version.as_deref(),
+        identity.product_version.as_deref(),
+        identity.sha256.as_deref(),
+        identity.architecture.as_deref(),
+    ) else {
+        return Err("FM26 build is not supported.".to_string());
+    };
+    let Some(module) = reader.module(&profile.module) else {
+        return Err("The FM26 game module was not available.".to_string());
+    };
+    let mut diagnostics = ExtractionDiagnostics::default();
+    let (selected, _) =
+        resolve_active_human_manager(&mut reader, module, profile, process_id, &mut diagnostics)
+            .map_err(|failure| failure.message)?;
+    let players_start = reader
+        .read_pointer(selected.team + profile.constants.team_players_start_offset)
+        .ok_or_else(|| "Managed squad collection was not readable.".to_string())?;
+    let players_end = reader
+        .read_pointer(selected.team + profile.constants.team_players_end_offset)
+        .ok_or_else(|| "Managed squad collection end was not readable.".to_string())?;
+    let player_count = ((players_end.saturating_sub(players_start)) / 8) as usize;
+    let mut samples = Vec::new();
+    for index in 0..player_count.min(80) {
+        let Some(raw_player) = reader
+            .read_pointer(players_start + (index as u64 * 8))
+            .filter(|value| *value != 0)
+        else {
+            continue;
+        };
+        let Some(person) = reader
+            .read_pointer(raw_player + profile.constants.player_person_offset)
+            .filter(|value| *value != 0)
+        else {
+            continue;
+        };
+        let Some(uid) = reader
+            .read_u32(person + profile.constants.entity_uid_offset)
+            .filter(|uid| is_plausible_fm_unique_id(*uid))
+        else {
+            continue;
+        };
+        samples.push((raw_player, uid, person, 0));
+    }
+    Ok(probe_player_origin_fields(&mut reader, profile, &samples))
+}
+
+#[cfg(all(feature = "probe", target_os = "windows"))]
+fn debug_probe_fmle_index_impl() -> Result<Value, String> {
+    use crate::fm26::fmle_scan::probe_fmle_player_index;
+
+    let Some((fm_pid, _)) = find_fm26_process() else {
+        return Err("FM26 process (fm.exe) not found.".to_string());
+    };
+    let Some((fmle_pid, fmle_name)) = find_fmle_process() else {
+        return Err("FMLE process (fmle26.exe) not found.".to_string());
+    };
+    let mut fm_reader = ProcessReader::open(fm_pid)
+        .map_err(|code| format!("Could not open FM26 read-only handle (Windows error {code})."))?;
+    let mut fmle_reader = ProcessReader::open(fmle_pid).map_err(|code| {
+        format!("Could not open FMLE read-only handle (Windows error {code}).")
+    })?;
+    let identity = fm_reader
+        .process_path()
+        .as_deref()
+        .map(read_executable_identity)
+        .unwrap_or_default();
+    let Some(profile) = find_entity_map(
+        identity.file_version.as_deref(),
+        identity.product_version.as_deref(),
+        identity.sha256.as_deref(),
+        identity.architecture.as_deref(),
+    ) else {
+        return Err("FM26 build is not supported.".to_string());
+    };
+    let Some(module) = fm_reader.module(&profile.module) else {
+        return Err("The FM26 game module was not available.".to_string());
+    };
+    let mut diagnostics = ExtractionDiagnostics::default();
+    let (selected, manager_pick_warning) = resolve_active_human_manager(
+        &mut fm_reader,
+        module,
+        profile,
+        fm_pid,
+        &mut diagnostics,
+    )
+    .map_err(|failure| failure.message)?;
+    let expected_index_count = std::env::var("FMT_FMLE_EXPECTED_COUNT")
+        .ok()
+        .and_then(|value| value.parse::<u32>().ok());
+    let mut report = probe_fmle_player_index(
+        &mut fm_reader,
+        &mut fmle_reader,
+        profile,
+        selected.team,
+        &selected.club_name,
+        selected.club_uid,
+        expected_index_count,
+    );
+    if let Some(object) = report.as_object_mut() {
+        object.insert("managerName".to_string(), json!(selected.manager_name));
+        object.insert("fmProcessId".to_string(), json!(fm_pid));
+        object.insert("fmleProcessId".to_string(), json!(fmle_pid));
+        object.insert("fmleProcessName".to_string(), json!(fmle_name));
+        object.insert(
+            "managerPickWarning".to_string(),
+            json!(manager_pick_warning),
+        );
+    }
+    Ok(report)
+}
+
+#[cfg(all(feature = "probe", target_os = "windows"))]
+fn debug_probe_player_registry_impl() -> Result<Value, String> {
+    use crate::fm26::player_registry::probe_player_registry;
+
+    let Some((process_id, _)) = find_fm26_process() else {
+        return Err("FM26 process not found.".to_string());
+    };
+    let mut reader = ProcessReader::open(process_id)
+        .map_err(|code| format!("Could not open FM26 read-only handle (Windows error {code})."))?;
+    let identity = reader
+        .process_path()
+        .as_deref()
+        .map(read_executable_identity)
+        .unwrap_or_default();
+    let Some(profile) = find_entity_map(
+        identity.file_version.as_deref(),
+        identity.product_version.as_deref(),
+        identity.sha256.as_deref(),
+        identity.architecture.as_deref(),
+    ) else {
+        return Err("FM26 build is not supported.".to_string());
+    };
+    let Some(module) = reader.module(&profile.module) else {
+        return Err("The FM26 game module was not available.".to_string());
+    };
+    let mut diagnostics = ExtractionDiagnostics::default();
+    let (selected, manager_pick_warning) =
+        resolve_active_human_manager(&mut reader, module, profile, process_id, &mut diagnostics)
+            .map_err(|failure| failure.message)?;
+    let mut report = probe_player_registry(
+        &mut reader,
+        module,
+        profile,
+        selected.human,
+        selected.club_uid,
+        &selected.club_name,
+        selected.team,
+    );
+    if let Some(object) = report.as_object_mut() {
+        object.insert("managerName".to_string(), json!(selected.manager_name));
+        object.insert(
+            "managerPickWarning".to_string(),
+            json!(manager_pick_warning),
+        );
+    }
+    Ok(report)
+}
+
+#[cfg(all(feature = "probe", target_os = "windows"))]
+fn debug_probe_club_team_anchors_impl() -> Result<Value, String> {
+    use crate::fm26::club_team_anchors::probe_club_team_anchors;
+
+    let Some((process_id, _)) = find_fm26_process() else {
+        return Err("FM26 process not found.".to_string());
+    };
+    let mut reader = ProcessReader::open(process_id)
+        .map_err(|code| format!("Could not open FM26 read-only handle (Windows error {code})."))?;
+    let identity = reader
+        .process_path()
+        .as_deref()
+        .map(read_executable_identity)
+        .unwrap_or_default();
+    let Some(profile) = find_entity_map(
+        identity.file_version.as_deref(),
+        identity.product_version.as_deref(),
+        identity.sha256.as_deref(),
+        identity.architecture.as_deref(),
+    ) else {
+        return Err("FM26 build is not supported.".to_string());
+    };
+    let Some(module) = reader.module(&profile.module) else {
+        return Err("The FM26 game module was not available.".to_string());
+    };
+    let mut diagnostics = ExtractionDiagnostics::default();
+    let (selected, manager_pick_warning) =
+        resolve_active_human_manager(&mut reader, module, profile, process_id, &mut diagnostics)
+            .map_err(|failure| failure.message)?;
+    let seeds = vec![selected.team];
+    let mut report = probe_club_team_anchors(
+        &mut reader,
+        module,
+        profile,
+        selected.human,
+        selected.club,
+        selected.club_uid,
+        &selected.club_name,
+        selected.team,
+        &seeds,
+    );
+    if let Some(object) = report.as_object_mut() {
+        object.insert("managerName".to_string(), json!(selected.manager_name));
+        object.insert(
+            "managerPickWarning".to_string(),
+            json!(manager_pick_warning),
+        );
+    }
+    Ok(report)
+}
+
+#[cfg(all(feature = "probe", target_os = "windows"))]
 fn debug_scan_club_teams_impl() -> Result<Value, String> {
     let Some((process_id, _)) = find_fm26_process() else {
         return Err("FM26 process not found.".to_string());
@@ -1293,7 +1428,6 @@ fn debug_scan_club_teams_impl() -> Result<Value, String> {
         selected.club_uid,
         selected.team,
         &seeds,
-        true,
     );
     let teams: Vec<Value> = discovered
         .into_iter()
@@ -1320,7 +1454,126 @@ fn debug_scan_club_teams_impl() -> Result<Value, String> {
     }))
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(all(feature = "probe", target_os = "windows"))]
+fn debug_probe_team_names_impl() -> Result<Value, String> {
+    use crate::fm26::team_names::probe_team_name_layout;
+
+    let Some((process_id, _)) = find_fm26_process() else {
+        return Err("FM26 process not found.".to_string());
+    };
+    let mut reader = ProcessReader::open(process_id)
+        .map_err(|code| format!("Could not open FM26 read-only handle (Windows error {code})."))?;
+    let identity = reader
+        .process_path()
+        .as_deref()
+        .map(read_executable_identity)
+        .unwrap_or_default();
+    let Some(profile) = find_entity_map(
+        identity.file_version.as_deref(),
+        identity.product_version.as_deref(),
+        identity.sha256.as_deref(),
+        identity.architecture.as_deref(),
+    ) else {
+        return Err("FM26 build is not supported.".to_string());
+    };
+    let Some(module) = reader.module(&profile.module) else {
+        return Err("The FM26 game module was not available.".to_string());
+    };
+    let mut diagnostics = ExtractionDiagnostics::default();
+    let (selected, manager_pick_warning) =
+        resolve_active_human_manager(&mut reader, module, profile, process_id, &mut diagnostics)
+            .map_err(|failure| failure.message)?;
+    let seeds = vec![selected.team];
+    let mut report = probe_team_name_layout(
+        &mut reader,
+        module,
+        profile,
+        selected.club,
+        selected.club_uid,
+        &selected.club_name,
+        selected.team,
+        &seeds,
+    );
+    if let Some(object) = report.as_object_mut() {
+        object.insert("managerName".to_string(), json!(selected.manager_name));
+        object.insert(
+            "managerPickWarning".to_string(),
+            json!(manager_pick_warning),
+        );
+    }
+    Ok(report)
+}
+
+#[cfg(all(feature = "probe", target_os = "windows"))]
+fn debug_probe_team_names_fixture_impl() -> Result<Value, String> {
+    use crate::fm26::team_names::probe_team_name_layout_fixture;
+
+    let Some((process_id, _)) = find_fm26_process() else {
+        return Err("FM26 process not found.".to_string());
+    };
+    let mut reader = ProcessReader::open(process_id)
+        .map_err(|code| format!("Could not open FM26 read-only handle (Windows error {code})."))?;
+    let identity = reader
+        .process_path()
+        .as_deref()
+        .map(read_executable_identity)
+        .unwrap_or_default();
+    let Some(profile) = find_entity_map(
+        identity.file_version.as_deref(),
+        identity.product_version.as_deref(),
+        identity.sha256.as_deref(),
+        identity.architecture.as_deref(),
+    ) else {
+        return Err("FM26 build is not supported.".to_string());
+    };
+    Ok(probe_team_name_layout_fixture(
+        &mut reader,
+        profile,
+        "FC Schalke 04",
+    ))
+}
+
+#[cfg(all(feature = "probe", target_os = "windows"))]
+fn debug_probe_bteam_intake_impl() -> Result<Value, String> {
+    use crate::fm26::team_names::probe_bteam_and_intake_status;
+
+    let Some((process_id, _)) = find_fm26_process() else {
+        return Err("FM26 process not found.".to_string());
+    };
+    let mut reader = ProcessReader::open(process_id)
+        .map_err(|code| format!("Could not open FM26 read-only handle (Windows error {code})."))?;
+    let identity = reader
+        .process_path()
+        .as_deref()
+        .map(read_executable_identity)
+        .unwrap_or_default();
+    let Some(profile) = find_entity_map(
+        identity.file_version.as_deref(),
+        identity.product_version.as_deref(),
+        identity.sha256.as_deref(),
+        identity.architecture.as_deref(),
+    ) else {
+        return Err("FM26 build is not supported.".to_string());
+    };
+    let Some(module) = reader.module(&profile.module) else {
+        return Err("The FM26 game module was not available.".to_string());
+    };
+    let mut diagnostics = ExtractionDiagnostics::default();
+    let (selected, _) =
+        resolve_active_human_manager(&mut reader, module, profile, process_id, &mut diagnostics)
+            .map_err(|failure| failure.message)?;
+    Ok(probe_bteam_and_intake_status(
+        &mut reader,
+        module,
+        profile,
+        selected.club,
+        selected.club_uid,
+        &selected.club_name,
+        selected.team,
+    ))
+}
+
+#[cfg(all(feature = "probe", target_os = "windows"))]
 fn debug_scan_club_affiliates_impl() -> Result<Value, String> {
     use crate::fm26::club_affiliates::probe_managed_club_affiliate_graph;
 
@@ -1358,7 +1611,6 @@ fn debug_scan_club_affiliates_impl() -> Result<Value, String> {
         selected.club_uid,
         selected.team,
         &seeds,
-        true,
     );
     let same_club_teams: Vec<Value> = discovered
         .iter()
@@ -1482,9 +1734,50 @@ fn read_person_loan_club(
 
 /// True when person has an active loan agreement pointing at another club.
 fn is_loaned_out_from_loan_club(loan_club_uid: Option<u32>, managed_club_uid: u32) -> bool {
-    loan_club_uid
-        .map(|uid| uid != managed_club_uid)
-        .unwrap_or(false)
+    is_outgoing_external_loan(loan_club_uid, managed_club_uid, &HashSet::new())
+}
+
+/// Outgoing loan to an external club — not parent→B-team affiliate (pointer-graph club UIDs).
+fn is_outgoing_external_loan(
+    loan_club_uid: Option<u32>,
+    managed_club_uid: u32,
+    bteam_affiliate_club_uids: &HashSet<u32>,
+) -> bool {
+    match loan_club_uid {
+        None => false,
+        Some(uid) if uid == managed_club_uid => false,
+        Some(uid) if bteam_affiliate_club_uids.contains(&uid) => false,
+        Some(_) => true,
+    }
+}
+
+fn merge_satellite_club_teams_json(mut base: Vec<Value>, extra: Vec<Value>) -> Vec<Value> {
+    for team in extra {
+        let team_uid = team.get("teamUid").and_then(Value::as_str);
+        if team_uid.is_some_and(|uid| {
+            base.iter()
+                .any(|entry| entry.get("teamUid").and_then(Value::as_str) == Some(uid))
+        }) {
+            continue;
+        }
+        let unit = team.get("squadUnit").and_then(Value::as_str);
+        let roster_len = team.get("rosterLen").and_then(Value::as_u64).unwrap_or(0);
+        if let Some(unit) = unit {
+            if let Some(index) = base.iter().position(|entry| {
+                entry.get("squadUnit").and_then(Value::as_str) == Some(unit)
+                    && entry
+                        .get("rosterLen")
+                        .and_then(Value::as_u64)
+                        .unwrap_or(0)
+                        < roster_len
+            }) {
+                base[index] = team;
+                continue;
+            }
+        }
+        base.push(team);
+    }
+    base
 }
 
 /// Contract object â†’ employing team pointer.
@@ -1499,6 +1792,18 @@ fn resolve_contract_team(
         .filter(|value| *value != 0)
 }
 
+/// Contract → employing club (uid + name).
+#[cfg(target_os = "windows")]
+fn resolve_employment_club_from_contract(
+    reader: &mut ProcessReader,
+    module: ModuleInfo,
+    profile: &EntityMapProfile,
+    contract: u64,
+) -> Option<(u32, String)> {
+    let team = resolve_contract_team(reader, profile, contract)?;
+    resolve_club_from_pointer(reader, module, profile, team)
+}
+
 /// Team pointer â†’ club UniqueID when vtable-validated.
 #[cfg(target_os = "windows")]
 fn contract_team_club_uid(
@@ -1508,19 +1813,6 @@ fn contract_team_club_uid(
     team: u64,
 ) -> Option<u32> {
     resolve_club_from_pointer(reader, module, profile, team).map(|(uid, _)| uid)
-}
-
-/// Team display name â€” shares club name string layout until a dedicated offset locks.
-#[cfg(target_os = "windows")]
-fn read_team_display_name(
-    reader: &mut ProcessReader,
-    team: u64,
-    profile: &EntityMapProfile,
-) -> Option<String> {
-    let name_pointer = reader
-        .read_pointer(team + profile.constants.club_name_offset)
-        .filter(|value| *value != 0)?;
-    reader.read_length_prefixed_string(name_pointer)
 }
 
 /// FMLE-style squad unit from team object label (Senior / U19 / …), not contract counts.
@@ -1545,7 +1837,7 @@ fn classify_team_squad_unit(
     if normalized.contains(" u17") || normalized.ends_with("u17") {
         return Some("under19s");
     }
-    if normalized.contains(" ii") || normalized.ends_with(" ii") {
+    if normalized.contains(" ii") || normalized.ends_with("ii") {
         return Some("reserves");
     }
     if normalized.contains("senior") {
@@ -1554,7 +1846,7 @@ fn classify_team_squad_unit(
     None
 }
 
-/// Classify club team when FM labels are missing — satellite teams carry their own entity UID.
+/// Classify club team when FM labels are missing — prefer TeamType, then name, then roster size.
 #[cfg(target_os = "windows")]
 fn classify_club_team_squad_unit(
     team_name: Option<&str>,
@@ -1563,9 +1855,14 @@ fn classify_club_team_squad_unit(
     team_uid: u32,
     club_uid: u32,
     roster_len: usize,
+    team_type: Option<u8>,
 ) -> Option<&'static str> {
     if team == first_team || team_uid == club_uid {
         return Some("firstTeam");
+    }
+    if let Some(unit) = team_type.and_then(crate::fm26::affiliate_links::squad_unit_from_team_type)
+    {
+        return Some(unit);
     }
     if let Some(name) = team_name.filter(|value| !value.trim().is_empty()) {
         if let Some(unit) = classify_team_squad_unit(name, team, first_team, team_uid, club_uid) {
@@ -1576,6 +1873,8 @@ fn classify_club_team_squad_unit(
         if roster_len >= 5 {
             return Some("under19s");
         }
+        // Dormant intake shells (FMLE: U18, roster_len 1, often 0 loadable players) stay in
+        // clubTeams for a future youth-intake loop — do not filter from discovery/UI tabs.
         return Some("reserves");
     }
     None
@@ -1633,14 +1932,6 @@ fn probe_team_roster_identities(
                 let (name, name_source) = resolve_managed_squad_name(reader, raw_player, profile, uid);
                 fallback["name"] = json!(name);
                 fallback["nameSource"] = json!(name_source);
-            } else if let Some(name) = fm_dossier::player_display_name(
-                &reader
-                    .read_u32(raw_player + profile.constants.entity_uid_offset)
-                    .unwrap_or(0)
-                    .to_string(),
-            ) {
-                fallback["name"] = json!(name);
-                fallback["nameSource"] = json!("dossier-uid-only");
             }
             entries.push(fallback);
             continue;
@@ -1684,6 +1975,7 @@ struct DiscoveredClubTeam {
     name: String,
     squad_unit: &'static str,
     roster_len: usize,
+    team_type: Option<u8>,
 }
 
 /// Club → Teams: validated team objects linked to the managed club (FMLE tree parity).
@@ -1696,74 +1988,39 @@ fn discover_managed_club_teams(
     managed_club_uid: u32,
     first_team: u64,
     index_team_seeds: &HashSet<u64>,
-    scan_heap: bool,
 ) -> Vec<DiscoveredClubTeam> {
-    let team_vtable = module.base + profile.constants.team_vtable_rva;
-    let mut candidate_teams: HashSet<u64> = index_team_seeds.clone();
-    if scan_heap {
-        if let Ok(hits) = scan_private_memory_for_pointers(reader, &[team_vtable]) {
-            if let Some(addresses) = hits.get(&team_vtable) {
-                candidate_teams.extend(addresses.iter().copied());
-            }
-        }
-    }
-
-    let mut seen = HashSet::new();
+    let seeds: Vec<u64> = index_team_seeds.iter().copied().collect();
+    let heap_anchors = [managed_club, first_team];
     let mut discovered = Vec::new();
-    for team in candidate_teams {
-        if team == 0 || !seen.insert(team) {
-            continue;
-        }
-        if validator::validate_vtable(reader, team, team_vtable).is_err() {
-            continue;
-        }
-        let Some(linked_club) = reader
-            .read_pointer(team + profile.constants.team_club_offset)
-            .filter(|value| *value != 0)
-        else {
-            continue;
-        };
-        let club_matches = if linked_club == managed_club {
-            true
-        } else {
-            reader
-                .read_u32(linked_club + profile.constants.entity_uid_offset)
-                .is_some_and(|uid| uid == managed_club_uid)
-        };
-        if !club_matches {
-            continue;
-        }
-        let Some(roster_len) = team_roster_len(reader, profile, team) else {
-            continue;
-        };
-        let name = read_team_display_name(reader, team, profile).unwrap_or_default();
-        let team_uid = reader
-            .read_u32(team + profile.constants.entity_uid_offset)
-            .unwrap_or(0);
+    for team in discover_teams_for_club(
+        reader,
+        module,
+        profile,
+        managed_club,
+        managed_club_uid,
+        &heap_anchors,
+        &seeds,
+    ) {
         let Some(squad_unit) = classify_club_team_squad_unit(
-            Some(name.as_str()).filter(|value| !value.trim().is_empty()),
-            team,
+            Some(team.name.as_str()).filter(|value| !value.trim().is_empty()),
+            team.team,
             first_team,
-            team_uid,
+            team.team_uid,
             managed_club_uid,
-            roster_len,
+            team.roster_len,
+            team.team_type,
         ) else {
             continue;
         };
         discovered.push(DiscoveredClubTeam {
-            team,
-            team_uid,
-            name,
+            team: team.team,
+            team_uid: team.team_uid,
+            name: club_team_label(&team.name, team.team_uid),
             squad_unit,
-            roster_len,
+            roster_len: team.roster_len,
+            team_type: team.team_type,
         });
     }
-    discovered.sort_by(|left, right| {
-        right
-            .roster_len
-            .cmp(&left.roster_len)
-            .then_with(|| left.name.cmp(&right.name))
-    });
     discovered
 }
 
@@ -1776,33 +2033,141 @@ fn club_teams_json(discovered: &[DiscoveredClubTeam], manager_team: u64) -> Vec<
                 "name": entry.name,
                 "rosterLen": entry.roster_len,
                 "squadUnit": entry.squad_unit,
+                "teamType": entry.team_type,
                 "isManagerTeam": entry.team == manager_team,
             })
         })
         .collect()
 }
 
-fn collect_index_club_team_pointers(
+/// B-team affiliate clubs (separate club entity, pointer-indirected @ managed+0x8E8).
+///
+/// Uses `discover_bteam_affiliate_clubs` (absolute pointer graph + inline-UID exclusion).
+#[cfg(target_os = "windows")]
+#[allow(clippy::too_many_arguments)]
+fn load_bteam_affiliate_rosters(
     reader: &mut ProcessReader,
     module: ModuleInfo,
     profile: &EntityMapProfile,
-    records: &HashMap<String, IndexedPlayerRecord>,
+    managed_club: u64,
     managed_club_uid: u32,
-) -> HashSet<u64> {
-    let mut teams = HashSet::new();
-    for record in records.values() {
-        let Some(contract) = record.contract_address else {
+    first_team: u64,
+    club_id: &str,
+    squad_game_date: Option<FmDate>,
+    affiliates: &[AffiliateClubDiscovery],
+    bteam_affiliate_club_uids: &HashSet<u32>,
+    managed_player_ids: &mut HashSet<String>,
+    players: &mut Vec<Value>,
+    skipped_squad_slots: &mut u32,
+    skipped_squad_details: &mut Vec<String>,
+    name_fallback_details: &mut Vec<String>,
+    player_vtable: &mut Option<u64>,
+) -> (usize, Vec<String>, Vec<DiscoveredClubTeam>) {
+    let mut promoted = 0usize;
+    let mut labels = Vec::new();
+    let mut discovered_teams = Vec::new();
+    crate::fmt_log::load_detail(format!(
+        "b-team affiliate clubs via pointer graph: {} resolved",
+        affiliates.len()
+    ));
+    let heap_anchors = [managed_club, first_team];
+    for affiliate in affiliates {
+        let teams = discover_teams_for_affiliate_club(
+            reader,
+            module,
+            profile,
+            affiliate.club,
+            affiliate.club_uid,
+            &heap_anchors,
+            Some((managed_club, managed_club_uid)),
+        );
+        crate::fmt_log::load_detail(format!(
+            "b-team affiliate club uid {} ({}) — {} team(s)",
+            affiliate.club_uid,
+            affiliate.club_name.trim(),
+            teams.len()
+        ));
+        if teams.is_empty() {
             continue;
-        };
-        let Some(team) = resolve_contract_team(reader, profile, contract) else {
-            continue;
-        };
-        if contract_team_club_uid(reader, module, profile, team).is_some_and(|uid| uid == managed_club_uid)
-        {
-            teams.insert(team);
+        }
+        for team in teams {
+            if team.team == first_team {
+                continue;
+            }
+            // Keep teams whose club link is the affiliate (parent alternate can leak senior/U19).
+            let linked_to_affiliate = reader
+                .read_pointer(team.team + profile.constants.team_club_offset)
+                .is_some_and(|linked| {
+                    linked == affiliate.club
+                        || reader
+                            .read_u32(linked + profile.constants.entity_uid_offset)
+                            .is_some_and(|uid| uid == affiliate.club_uid)
+                });
+            if !linked_to_affiliate && team.team_uid != affiliate.club_uid {
+                continue;
+            }
+            let normalized_name = team.name.trim().to_ascii_lowercase();
+            let is_bteam_squad = team.team_uid == affiliate.club_uid
+                || normalized_name.contains(" ii")
+                || normalized_name.ends_with("ii");
+            if !is_bteam_squad {
+                continue;
+            }
+            crate::fmt_log::load_detail(format!(
+                "b-team roster: {} uid {} ({} players)",
+                team.name.trim(),
+                team.team_uid,
+                team.roster_len
+            ));
+            let squad_unit = classify_club_team_squad_unit(
+                Some(team.name.as_str()).filter(|value| !value.trim().is_empty()),
+                team.team,
+                first_team,
+                team.team_uid,
+                managed_club_uid,
+                team.roster_len,
+                team.team_type,
+            )
+            .unwrap_or("reserves");
+            let team_label = club_team_label(&team.name, team.team_uid);
+            discovered_teams.push(DiscoveredClubTeam {
+                team: team.team,
+                team_uid: team.team_uid,
+                name: team_label.clone(),
+                squad_unit,
+                roster_len: team.roster_len,
+                team_type: team.team_type,
+            });
+            labels.push(format!(
+                "{} (affiliate {}) uid {} ({}, {} roster)",
+                team_label.trim(),
+                affiliate.club_name.trim(),
+                team.team_uid,
+                squad_unit,
+                team.roster_len
+            ));
+            promoted += load_team_roster(
+                reader,
+                module,
+                profile,
+                team.team,
+                &team_label,
+                squad_unit,
+                team.team_uid,
+                club_id,
+                managed_club_uid,
+                squad_game_date,
+                bteam_affiliate_club_uids,
+                managed_player_ids,
+                players,
+                skipped_squad_slots,
+                skipped_squad_details,
+                name_fallback_details,
+                player_vtable,
+            );
         }
     }
-    teams
+    (promoted, labels, discovered_teams)
 }
 
 #[cfg(target_os = "windows")]
@@ -1818,8 +2183,8 @@ fn load_team_roster(
     club_id: &str,
     club_uid: u32,
     squad_game_date: Option<FmDate>,
+    bteam_affiliate_club_uids: &HashSet<u32>,
     managed_player_ids: &mut HashSet<String>,
-    managed_index_records: &mut Vec<IndexedPlayerRecord>,
     players: &mut Vec<Value>,
     skipped_squad_slots: &mut u32,
     skipped_squad_details: &mut Vec<String>,
@@ -1866,8 +2231,8 @@ fn load_team_roster(
             club_id,
             club_uid,
             squad_game_date,
+            bteam_affiliate_club_uids,
             managed_player_ids,
-            managed_index_records,
             players,
             skipped_squad_slots,
             skipped_squad_details,
@@ -1876,30 +2241,6 @@ fn load_team_roster(
         );
     }
     players.len().saturating_sub(before)
-}
-
-/// Indexed records whose active contract employs them at `managed_club_uid`.
-#[cfg(target_os = "windows")]
-fn count_managed_club_employees(
-    reader: &mut ProcessReader,
-    module: ModuleInfo,
-    profile: &EntityMapProfile,
-    records: &HashMap<String, IndexedPlayerRecord>,
-    managed_club_uid: u32,
-) -> u32 {
-    records
-        .values()
-        .filter(|record| {
-            let Some(contract) = record.contract_address else {
-                return false;
-            };
-            let Some(team) = resolve_contract_team(reader, profile, contract) else {
-                return false;
-            };
-            contract_team_club_uid(reader, module, profile, team)
-                .is_some_and(|uid| uid == managed_club_uid)
-        })
-        .count() as u32
 }
 
 #[cfg(target_os = "windows")]
@@ -1928,8 +2269,8 @@ fn push_squad_player_from_raw(
     club_id: &str,
     club_uid: u32,
     squad_game_date: Option<FmDate>,
+    bteam_affiliate_club_uids: &HashSet<u32>,
     managed_player_ids: &mut HashSet<String>,
-    managed_index_records: &mut Vec<IndexedPlayerRecord>,
     players: &mut Vec<Value>,
     skipped_squad_slots: &mut u32,
     skipped_squad_details: &mut Vec<String>,
@@ -2099,26 +2440,29 @@ fn push_squad_player_from_raw(
         .filter(|value| *value != 0);
     let loan_club = read_person_loan_club(reader, module, profile, person);
     let loan_club_uid = loan_club.as_ref().map(|(uid, _)| *uid);
-    let loaned_out = is_loaned_out_from_loan_club(loan_club_uid, club_uid);
-    let (loan_club_id, loan_club_name) = if loaned_out {
-        match loan_club {
-            Some((uid, name)) => (Some(uid.to_string()), Some(name)),
-            None => (None, None),
+    let loaned_out =
+        is_outgoing_external_loan(loan_club_uid, club_uid, bteam_affiliate_club_uids);
+    let employment_club = contract_address
+        .and_then(|contract| resolve_employment_club_from_contract(reader, module, profile, contract));
+    let employment_club_uid = employment_club.as_ref().map(|(uid, _)| *uid);
+    // Incoming loan: agreement lists managed club as destination, or contract employer is elsewhere.
+    let loaned_in = !loaned_out
+        && loan_club.is_some()
+        && (loan_club_uid == Some(club_uid)
+            || employment_club_uid.is_some_and(|employer_uid| employer_uid != club_uid));
+    let (employer_club_id, employer_club_name) = if loaned_in {
+        match employment_club {
+            Some((uid, name)) if uid != club_uid => (Some(uid.to_string()), Some(name)),
+            _ => (None, None),
         }
     } else {
         (None, None)
     };
+    let (loan_club_id, loan_club_name) = match loan_club {
+        Some((uid, name)) if uid != club_uid => (Some(uid.to_string()), Some(name)),
+        _ => (None, None),
+    };
     managed_player_ids.insert(player_id.clone());
-    managed_index_records.push(IndexedPlayerRecord {
-        id: player_id.clone(),
-        name: name.clone(),
-        positions: positions.clone(),
-        managed_squad: true,
-        visibility_safe: true,
-        raw_player_address: raw_player,
-        person_address: person,
-        contract_address,
-    });
     players.push(json!({
         "id": player_id,
         "name": name.clone(),
@@ -2159,6 +2503,9 @@ fn push_squad_player_from_raw(
         "squadUnit": squad_unit,
         "squadTeamUid": squad_team_uid.to_string(),
         "loanedOut": loaned_out,
+        "loanedIn": loaned_in,
+        "employerClubId": employer_club_id,
+        "employerClubName": employer_club_name,
         "loanClubId": loan_club_id,
         "loanClubName": loan_club_name,
         "transferInterest": null,
@@ -2225,7 +2572,6 @@ fn extract_live_data(
     profile: &EntityMapProfile,
     diagnostics: &mut ExtractionDiagnostics,
     process_id: u32,
-    include_database_index: bool,
     progress: Option<&dyn Fn(&'static str)>,
 ) -> Result<LiveData, ExtractionFailure> {
     let signature = profile
@@ -2394,15 +2740,10 @@ fn extract_live_data(
     }
 
     let club_id = club_uid.to_string();
-
-    let memory_anchors = LiveMemoryAnchors {
-        save_pointer: human,
-        human_pointer: human,
-        team_pointer: team,
-        club_pointer: club,
-        players_collection_start: 0,
-        tactic_manager_pointer: None,
-    };
+    let bteam_affiliates =
+        discover_bteam_affiliate_clubs(reader, module, profile, club, club_uid, team);
+    let bteam_affiliate_club_uids: HashSet<u32> =
+        bteam_affiliates.iter().map(|entry| entry.club_uid).collect();
 
     // Loaned player objects often lack a readable current-date; borrow one from the squad.
     let mut squad_game_date = None;
@@ -2462,7 +2803,6 @@ fn extract_live_data(
 
     let mut players = Vec::new();
     let mut managed_player_ids = HashSet::new();
-    let mut managed_index_records = Vec::new();
     let mut player_vtable = None;
     let mut skipped_squad_slots = 0u32;
     let mut skipped_squad_details: Vec<String> = Vec::new();
@@ -2492,8 +2832,8 @@ fn extract_live_data(
             &club_id,
             club_uid,
             squad_game_date,
+            &bteam_affiliate_club_uids,
             &mut managed_player_ids,
-            &mut managed_index_records,
             &mut players,
             &mut skipped_squad_slots,
             &mut skipped_squad_details,
@@ -2501,9 +2841,6 @@ fn extract_live_data(
             &mut player_vtable,
         );
     }
-
-    let mut memory_anchors = memory_anchors;
-    memory_anchors.players_collection_start = players_start;
 
     if players.is_empty() {
         return Err(ExtractionFailure::new(
@@ -2518,7 +2855,6 @@ fn extract_live_data(
         player_count,
         skipped_squad_slots
     ));
-    let managed_tactic_records = managed_index_records.clone();
     let skipped_squad_warning = if skipped_squad_slots > 0 {
         let mut message = format!(
             "Managed squad memory skipped {skipped_squad_slots} slot(s); {} players passed validation.",
@@ -2540,96 +2876,18 @@ fn extract_live_data(
     };
     let name_fallback_warning = (!name_fallback_details.is_empty()).then(|| {
         format!(
-            "{} managed-squad name(s) used save-index fallback because live FM name strings were unreadable: {}",
+            "{} managed-squad name(s) fell back to UID labels because live FM name strings were unreadable: {}",
             name_fallback_details.len(),
             name_fallback_details.join("; ")
         )
     });
-
-    let (
-        database_players_indexed,
-        background_players_indexed,
-        database_index_status,
-        database_scope,
-        tactic_manager_pointer,
-        database_index_error,
-    ) = if include_database_index {
-        if let Some(progress) = progress {
-            progress("indexing_player_database");
-        }
-        let seed_vtable = player_vtable.ok_or_else(|| {
-            ExtractionFailure::new(
-                "player_database",
-                "The live squad did not provide a player type signature.",
-            )
-        })?;
-        match index_full_player_database(
-            reader,
-            profile,
-            process_id,
-            memory_anchors,
-            seed_vtable,
-            module,
-            &managed_player_ids,
-            managed_index_records.clone(),
-        ) {
-            Ok(indexed) => {
-                if let Some(progress) = progress {
-                    progress("building_visibility_index");
-                }
-                diagnostics.last_successful_read = Some("index_full_player_database".to_string());
-                (
-                    indexed.total,
-                    indexed.background,
-                    "ready",
-                    "full-save-index",
-                    indexed.tactic_manager_pointer,
-                    None,
-                )
-            }
-            Err(failure) => (
-                managed_player_ids.len() as u32,
-                0,
-                "failed",
-                "managed-squad",
-                None,
-                Some(format!("{}: {}", failure.stage, failure.message)),
-            ),
-        }
-    } else {
-        store_player_index(process_id, memory_anchors, managed_index_records.clone());
-        (
-            managed_player_ids.len() as u32,
-            0,
-            "not_run",
-            "managed-squad",
-            None,
-            None,
-        )
-    };
 
     let mut club_squad_promoted = 0usize;
     let mut discovered_team_labels: Vec<String> = Vec::new();
     if let Some(progress) = progress {
         progress("loading_club_teams");
     }
-    let mut index_team_seeds = if include_database_index {
-        PLAYER_DATABASE_INDEX
-            .get()
-            .and_then(|index| index.read().ok())
-            .map(|guard| {
-                collect_index_club_team_pointers(
-                    reader,
-                    module,
-                    profile,
-                    &guard.records,
-                    club_uid,
-                )
-            })
-            .unwrap_or_default()
-    } else {
-        HashSet::new()
-    };
+    let mut index_team_seeds = HashSet::new();
     index_team_seeds.insert(team);
     let discovered_teams = discover_managed_club_teams(
         reader,
@@ -2639,8 +2897,11 @@ fn extract_live_data(
         club_uid,
         team,
         &index_team_seeds,
-        true,
     );
+    crate::fmt_log::load_detail(format!(
+        "same-club teams: {} discovered (club blob + heap window @ club/first team)",
+        discovered_teams.len()
+    ));
     for entry in &discovered_teams {
         discovered_team_labels.push(format!(
             "{} uid {} ({}, {} roster)",
@@ -2650,7 +2911,7 @@ fn extract_live_data(
             entry.roster_len
         ));
     }
-    let club_teams = club_teams_json(&discovered_teams, team);
+    let mut club_teams = club_teams_json(&discovered_teams, team);
     for entry in discovered_teams {
         if entry.team == team || entry.squad_unit == "firstTeam" {
             continue;
@@ -2667,8 +2928,8 @@ fn extract_live_data(
             &club_id,
             club_uid,
             squad_game_date,
+            &bteam_affiliate_club_uids,
             &mut managed_player_ids,
-            &mut managed_index_records,
             &mut players,
             &mut skipped_squad_slots,
             &mut skipped_squad_details,
@@ -2676,6 +2937,124 @@ fn extract_live_data(
             &mut player_vtable,
         );
     }
+    let (bteam_promoted, bteam_labels, bteam_teams) = load_bteam_affiliate_rosters(
+        reader,
+        module,
+        profile,
+        club,
+        club_uid,
+        team,
+        &club_id,
+        squad_game_date,
+        &bteam_affiliates,
+        &bteam_affiliate_club_uids,
+        &mut managed_player_ids,
+        &mut players,
+        &mut skipped_squad_slots,
+        &mut skipped_squad_details,
+        &mut name_fallback_details,
+        &mut player_vtable,
+    );
+    club_teams = merge_satellite_club_teams_json(
+        club_teams,
+        club_teams_json(&bteam_teams, team),
+    );
+    club_squad_promoted += bteam_promoted;
+    for label in bteam_labels {
+        discovered_team_labels.push(label);
+    }
+
+    let (
+        database_players_indexed,
+        background_players_indexed,
+        database_index_status,
+        database_scope,
+        database_index_error,
+    ) = {
+        #[cfg(target_os = "windows")]
+        {
+            use crate::fm26::player_registry::{build_player_database_index, discover_player_registry};
+
+            if let Some(progress) = progress {
+                progress("indexing_player_database");
+            }
+            let managed_uids: HashSet<u32> = managed_player_ids
+                .iter()
+                .filter_map(|id| id.parse::<u32>().ok())
+                .collect();
+            let vtable = player_vtable.unwrap_or(0);
+            match discover_player_registry(
+                reader,
+                module,
+                profile,
+                team,
+                &managed_uids,
+            ) {
+                Ok((registry, discovered_vtable)) => {
+                    let vtable = if vtable != 0 {
+                        vtable
+                    } else {
+                        discovered_vtable
+                    };
+                    crate::fmt_log::load_detail(format!(
+                        "player registry: {} slots via {} ({})",
+                        registry.count,
+                        registry.registry_slot,
+                        if registry.shards.is_some() {
+                            format!("{} shards", registry.shards.as_ref().map(|s| s.len()).unwrap_or(0))
+                        } else {
+                            format!("vector @ {}", hex_address(registry.vector_start))
+                        }
+                    ));
+                    let index = build_player_database_index(
+                        reader,
+                        module,
+                        profile,
+                        process_id,
+                        team,
+                        &managed_uids,
+                        vtable,
+                        &registry,
+                    );
+                    let total = index.records.len() as u32;
+                    let managed = index
+                        .records
+                        .values()
+                        .filter(|record| record.managed_squad)
+                        .count() as u32;
+                    store_player_database_index(index);
+                    (
+                        total,
+                        total.saturating_sub(managed),
+                        "ready",
+                        "full-save-index",
+                        None,
+                    )
+                }
+                Err(error) => {
+                    crate::fmt_log::load_detail(format!("player registry index failed: {error}"));
+                    (
+                        managed_player_ids.len() as u32,
+                        0u32,
+                        "failed",
+                        "managed-squad",
+                        Some(error),
+                    )
+                }
+            }
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = (reader, module, profile, process_id, team, progress, player_vtable);
+            (
+                managed_player_ids.len() as u32,
+                0u32,
+                "not_run",
+                "managed-squad",
+                None,
+            )
+        }
+    };
 
     let season = players
         .first()
@@ -2687,45 +3066,11 @@ fn extract_live_data(
             object.remove("_season");
         }
     }
-    let dossier_reference = if include_database_index {
-        fm_dossier::augment_live_players(&mut players)
-    } else {
-        None
-    };
-    // Do not let Dossier mask a failed/missing memory world index (stock GS load truth).
-    let database_players_indexed = if database_index_status == "ready" {
-        dossier_reference
-            .as_ref()
-            .map(|reference| database_players_indexed.max(reference.player_count))
-            .unwrap_or(database_players_indexed)
-    } else {
-        database_players_indexed
-    };
-    let background_players_indexed = if database_index_status == "ready" {
-        dossier_reference
-            .as_ref()
-            .map(|reference| {
-                reference
-                    .player_count
-                    .saturating_sub(players.len().try_into().unwrap_or_default())
-                    .max(background_players_indexed)
-            })
-            .unwrap_or(background_players_indexed)
-    } else {
-        background_players_indexed
-    };
-    let tactic = tactic_manager_pointer
-        .and_then(|pointer| extract_live_tactic(reader, pointer, &managed_tactic_records));
+    let tactic: Option<Value> = None;
+    let tactic_manager_pointer: Option<u64> = None;
     let mut warnings = vec![
         "Managed-squad IDs, names, dates of birth, ages, nationality, positions, preferred foot, visible attributes, and mapped CA/PA/hidden/personality are validated for this FM26 build.".to_string(),
-        "FM26 role, duty and out-of-possession role catalogues are mapped from the current build metadata. Player playable-role scoring now uses mapped role metadata plus live attributes and position familiarity.".to_string(),
         "Form, match ratings, contract, wage, valuation, fitness and squad-status relationships are not yet validated for this build and remain Unknown.".to_string(),
-        if tactic.is_some() {
-            "Live FM26 tactic formation and selected XI slots are mapped from the active tactic manager. Role/duty slot packets are published only if their FM26 masks validate against the live formation.".to_string()
-        } else {
-            "The live FM26 tactic manager is detected with read-only access, but the selected-slot block did not validate for this read. No tactic is guessed.".to_string()
-        },
-            "The FM26 shortlist collection is not mapped safely. FMT Favorites remains a local list resolved against live players.".to_string(),
     ];
     if let Some(warning) = skipped_squad_warning {
         warnings.push(warning);
@@ -2737,24 +3082,7 @@ fn extract_live_data(
         warnings.push(warning);
     }
     if let Some(error) = &database_index_error {
-        warnings.push(format!(
-            "Wider player database index failed ({error}). Only the managed squad is available â€” same fallback as stock GlassScout, but the failure reason is now visible."
-        ));
-    } else if include_database_index && database_index_status == "ready" {
-        if dossier_reference.is_some() {
-            warnings.push(format!(
-                "{background_players_indexed} wider-save player records were indexed in memory; FM Dossier also enriched contract/search fields from a local save index."
-            ));
-        } else {
-            warnings.push(format!(
-                "{background_players_indexed} wider-save player records were indexed in memory (stock GlassScout full-save path). They remain hidden from the UI until FM scout-knowledge visibility can be validated."
-            ));
-        }
-    } else if include_database_index {
-        warnings.push(
-            "The wider player database could not be indexed safely; only the managed squad is available."
-                .to_string(),
-        );
+        warnings.push(format!("Full player database index failed: {error}"));
     }
     if club_squad_promoted > 0 {
         warnings.push(format!(
@@ -2766,30 +3094,7 @@ fn extract_live_data(
             discovered_team_labels.join("; ")
         ));
     }
-    if let Some(reference) = &dossier_reference {
-        warnings.push(format!(
-            "FM Dossier local save index enriched missing contract, wage, value, condition, history and search fields from {}. This is a local read-only reference layer while native offsets are mapped.",
-            reference.path.display()
-        ));
-    }
-    let club_employees = if database_index_status == "ready" {
-        PLAYER_DATABASE_INDEX
-            .get()
-            .and_then(|index| index.read().ok())
-            .map(|guard| {
-                count_managed_club_employees(
-                    reader,
-                    module,
-                    profile,
-                    &guard.records,
-                    club_uid,
-                )
-            })
-            .filter(|count| *count > 0)
-            .unwrap_or_else(|| snapshot_club_employee_count(&players, &club_id))
-    } else {
-        snapshot_club_employee_count(&players, &club_id)
-    };
+    let club_employees = snapshot_club_employee_count(&players, &club_id);
     let clubs = vec![json!({
         "id": club_id,
         "name": club_name,
@@ -2810,557 +3115,8 @@ fn extract_live_data(
         database_scope,
         database_index_error,
         warnings,
-        tactic_manager_pointer,
+        tactic_manager_pointer: None,
         club_employees,
-    })
-}
-
-#[cfg(target_os = "windows")]
-const TACTIC_FORMATION_CODE_OFFSET: u64 = 0x03D4;
-#[cfg(target_os = "windows")]
-const TACTIC_SELECTION_POINTER_OFFSETS: [u64; 3] = [0x41B8, 0x41C0, 0x41C8];
-
-#[cfg(target_os = "windows")]
-fn extract_live_tactic(
-    reader: &mut ProcessReader,
-    tactic_manager_pointer: u64,
-    managed_records: &[IndexedPlayerRecord],
-) -> Option<Value> {
-    let formation_code = reader.read_u32(tactic_manager_pointer + TACTIC_FORMATION_CODE_OFFSET)?;
-    let template = tactic_formation_template(formation_code)?;
-    let selection = find_live_tactic_selection(
-        reader,
-        tactic_manager_pointer,
-        managed_records,
-        template.positions.len(),
-    )?;
-    let managed_by_person = managed_records
-        .iter()
-        .map(|record| (record.person_address, record))
-        .collect::<HashMap<_, _>>();
-    let mut slots = Vec::with_capacity(template.positions.len());
-    let role_packet = find_live_tactic_role_packet(
-        reader,
-        tactic_manager_pointer,
-        &selection,
-        template.positions,
-    );
-
-    for (index, position) in template.positions.iter().enumerate() {
-        let person_pointer = selection.person_pointers[index];
-        let record = managed_by_person.get(&person_pointer).copied();
-        let role_slot = role_packet
-            .as_ref()
-            .and_then(|packet| packet.slots.get(index))
-            .copied();
-        slots.push(json!({
-            "playerId": record.map(|record| record.id.clone()),
-            "position": position,
-            "role": role_slot.and_then(|slot| slot.role_label),
-            "roleShort": role_slot.and_then(|slot| slot.role_short_label),
-            "roleMask": role_slot.and_then(|slot| slot.role_mask).map(|mask| format!("0x{mask:X}")),
-            "duty": role_slot.and_then(|slot| slot.duty_label),
-            "dutyShort": role_slot.and_then(|slot| slot.duty_short_label),
-            "dutyMask": role_slot.and_then(|slot| slot.duty_mask).map(|mask| format!("0x{mask:X}")),
-            "personPointer": if person_pointer == 0 { None } else { Some(hex_address(person_pointer)) },
-            "decoderStatus": match (record.is_some(), role_slot.and_then(|slot| slot.role_label).is_some(), role_slot.and_then(|slot| slot.duty_label).is_some()) {
-                (true, true, true) => "player-role-duty-validated",
-                (true, true, false) => "player-role-validated-duty-pending",
-                (true, false, _) => "player-slot-validated-role-pending",
-                _ => "player-slot-unresolved"
-            }
-        }));
-    }
-
-    let role_warning = match &role_packet {
-        Some(packet) if packet.duties_resolved == template.positions.len() => {
-            "Packed FM26 role and duty masks validated against the active tactic slots."
-        }
-        Some(_) => {
-            "Packed FM26 role masks validated against the active tactic slots; duty masks remain pending for this read."
-        }
-        None => {
-            "Packed role, duty, phase-layout and instruction codes did not validate on this read, so GlassScout does not invent them."
-        }
-    };
-    let warnings = if template.exact_shape {
-        vec![
-            "Formation and selected XI slots are decoded from live FM26 memory.",
-            role_warning,
-        ]
-    } else {
-        vec![
-            "The FM26 formation code is known, but this formation's exact pitch slot template is not validated yet.",
-            "Selected XI is decoded from live FM26 memory; pitch placement uses neutral slot labels until the formation template is mapped.",
-            role_warning,
-        ]
-    };
-    Some(json!({
-        "name": null,
-        "formation": template.label,
-        "formationEnum": template.enum_name,
-        "formationCode": formation_code,
-        "slots": slots,
-        "teamInstructions": [],
-        "playerInstructionsReadable": false,
-        "decoderStatus": match (&role_packet, template.exact_shape) {
-            (Some(packet), true) if packet.duties_resolved == template.positions.len() => "formation-selected-xi-role-duty-validated",
-            (Some(_), true) => "formation-selected-xi-role-validated",
-            (None, true) => "formation-shape-and-selected-xi-validated",
-            (Some(_), false) => "selected-xi-role-validated-template-pending",
-            (None, false) => "selected-xi-validated-template-pending",
-        },
-        "layoutStatus": if template.exact_shape { "exact-template" } else { "formation-name-only" },
-        "selectionPointer": hex_address(selection.base_address + selection.offset),
-        "selectionStride": selection.stride,
-        "selectionResolvedPlayers": selection.resolved_players,
-        "roleDutyDecoderStatus": role_packet.as_ref().map(|packet| packet.status).unwrap_or("packet-not-validated"),
-        "rolePacketPointer": role_packet.as_ref().map(|packet| hex_address(packet.base_address + packet.offset)),
-        "rolePacketStride": role_packet.as_ref().map(|packet| packet.stride),
-        "rolePacketWidth": role_packet.as_ref().map(|packet| packet.width),
-        "rolesResolved": role_packet.as_ref().map(|packet| packet.roles_resolved).unwrap_or_default(),
-        "dutiesResolved": role_packet.as_ref().map(|packet| packet.duties_resolved).unwrap_or_default(),
-        "roleCatalogue": role_catalogue_status(),
-        "warnings": warnings
-    }))
-}
-
-#[cfg(target_os = "windows")]
-struct TacticSelection {
-    base_address: u64,
-    offset: u64,
-    stride: u64,
-    person_pointers: Vec<u64>,
-    resolved_players: usize,
-}
-
-#[cfg(target_os = "windows")]
-#[derive(Clone, Copy)]
-struct TacticRoleSlot {
-    role_label: Option<&'static str>,
-    role_short_label: Option<&'static str>,
-    role_mask: Option<u64>,
-    duty_label: Option<&'static str>,
-    duty_short_label: Option<&'static str>,
-    duty_mask: Option<u64>,
-}
-
-#[cfg(target_os = "windows")]
-struct TacticRolePacket {
-    base_address: u64,
-    offset: u64,
-    stride: u64,
-    width: u64,
-    status: &'static str,
-    slots: Vec<TacticRoleSlot>,
-    roles_resolved: usize,
-    duties_resolved: usize,
-    compatible_roles: usize,
-}
-
-#[cfg(target_os = "windows")]
-fn find_live_tactic_role_packet(
-    reader: &mut ProcessReader,
-    tactic_manager_pointer: u64,
-    selection: &TacticSelection,
-    positions: &[&str],
-) -> Option<TacticRolePacket> {
-    let mut candidates = vec![tactic_manager_pointer, selection.base_address];
-    if let Some(bytes) = reader.read_bytes(tactic_manager_pointer, 0x2000) {
-        for offset in (0..bytes.len().saturating_sub(8)).step_by(8) {
-            let pointer = u64::from_le_bytes(bytes[offset..offset + 8].try_into().ok()?);
-            if plausible_process_pointer(pointer) {
-                candidates.push(pointer);
-            }
-        }
-    }
-    candidates.sort_unstable();
-    candidates.dedup();
-
-    let mut best: Option<TacticRolePacket> = None;
-    for base_address in candidates {
-        let Some(bytes) = read_bounded_window(reader, base_address) else {
-            continue;
-        };
-        for width in [8_u64, 4_u64] {
-            for stride in [width, 8, 0x10, 0x18, 0x20, 0x28, 0x30, 0x48, 0x50] {
-                if stride < width {
-                    continue;
-                }
-                let needed = (positions.len().saturating_sub(1) as u64)
-                    .saturating_mul(stride)
-                    .saturating_add(width) as usize;
-                if bytes.len() < needed {
-                    continue;
-                }
-                let max_start = bytes.len().saturating_sub(needed);
-                for start in (0..=max_start).step_by(4) {
-                    let Some(packet) = decode_role_packet_at(
-                        base_address,
-                        &bytes,
-                        start,
-                        stride,
-                        width,
-                        positions,
-                    ) else {
-                        continue;
-                    };
-                    let replace = best.as_ref().is_none_or(|current| {
-                        packet.roles_resolved > current.roles_resolved
-                            || (packet.roles_resolved == current.roles_resolved
-                                && packet.duties_resolved > current.duties_resolved)
-                            || (packet.roles_resolved == current.roles_resolved
-                                && packet.duties_resolved == current.duties_resolved
-                                && packet.compatible_roles > current.compatible_roles)
-                    });
-                    if replace {
-                        best = Some(packet);
-                    }
-                }
-            }
-        }
-    }
-    best
-}
-
-#[cfg(target_os = "windows")]
-fn decode_role_packet_at(
-    base_address: u64,
-    bytes: &[u8],
-    start: usize,
-    stride: u64,
-    width: u64,
-    positions: &[&str],
-) -> Option<TacticRolePacket> {
-    let mut slots = Vec::with_capacity(positions.len());
-    let mut roles_resolved = 0_usize;
-    let mut duties_resolved = 0_usize;
-    let mut compatible_roles = 0_usize;
-    let mut distinct_roles = HashSet::new();
-    let mut distinct_duties = HashSet::new();
-
-    for (index, position) in positions.iter().enumerate() {
-        let offset = start + (index as u64 * stride) as usize;
-        let value = read_packet_value(bytes, offset, width)?;
-        let decoded = decode_role_duty_mask(value);
-        if decoded.unknown_bits != 0 {
-            return None;
-        }
-        let role = decoded
-            .role
-            .or_else(|| role_definition_for_mask(value & u64::from(u32::MAX)));
-        let duty = decoded
-            .duty
-            .or_else(|| duty_definition_for_mask(value & u64::from(u32::MAX)));
-        if let Some(role) = role {
-            roles_resolved += 1;
-            distinct_roles.insert(role.key);
-            if role_supports_slot(role, position) {
-                compatible_roles += 1;
-            }
-        }
-        if let Some(duty) = duty {
-            duties_resolved += 1;
-            distinct_duties.insert(duty.key);
-        }
-        if role.is_none() && duty.is_none() {
-            return None;
-        }
-        slots.push(TacticRoleSlot {
-            role_label: role.map(|definition| definition.label),
-            role_short_label: role.map(|definition| definition.short_label),
-            role_mask: role.map(|definition| definition.mask),
-            duty_label: duty.map(|definition| definition.label),
-            duty_short_label: duty.map(|definition| definition.short_label),
-            duty_mask: duty.map(|definition| definition.mask),
-        });
-    }
-
-    if roles_resolved < positions.len() || compatible_roles < 7 || distinct_roles.len() < 3 {
-        return None;
-    }
-    let status = if duties_resolved == positions.len() && distinct_duties.len() >= 2 {
-        "role-duty-packet-validated"
-    } else if duties_resolved == 0 {
-        "role-packet-validated-duty-pending"
-    } else {
-        "role-packet-validated-partial-duty"
-    };
-    Some(TacticRolePacket {
-        base_address,
-        offset: start as u64,
-        stride,
-        width,
-        status,
-        slots,
-        roles_resolved,
-        duties_resolved,
-        compatible_roles,
-    })
-}
-
-#[cfg(target_os = "windows")]
-fn read_packet_value(bytes: &[u8], offset: usize, width: u64) -> Option<u64> {
-    match width {
-        4 => bytes
-            .get(offset..offset + 4)
-            .and_then(|slice| slice.try_into().ok())
-            .map(u32::from_le_bytes)
-            .map(u64::from),
-        8 => bytes
-            .get(offset..offset + 8)
-            .and_then(|slice| slice.try_into().ok())
-            .map(u64::from_le_bytes),
-        _ => None,
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn find_live_tactic_selection(
-    reader: &mut ProcessReader,
-    tactic_manager_pointer: u64,
-    managed_records: &[IndexedPlayerRecord],
-    slot_count: usize,
-) -> Option<TacticSelection> {
-    let managed_people = managed_records
-        .iter()
-        .map(|record| record.person_address)
-        .collect::<HashSet<_>>();
-    let mut candidates = Vec::new();
-    candidates.push(tactic_manager_pointer);
-    for pointer_offset in TACTIC_SELECTION_POINTER_OFFSETS {
-        if let Some(pointer) = reader
-            .read_pointer(tactic_manager_pointer + pointer_offset)
-            .filter(|pointer| plausible_process_pointer(*pointer))
-        {
-            candidates.push(pointer);
-        }
-    }
-    if let Some(bytes) = reader.read_bytes(tactic_manager_pointer, 0x6000) {
-        for offset in (0..bytes.len().saturating_sub(8)).step_by(8) {
-            let pointer = u64::from_le_bytes(bytes[offset..offset + 8].try_into().ok()?);
-            if plausible_process_pointer(pointer) {
-                candidates.push(pointer);
-            }
-        }
-    }
-    candidates.sort_unstable();
-    candidates.dedup();
-
-    let mut best: Option<TacticSelection> = None;
-    for base_address in candidates {
-        let Some(bytes) = read_bounded_window(reader, base_address) else {
-            continue;
-        };
-        for stride in [8_u64, 0x48] {
-            let needed = (slot_count.saturating_sub(1) as u64)
-                .saturating_mul(stride)
-                .saturating_add(8) as usize;
-            if bytes.len() < needed {
-                continue;
-            }
-            let max_start = bytes.len().saturating_sub(needed);
-            for start in (0..=max_start).step_by(8) {
-                let mut pointers = Vec::with_capacity(slot_count);
-                let mut resolved = 0_usize;
-                let mut plausible = 0_usize;
-                for index in 0..slot_count {
-                    let offset = start + (index as u64 * stride) as usize;
-                    let pointer = u64::from_le_bytes(bytes[offset..offset + 8].try_into().ok()?);
-                    if plausible_process_pointer(pointer) {
-                        plausible += 1;
-                    }
-                    if managed_people.contains(&pointer) {
-                        resolved += 1;
-                    }
-                    pointers.push(pointer);
-                }
-                if resolved < 8 || plausible < 10 {
-                    continue;
-                }
-                let replace = best
-                    .as_ref()
-                    .is_none_or(|current| resolved > current.resolved_players);
-                if replace {
-                    best = Some(TacticSelection {
-                        base_address,
-                        offset: start as u64,
-                        stride,
-                        person_pointers: pointers,
-                        resolved_players: resolved,
-                    });
-                    if resolved == slot_count {
-                        return best;
-                    }
-                }
-            }
-        }
-    }
-    best
-}
-
-#[cfg(target_os = "windows")]
-fn read_bounded_window(reader: &mut ProcessReader, base_address: u64) -> Option<Vec<u8>> {
-    for size in [0x4000_usize, 0x2000, 0x1000] {
-        if let Some(bytes) = reader.read_bytes(base_address, size) {
-            return Some(bytes);
-        }
-    }
-    None
-}
-
-#[cfg(target_os = "windows")]
-fn plausible_process_pointer(pointer: u64) -> bool {
-    (0x10000000000..0x0000_8000_0000_0000).contains(&pointer)
-}
-
-#[cfg(target_os = "windows")]
-struct IndexSummary {
-    total: u32,
-    background: u32,
-    tactic_manager_pointer: Option<u64>,
-}
-
-#[cfg(target_os = "windows")]
-fn store_player_index(
-    process_id: u32,
-    anchors: LiveMemoryAnchors,
-    records: Vec<IndexedPlayerRecord>,
-) {
-    let save_pointer = anchors.save_pointer;
-    let records = records
-        .into_iter()
-        .map(|record| (record.id.clone(), record))
-        .collect();
-    let index = PLAYER_DATABASE_INDEX.get_or_init(|| RwLock::new(PlayerDatabaseIndex::default()));
-    if let Ok(mut index) = index.write() {
-        *index = PlayerDatabaseIndex {
-            process_id,
-            save_pointer,
-            anchors,
-            records,
-        };
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn index_full_player_database(
-    reader: &mut ProcessReader,
-    profile: &EntityMapProfile,
-    process_id: u32,
-    mut anchors: LiveMemoryAnchors,
-    player_vtable: u64,
-    module: ModuleInfo,
-    managed_player_ids: &HashSet<String>,
-    managed_records: Vec<IndexedPlayerRecord>,
-) -> Result<IndexSummary, ExtractionFailure> {
-    let mut records: HashMap<String, IndexedPlayerRecord> = managed_records
-        .into_iter()
-        .map(|record| (record.id.clone(), record))
-        .collect();
-    let tactics_manager_vtable = module.base + profile.constants.tactics_manager_vtable_rva;
-    let mut object_hits =
-        scan_private_memory_for_pointers(reader, &[player_vtable, tactics_manager_vtable])
-            .map_err(|error| ExtractionFailure::new("player_database", error.to_string()))?;
-    let candidate_addresses = object_hits.remove(&player_vtable).unwrap_or_default();
-    let tactic_manager_hits = object_hits
-        .remove(&tactics_manager_vtable)
-        .unwrap_or_default();
-    let tactic_manager_pointer = (tactic_manager_hits.len() == 1).then_some(tactic_manager_hits[0]);
-
-    for address in candidate_addresses {
-        if records.len() >= 250_000 {
-            break;
-        }
-        let Some(mut record) = read_indexed_player_candidate(reader, address, profile) else {
-            continue;
-        };
-        if managed_player_ids.contains(&record.id) {
-            continue;
-        }
-        record.managed_squad = false;
-        record.visibility_safe = false;
-        records.entry(record.id.clone()).or_insert(record);
-    }
-
-    if records.len() < managed_player_ids.len() {
-        return Err(ExtractionFailure::new(
-            "player_database",
-            "The wider player index failed its managed-squad integrity check.",
-        ));
-    }
-
-    let total = records.len() as u32;
-    let background = records
-        .values()
-        .filter(|record| !record.managed_squad)
-        .count() as u32;
-    anchors.tactic_manager_pointer = tactic_manager_pointer;
-    let save_pointer = anchors.save_pointer;
-    let index = PLAYER_DATABASE_INDEX.get_or_init(|| RwLock::new(PlayerDatabaseIndex::default()));
-    if let Ok(mut index) = index.write() {
-        *index = PlayerDatabaseIndex {
-            process_id,
-            save_pointer,
-            anchors,
-            records,
-        };
-    }
-    Ok(IndexSummary {
-        total,
-        background,
-        tactic_manager_pointer,
-    })
-}
-
-#[cfg(target_os = "windows")]
-fn read_indexed_player_candidate(
-    reader: &mut ProcessReader,
-    raw_player: u64,
-    profile: &EntityMapProfile,
-) -> Option<IndexedPlayerRecord> {
-    let person = resolve_person_address(reader, raw_player, profile)?;
-    let uid = reader
-        .read_u32(person.checked_add(profile.constants.entity_uid_offset)?)
-        .filter(|uid| is_plausible_fm_unique_id(*uid))?;
-    let name = display_name(
-        read_name_field(
-            reader,
-            person.checked_add(profile.constants.person_first_name_offset)?,
-        ),
-        read_name_field(
-            reader,
-            person.checked_add(profile.constants.person_second_name_offset)?,
-        ),
-        read_name_field(
-            reader,
-            person.checked_add(profile.constants.person_common_name_offset)?,
-        ),
-    )?;
-    let position_bytes = reader.read_bytes(
-        raw_player.checked_add(profile.constants.player_positions_offset)?,
-        POSITION_NAMES.len(),
-    )?;
-    if position_bytes.iter().any(|rating| *rating > 20)
-        || position_bytes.iter().all(|rating| *rating == 0)
-    {
-        return None;
-    }
-    let (positions, _secondary_positions) = classify_player_positions(&position_bytes);
-    if positions.is_empty() {
-        return None;
-    }
-    Some(IndexedPlayerRecord {
-        id: uid.to_string(),
-        name,
-        positions,
-        managed_squad: false,
-        visibility_safe: false,
-        raw_player_address: raw_player,
-        person_address: person,
-        contract_address: reader
-            .read_pointer(person.checked_add(profile.constants.person_contract_offset)?)
-            .filter(|value| *value != 0),
     })
 }
 
@@ -3612,7 +3368,7 @@ fn person_identity_valid(
     {
         return true;
     }
-    fm_dossier::player_display_name(&uid.to_string()).is_some()
+    false
 }
 
 #[cfg(target_os = "windows")]
@@ -3699,9 +3455,6 @@ fn resolve_managed_squad_name(
     ) {
         return (name, "own-squad");
     }
-    if let Some(name) = fm_dossier::player_display_name(&uid.to_string()) {
-        return (name, "dossier-fallback");
-    }
     (format!("Player {uid}"), "uid-fallback")
 }
 
@@ -3739,28 +3492,14 @@ fn read_executable_identity(path: &str) -> ExecutableIdentity {
 
     #[cfg(target_os = "windows")]
     {
-        let escaped_path = path.replace('\'', "''");
-        let script = format!(
-            "$v=(Get-Item -LiteralPath '{escaped_path}').VersionInfo; [Console]::Write($v.FileVersion+'|'+$v.ProductVersion)"
-        );
-        if let Ok(output) = std::process::Command::new("powershell")
-            .args(["-NoProfile", "-NonInteractive", "-Command", &script])
-            .output()
+        if let Some((file_version, product_version)) =
+            crate::fm26::executable::read_windows_file_versions(path)
         {
-            if output.status.success() {
-                let value = String::from_utf8_lossy(&output.stdout);
-                let mut parts = value.splitn(2, '|');
-                identity.file_version = parts
-                    .next()
-                    .map(str::trim)
-                    .filter(|value| !value.is_empty())
-                    .map(str::to_string);
-                identity.product_version = parts
-                    .next()
-                    .map(str::trim)
-                    .filter(|value| !value.is_empty())
-                    .map(str::to_string);
-            }
+            crate::fmt_log::load_detail(format!(
+                "executable versions: file={file_version} product={product_version}"
+            ));
+            identity.file_version = Some(file_version);
+            identity.product_version = Some(product_version);
         }
     }
 
@@ -3855,6 +3594,13 @@ mod tests {
         assert!(!super::is_loaned_out_from_loan_club(Some(920), 920));
         assert!(!super::is_loaned_out_from_loan_club(None, 920));
     }
+
+    #[test]
+    fn bteam_affiliate_loan_is_not_outgoing_external_loan() {
+        let bteam = HashSet::from([3_609_393_u32]);
+        assert!(!super::is_outgoing_external_loan(Some(3_609_393), 920, &bteam));
+        assert!(super::is_outgoing_external_loan(Some(1150), 920, &bteam));
+    }
     #[test]
     fn fm_dates_and_age_match_the_current_save_calendar() {
         let birth = FmDate {
@@ -3948,22 +3694,34 @@ mod tests {
     #[test]
     fn classify_club_team_by_uid_when_name_missing() {
         assert_eq!(
-            super::classify_club_team_squad_unit(None, 100, 100, 920, 920, 28),
+            super::classify_club_team_squad_unit(None, 100, 100, 920, 920, 28, None),
             Some("firstTeam")
         );
         assert_eq!(
-            super::classify_club_team_squad_unit(None, 200, 100, 2_000_069_496, 920, 18),
+            super::classify_club_team_squad_unit(None, 200, 100, 2_000_069_496, 920, 18, None),
             Some("under19s")
         );
         assert_eq!(
-            super::classify_club_team_squad_unit(None, 300, 100, 2_000_394_357, 920, 1),
+            super::classify_club_team_squad_unit(None, 300, 100, 2_000_394_357, 920, 1, None),
             Some("reserves")
+        );
+        assert_eq!(
+            super::classify_club_team_squad_unit(
+                Some("Leicester City"),
+                200,
+                100,
+                2_000_778_719,
+                673,
+                36,
+                Some(11),
+            ),
+            Some("under19s")
         );
     }
 
     #[test]
     #[ignore = "live FM26 RAM probe"]
-    #[cfg(target_os = "windows")]
+    #[cfg(all(feature = "probe", target_os = "windows"))]
     fn debug_scan_club_teams_live() {
         let result = super::debug_scan_club_teams_impl();
         if let Ok(value) = &result {
@@ -3971,6 +3729,17 @@ mod tests {
         }
         let value = result.expect("debug_scan_club_teams failed");
         assert!(!value["teams"].as_array().unwrap_or(&vec![]).is_empty());
+    }
+
+    #[test]
+    #[ignore = "live FM26 RAM probe"]
+    #[cfg(all(feature = "probe", target_os = "windows"))]
+    fn debug_scan_club_affiliates_live() {
+        let result = super::debug_scan_club_affiliates_impl();
+        if let Ok(value) = &result {
+            eprintln!("{}", serde_json::to_string_pretty(value).unwrap_or_default());
+        }
+        result.expect("debug_scan_club_affiliates failed");
     }
 }
 
