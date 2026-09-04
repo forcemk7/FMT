@@ -52,4 +52,4 @@ Shipped:
 
 Verify: `npm test -- --run src/domain/live-data.test.ts` — 32 passed.
 
-Commit: _(filled after git)_
+Commit: `9f702ceb07df5a1593bd520c15f02b77fea4a341`
