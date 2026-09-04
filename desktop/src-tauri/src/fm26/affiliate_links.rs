@@ -36,25 +36,48 @@ pub(crate) const AFFILIATE_LINK_STRUCT_PROBE_BYTES: usize = 512;
 /// Feeder affiliates embed club UID inline ~this region (not pointer-indirected).
 pub(crate) const FEEDER_INLINE_UID_SCAN_BYTES: usize = 64 * 1024;
 
-/// Production B-team (German II): satellite team roster band locked on Schalke II @ 33 players.
-pub(crate) const BTEAM_SATELLITE_ROSTER_MIN: usize = 28;
-pub(crate) const BTEAM_SATELLITE_ROSTER_MAX: usize = 38;
+/// Squad-tab separate-club reserves (II / NPL / …): roster band covers Schalke II (~21–33) and Melbourne NPL (~29).
+pub(crate) const BTEAM_SATELLITE_ROSTER_MIN: usize = 12;
+pub(crate) const BTEAM_SATELLITE_ROSTER_MAX: usize = 55;
 
-/// Returns true when a heap satellite team looks like the managed club's II / reserves squad.
+fn managed_club_name_stem(managed_club_name: &str) -> String {
+    let mut key = managed_club_name.trim().to_ascii_lowercase();
+    for suffix in [" football club", " fc", " cf"] {
+        if let Some(stripped) = key.strip_suffix(suffix) {
+            key = stripped.trim().to_string();
+            break;
+        }
+    }
+    key
+}
+
+/// True when the team string looks like a Squad-tab reserve side (II / NPL / " 2"), not U19/U21.
+fn squad_tab_affiliate_name_marker(team_key: &str) -> bool {
+    let key = team_key.trim();
+    key.contains(" ii")
+        || key.ends_with("ii")
+        || key.contains("(npl)")
+        || key.contains(" npl")
+        || key.ends_with(" 2")
+        || key.contains(" 2 ")
+}
+
+/// Returns true when a heap satellite team looks like a Squad-tab separate-club reserve
+/// (FMLE class: Main + Permanent + Players Move Freely — e.g. German II, Melbourne NPL).
 pub(crate) fn bteam_satellite_team_matches(
     managed_club_name: &str,
     team_name: &str,
     roster_len: usize,
 ) -> bool {
-    if roster_len < BTEAM_SATELLITE_ROSTER_MIN || roster_len > BTEAM_SATELLITE_ROSTER_MAX {
+    if !(BTEAM_SATELLITE_ROSTER_MIN..=BTEAM_SATELLITE_ROSTER_MAX).contains(&roster_len) {
         return false;
     }
-    let managed_key = managed_club_name.trim().to_ascii_lowercase();
+    let stem = managed_club_name_stem(managed_club_name);
     let team_key = team_name.trim().to_ascii_lowercase();
-    if managed_key.is_empty() || !team_key.contains(&managed_key) {
+    if stem.is_empty() || !team_key.contains(&stem) {
         return false;
     }
-    team_key.contains(" ii") || team_key.ends_with("ii")
+    squad_tab_affiliate_name_marker(&team_key)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -130,10 +153,7 @@ pub(crate) fn squad_unit_from_team_type(team_type: u8) -> Option<&'static str> {
     }
 }
 
-/// Fine-grained FMScout TeamType → UI label (tabs / Settings).
-///
-/// Only used when the team display string is empty or equals the club name.
-/// Real distinct FM strings (e.g. `FC Schalke 04 U19`) win over these labels.
+/// Fine-grained FMScout TeamType → UI label (default squad tab name).
 pub(crate) fn team_type_display_label(team_type: u8) -> Option<&'static str> {
     match team_type {
         0 => Some("First Team"),
@@ -156,27 +176,26 @@ pub(crate) fn team_type_display_label(team_type: u8) -> Option<&'static str> {
     }
 }
 
-/// Squad tab / Settings label: prefer a distinct FM team string; otherwise TeamType.
+/// Squad tab / Settings label: TeamType first; remind when type is missing/unmapped.
 pub(crate) fn resolve_team_tab_label(
     raw_name: &str,
-    club_name: &str,
+    _club_name: &str,
     team_type: Option<u8>,
     team_uid: u32,
 ) -> String {
-    let trimmed = raw_name.trim();
-    let club = club_name.trim();
-    let collides =
-        trimmed.is_empty() || (!club.is_empty() && trimmed.eq_ignore_ascii_case(club));
-    if !collides {
-        return trimmed.to_string();
+    match team_type {
+        Some(value) => team_type_display_label(value)
+            .map(str::to_string)
+            .unwrap_or_else(|| format!("Map TeamType {value}")),
+        None => {
+            let trimmed = raw_name.trim();
+            if !trimmed.is_empty() {
+                format!("Map TeamType (?): {trimmed}")
+            } else {
+                format!("Map TeamType (?): uid-{team_uid}")
+            }
+        }
     }
-    if let Some(label) = team_type.and_then(team_type_display_label) {
-        return label.to_string();
-    }
-    if !trimmed.is_empty() {
-        return trimmed.to_string();
-    }
-    format!("team-uid-{team_uid}")
 }
 
 /// Max teams in a club Teams vector (First + youth sides; not world table).
@@ -941,11 +960,10 @@ fn discover_bteam_from_heap_satellite_teams(
         else {
             continue;
         };
-        if roster_len < BTEAM_SATELLITE_ROSTER_MIN || roster_len > BTEAM_SATELLITE_ROSTER_MAX {
-            continue;
-        }
         let team_name = read_team_display_name(reader, *team, profile);
-        if !bteam_satellite_team_matches(&managed_club_name, &team_name, roster_len) {
+        if !bteam_satellite_team_matches(&managed_club_name, &team_name, roster_len)
+            && !bteam_satellite_team_matches(&managed_club_name, &club_name, roster_len)
+        {
             continue;
         }
         try_push_bteam_affiliate(
@@ -966,10 +984,13 @@ fn discover_bteam_from_heap_satellite_teams(
                 team_name.trim()
             ),
         );
-        if !found.is_empty() {
-            break;
-        }
     }
+    // Prefer the largest squad-tab affiliate when several satellites match.
+    found.sort_by(|left, right| {
+        // stable order by uid; roster preference applied by re-scanning names is unavailable here —
+        // keep all unique clubs (seen_uids already deduped).
+        left.club_uid.cmp(&right.club_uid)
+    });
     found
 }
 
@@ -1519,11 +1540,21 @@ mod tests {
     };
 
     #[test]
-    fn bteam_satellite_filter_locks_schalke_ii() {
+    fn bteam_satellite_filter_locks_schalke_ii_and_melbourne_npl() {
+        assert!(bteam_satellite_team_matches(
+            "FC Schalke 04",
+            "FC Schalke 04 II",
+            21,
+        ));
         assert!(bteam_satellite_team_matches(
             "FC Schalke 04",
             "FC Schalke 04 II",
             33,
+        ));
+        assert!(bteam_satellite_team_matches(
+            "Melbourne Victory Football Club",
+            "Melbourne Victory (NPL)",
+            29,
         ));
         assert!(!bteam_satellite_team_matches(
             "FC Schalke 04",
@@ -1548,9 +1579,9 @@ mod tests {
     }
 
     #[test]
-    fn bteam_satellite_roster_band_matches_entity_map() {
-        assert_eq!(BTEAM_SATELLITE_ROSTER_MIN, 28);
-        assert_eq!(BTEAM_SATELLITE_ROSTER_MAX, 38);
+    fn bteam_satellite_roster_band_covers_ii_and_npl() {
+        assert_eq!(BTEAM_SATELLITE_ROSTER_MIN, 12);
+        assert_eq!(BTEAM_SATELLITE_ROSTER_MAX, 55);
     }
 
     #[test]
@@ -1594,10 +1625,10 @@ mod tests {
     }
 
     #[test]
-    fn resolve_team_tab_label_prefers_distinct_fm_string() {
+    fn resolve_team_tab_label_prefers_team_type() {
         assert_eq!(
             resolve_team_tab_label("FC Schalke 04 U19", "FC Schalke 04", Some(11), 1),
-            "FC Schalke 04 U19"
+            "U19"
         );
         assert_eq!(
             resolve_team_tab_label("Liverpool", "Liverpool", Some(0), 676),
@@ -1616,8 +1647,16 @@ mod tests {
             "U19"
         );
         assert_eq!(
+            resolve_team_tab_label("Some Side", "Club", Some(55), 7),
+            "Map TeamType 55"
+        );
+        assert_eq!(
+            resolve_team_tab_label("Some Side", "Club", None, 7),
+            "Map TeamType (?): Some Side"
+        );
+        assert_eq!(
             resolve_team_tab_label("", "", None, 42),
-            "team-uid-42"
+            "Map TeamType (?): uid-42"
         );
     }
 

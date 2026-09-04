@@ -1,12 +1,10 @@
 ﻿# Status
 
-Last updated: 2026-09-04 (T213 done — Diagnostics + in-game date; T212 still in_progress)
+Last updated: 2026-09-04 (T212 done — managed affiliate II/NPL)
 
 ## Now
 
-**T212** Load managed affiliate squads (II / NPL) — cursor-agent. Filter = Main+Permanent+Players Move Freely (Melbourne confirms same pattern). Wire into production Club.Teams path.
-
-**Human:** Melbourne NPL **PASS** (total 55). Load Schalke FM24Continue — expect First + U19 + II. NPL/II tab labels later.
+**Human:** Schalke + Melbourne affiliate squads **PASS** (totals 79 / 55). Affiliate tab label still “First Team” — later. Empty Youth(0) OK.
 
 **T208** Five-band attr tones — Super deferred; await archive confirm.
 
@@ -18,7 +16,6 @@ Last updated: 2026-09-04 (T213 done — Diagnostics + in-game date; T212 still i
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
-| T212 | Load managed affiliate squads (II / NPL) | in_progress | 1 | cursor-agent — Main+Permanent+PMF |
 | T208 | Five-band attr tones + hot-amber super | in_progress | 2 | cursor-agent — Super deferred; await archive confirm |
 | T190 | Development all-time from Progress Report CA strip | blocked | 2 | **parked** |
 | T209 | Squad — roster status as single select | ready | 5 | after T208; multi→single |
@@ -33,6 +30,7 @@ Last updated: 2026-09-04 (T213 done — Diagnostics + in-game date; T212 still i
 
 ## Recently done
 
+- **T212** Load managed affiliate squads (Schalke II + Melbourne NPL; totals 79/55)
 - **T213** Diagnostics — rename, game date, load-order fields
 - **T211** Club.Teams — map TeamType 21 (Youth; Melbourne Youths 15)
 - **T206** Club.Teams — in-game team display names (TeamType when name equals club; keep real `… U19`)

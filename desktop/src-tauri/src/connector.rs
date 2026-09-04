@@ -12,7 +12,10 @@ use std::{
 use tauri::Emitter;
 
 use crate::fm26::{
-    affiliate_links::discover_teams_for_club,
+    affiliate_links::{
+        discover_bteam_affiliate_clubs, discover_teams_for_affiliate_club, discover_teams_for_club,
+        AffiliateClubDiscovery,
+    },
     memory::{ModuleInfo, ProcessReader},
     offsets::{
         executable_sha256_for_versions, find_entity_map, mapping_coverage, EntityMapProfile,
@@ -1431,6 +1434,38 @@ fn debug_scan_club_teams_impl() -> Result<Value, String> {
             })
         })
         .collect();
+    let affiliates = discover_bteam_affiliate_clubs(
+        &mut reader,
+        module,
+        profile,
+        selected.club,
+        selected.club_uid,
+        selected.team,
+    );
+    let affiliate_teams: Vec<Value> = affiliates
+        .iter()
+        .flat_map(|affiliate| {
+            let teams = discover_teams_for_affiliate_club(
+                &mut reader,
+                module,
+                profile,
+                affiliate.club,
+                affiliate.club_uid,
+                &heap_anchors,
+                Some((selected.club, selected.club_uid)),
+            );
+            teams.into_iter().map(|team| {
+                json!({
+                    "affiliateClubUid": affiliate.club_uid,
+                    "affiliateClubName": affiliate.club_name,
+                    "teamUid": team.team_uid,
+                    "name": team.name,
+                    "rosterLen": team.roster_len,
+                    "teamType": team.team_type,
+                })
+            })
+        })
+        .collect();
     Ok(json!({
         "managedClubUid": selected.club_uid,
         "managedClubName": selected.club_name,
@@ -1439,6 +1474,13 @@ fn debug_scan_club_teams_impl() -> Result<Value, String> {
         "bytesRead": reader.bytes_read,
         "rawClubTeamsBeforeClassify": raw_from_club,
         "teams": teams,
+        "squadTabAffiliates": affiliates.iter().map(|a| json!({
+            "clubUid": a.club_uid,
+            "clubName": a.club_name,
+            "linkKind": format!("{:?}", a.link_kind),
+            "linkStructPointer": a.link_struct_pointer.map(hex_address),
+        })).collect::<Vec<_>>(),
+        "squadTabAffiliateTeams": affiliate_teams,
     }))
 }
 
@@ -1830,7 +1872,7 @@ fn contract_team_club_uid(
 ///
 /// - Managed first team pointer / UID == club UID → `firstTeam`
 /// - TeamType byte (FMScout enum @ team+0x28) → `firstTeam` / `under19s` / `reserves`
-/// - No name / roster-band heuristics (those are unfinished RE).
+/// - Missing/unmapped TeamType → still load as `reserves` (tab label reminds to map)
 #[cfg(target_os = "windows")]
 fn classify_club_team_squad_unit(
     _team_name: Option<&str>,
@@ -1844,7 +1886,11 @@ fn classify_club_team_squad_unit(
     if team == first_team || team_uid == club_uid {
         return Some("firstTeam");
     }
-    team_type.and_then(crate::fm26::affiliate_links::squad_unit_from_team_type)
+    Some(
+        team_type
+            .and_then(crate::fm26::affiliate_links::squad_unit_from_team_type)
+            .unwrap_or("reserves"),
+    )
 }
 
 #[cfg(target_os = "windows")]
@@ -2007,6 +2053,161 @@ fn club_teams_json(discovered: &[DiscoveredClubTeam], manager_team: u64) -> Vec<
             })
         })
         .collect()
+}
+
+fn merge_satellite_club_teams_json(mut base: Vec<Value>, extra: Vec<Value>) -> Vec<Value> {
+    for team in extra {
+        let team_uid = team.get("teamUid").and_then(Value::as_str);
+        if team_uid.is_some_and(|uid| {
+            base.iter()
+                .any(|entry| entry.get("teamUid").and_then(Value::as_str) == Some(uid))
+        }) {
+            continue;
+        }
+        base.push(team);
+    }
+    base
+}
+
+/// Squad-tab separate-club reserves (German II / Melbourne NPL / …).
+///
+/// Discovery = parent-edge affiliates that are not inline feeders (FMLE class Main+Permanent+
+/// Players Move Freely). Then Club.Teams on that club → existing roster pipeline.
+#[cfg(target_os = "windows")]
+#[allow(clippy::too_many_arguments)]
+fn load_bteam_affiliate_rosters(
+    reader: &mut ProcessReader,
+    module: ModuleInfo,
+    profile: &EntityMapProfile,
+    managed_club: u64,
+    managed_club_uid: u32,
+    managed_club_name: &str,
+    first_team: u64,
+    club_id: &str,
+    squad_game_date: Option<FmDate>,
+    affiliates: &[AffiliateClubDiscovery],
+    bteam_affiliate_club_uids: &HashSet<u32>,
+    managed_player_ids: &mut HashSet<String>,
+    players: &mut Vec<Value>,
+    skipped_squad_slots: &mut u32,
+    skipped_squad_details: &mut Vec<String>,
+    name_fallback_details: &mut Vec<String>,
+    player_vtable: &mut Option<u64>,
+) -> (usize, Vec<String>, Vec<DiscoveredClubTeam>) {
+    let mut promoted = 0usize;
+    let mut labels = Vec::new();
+    let mut discovered_teams = Vec::new();
+    crate::fmt_log::load_detail(format!(
+        "squad-tab affiliate clubs via pointer graph: {} resolved",
+        affiliates.len()
+    ));
+    let heap_anchors = [managed_club, first_team];
+    for affiliate in affiliates {
+        let teams = discover_teams_for_affiliate_club(
+            reader,
+            module,
+            profile,
+            affiliate.club,
+            affiliate.club_uid,
+            &heap_anchors,
+            Some((managed_club, managed_club_uid)),
+        );
+        crate::fmt_log::load_detail(format!(
+            "affiliate club uid {} ({}) — {} team(s)",
+            affiliate.club_uid,
+            affiliate.club_name.trim(),
+            teams.len()
+        ));
+        if teams.is_empty() {
+            continue;
+        }
+        let mut linked_teams: Vec<_> = teams
+            .into_iter()
+            .filter(|team| {
+                if team.team == first_team {
+                    return false;
+                }
+                let linked_to_affiliate = reader
+                    .read_pointer(team.team + profile.constants.team_club_offset)
+                    .is_some_and(|linked| {
+                        linked == affiliate.club
+                            || reader
+                                .read_u32(linked + profile.constants.entity_uid_offset)
+                                .is_some_and(|uid| uid == affiliate.club_uid)
+                    });
+                linked_to_affiliate || team.team_uid == affiliate.club_uid
+            })
+            .collect();
+        if linked_teams.is_empty() {
+            continue;
+        }
+        if linked_teams.iter().any(|team| team.team_type == Some(0)) {
+            linked_teams.retain(|team| team.team_type == Some(0));
+        } else if linked_teams.len() > 1 {
+            let max_roster = linked_teams
+                .iter()
+                .map(|team| team.roster_len)
+                .max()
+                .unwrap_or(0);
+            linked_teams.retain(|team| team.roster_len == max_roster);
+        }
+        for team in linked_teams {
+            // Separate-club reserves are never the managed First Team tab.
+            let squad_unit = "reserves";
+            let affiliate_name = affiliate.club_name.trim();
+            let team_label = if !affiliate_name.is_empty() {
+                affiliate_name.to_string()
+            } else {
+                club_team_label(
+                    &team.name,
+                    managed_club_name,
+                    team.team_type,
+                    team.team_uid,
+                )
+            };
+            crate::fmt_log::load_detail(format!(
+                "affiliate roster: {} uid {} ({} players)",
+                team_label.trim(),
+                team.team_uid,
+                team.roster_len
+            ));
+            discovered_teams.push(DiscoveredClubTeam {
+                team: team.team,
+                team_uid: team.team_uid,
+                name: team_label.clone(),
+                squad_unit,
+                roster_len: team.roster_len,
+                team_type: team.team_type,
+            });
+            labels.push(format!(
+                "{} (affiliate) uid {} ({}, {} roster)",
+                team_label.trim(),
+                team.team_uid,
+                squad_unit,
+                team.roster_len
+            ));
+            promoted += load_team_roster(
+                reader,
+                module,
+                profile,
+                team.team,
+                &team_label,
+                squad_unit,
+                team.team_uid,
+                club_id,
+                managed_club_uid,
+                squad_game_date,
+                bteam_affiliate_club_uids,
+                managed_player_ids,
+                players,
+                skipped_squad_slots,
+                skipped_squad_details,
+                name_fallback_details,
+                player_vtable,
+            );
+        }
+    }
+    (promoted, labels, discovered_teams)
 }
 
 fn load_team_roster(
@@ -2582,10 +2783,12 @@ fn extract_live_data(
     diagnostics.last_successful_read = Some("validate_managed_club".to_string());
 
     let club_id = club_uid.to_string();
-    // Separate-club reserves (German II etc.) stay out of production until affiliate
-    // Main+Permanent+Players Move Freely flags are locked (future ticket). Empty set =
-    // loans to those clubs classify as normal outgoing until then.
-    let affiliate_reserve_club_uids: HashSet<u32> = HashSet::new();
+    // Squad-tab separate-club reserves (II / NPL): parent-edge affiliates that are not
+    // inline feeders. FMLE labels this class Main+Permanent+Players Move Freely.
+    let bteam_affiliates =
+        discover_bteam_affiliate_clubs(reader, module, profile, club, club_uid, team);
+    let affiliate_reserve_club_uids: HashSet<u32> =
+        bteam_affiliates.iter().map(|entry| entry.club_uid).collect();
 
     if let Some(progress) = progress {
         progress("loading_club_teams");
@@ -2603,8 +2806,9 @@ fn extract_live_data(
         &index_team_seeds,
     );
     crate::fmt_log::load_detail(format!(
-        "Club.Teams vector: {} same-club team(s)",
-        discovered_teams.len()
+        "Club.Teams vector: {} same-club team(s); {} squad-tab affiliate club(s)",
+        discovered_teams.len(),
+        bteam_affiliates.len()
     ));
     let mut discovered_team_labels: Vec<String> = Vec::new();
     for entry in &discovered_teams {
@@ -2617,7 +2821,7 @@ fn extract_live_data(
             entry.team_type
         ));
     }
-    let club_teams = club_teams_json(&discovered_teams, team);
+    let mut club_teams = club_teams_json(&discovered_teams, team);
 
     if let Some(progress) = progress {
         progress("loading_managed_squad");
@@ -2781,6 +2985,34 @@ fn extract_live_data(
         );
     }
 
+    if let Some(progress) = progress {
+        progress("loading_affiliate_squads");
+    }
+    let (bteam_promoted, bteam_labels, bteam_teams) = load_bteam_affiliate_rosters(
+        reader,
+        module,
+        profile,
+        club,
+        club_uid,
+        &club_name,
+        team,
+        &club_id,
+        squad_game_date,
+        &bteam_affiliates,
+        &affiliate_reserve_club_uids,
+        &mut managed_player_ids,
+        &mut players,
+        &mut skipped_squad_slots,
+        &mut skipped_squad_details,
+        &mut name_fallback_details,
+        &mut player_vtable,
+    );
+    club_squad_promoted += bteam_promoted;
+    for label in bteam_labels {
+        discovered_team_labels.push(label);
+    }
+    club_teams = merge_satellite_club_teams_json(club_teams, club_teams_json(&bteam_teams, team));
+
     // Full-save (~235k) index is Loop D — not in production until a fast, cross-save path exists.
     let _ = (reader, module, profile, process_id, team, progress, player_vtable);
     let database_players_indexed = managed_player_ids.len() as u32;
@@ -2811,7 +3043,6 @@ fn extract_live_data(
     let mut warnings = vec![
         "Managed-squad IDs, names, dates of birth, ages, nationality, positions, preferred foot, visible attributes, and mapped CA/PA/hidden/personality are validated for this FM26 build.".to_string(),
         "Form, match ratings, contract, wage, valuation, fitness and squad-status relationships are not yet validated for this build and remain Unknown.".to_string(),
-        "Separate-club reserve affiliates (e.g. German II) are not loaded until affiliate Main+Permanent+Players Move Freely flags are locked.".to_string(),
     ];
     if let Some(warning) = skipped_squad_warning {
         warnings.push(warning);
@@ -2822,9 +3053,16 @@ fn extract_live_data(
     if let Some(warning) = manager_pick_warning {
         warnings.push(warning);
     }
+    if !bteam_affiliates.is_empty() {
+        warnings.push(format!(
+            "{} squad-tab affiliate club(s) resolved (separate-club reserves / NPL); {} player(s) promoted from those rosters.",
+            bteam_affiliates.len(),
+            bteam_promoted
+        ));
+    }
     if club_squad_promoted > 0 {
         warnings.push(format!(
-            "{club_squad_promoted} player(s) loaded from same-club Club.Teams rosters (TeamType-classified)."
+            "{club_squad_promoted} player(s) loaded from Club.Teams + squad-tab affiliate rosters."
         ));
     } else if discovered_team_labels.len() > 1 {
         warnings.push(format!(
@@ -3585,10 +3823,14 @@ mod tests {
             super::classify_club_team_squad_unit(None, 100, 100, 920, 920, 28, None),
             Some("firstTeam")
         );
-        // Without TeamType, non-first teams are not classified (no name/roster heuristics).
+        // Missing/unmapped TeamType still loads (reserves bucket; label reminds to map).
         assert_eq!(
             super::classify_club_team_squad_unit(None, 200, 100, 2_000_069_496, 920, 18, None),
-            None
+            Some("reserves")
+        );
+        assert_eq!(
+            super::classify_club_team_squad_unit(None, 200, 100, 2_000_069_496, 920, 18, Some(55)),
+            Some("reserves")
         );
         assert_eq!(
             super::classify_club_team_squad_unit(
