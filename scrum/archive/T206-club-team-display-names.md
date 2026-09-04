@@ -50,7 +50,7 @@ Shipped:
 
 Verify:
 - `npm test -- --run src/domain/live-data.test.ts` — 36 passed
-- `cargo test --lib resolve_team_tab_label|team_type_display|team_type_maps_fmscout` — 3/3 ok
+- `cargo test --lib resolve_team_tab_label` — ok
 - Human: reload English club (≥2 teams) + Schalke for live eyeball
 
-Commit: _(filled after git)_
+Commit: `3d9c9e9bf37e4d2392c9ba5c70fc97b43d693dda`
