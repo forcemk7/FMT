@@ -44,4 +44,4 @@ Same-club Club.Teams now mirrors FM for Liverpool / Leicester / Bodø / Legia / 
 - **Melbourne PASS:** FMT total 55 = First 21 + Youth 15 + NPL ~19 (tmp gens out).
 - **Schalke PASS:** FMT total 79 = First 37 + U19 21 (FM 26−tmp) + II 21. Empty Youth(0) OK.
 - Residual: affiliate tab label still “First Team” (TeamType 0).
-- Commit: (filled after git)
+- Commit: `dd5ea45`
