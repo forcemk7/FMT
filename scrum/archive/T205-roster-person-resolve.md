@@ -66,4 +66,4 @@ Loop A fails when key first-team players never appear. Liverpool Club.Teams firs
 
 ### Commit
 
-_(SHA after commit)_
+`6f34358` — T205: FSS PLAO person resolve for Club.Teams rosters

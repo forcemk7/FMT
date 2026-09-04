@@ -1,0 +1,145 @@
+---
+description: FM26 live-read archive — world object tables first; FMLE-class scouting core; no lost RE
+globs: desktop/src-tauri/src/fm26/**,desktop/src-tauri/entity-maps/**,desktop/src-tauri/src/bin/fmt-probe.rs,desktop/src-tauri/src/connector.rs
+alwaysApply: false
+---
+
+# FM26 live read — archive + direction
+
+This file is the durable research store. Agents touching live-read paths get it automatically. Do not recreate this RE from scratch.
+
+**Product fork (keep):** FMLE = Live Editing. FMT = Gameplay Support (Squad / Loans / GM / HoYD / Progress).  
+**Shared need (believe):** the same **scouting core** — full in-game world readable in ~&lt;2s from `fm.exe` / `game_plugin.dll`. Editing bytes is out of scope for FMT; reading is not.
+
+**Loop D** stays parked in `scrum/SCOPE.md` until Loop A is daily habit. When funded: build the shared read core, then filter — do not invent tickets from this file alone.
+
+---
+
+## Preferred architecture (revised)
+
+**World tables first, managed club second.**
+
+1. Resolve `game_plugin.dll` base + offset table (`tableRva` or signature fallback).
+2. Walk People / Club / Team (and other slots as needed) → UID→pointer maps in &lt;2s.
+3. **Then** attach the human manager → managed club → Club.Teams / TeamType for Squad UI.
+
+Managed-club-first (GlassScout) + heap/idiom “player registry” burned tokens and still does not match FMLE. Mapping only the managed graph is the hard path; loading the world from known tables then selecting the managed club is the easy path.
+
+Loop A today may keep the squad path until Loop D ships — do not rip production without a ticket. New world-index / registry RE **must** prefer table walk.
+
+---
+
+## Object-table walk (the &lt;2s core)
+
+```
+game_plugin.base + tableRva     → offset table base
+table + SLOT                    → slotPtr
+slotPtr + 0x80                  → vector descriptor
+read U64 begin, U64 end         → pointer array
+count = (end - begin) / 8
+classify person rows by vtable (Player / Staff / PlayerStaff / HumanManager)
+```
+
+**Patch resilience:** maintain build→`tableRva` map; if stale, **score-scan** for a table whose slot counts look sane (continents≈7, regions≈28, people 30k–120k, teams 30k–90k, clubs 10k–50k, …). Pattern from fm-ai-assistent `FmOffsets` (Windows + Linux / Proton same layout).
+
+FMLE often needs online after SI patches (remote offsets). Local RVA map + signature fallback avoids that tax if kept current.
+
+### Stable slot offsets (same across builds)
+
+| Slot | Offset |
+|------|--------|
+| CityOffset | 0x0F0 |
+| ClubOffset | 0x0F8 |
+| CompetitionOffset | 0x100 |
+| ContinentOffset | 0x108 |
+| NationOffset | 0x110 |
+| CurrencyOffset | 0x118 |
+| PeopleOffset | 0x150 |
+| RegionOffset | 0x160 |
+| StadiumOffset | 0x168 |
+| TeamOffset | 0x180 |
+| AgreementOffset | 0x1A0 |
+
+---
+
+## Field offsets (FMSuperScout Fields.cs ↔ FMT entity-map)
+
+Provenance: CE tables (tdg6661), pinned FM **26.3.x** `game_plugin`. Player block = PLAO (person − dynamic class offset). FMT entity-map already aligned on most player fields.
+
+| Field | FSS | FMT entity-map | Status |
+|-------|-----|----------------|--------|
+| UID | 0x0C | entityUid 12 | Match |
+| CA / PA | 0x264 / 0x266 | 612 / 614 | Match — do not re-RE |
+| Positions | 0x150 | 336 | Match |
+| Attrs (×5) | 0x15F | 351 | Match |
+| Height | 0x22E (u16) | 558 (u8 in map) | Verify width |
+| First/Second/Common name | 0x50/58/60 | 80/88/96 | Match |
+| Nation | 0x68 | 104 | Match |
+| DOB | 0x88 | 136 | Match |
+| Contract ptr | 0xA8 | 168 | Match |
+| Loan (FMT) | — | person+176 | FMT-locked |
+| Personality 0x70–0x77 | Adapt…Controversy | personPersonality 112 | Match |
+| Wage / expiry | contract+0x20 / +0x48 | unmapped | Free win when ticketed |
+| Team→club | 0x30 | teamClub 48 | Match |
+| Team→competition | 0x50 | — | Available |
+| Club.Teams begin/end | — | club+24/+32 | FMT-locked (T200) |
+| TeamType | — | team+40 (0x28) | AppCake FM22→FM26 |
+
+Person class dynamic offsets (FSS): Player `0x288`, PlayerStaff `0x380`, Staff `0x100`, HumanManager `0x450` — same idea as AppCake person-type split after walking People. FMT `playerPersonOffset` **648 (0x288)** = Player class; roster PLAO = person − class_offset. Some Team.Players slots are **non-person sentinels** (shared module vtable, fail all class offsets) — report honestly, do not treat as missing First XI.
+
+---
+
+## Source ranking (token-burn)
+
+| Source | Reuse | Burn | Notes |
+|--------|-------|------|-------|
+| JelmerBouma1985/fm-ai-assistent `FmOffsets` | **Port** tableBounds + RVA/scan | Lowest | Open FM26 world walker |
+| mavarobli/FMSuperScout `Fields.cs` | Offset table only | Low | Not BepInEx product path (SCOPE) |
+| AppCakeLtd/FMScoutFramework | Architecture / TeamType | Medium | Open ≤FM22; ObjectManager = MainAddress→slots→arrays |
+| FMT GlassScout core | Keep process/memory/entity-map/squad UI | Sunk | Don’t invent world index via `player_registry` idiom scan |
+| FMLE 26 binary | A/B oracle only | High if RE’d | Packed; no shippable shared core |
+| Legacy FMScoutFramework.dll | Insight only | Dead for FM26 | Shipped with **FMSE ≤FM23** (discontinued); same lineage as AppCake, not a drop-in |
+
+### Canonical URLs
+
+1. https://github.com/JelmerBouma1985/fm-ai-assistent — `FmOffsets` / WindowsProcessReader  
+2. https://github.com/mavarobli/FMSuperScout/blob/main/plugin/Fields.cs  
+3. https://github.com/AppCakeLtd/FMScoutFramework — `ObjectManager.cs`, `Defines/Versions` (Steam_22_*)  
+4. https://github.com/ThanosSiopoudis/FMScoutFramework — older GPL FM14–16  
+5. https://github.com/robeady/fm-explorer — documents FMScoutFramework.dll from FMSE releases  
+6. https://github.com/TobiasTest22/GlassScout — FMT import origin (`NOTICE-GlassScout.md`)
+
+---
+
+## FMLE / FMScoutFramework facts (machine + history)
+
+- Install: `C:\Program Files\FM26 Live Editor\fmle26.exe` (~11.6MB packed) + `C:\Users\mrdev\Documents\FMLE`.
+- ASCII/UTF-16 string scan: **HIT** `game_plugin`; **miss** `FMScoutFramework`, `PeopleOffset`, Costura/ILMerge.
+- No separate `FMScoutFramework.dll` next to FMLE26. Stam’s FMLE is the closed successor after FMSE ended (2024); free scouting, paid save-edits.
+- Googled `FMScoutFramework.dll` = FMSE / AppCake lineage, not something to link into FMT for FM26.
+- FMLE claims load searchable world in under ~2s — benchmark for the shared read core, not a license to copy their binary.
+
+---
+
+## Do / Don’t
+
+**Do**
+
+- Prefer object-table walk for any full-world / registry / “beat FMLE read” work.
+- Reuse Fields.cs for wage/expiry/rep/competition when a ticket needs them.
+- Use FMLE only as live A/B (already used for affiliate flags, etc.).
+- When Loop D is funded: spike Rust `tableBounds` → People/Club/Team counts + UID maps; then resolve managed club from that index.
+
+**Don’t**
+
+- Don’t decompile FMLE into production.
+- Don’t adopt BepInEx / in-process plugin dumpers.
+- Don’t continue heap/idiom `player_registry` as the world strategy.
+- Don’t invent Loop D tickets while Loop A owns the board.
+- Don’t re-RE CA/PA/attrs already locked in entity-map.
+
+---
+
+## Smallest future spike (when funded — not a ticket yet)
+
+One module next to `ProcessReader`: resolve table base for current `game_plugin` build → `Bounds` for People/Club/Team → sanity-check counts → optional dump UID→pointer. That replaces months of managed-graph RE for world coverage. Squad then filters managed club/teams from the loaded world.
