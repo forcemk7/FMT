@@ -11,6 +11,8 @@ FMT is a **Football Manager 26** desktop companion: live read of the loaded save
 **Loop A — Replace the spreadsheet (Step 1, funded now)**  
 Load save → FMT connects (squad only) → **Squad** → open player desk → attrs + CA/PA/HA + history → decide development. Owner returns next session because the sheet is obsolete.
 
+**Loop A product shape (UI):** managed club → club teams → roster players → attributes. That is what the user must see and trust — **not** a mandate that live bytes are only walked that way. Prefer proven OSS / archive field layouts (see `.cursor/rules/fm-live-read.mdc`) for accuracy and cross-save reliability; invent managed-graph RE only when giants don’t cover the gap. Full-world index **load** remains Loop D.
+
 **Loop B — Squad at a glance (Step 1 companion)**  
 Load → **Dashboard** = collective view of the same squad/profile signals (movement, CA/HA, flags) → click into a player (Loop A). Dashboard is not a second product; it is Squad rolled up.
 
@@ -19,11 +21,11 @@ Nav stubs stay **Later** until they have load → desk → decision. Empty chrom
 
 - **Loans** — live: Squad twin filtered to outgoing `loanedOut` (honesty / tracking).
 - **GM** — live: Squad twin that **advises Sell vs Loan** from squad **median CA**. Sell = capped low PA, or past dev age (25+) with CA far below PA (decline). Loan = age ≤24 with CA far below PA — youth below median (loan then sell) or CA still below median. Not a transfer market, not a loan finder.
-- **HoYD** — live: Squad twin filtered to **high-PA groom prospects** (`PA ≥ squad median CA`, headroom > 8), sorted PA desc. Not mentoring, not world search.
+- **HoYD** — live: Squad twin filtered to **high-PA groom prospects** (age ≤24, `PA ≥ squad median CA`, headroom > 8), sorted PA desc. Not mentoring, not world search.
 - **Tactic · TD** — still Later until each has its own proven loop.
 
-**Loop D — Replace FMLE (Step 2, not funded)**  
-Full-save index at usable speed. Hard RE. Parked until Loop A is daily habit.
+**Loop D — Shared scouting core / replace FMLE read speed (Step 2, not funded)**  
+Full-world live index in ~&lt;2s (FMLE-class **read** core; FMT does not ship live editing). Parked until Loop A is daily habit. Direction: load `game_plugin` object tables first, then attach managed club/teams. Catalog: `research/ecosystem.md` + `research/recipes.md`. Law: `.cursor/rules/fm-live-read.mdc`. FMLE binary = A/B only.
 
 ## Need-to-have (do)
 
@@ -46,7 +48,7 @@ Full-save index at usable speed. Hard RE. Parked until Loop A is daily habit.
 - Six layers of headers / GS recruitment chrome
 - Building Tactic/HoYD/TD (or GM beyond filtered Squad) as fake working products
 - GM sell/loan recommenders, listing workflows, world search
-- Blind world-table RE / beat FMLE this week
+- Blind heap/idiom world RE / beat FMLE this week (table-walk path is Loop D, parked)
 - Offline `.fm` extract / BepInEx
 - “Dashboard component framework” as a standalone project
 

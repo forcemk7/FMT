@@ -137,7 +137,7 @@ Watch: GitHub topics / new repos mentioning FM26, fmscout.com news, SortItOutSI 
 Use FMSuperScout `Fields.cs` + FMT `entity-maps/index.json`.  
 Already matched: UID, CA/PA, positions, attrs×5, names, nation, DOB, contract ptr, personality pack.  
 **Not** matched by UID band: regen/newgen. DB wonderkids (e.g. Yamal `2000256231`) share the ~2.0B UID range with regens — do not use UID ≥ 1.9B as origin law. Face `r-{uid}` is graphics-pack namespace only.  
-**T216:** origin = `person+0xD5` (`isDatabaseOrigin`: 1=DB, 0=regen). Validated Yamal-set vs Schalke U19+First Team. `isRegen = (byte==0)`. Face `r-{uid}` and UID ≥1.9B are **not** law. FSS `person+0x18` bit `0x08` = youth team, not newgen. Detail: [`FM-RECIPES.md`](./FM-RECIPES.md).  
+**T216:** origin = `person+0xD5` (`isDatabaseOrigin`: 1=DB, 0=regen). Validated Yamal-set vs Schalke U19+First Team. `isRegen = (byte==0)`. Face `r-{uid}` and UID ≥1.9B are **not** law. FSS `person+0x18` bit `0x08` = youth team, not newgen. Detail: [`recipes.md`](./recipes.md).  
 Next free wins when ticketed: wage `contract+0x20`, expiry `+0x48`, guide/transfer value, team competition `@0x50`.
 
 ### R3 — Managed club/teams (Loop A today)
@@ -153,7 +153,7 @@ Maintain build→RVA (or remote pack). Fallback: scored table signature (count r
 
 | Path | Role |
 |------|------|
-| [`FM-RECIPES.md`](./FM-RECIPES.md) | **First-party** locked offsets / traps / open residuals |
+| [`recipes.md`](./recipes.md) | **First-party** locked offsets / traps / open residuals |
 | `desktop/src-tauri/entity-maps/index.json` | Locked build profile + field status |
 | `desktop/src-tauri/src/fm26/` | Process reader + production squad/affiliate path |
 | `NOTICE-GlassScout.md` | Upstream attribution |
@@ -165,5 +165,6 @@ Maintain build→RVA (or remote pack). Fallback: scored table signature (count r
 
 | Date | Change |
 |------|--------|
-| 2026-09-05 | Point to `FM-RECIPES.md`; drop deleted probe-module anchors (T219) |
+| 2026-09-05 | Moved to `research/ecosystem.md` (T220) |
+| 2026-09-05 | Point to `recipes.md`; drop deleted probe-module anchors (T219) |
 | 2026-09-04 | Initial index from live-read research; world-tables-first direction recorded |

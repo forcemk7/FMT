@@ -1,12 +1,12 @@
 # FMT first-party RE recipes
 
 **Role:** Locked offsets and verdicts discovered **in this project** (tickets + live A/B).  
-**Companion:** public tools / steal modes → [`FM-ECOSYSTEM.md`](./FM-ECOSYSTEM.md).  
+**Companion:** public tools / steal modes → [`ecosystem.md`](./ecosystem.md).  
 **Agent law when editing live-read code:** `.cursor/rules/fm-live-read.mdc`.
 
 Update this file when a ticket locks or discards a recipe. Prefer recipes here over resurrecting deleted probe modules.
 
-**Last updated:** 2026-09-05 (T219 — probe fossils stripped; knowledge kept here)
+**Last updated:** 2026-09-05 (T220 — moved to `research/`)
 
 ---
 
@@ -15,7 +15,7 @@ Update this file when a ticket locks or discards a recipe. Prefer recipes here o
 1. **Product tree stays thin** — production load code only (`affiliate_links`, Club.Teams walk, entity-map fields).
 2. **Knowledge compounds here** — so FMT can stay maintainable across patches, support adjacent OSS tooling, and publish learnings without shipping RE scrap heaps.
 3. **Do not revive discarded approaches** listed below without new evidence + a ticket.
-4. External community research stays in `FM-ECOSYSTEM.md`; **this file is FMT ground truth**.
+4. External community research stays in `ecosystem.md`; **this file is FMT ground truth**.
 
 ---
 
@@ -78,7 +78,7 @@ Tickets: T200, T201, T206, T211, T212.
 ## World tables (Loop D direction — parked)
 
 Prefer `game_plugin` object-table walk (People/Club/Team slots) over heap/idiom “player registry”.  
-Stable slot offsets and public ports: `FM-ECOSYSTEM.md` recipe R1 + `.cursor/rules/fm-live-read.mdc`.
+Stable slot offsets and public ports: `ecosystem.md` recipe R1 + `.cursor/rules/fm-live-read.mdc`.
 
 **Discarded for world index:** `player_registry` idiom/heap experiments (removed T219) — do not resurrect as the world strategy.
 
@@ -108,4 +108,5 @@ Re-probe when needed: write a **new** minimal probe under a ticket; start from t
 
 | Date | Change |
 |------|--------|
+| 2026-09-05 | T220: home is `research/`; T219 probe fossils stripped |
 | 2026-09-05 | T219: initial first-party recipe book; strip probe fossils |

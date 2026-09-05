@@ -25,7 +25,7 @@ data/history.json
 data/history.json.bak
 *.fm
 
-# RE probe scratch (never commit — knowledge lives in scrum/FM-RECIPES.md)
+# RE probe scratch (never commit — knowledge lives in research/)
 desktop/*.json
 desktop/*.inflated.bin
 desktop/*.err

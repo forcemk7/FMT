@@ -32,7 +32,7 @@ Read scrum/README.md, scrum/AGENTS.md, scrum/STATUS.md.
 If STATUS says freeze, or the Board has no ready ticket: stop. Do not invent work. Do not edit SCOPE.
 Otherwise claim only the ticket I name (or the single ready ticket).
 Stay inside that ticket’s acceptance. No second ticket.
-If the ticket touches FM live memory / offsets / world index: read scrum/FM-ECOSYSTEM.md before inventing RE; update it if you find a public source.
+If the ticket touches FM live memory / offsets / world index: read `research/ecosystem.md` + `research/recipes.md` before inventing RE; update them if you find or lock something.
 When finished: BEFORE your final reply, Complete (archive + STATUS) then git commit on FMT/ per AGENTS.md Git — one commit, message T0XX: why. Do not push unless the ticket says to.
 ```
 
@@ -47,7 +47,7 @@ Workers **must** close the ticket (`done` → `archive/` + STATUS sync) as the l
 3. [ROADMAP.md](./ROADMAP.md)
 4. [AGENTS.md](./AGENTS.md)
 5. The ticket under `tickets/`
-6. If the ticket touches live FM memory / offsets / FMLE / world index: [FM-ECOSYSTEM.md](./FM-ECOSYSTEM.md) **before** inventing RE
+6. If the ticket touches live FM memory / offsets / FMLE / world index: [`research/ecosystem.md`](../research/ecosystem.md) + [`research/recipes.md`](../research/recipes.md) **before** inventing RE
 
 ## Ticket lifecycle
 
@@ -69,13 +69,14 @@ scrum/
   ROADMAP.md
   STATUS.md
   AGENTS.md
-  FM-ECOSYSTEM.md   ← living public FM-tools / offsets / recipes index
   tickets/
   archive/
 ```
 
-## FM ecosystem index
+Knowledge (not the board): [`../research/`](../research/) — public ecosystem + FMT recipes.
 
-[FM-ECOSYSTEM.md](./FM-ECOSYSTEM.md) compounds public FM tooling knowledge (open repos, offset recipes, closed benchmarks).  
-[FM-RECIPES.md](./FM-RECIPES.md) is **FMT first-party** locked offsets / traps (affiliates, Club.Teams, origin, discarded approaches).  
-Workers: **check both before inventing memory RE.** Update them when you find or verify a source. Operational law for live-read code: `.cursor/rules/fm-live-read.mdc`.
+## Research index
+
+[`research/ecosystem.md`](../research/ecosystem.md) compounds public FM tooling knowledge.  
+[`research/recipes.md`](../research/recipes.md) is **FMT first-party** locked offsets / traps.  
+Workers: **check both before inventing memory RE.** Update them when you find or verify a source. Operational law: `.cursor/rules/fm-live-read.mdc`.

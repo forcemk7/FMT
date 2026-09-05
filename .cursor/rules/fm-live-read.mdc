@@ -7,8 +7,8 @@ alwaysApply: false
 # FM26 live read — archive + direction
 
 This file is the **operational law** for live-read code (auto-injected on matching paths).  
-**Public FM tools / steal modes:** `scrum/FM-ECOSYSTEM.md`.  
-**FMT first-party locked recipes:** `scrum/FM-RECIPES.md` — check and update; do not let knowledge die in deleted probes or chat.
+**Public FM tools / steal modes:** `research/ecosystem.md`.  
+**FMT first-party locked recipes:** `research/recipes.md` — check and update; do not let knowledge die in deleted probes or chat.
 
 **Product fork (keep):** FMLE = Live Editing. FMT = Gameplay Support (Squad / Loans / GM / HoYD / Progress).  
 **Shared need (believe):** the same **scouting core** — full in-game world readable in ~&lt;2s from `fm.exe` / `game_plugin.dll`. Editing bytes is out of scope for FMT; reading is not.
