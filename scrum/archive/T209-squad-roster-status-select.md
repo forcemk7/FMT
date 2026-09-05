@@ -57,4 +57,4 @@ Steal only the **Hide players**-class status slice from FM’s Filter panel. Map
 
 ## Progress
 
-Shipped FM-style Filter pill → Status menu (At club / On loan / Loaned out with counts). Single status; default At club; session remembers one status per team. Vitest session + live-data OK.
+Shipped FM-style Filter pill → Status menu (At club / On loan / Loaned out with counts). Single status; default At club; session remembers one status per team. Vitest session + live-data OK. Commit `9f816c2`.
