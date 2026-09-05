@@ -1,21 +1,22 @@
 ﻿# Status
 
-Last updated: 2026-09-06 (T124 done — quiet Start FMT; board empty of ready Loop A)
+Last updated: 2026-09-06 (T221 done — GS chrome strip; T222 ready)
 
 ## Now
 
-**Board clear of T124.** No other `ready` Loop A tickets — ask HQ / deferrals only (T210 deferred, T190 parked).
+**Board clear of T221.** Next: **T222** Commit wired FMT WIP (Pass 2).
 
 **T190 parked** — Save ID in RAM before save-copy CA path.
 
 **Deferred:** T215 Diagnostics source-of-truth skeleton + live fill. T210 Squad card/list density. T139 theme. T162 trophy cabinet. Empty Youth(0) tab. Loop D full-world load parked — catalog `research/ecosystem.md` + `research/recipes.md`. Placement ladder — not now.
 
-**Residuals (not tickets):** orphan GS CSS in `globals.css` (`.confidence-ring*`, `.startup-screen`, `.app-sidebar`, scout-room chrome); Main/Permanent/PMF affiliation bytes still open (see `research/recipes.md`).
+**Residuals (not tickets):** Main/Permanent/PMF affiliation bytes still open (see `research/recipes.md`).
 
 ## Board
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
+| T222 | Commit wired FMT WIP (desk / cosmetics / terminal) | ready | 4 | Pass 2; after T221 |
 | T190 | Development all-time from Progress Report CA strip | blocked | 2 | **parked** |
 | T210 | Squad — card / list density toggle | deferred | — | not now |
 | T215 | Diagnostics — source-of-truth skeleton + live fill | deferred | — | after product loops; quality/compress phase |
@@ -28,6 +29,7 @@ Last updated: 2026-09-06 (T124 done — quiet Start FMT; board empty of ready Lo
 
 ## Recently done
 
+- **T221** Strip GlassScout chrome leftovers (CSS + scratch dumps)
 - **T124** Quiet dev launch — BROWSER=none + Start FMT wait line
 - **T209** Squad roster Filter dropdown (multi-select status + counts)
 - **T208** Five-band SD tones + Super/High greens; deltas Super/Low; range-% rings

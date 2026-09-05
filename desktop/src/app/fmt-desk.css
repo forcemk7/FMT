@@ -306,12 +306,6 @@ body.fmt-shell .attr-tone-mid { color: var(--attr-tone-mid); background: transpa
 body.fmt-shell .attr-tone-low { color: var(--attr-tone-low); }
 body.fmt-shell .attr-tone-super { color: var(--attr-tone-super); }
 
-body.fmt-shell .fit-score-ring {
-  background: conic-gradient(var(--fit-color) var(--fit-score), rgba(255, 255, 255, 0.08) 0);
-}
-body.fmt-shell .fit-score-ring:after {
-  background: var(--panel-2);
-}
 body.fmt-shell .ability-ring-high { --fit-color: var(--attr-tone-high); }
 body.fmt-shell .ability-ring-upper { --fit-color: var(--attr-tone-upper); }
 body.fmt-shell .ability-ring-mid { --fit-color: var(--attr-tone-mid); }
@@ -605,12 +599,6 @@ body.fmt-shell .live-data-state.is-empty {
 }
 body.fmt-shell .live-source-label {
   color: var(--text-muted);
-}
-body.fmt-shell .startup-brand strong {
-  color: var(--text);
-}
-body.fmt-shell .startup-brand small {
-  color: var(--gold);
 }
 
 /* Header squad search results — panel tokens (not light GS chrome) */

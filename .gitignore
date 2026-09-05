@@ -31,8 +31,12 @@ desktop/*.inflated.bin
 desktop/*.err
 desktop/*-stderr.txt
 desktop/*-err.txt
+desktop/*-summary.txt
+desktop/target-check.txt
+desktop/src-tauri/probe-err.txt
 desktop/src-tauri/target-*/
 desktop/target-*/
+tmp_json_opt.rs
 !desktop/package.json
 !desktop/package-lock.json
 !desktop/tsconfig.json
