@@ -9,7 +9,6 @@ import {
   ChevronRight,
   CircleHelp,
   ClipboardList,
-  GitCompareArrows,
   MapPinned,
   ShieldAlert,
   Star,
@@ -23,7 +22,6 @@ import { formatPlayerPositions } from "@/domain/live-data";
 import { livePersonalityLabels } from "@/domain/personality-labels";
 import { AttributeDesk } from "@/components/attribute-desk";
 import { AttributeHistoryPanel } from "@/components/attribute-history-panel";
-import { MentoringPanel } from "@/components/mentoring-panel";
 import { Button } from "@/components/ui/button";
 import { PlayerFace } from "@/components/player-face";
 import { ClubLogo } from "@/components/club-logo";
@@ -133,7 +131,6 @@ function RoleFitCards({ player, limit = 6 }: { player: LivePlayer; limit?: numbe
 
 const PROFILE_TABS = [
   "attributes",
-  "mentoring",
   "development",
   "overview",
   "tactical",
@@ -144,7 +141,6 @@ const PROFILE_TABS = [
 function profileTabLabel(value: (typeof PROFILE_TABS)[number]) {
   if (value === "tactical") return "Tactical fit";
   if (value === "development") return "Development";
-  if (value === "mentoring") return "Mentoring";
   return value[0]!.toUpperCase() + value.slice(1);
 }
 
@@ -451,16 +447,6 @@ export function PlayerProfileScreen({
               historySyncKey={snapshot.status.lastSync}
             />
           </section>
-        </TabsContent>
-        <TabsContent value="mentoring">
-          <MentoringPanel
-            key={player.id}
-            player={player}
-            snapshot={snapshot}
-            checking={checking}
-            onRefresh={onRefresh}
-            onOpenPlayer={onOpenPlayer}
-          />
         </TabsContent>
         <TabsContent value="development">
           <AttributeHistoryPanel

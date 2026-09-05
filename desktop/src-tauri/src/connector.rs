@@ -18,7 +18,7 @@ use crate::fm26::{
     },
     memory::{ModuleInfo, ProcessReader},
     offsets::{
-        executable_sha256_for_versions, find_entity_map, mapping_coverage, EntityMapProfile,
+        executable_sha256_for_versions, find_entity_map, EntityMapProfile,
         MappingCoverage,
     },
     parser::{
@@ -27,11 +27,7 @@ use crate::fm26::{
         visible_attribute_map,
     },
     permissions::{can_write_memory, READ_ONLY_PROCESS_ACCESS_LABEL},
-    process::{find_fm26_process, find_fmle_process},
-    roles::{
-        decode_role_duty_mask, duty_definition_for_mask, role_catalogue_status,
-        role_definition_for_mask, role_supports_slot,
-    },
+    process::find_fm26_process,
     scanner::{parse_pattern, scan_module},
     structs::{FmDate, PLAYER_ATTRIBUTE_NAMES, POSITION_NAMES},
     validator,
