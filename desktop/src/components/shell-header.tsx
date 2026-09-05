@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type RefObject } from "react";
 import {
   ChevronDown,
   CircleDashed,
@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { LiveFootballSnapshot } from "@/domain/adapters";
 import { isDashViewId } from "@/domain/dashboard-views";
+import { shellLoadLabel } from "@/domain/fmt-terminal-log";
 
 export type Screen =
   | "Dashboard"
@@ -52,13 +53,6 @@ const navigation: NavItem[] = [
 
 /** Collapse the horizontal tab row when the header can't fit it cleanly. */
 const NAV_COMPACT_BELOW = 1020;
-
-function connectionDetail(snapshot: LiveFootballSnapshot) {
-  const status = snapshot.status;
-  if (status.state === "connected") return `${status.managedSquadPlayers} squad`;
-  if (status.failureStage) return status.failureStage.replaceAll("_", " ");
-  return "Not synced";
-}
 
 function NavButtons({
   activeNav,
@@ -104,20 +98,23 @@ export function ShellHeader({
   onNavigate,
   search,
   onSearch,
+  searchInputRef,
   snapshot,
   checking,
+  loadStage,
   onRefresh,
 }: {
   screen: Screen;
   onNavigate: (screen: Screen) => void;
   search: string;
   onSearch: (value: string) => void;
+  searchInputRef?: RefObject<HTMLInputElement | null>;
   snapshot: LiveFootballSnapshot;
   checking: boolean;
+  loadStage?: string | null;
   onRefresh: () => Promise<unknown>;
 }) {
   const connected = snapshot.status.state === "connected";
-  const club = snapshot.clubs.find((item) => item.id === snapshot.managedClubId);
   const activeNav =
     screen === "Player Profile" || screen === "Club Profile"
       ? "Squad"
@@ -125,8 +122,7 @@ export function ShellHeader({
         ? "Dashboard"
         : screen;
   const needsLoad = !connected;
-  const loadLabel = checking ? "Loading…" : needsLoad ? "Load Data" : club?.name ?? "Synced";
-  const loadDetail = connected ? connectionDetail(snapshot) : null;
+  const loadLabel = shellLoadLabel(snapshot, checking, loadStage);
 
   const headerRef = useRef<HTMLElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -210,9 +206,10 @@ export function ShellHeader({
         <div className="search-wrap shell-search">
           <Search aria-hidden="true" />
           <Input
+            ref={searchInputRef}
             type="search"
             name="fmt-squad-search"
-            aria-label="Search squad"
+            aria-label="Search players"
             placeholder={connected ? "Search squad…" : "Load save to search"}
             value={search}
             onChange={(event) => onSearch(event.target.value)}
@@ -237,7 +234,6 @@ export function ShellHeader({
         >
           <span className={connected ? "live-dot" : "neutral-dot"} aria-hidden="true" />
           <strong>{loadLabel}</strong>
-          {loadDetail ? <span>{loadDetail}</span> : null}
           <RefreshCw aria-hidden="true" className={cn("shell-load-icon", checking && "spin")} />
         </button>
 

@@ -1,16 +1,16 @@
 ﻿# Status
 
-Last updated: 2026-09-05 (T216 done — person+0xD5 isRegen)
+Last updated: 2026-09-05 (T217 done — forgiving search + keyboard)
 
 ## Now
 
-**Board clear of T216.** Next: highest-priority `ready` (T209 after T208, or ask HQ).
+**Board clear of T217.** Next: T218 dead-code hygiene (ready), or highest-priority other `ready` (T209 after T208).
 
 **T208** Five-band attr tones — Super deferred; await archive confirm.
 
 **T190 parked** — Save ID in RAM before save-copy CA path.
 
-**Deferred:** T215 Diagnostics source-of-truth skeleton + live fill. T210 Squad card/list density. T139 theme. T162 trophy cabinet. T124 quiet dev launch. Empty Youth(0) tab. Loop D full-world load parked — catalog `scrum/FM-ECOSYSTEM.md`.
+**Deferred:** T215 Diagnostics source-of-truth skeleton + live fill. T210 Squad card/list density. T139 theme. T162 trophy cabinet. T124 quiet dev launch. Empty Youth(0) tab. Loop D full-world load parked — catalog `scrum/FM-ECOSYSTEM.md`. Placement ladder (affiliate hierarchy) — not now (needs minutes/league RE).
 
 ## Board
 
@@ -19,6 +19,7 @@ Last updated: 2026-09-05 (T216 done — person+0xD5 isRegen)
 | T208 | Five-band attr tones + hot-amber super | in_progress | 2 | cursor-agent — Super deferred; await archive confirm |
 | T190 | Development all-time from Progress Report CA strip | blocked | 2 | **parked** |
 | T209 | Squad — roster status as single select | ready | 5 | after T208; multi→single |
+| T218 | Dead code / unused import build hygiene | ready | 6 | after T217 |
 | T124 | Quiet dev launch | ready | 9 | behind Loop A |
 | T210 | Squad — card / list density toggle | deferred | — | not now; after T209 if unfrozen |
 | T215 | Diagnostics — source-of-truth skeleton + live fill | deferred | — | after product loops; quality/compress phase |
@@ -31,6 +32,7 @@ Last updated: 2026-09-05 (T216 done — person+0xD5 isRegen)
 
 ## Recently done
 
+- **T217** Forgiving squad search (diacritic fold) + Ctrl+F / arrows / Enter / Esc
 - **T216** Live isRegen from person+0xD5 (DB=1 / regen=0); personality labels use real origin
 - **T214** Lock durable Squad-tab affiliate discovery (`club+0x118` + type `+0x30`; T212 bridge for NPL)
 - **T212** Load managed affiliate squads (Schalke II + Melbourne NPL; totals 79/55)

@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { motion } from "framer-motion";
 import { ShellHeader, type Screen } from "@/components/shell-header";
 import { MyTeamScreen } from "@/components/my-team-screen";
 import { LaterRoleScreen } from "@/components/later-role-screen";
@@ -10,17 +10,21 @@ import { SettingsScreen } from "@/components/settings-screen";
 import { ClubProfileScreen } from "@/components/club-profile-screen";
 import { DashboardScreen, DashboardViewScreen } from "@/components/dashboard-screen";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import {
-  fm26LiveAdapter,
-  type LiveConnectorStatus,
-  type LiveFootballSnapshot,
-  type LivePlayer,
-} from "@/domain/adapters";
-import { ingestSnapshotPlayers } from "@/domain/attribute-history";
+import { attachSnapshotDeltas, deferRecordSnapshotPlayers } from "@/domain/attribute-history";
+import { markFmtCosmeticsReady } from "@/domain/cosmetics-ready";
+import { normalizeLiveSnapshot, fm26LiveAdapter, type LiveConnectorStatus, type LiveFootballSnapshot, type LivePlayer } from "@/domain/adapters";
+import { warmSquadGraphics } from "@/domain/warm-squad-graphics";
 import { isDashViewId, type DashViewId } from "@/domain/dashboard-views";
 import { toggleFavorite, type FavoriteRecord } from "@/domain/live-data";
-import { warmSquadGraphics } from "@/domain/warm-squad-graphics";
 import { applyAttrColorPalette, loadAttrColorPalette } from "@/domain/attr-colors";
+import {
+  liveDeskHeadline,
+  mirrorToTerminal,
+  resetTerminalMirror,
+  shellStatusLine,
+} from "@/domain/fmt-terminal-log";
+import { writeAppMainScrollTop } from "@/domain/squad-desk-session";
+import { playerMatchesSquadSearch } from "@/domain/squad-search";
 
 const initialStatus: LiveConnectorStatus = {
   processDetected: false,
@@ -32,6 +36,7 @@ const initialStatus: LiveConnectorStatus = {
   state: "not_checked",
   playersLoaded: 0,
   managedSquadPlayers: 0,
+  clubEmployees: 0,
   databasePlayersIndexed: 0,
   backgroundPlayersIndexed: 0,
   visiblePlayersLoaded: 0,
@@ -74,6 +79,7 @@ const initialSnapshot: LiveFootballSnapshot = {
   gameDate: null,
   season: null,
   clubs: [],
+  clubTeams: [],
   players: [],
   tactic: null,
   tacticSource: "none",
@@ -92,6 +98,8 @@ export function FMTApp() {
   const [screenHistory, setScreenHistory] = useState<Screen[]>(["Dashboard"]);
   const [historyIndex, setHistoryIndex] = useState(0);
   const [search, setSearch] = useState("");
+  const [searchHighlight, setSearchHighlight] = useState(0);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [snapshot, setSnapshot] = useState<LiveFootballSnapshot>(initialSnapshot);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
   const [selectedClubId, setSelectedClubId] = useState<string | null>(null);
@@ -111,6 +119,32 @@ export function FMTApp() {
     }
   });
   const [checking, setChecking] = useState(false);
+  const [loadStage, setLoadStage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return;
+    let remove: (() => void) | null = null;
+    void import("@tauri-apps/api/event")
+      .then(({ listen }) =>
+        listen<string>("fmt-load-progress", (event) => {
+          setLoadStage(event.payload);
+        }),
+      )
+      .then((unlisten) => {
+        remove = unlisten;
+      });
+    return () => remove?.();
+  }, []);
+
+  useEffect(() => {
+    if (checking) return;
+    void mirrorToTerminal(shellStatusLine(snapshot, false, null));
+  }, [snapshot, checking]);
+
+  useEffect(() => {
+    if (checking || snapshot.status.state === "connected") return;
+    void mirrorToTerminal(liveDeskHeadline(snapshot, "Live data"));
+  }, [snapshot, checking]);
 
   useEffect(() => {
     window.localStorage.setItem("fmt-favorites-v1", JSON.stringify(favorites));
@@ -119,6 +153,13 @@ export function FMTApp() {
   useEffect(() => {
     applyAttrColorPalette(loadAttrColorPalette());
   }, []);
+
+  // Shared `.app-main` scroll must not leak into other screens.
+  // Zero after Squad has unmounted (effect, not layout) so we don't flash Squad-to-top mid-swap.
+  useEffect(() => {
+    if (screen === "Squad") return;
+    writeAppMainScrollTop(0);
+  }, [screen]);
 
   const navigate = useCallback(
     (nextScreen: Screen) => {
@@ -139,20 +180,25 @@ export function FMTApp() {
   }, [historyIndex, screenHistory]);
 
   const checkConnection = useCallback(async () => {
+    resetTerminalMirror();
+    setLoadStage("detecting_fm26");
     setChecking(true);
     try {
-      const nextSnapshot = await fm26LiveAdapter.getSnapshot();
+      const nextSnapshot = normalizeLiveSnapshot(await fm26LiveAdapter.getSnapshot());
       if (nextSnapshot.status.state === "connected" && nextSnapshot.players.length) {
-        // Stable Attributes (recent) + Development (all-time) Δ from Load history — T188.
-        // Do not retouch Attributes until Development has a real in-game all-time source.
-        const players = ingestSnapshotPlayers(nextSnapshot.players, nextSnapshot.season);
-        warmSquadGraphics(nextSnapshot);
+        const players = attachSnapshotDeltas(nextSnapshot.players);
         setSnapshot({ ...nextSnapshot, players });
+        deferRecordSnapshotPlayers(nextSnapshot.players, nextSnapshot.season);
+        window.requestAnimationFrame(() => {
+          markFmtCosmeticsReady();
+          warmSquadGraphics({ ...nextSnapshot, players });
+        });
         return nextSnapshot.status;
       }
       setSnapshot(nextSnapshot);
       return nextSnapshot.status;
     } finally {
+      setLoadStage(null);
       setChecking(false);
     }
   }, []);
@@ -198,10 +244,88 @@ export function FMTApp() {
   }, [goBack, historyIndex, navigate, returnScreen]);
 
   const squadSearchHits = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = search.trim();
     if (!q) return [] as LivePlayer[];
-    return snapshot.players.filter((player) => player.name.toLowerCase().includes(q)).slice(0, 8);
+    return snapshot.players
+      .filter((player) => playerMatchesSquadSearch(player.name, q))
+      .slice(0, 12);
   }, [search, snapshot.players]);
+
+  useEffect(() => {
+    setSearchHighlight(0);
+  }, [search]);
+
+  const clearSearch = useCallback(() => {
+    setSearch("");
+    setSearchHighlight(0);
+  }, []);
+
+  const openSearchHit = useCallback(
+    (playerId: string) => {
+      openPlayer(playerId);
+      clearSearch();
+    },
+    [openPlayer, clearSearch],
+  );
+
+  useEffect(() => {
+    const connected = snapshot.status.state === "connected";
+    const onKey = (event: KeyboardEvent) => {
+      const findChord =
+        (event.key === "f" || event.key === "F") && (event.ctrlKey || event.metaKey);
+      if (findChord && connected) {
+        event.preventDefault();
+        const input = searchInputRef.current;
+        if (input) {
+          input.focus();
+          input.select();
+        }
+        return;
+      }
+
+      if (!search.trim()) return;
+
+      if (event.key === "Escape") {
+        event.preventDefault();
+        clearSearch();
+        searchInputRef.current?.blur();
+        return;
+      }
+
+      const active = document.activeElement;
+      const searchFocused = active === searchInputRef.current;
+      const inResults = active?.closest?.(".global-search-results") != null;
+      if (!searchFocused && !inResults) {
+        const tag = (active as HTMLElement | null)?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      }
+
+      if (event.key === "ArrowDown" && squadSearchHits.length) {
+        event.preventDefault();
+        setSearchHighlight((index) => Math.min(index + 1, squadSearchHits.length - 1));
+        return;
+      }
+      if (event.key === "ArrowUp" && squadSearchHits.length) {
+        event.preventDefault();
+        setSearchHighlight((index) => Math.max(index - 1, 0));
+        return;
+      }
+      if (event.key === "Enter" && squadSearchHits.length && (searchFocused || inResults)) {
+        event.preventDefault();
+        const hit = squadSearchHits[searchHighlight] ?? squadSearchHits[0];
+        if (hit) openSearchHit(hit.id);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [
+    snapshot.status.state,
+    search,
+    squadSearchHits,
+    searchHighlight,
+    clearSearch,
+    openSearchHit,
+  ]);
 
   const content =
     screen === "Dashboard" ? (
@@ -285,45 +409,51 @@ export function FMTApp() {
           onNavigate={navigate}
           search={search}
           onSearch={setSearch}
+          searchInputRef={searchInputRef}
           snapshot={snapshot}
           checking={checking}
+          loadStage={loadStage}
           onRefresh={checkConnection}
         />
         {search ? (
           <motion.div
             className="global-search-results"
+            role="listbox"
+            aria-label="Squad search results"
             initial={{ opacity: 0, y: -6 }}
             animate={{ opacity: 1, y: 0 }}
           >
             <header>
               <strong>Squad search</strong>
-              <button type="button" onClick={() => setSearch("")}>
+              <button type="button" onClick={clearSearch}>
                 Clear
               </button>
             </header>
-            {squadSearchHits.map((player) => (
+            {squadSearchHits.map((player, index) => (
               <button
                 key={player.id}
+                id={`squad-search-hit-${player.id}`}
                 type="button"
-                onClick={() => {
-                  openPlayer(player.id);
-                  setSearch("");
-                }}
+                role="option"
+                aria-selected={index === searchHighlight}
+                className={index === searchHighlight ? "is-active" : undefined}
+                onMouseEnter={() => setSearchHighlight(index)}
+                onClick={() => openSearchHit(player.id)}
               >
-                <span>Player</span>
+                <span>Squad</span>
                 <strong>{player.name}</strong>
-                <small>{player.positions?.join(" / ") || "Position unknown"}</small>
+                <small>
+                  {player.positions?.length ? player.positions.join(" / ") : "Managed squad"}
+                </small>
               </button>
             ))}
-            {!squadSearchHits.length ? <p>No squad player matches “{search}”.</p> : null}
+            {!squadSearchHits.length ? <p>No matches for “{search}”.</p> : null}
           </motion.div>
         ) : null}
         <section className="app-main">
-          <AnimatePresence mode="wait">
-            <div key={screen} className="screen-slot">
-              {content}
-            </div>
-          </AnimatePresence>
+          <div key={screen} className="screen-slot">
+            {content}
+          </div>
         </section>
       </div>
     </TooltipProvider>

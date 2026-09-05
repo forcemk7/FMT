@@ -95,7 +95,7 @@ body.fmt-shell {
   --attr-tone-upper: #3a8acf;
   --attr-tone-mid: #e6e6fa;
   --attr-tone-low: #bd4e4e;
-  --attr-tone-super: #d4b45a;
+  --attr-tone-super: #ffffff;
 
   color: var(--text);
   background:
@@ -304,7 +304,7 @@ body.fmt-shell .attr-tone-high { color: var(--attr-tone-high); }
 body.fmt-shell .attr-tone-upper { color: var(--attr-tone-upper); }
 body.fmt-shell .attr-tone-mid { color: var(--attr-tone-mid); background: transparent; padding: 0; }
 body.fmt-shell .attr-tone-low { color: var(--attr-tone-low); }
-body.fmt-shell .attr-tone-super { color: var(--gold); }
+body.fmt-shell .attr-tone-super { color: var(--attr-tone-super); }
 
 body.fmt-shell .fit-score-ring {
   background: conic-gradient(var(--fit-color) var(--fit-score), rgba(255, 255, 255, 0.08) 0);
@@ -316,7 +316,7 @@ body.fmt-shell .ability-ring-high { --fit-color: var(--attr-tone-high); }
 body.fmt-shell .ability-ring-upper { --fit-color: var(--attr-tone-upper); }
 body.fmt-shell .ability-ring-mid { --fit-color: var(--attr-tone-mid); }
 body.fmt-shell .ability-ring-low { --fit-color: var(--attr-tone-low); }
-body.fmt-shell .ability-ring-super { --fit-color: var(--gold); }
+body.fmt-shell .ability-ring-super { --fit-color: var(--attr-tone-super); }
 body.fmt-shell .squad-matrix {
   background: var(--panel) !important;
   border-color: var(--hairline);
@@ -443,8 +443,8 @@ body.fmt-shell .dash-has-score.tone-low {
   color: var(--attr-tone-low);
 }
 body.fmt-shell .dash-has-score.tone-super {
-  background: color-mix(in srgb, var(--attr-tone-super, var(--gold)) 22%, transparent);
-  color: var(--attr-tone-super, var(--gold));
+  background: color-mix(in srgb, var(--attr-tone-super) 22%, transparent);
+  color: var(--attr-tone-super);
 }
 
 body.fmt-shell .dash-has-tooltip {
@@ -468,6 +468,7 @@ body.fmt-shell .dash-has-tooltip-cell.tone-high strong { color: var(--attr-tone-
 body.fmt-shell .dash-has-tooltip-cell.tone-upper strong { color: var(--attr-tone-upper) !important; }
 body.fmt-shell .dash-has-tooltip-cell.tone-mid strong { color: var(--attr-tone-mid) !important; }
 body.fmt-shell .dash-has-tooltip-cell.tone-low strong { color: var(--attr-tone-low) !important; }
+body.fmt-shell .dash-has-tooltip-cell.tone-super strong { color: var(--attr-tone-super) !important; }
 
 body.fmt-shell .settings-expand-body {
   background: transparent !important;
@@ -643,7 +644,8 @@ body.fmt-shell .global-search-results > button {
   gap: 8px;
   align-items: center;
 }
-body.fmt-shell .global-search-results > button:hover {
+body.fmt-shell .global-search-results > button:hover,
+body.fmt-shell .global-search-results > button.is-active {
   background: rgba(255, 255, 255, 0.04);
 }
 body.fmt-shell .global-search-results > button span {
