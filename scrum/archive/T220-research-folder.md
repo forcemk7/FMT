@@ -30,4 +30,4 @@ Owner wants R&D afforded its own root folder so compounded FM knowledge is centr
 
 ## Progress
 
-Shipped `research/` home. Commit SHA in follow-up note if needed.
+Shipped `research/` home. Commit: `a99d850`.
