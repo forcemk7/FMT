@@ -48,4 +48,4 @@ Loop A cleanup: after T218 killed most GS components, the fork still leaves weig
 
 ## Progress
 
-Deleted scratch dumps + `distribution.ts`. Stripped scout-room / sidebar / startup / confidence / fit-score / recruitment / favorites-table CSS from `globals.css` (~3.8k→~2.5k lines) and dead fit-score/startup overrides in `fmt-desk.css`. Vitest smoke OK.
+Deleted scratch dumps + `distribution.ts`. Stripped scout-room / sidebar / startup / confidence / fit-score / recruitment / favorites-table CSS from `globals.css` (~3.8k→~2.5k lines) and dead fit-score/startup overrides in `fmt-desk.css`. Vitest smoke OK. Commit `fb9a48a`.
