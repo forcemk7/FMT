@@ -87,7 +87,7 @@
     --amber: #e5a125;
     --amber-soft: #3a2e14;
     --panel-shadow: 0 14px 36px rgba(0, 0, 0, 0.28), 0 2px 8px rgba(0, 0, 0, 0.18);
-    --attr-tone-high: #1b7a34;
+    --attr-tone-high: #2f9e4f;
     --attr-tone-upper: #3a8acf;
     --attr-tone-mid: #e6e6fa;
     --attr-tone-low: #bd4e4e;
@@ -1724,7 +1724,7 @@ button:active,
   font-variant-numeric:tabular-nums;font-weight:700;
 }
 :root{
-  --attr-tone-high: #1b7a34;
+  --attr-tone-high: #2f9e4f;
   --attr-tone-upper:#3a8acf;
   --attr-tone-mid:#e6e6fa;
   --attr-tone-low:#bd4e4e;
