@@ -37,4 +37,4 @@ Pass 2 of cleanup: the app already imports domain/UI that never landed as commit
 
 ## Progress
 
-Landed has-breakdown grid, attribute-desk domain, cosmetics-ready gate for faces, fmt-terminal-log labels. Vitest 9 tests OK.
+Landed has-breakdown grid, attribute-desk domain, cosmetics-ready gate for faces, fmt-terminal-log labels. Vitest 9 tests OK. Commit `bf4e14a`.
