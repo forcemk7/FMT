@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { LiveFootballSnapshot, LivePlayer } from "@/domain/adapters";
 import { abilityProgress, abilityToneFromScore } from "@/domain/attribute-tone";
 import { formatHasScore, hasBand, hasProgress, liveHasScore } from "@/domain/has-score";
@@ -24,11 +24,15 @@ import {
   type SquadTeamRosterCounts,
 } from "@/domain/live-data";
 import {
-  getSquadDeskScrollTop,
+  clearSquadDeskRosterFilters,
+  getSquadDeskRosterFilters,
   getSquadDeskSelectedTeamUid,
-  readAppMainScrollTop,
+  restoreSquadScrollToMain,
+  setSquadDeskRosterFilters,
   setSquadDeskScrollTop,
   setSquadDeskSelectedTeamUid,
+  stashSquadScroll,
+  unfreezeSquadScroll,
   writeAppMainScrollTop,
 } from "@/domain/squad-desk-session";
 import { ClubLogo } from "@/components/club-logo";
@@ -51,6 +55,29 @@ const SQUAD_ROSTER_FILTER_OPTIONS: Array<{
   { status: "loanedIn", label: "On loan", countKey: "loanedIn" },
   { status: "loanedOut", label: "Loaned out", countKey: "loanedOut" },
 ];
+
+/** Default: At club when present, else first available status. */
+function defaultRosterStatus(counts: SquadTeamRosterCounts): SquadRosterStatus | null {
+  if (counts.atClub > 0) return "atClub";
+  for (const { status, countKey } of SQUAD_ROSTER_FILTER_OPTIONS) {
+    if (counts[countKey] > 0) return status;
+  }
+  return null;
+}
+
+function resolveRosterStatus(
+  teamUid: string,
+  counts: SquadTeamRosterCounts,
+): SquadRosterStatus | null {
+  const available = new Set(
+    SQUAD_ROSTER_FILTER_OPTIONS.filter(
+      ({ countKey }) => counts[countKey] > 0,
+    ).map(({ status }) => status),
+  );
+  const remembered = getSquadDeskRosterFilters(teamUid)?.[0];
+  if (remembered && available.has(remembered)) return remembered;
+  return defaultRosterStatus(counts);
+}
 
 const GM_ADVICE_LANES: Array<{ advice: GmAdvice; title: string; empty: string }> = [
   { advice: "sell", title: "Sell", empty: "No sell candidates." },
@@ -342,9 +369,38 @@ export function MyTeamScreen({
     const remembered = getSquadDeskSelectedTeamUid();
     return remembered ?? defaultTeamUid;
   });
-  const [enabledRosterStatuses, setEnabledRosterStatuses] = useState(
-    () => new Set<SquadRosterStatus>(["atClub"]),
-  );
+  const [rosterStatus, setRosterStatus] = useState<SquadRosterStatus | null>(() => {
+    if (!squadDeskMode) return "atClub";
+    const teamUid = getSquadDeskSelectedTeamUid() ?? defaultTeamUid;
+    if (!teamUid) return "atClub";
+    const remembered = getSquadDeskRosterFilters(teamUid)?.[0];
+    return remembered ?? "atClub";
+  });
+  const [rosterFilterOpen, setRosterFilterOpen] = useState(false);
+  const rosterFilterRef = useRef<HTMLDivElement | null>(null);
+  const sessionClubIdRef = useRef(snapshot.managedClubId);
+  useEffect(() => {
+    if (sessionClubIdRef.current === snapshot.managedClubId) return;
+    sessionClubIdRef.current = snapshot.managedClubId;
+    clearSquadDeskRosterFilters();
+  }, [snapshot.managedClubId]);
+  useEffect(() => {
+    if (!rosterFilterOpen) return;
+    const onPointer = (event: MouseEvent) => {
+      if (!(event.target instanceof Node)) return;
+      if (rosterFilterRef.current?.contains(event.target)) return;
+      setRosterFilterOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setRosterFilterOpen(false);
+    };
+    document.addEventListener("mousedown", onPointer);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onPointer);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [rosterFilterOpen]);
   useEffect(() => {
     setSelectedTeamUid((current) => {
       const candidate =
@@ -365,11 +421,7 @@ export function MyTeamScreen({
   }, [selectedTeamUid, squadDeskMode]);
   useLayoutEffect(() => {
     if (!squadDeskMode) return;
-    const top = getSquadDeskScrollTop();
-    if (top <= 0) return;
-    writeAppMainScrollTop(top);
-    const frame = window.requestAnimationFrame(() => writeAppMainScrollTop(top));
-    return () => window.cancelAnimationFrame(frame);
+    return restoreSquadScrollToMain();
   }, [squadDeskMode]);
   useEffect(() => {
     if (!squadDeskMode) return;
@@ -377,10 +429,9 @@ export function MyTeamScreen({
     if (!(main instanceof HTMLElement)) return;
     const onScroll = () => setSquadDeskScrollTop(main.scrollTop);
     main.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      setSquadDeskScrollTop(readAppMainScrollTop());
-      main.removeEventListener("scroll", onScroll);
-    };
+    // Do not re-read scroll on unmount — Profile content may have already
+    // clamped `.app-main` to 0 and would wipe the stash.
+    return () => main.removeEventListener("scroll", onScroll);
   }, [squadDeskMode]);
   const selectedTeam =
     clubTeams.find((team) => team.teamUid === selectedTeamUid) ?? clubTeams[0] ?? null;
@@ -400,18 +451,23 @@ export function MyTeamScreen({
     ],
   );
   useEffect(() => {
-    const available = new Set(
-      availableRosterFilters.map(({ status }) => status),
-    );
-    setEnabledRosterStatuses((current) => {
-      const kept = new Set(
-        [...current].filter((status) => available.has(status)),
-      );
-      if (kept.size > 0) return kept;
-      if (available.size === 0) return kept;
-      return new Set(available);
-    });
-  }, [availableRosterFilters, selectedTeam?.teamUid]);
+    if (!squadDeskMode || !selectedTeam) return;
+    const next = resolveRosterStatus(selectedTeam.teamUid, selectedTeamCounts);
+    setRosterStatus(next);
+    if (next) {
+      setSquadDeskRosterFilters(selectedTeam.teamUid, [next]);
+    }
+  }, [
+    squadDeskMode,
+    selectedTeam?.teamUid,
+    selectedTeamCounts.atClub,
+    selectedTeamCounts.loanedIn,
+    selectedTeamCounts.loanedOut,
+  ]);
+  const enabledRosterStatuses = useMemo(() => {
+    if (!rosterStatus) return new Set<SquadRosterStatus>();
+    return new Set<SquadRosterStatus>([rosterStatus]);
+  }, [rosterStatus]);
   const teamRoster = useMemo(
     () =>
       snapshot.players.filter((player) => {
@@ -504,29 +560,22 @@ export function MyTeamScreen({
                 selectedTeamCounts.loanedIn +
                 selectedTeamCounts.loanedOut >
               0
-            ? "No players match the selected roster filters."
+            ? "No players match the selected roster filter."
             : `No players loaded for ${selectedTeam.name.trim() || "this team"} — check FM squad screen vs FMT read.`
           : null;
 
-  function toggleRosterStatus(status: SquadRosterStatus) {
-    setEnabledRosterStatuses((current) => {
-      const next = new Set(current);
-      if (next.has(status)) {
-        const enabledVisible = availableRosterFilters.filter(({ status: option }) =>
-          next.has(option),
-        );
-        if (enabledVisible.length <= 1) return current;
-        next.delete(status);
-      } else {
-        next.add(status);
-      }
-      return next;
-    });
+  function selectRosterStatus(status: SquadRosterStatus) {
+    setRosterStatus(status);
+    if (selectedTeam) {
+      setSquadDeskRosterFilters(selectedTeam.teamUid, [status]);
+    }
+    setRosterFilterOpen(false);
   }
 
   function openPlayerFromDesk(playerId: string) {
     if (squadDeskMode) {
-      setSquadDeskScrollTop(readAppMainScrollTop());
+      // Freeze before navigate so unmount/Profile clamp cannot clear the stash.
+      stashSquadScroll();
     }
     onOpenPlayer(playerId);
   }
@@ -577,43 +626,68 @@ export function MyTeamScreen({
                   className={`squad-unit-tab${active ? " is-active" : ""}`}
                   onClick={() => {
                     if (team.teamUid === selectedTeamUid) return;
+                    unfreezeSquadScroll();
                     setSquadDeskScrollTop(0);
                     writeAppMainScrollTop(0);
+                    setRosterFilterOpen(false);
                     setSelectedTeamUid(team.teamUid);
                   }}
                 >
-                  {squadTeamTabLabel(team, managedClubName)}
+                  {squadTeamTabLabel(
+                    team,
+                    managedClubName,
+                    rosterCountsByTeamUid.get(team.teamUid),
+                  )}
                 </button>
               );
             })}
           </div>
           {availableRosterFilters.length > 0 ? (
-            <div className="squad-roster-filters" role="group" aria-label="Roster status">
-              {availableRosterFilters.map(({ status, label, countKey }) => {
-                const checked = enabledRosterStatuses.has(status);
-                const count = selectedTeamCounts[countKey];
-                const lastChecked =
-                  checked &&
-                  availableRosterFilters.filter(({ status: option }) =>
-                    enabledRosterStatuses.has(option),
-                  ).length <= 1;
-                return (
-                  <label
-                    key={status}
-                    className={`squad-roster-filter${checked ? " is-checked" : ""}${lastChecked ? " is-locked" : ""}`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      disabled={lastChecked}
-                      onChange={() => toggleRosterStatus(status)}
-                    />
-                    <span>
-                      {label} <b>{count}</b>
-                    </span>
-                  </label>
-                );
-              })}
+            <div className="squad-roster-filter-menu" ref={rosterFilterRef}>
+              <button
+                type="button"
+                className={`squad-roster-filter-trigger${rosterFilterOpen ? " is-open" : ""}`}
+                aria-expanded={rosterFilterOpen}
+                aria-haspopup="listbox"
+                aria-label="Roster status filter"
+                onClick={() => setRosterFilterOpen((open) => !open)}
+              >
+                <span>Filter</span>
+                <span className="squad-roster-filter-chevron" aria-hidden>
+                  ▾
+                </span>
+              </button>
+              {rosterFilterOpen ? (
+                <div
+                  className="squad-roster-filter-panel"
+                  role="listbox"
+                  aria-label="Roster status"
+                >
+                  <div className="squad-roster-filter-section">Status</div>
+                  {availableRosterFilters.map(({ status, label, countKey }) => {
+                    const selected = rosterStatus === status;
+                    const count = selectedTeamCounts[countKey];
+                    return (
+                      <button
+                        key={status}
+                        type="button"
+                        role="option"
+                        aria-selected={selected}
+                        className={`squad-roster-filter-option${selected ? " is-selected" : ""}`}
+                        onClick={() => selectRosterStatus(status)}
+                      >
+                        <span
+                          className={`squad-roster-filter-check${selected ? " is-on" : ""}`}
+                          aria-hidden
+                        />
+                        <span className="squad-roster-filter-option-label">
+                          {label} <b>({count})</b>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null}
             </div>
           ) : null}
         </div>

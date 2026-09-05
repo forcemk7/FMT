@@ -1,14 +1,14 @@
 ﻿# Status
 
-Last updated: 2026-09-06 (T208 done — SD bands + Super/High + Super/Low deltas + range-% rings)
+Last updated: 2026-09-06 (T209 done — Squad Filter dropdown for roster status)
 
 ## Now
 
-**Board clear of T208.** Next: highest-priority `ready` (**T209** roster Filter dropdown).
+**Board clear of T209.** Next: highest-priority `ready` (**T124** quiet dev launch) or ask HQ.
 
 **T190 parked** — Save ID in RAM before save-copy CA path.
 
-**Deferred:** T215 Diagnostics source-of-truth skeleton + live fill. T210 Squad card/list density. T139 theme. T162 trophy cabinet. T124 quiet dev launch. Empty Youth(0) tab. Loop D full-world load parked — catalog `research/ecosystem.md` + `research/recipes.md`. Placement ladder — not now.
+**Deferred:** T215 Diagnostics source-of-truth skeleton + live fill. T210 Squad card/list density. T139 theme. T162 trophy cabinet. Empty Youth(0) tab. Loop D full-world load parked — catalog `research/ecosystem.md` + `research/recipes.md`. Placement ladder — not now.
 
 **Residuals (not tickets):** orphan GS CSS in `globals.css` (`.confidence-ring*`, `.startup-screen`, `.app-sidebar`, scout-room chrome); Main/Permanent/PMF affiliation bytes still open (see `research/recipes.md`).
 
@@ -17,9 +17,8 @@ Last updated: 2026-09-06 (T208 done — SD bands + Super/High + Super/Low deltas
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
 | T190 | Development all-time from Progress Report CA strip | blocked | 2 | **parked** |
-| T209 | Squad — roster status Filter dropdown | ready | 5 | FM-style Filter; Hide players status only |
 | T124 | Quiet dev launch | ready | 9 | behind Loop A |
-| T210 | Squad — card / list density toggle | deferred | — | not now; after T209 if unfrozen |
+| T210 | Squad — card / list density toggle | deferred | — | not now |
 | T215 | Diagnostics — source-of-truth skeleton + live fill | deferred | — | after product loops; quality/compress phase |
 | T139 | FMT visual theme | deferred | — | overlapped |
 | T162 | Player trophy cabinet | deferred | — | backlog |
@@ -30,6 +29,7 @@ Last updated: 2026-09-06 (T208 done — SD bands + Super/High + Super/Low deltas
 
 ## Recently done
 
+- **T209** Squad roster status Filter dropdown (single status + counts)
 - **T208** Five-band SD tones + Super/High greens; deltas Super/Low; range-% rings
 - **T220** Move R&D knowledge to `research/` (`ecosystem.md` + `recipes.md`)
 - **T219** First-party recipes + strip probe fossils / dumps / fmt-probe

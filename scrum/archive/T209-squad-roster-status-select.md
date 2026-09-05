@@ -1,12 +1,12 @@
 ---
 id: T209
 title: Squad — roster status Filter dropdown
-status: ready
+status: done
 priority: 5
-owner: null
-claimed_at: null
-started_at: null
-completed_at: null
+owner: cursor-agent
+claimed_at: "2026-09-06T00:14:00+02:00"
+started_at: "2026-09-06T00:14:00+02:00"
+completed_at: "2026-09-06T00:18:00+02:00"
 depends_on: []
 ---
 
@@ -43,11 +43,11 @@ Steal only the **Hide players**-class status slice from FM’s Filter panel. Map
 
 ## Acceptance criteria
 
-- [ ] Squad toolbar shows one Filter control, not three always-visible checkboxes
-- [ ] Menu lists only available statuses with counts; choosing one filters the matrix
-- [ ] Default selection is At club when available for the team
-- [ ] Domain helpers remain source of truth; adjust multi-select tests
-- [ ] One commit `T209: …`
+- [x] Squad toolbar shows one Filter control, not three always-visible checkboxes
+- [x] Menu lists only available statuses with counts; choosing one filters the matrix
+- [x] Default selection is At club when available for the team
+- [x] Domain helpers remain source of truth; adjust multi-select tests
+- [x] One commit `T209: …`
 
 ## Notes / pointers
 
@@ -57,4 +57,4 @@ Steal only the **Hide players**-class status slice from FM’s Filter panel. Map
 
 ## Progress
 
-_(worker fills)_
+Shipped FM-style Filter pill → Status menu (At club / On loan / Loaned out with counts). Single status; default At club; session remembers one status per team. Vitest session + live-data OK.
