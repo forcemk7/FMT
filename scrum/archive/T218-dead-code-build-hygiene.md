@@ -68,3 +68,5 @@ Warm after mainly reflects a hot cache; durable win is **~376 tracked files / ~1
 - CSS leftovers: `.confidence-ring*`, `.startup-screen` in `globals.css`
 - Test-only islands: `scout-knowledge` / `player-evaluation` (still used by `product.test.ts`)
 - `feature = "probe"` blocks still reference `find_fmle_process` without a default import (cfg-gated; no default-build break)
+
+Commit: `6de50b9`.
