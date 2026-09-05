@@ -58,3 +58,5 @@ Owner wants a serious FMT R&D/knowledge layer (future OSS / adjacent tooling / v
 
 - Orphan GS CSS in `globals.css` (not deleted this ticket — surgical risk)
 - Main/Permanent/PMF bytes still open (FM-RECIPES)
+
+Commit: `6b455d1`.
