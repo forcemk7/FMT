@@ -12,6 +12,7 @@ pub(crate) mod offsets;
 pub(crate) mod parser;
 pub(crate) mod permissions;
 pub(crate) mod pge_affiliation_sign;
+pub(crate) mod player_origin;
 pub(crate) mod process;
 pub(crate) mod roles;
 pub(crate) mod scanner;

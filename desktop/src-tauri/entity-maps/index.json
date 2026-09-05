@@ -57,6 +57,7 @@
         "nationNameOffset": 24,
         "personBirthDateOffset": 136,
         "personPersonalityOffset": 112,
+        "personDatabaseOriginOffset": 213,
         "tacticsManagerVtableRva": 74061456
       },
       "sections": {
@@ -71,6 +72,7 @@
           "currentAbility": { "offset": 612, "source": "player", "valueType": "u16", "transform": "1-200 or omit", "status": "candidate", "confidence": 0.8, "validations": ["aligned FMSuperScout Fields.cs 26.3.x / Cheat Engine tables"] },
           "potentialAbility": { "offset": 614, "source": "player", "valueType": "u16", "transform": "1-200 or omit", "status": "candidate", "confidence": 0.8, "validations": ["aligned FMSuperScout Fields.cs 26.3.x / Cheat Engine tables"] },
           "personalityAttributes": { "offset": 112, "source": "person", "valueType": "u8[8]", "transform": "1-20 or omit per byte", "status": "candidate", "confidence": 0.8, "validations": ["person+0x70..0x77 personality pack; live LE compare pending"] },
+          "isDatabaseOrigin": { "offset": 213, "source": "person", "valueType": "u8", "transform": "1=database player, 0=game-generated (regen/newgen); isRegen = (byte==0)", "status": "validated", "confidence": 0.9, "validations": ["T216: Yamal/Darvich/Bernal/Escudero/Saleem all 1; Schalke U19×8 and First Team×16 all 0; not UID band; not FSS youth bit 0x18"] },
           "preferredFoot": { "offset": 375, "source": "player", "valueType": "u8[2]", "transform": "display 1-20 each; Either when same competency band else higher band Left/Right", "status": "validated", "confidence": 0.97, "validations": ["left/right foot evidence matches managed profiles"] },
           "heightCm": { "offset": 558, "source": "player", "valueType": "u8", "transform": "centimetres 140-220", "status": "validated", "confidence": 0.95, "validations": ["Sam Kizza 193", "Nathan Jones 192", "Felix Heynke 181", "Lorenzo Heilbrom 198", "consensus player+558 across 4/4"] },
           "form": { "offset": null, "source": "player", "valueType": "unknown", "transform": null, "status": "unmapped", "confidence": 0.0, "validations": [] }

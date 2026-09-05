@@ -107,6 +107,8 @@ pub(crate) struct MapConstants {
     pub(crate) nation_name_offset: u64,
     pub(crate) person_birth_date_offset: u64,
     pub(crate) person_personality_offset: u64,
+    /// person+0xD5: 1 = database player, 0 = game-generated (T216). isRegen = byte == 0.
+    pub(crate) person_database_origin_offset: u64,
     pub(crate) tactics_manager_vtable_rva: u64,
 }
 

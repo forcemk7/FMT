@@ -126,6 +126,11 @@ export type LivePlayer = {
   hiddenAttributes?: Record<string, number | null>;
   /** Personality pack (Adaptability…Controversy), 1–20 when readable */
   personalityAttributes?: Record<string, number | null>;
+  /**
+   * Game-generated / regen (T216): person+0xD5 == 0.
+   * Database players read 1. Not UID band; not face `r-`.
+   */
+  isRegen?: boolean | null;
   /** Load-history recent — Attributes desk (T188; frozen until Development solved). */
   recentAttrDeltas?: Record<string, number | null>;
   /** Development desk — Load all-time for now; replace with in-game pack when locus found. */

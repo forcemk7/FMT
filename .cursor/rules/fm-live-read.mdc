@@ -6,7 +6,8 @@ alwaysApply: false
 
 # FM26 live read — archive + direction
 
-This file is the durable research store. Agents touching live-read paths get it automatically. Do not recreate this RE from scratch.
+This file is the **operational law** for live-read code (auto-injected on matching paths).  
+**Living catalog** of public FM tools / offsets / recipes: `scrum/FM-ECOSYSTEM.md` — check and update that file; do not let knowledge die in chat.
 
 **Product fork (keep):** FMLE = Live Editing. FMT = Gameplay Support (Squad / Loans / GM / HoYD / Progress).  
 **Shared need (believe):** the same **scouting core** — full in-game world readable in ~&lt;2s from `fm.exe` / `game_plugin.dll`. Editing bytes is out of scope for FMT; reading is not.
@@ -69,6 +70,7 @@ Provenance: CE tables (tdg6661), pinned FM **26.3.x** `game_plugin`. Player bloc
 | Field | FSS | FMT entity-map | Status |
 |-------|-----|----------------|--------|
 | UID | 0x0C | entityUid 12 | Match |
+| isDatabaseOrigin | — | person+0xD5 (213) | Match (T216) — 1=DB, 0=regen; not youth bit 0x18 |
 | CA / PA | 0x264 / 0x266 | 612 / 614 | Match — do not re-RE |
 | Positions | 0x150 | 336 | Match |
 | Attrs (×5) | 0x15F | 351 | Match |
@@ -137,6 +139,62 @@ Person class dynamic offsets (FSS): Player `0x288`, PlayerStaff `0x380`, Staff `
 - Don’t continue heap/idiom `player_registry` as the world strategy.
 - Don’t invent Loop D tickets while Loop A owns the board.
 - Don’t re-RE CA/PA/attrs already locked in entity-map.
+
+---
+
+## Affiliations (public research — 2026-09-04)
+
+**Verdict:** There is **no** open GitHub recipe with Main / Permanent / Players Move Freely **byte offsets** for FM26 (or earlier). Open tools never finished Club Affiliation entities. Closed editors (FMLE / FMRTE / tdg CE tables) own the write path. Semantic schema **is** public via FMLE UI strings; FMT’s live link scraps (`club+0x8E8`, link `club@0x160`) are ahead of OSS for Squad-tab reserves.
+
+### What open source actually has
+
+| Source | Affiliation content | Action |
+|--------|---------------------|--------|
+| AppCake `Relationship` / `RelationshipOffsets` | Person/club **favourites & rivals**. `Permanent` @ **0xD**, true = byte **79**. **Not** club affiliations. | Do not port for II/NPL |
+| AppCake `ClubOffsets` | Teams / Nation / Finances — **no** affiliation vector | — |
+| AppCake `Agreement` | Stub RowID/UID/Name only (nation-style agreements naming) | Thin |
+| Jelmer `FmOffsets` | Slot **`AgreementOffset = 0x1A0`** on world table (counts scored 0–1000) | Prefer table walk when funded |
+| FSS `Fields.cs` | CE-derived player/staff/team — **zero** affiliation fields | Confirms CE open dumps skip this |
+| CE public posts | `vtbAgreement` = `db::AGREEMENT`; experimental “Add Club Affiliation” scripts | Closed CT field maps (Patreon) |
+| FMLE free | Can **view** Affiliations; **Save Changes requires license** — free checkbox A/B does not write RAM (T214) | Paid A/B **or** static type compare |
+
+### FMLE affiliation schema (ASCII/i18n in `fmle26.exe` — not offsets)
+
+**Type enum labels (order as packed in binary):**  
+Affiliated Club → Sub Team → Feeder Team → B Club → C Club → 2 Club → 3 Club → **II Club** → Good Relations → Likely Friendly → Shared Youth Club → Regional Academy → Extinct B/C Club → Women's Club → …
+
+**Flag / benefit keys (UI):** `main`, `permanent`, `players_move_freely`, `players_go_on_loan`, `first_option_to_buy`, `same_board`, `uses_same_kit`, `financial_help`, `use_parent_facilities`, `sub_training_facilities`, `max_loan`, `play_friendlies`, `youth_training`, `scouting_knowledge`, `no_same_division`, `loan_players_from_sub`, …
+
+Squad-tab reserves (Schalke II / Melbourne NPL class) are almost certainly **Type ∈ {B/C/2/3/II Club, Sub Team}**, not Feeder / Good Relations. Prefer locking the **Type byte** via static II-vs-feeder compare on the true affiliation record over name needles.
+
+### Schalke affiliation catalog (human ground truth — 2026-09-04)
+
+**FM Affiliates only** (Squad-tab / board affiliations — the list FMT must eventually mirror for discovery):
+
+1. Schalke 04 II (B-team / II Club — Squad tab)
+2. Daegu
+3. Kaiserslautern
+4. Legia
+5. Melbourne Victory
+6. Sparta Praha
+
+**FMLE Affiliates tab** shows the above **plus** friendlies / good-relations style links (not Squad-tab reserves):
+
+7. Duisburg · FC Twente · Oberhausen · SW Essen · Sevilla · Wuppertal
+
+Squad-tab durable filter targets the **FM-only six** (especially II). Do not treat FMLE-only friendlies as Squad tabs. `@0x8E8` Münster / Hannover 96 II are **not** in either list — wrong container.
+
+### `@0x8E8` trap (static compare 2026-09-04)
+
+Live Schalke dumps: slots at `club+0x8E8` (Münster / Hannover 96 II) are **16-byte Relationship-like catalogs** — repeating stride, `Permanent` often **79 (0x4F) at +0xD**, `Type` often **5**. That matches AppCake **Relationship** encoding, not FMLE club-affiliation Type (II Club / Feeder Team / …).
+
+II heap candidate (`club@0x160` → uid 3609393) has a **different** layout (near-zero head). **Do not** byte-diff II heap vs `@0x8E8` catalogs for Main/Permanent/PMF — apples/oranges. True FMLE feeders (Kaiser / Legia) also showed empty pointer/UID bridges in archived `affiliates-probe-live` linkAnalysis.
+
+### Durable next steps (T214)
+
+1. **Static lock (no paid LE):** with FM open, dump **same-layout** affiliation records for II vs true FMLE Feeder(Main) — prefer **Agreement** table (`0x1A0`) or whatever object FMLE Save writes; then Type + Main/Permanent/PMF.
+2. **Paid FMLE (~£5.49):** one-flag Save Changes A/B when Cursor card works.
+3. Keep T212 satellite until Type/flag filter ships — do not re-RE AppCake Relationship.Permanent; do not treat `@0x8E8` catalogs as feeders.
 
 ---
 

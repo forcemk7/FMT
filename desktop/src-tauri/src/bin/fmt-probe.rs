@@ -3,7 +3,7 @@
 use std::{env, io::Write, process::ExitCode};
 
 fn main() -> ExitCode {
-    let usage = "Usage: fmt-probe <command> [args]\n  affiliate-flags\n  club-teams\n  club-affiliates\n  affiliate-containers\n  agreement-table\n  pge-sign\n  editor-affiliations\n  duisburg-ab [feeder|likely]\n  affil-types";
+    let usage = "Usage: fmt-probe <command> [args]\n  affiliate-flags\n  club-teams\n  club-affiliates\n  affiliate-containers\n  agreement-table\n  pge-sign\n  editor-affiliations\n  duisburg-ab [feeder|likely]\n  affil-types\n  player-origin";
     let Some(command) = env::args().nth(1) else {
         eprintln!("{usage}");
         return ExitCode::from(2);
@@ -28,6 +28,7 @@ fn main() -> ExitCode {
             glassscout_fm26_lib::connector::run_debug_probe_duisburg_type_ab(&label)
         }
         "affil-types" => glassscout_fm26_lib::connector::run_debug_probe_affiliation_type_census(),
+        "player-origin" => glassscout_fm26_lib::connector::run_debug_probe_player_origin(),
         other => {
             eprintln!("Unknown command '{other}'.\n{usage}");
             return ExitCode::from(2);

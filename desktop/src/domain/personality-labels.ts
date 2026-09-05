@@ -39,8 +39,8 @@ export function liveMatchableAttrs(player: LivePlayer): MatchableAttrs | null {
     attrs.age = player.age;
   }
 
-  // Regen flag not on live player yet — treat as non-regen (regen-only labels skipped).
-  attrs.isRegen = false;
+  // T216: live person+0xD5 (0=regen, 1=database). Unknown → non-regen (skip regen-only labels).
+  attrs.isRegen = player.isRegen === true;
 
   return attrs;
 }

@@ -299,7 +299,10 @@ pub fn run_debug_scan_club_teams() -> Result<Value, String> {
     debug_scan_club_teams_impl()
 }
 
-#[cfg(all(feature = "probe", target_os = "windows"))]
+#[cfg(all(
+    any(feature = "probe", feature = "affiliate_flags_probe"),
+    target_os = "windows"
+))]
 pub fn run_debug_probe_player_origin() -> Result<Value, String> {
     debug_probe_player_origin_impl()
 }
@@ -1190,9 +1193,14 @@ fn resolve_active_human_manager(
     Ok((resolved.swap_remove(best_index), manager_pick_warning))
 }
 
-#[cfg(all(feature = "probe", target_os = "windows"))]
+#[cfg(all(
+    any(feature = "probe", feature = "affiliate_flags_probe"),
+    target_os = "windows"
+))]
 fn debug_probe_player_origin_impl() -> Result<Value, String> {
-    use crate::fm26::player_origin::probe_player_origin_fields;
+    use crate::fm26::player_origin::{
+        probe_origin_byte_split, resolve_db_origin_samples, OriginSample,
+    };
 
     let Some((process_id, _)) = find_fm26_process() else {
         return Err("FM26 process not found.".to_string());
@@ -1219,36 +1227,176 @@ fn debug_probe_player_origin_impl() -> Result<Value, String> {
     let (selected, _) =
         resolve_active_human_manager(&mut reader, module, profile, process_id, &mut diagnostics)
             .map_err(|failure| failure.message)?;
-    let players_start = reader
-        .read_pointer(selected.team + profile.constants.team_players_start_offset)
-        .ok_or_else(|| "Managed squad collection was not readable.".to_string())?;
-    let players_end = reader
-        .read_pointer(selected.team + profile.constants.team_players_end_offset)
-        .ok_or_else(|| "Managed squad collection end was not readable.".to_string())?;
-    let player_count = ((players_end.saturating_sub(players_start)) / 8) as usize;
-    let mut samples = Vec::new();
-    for index in 0..player_count.min(80) {
-        let Some(raw_player) = reader
-            .read_pointer(players_start + (index as u64 * 8))
-            .filter(|value| *value != 0)
+
+    eprintln!("player-origin: resolving DB ground-truth UIDs (heap u32 scan)…");
+    let skip_db = std::env::var("PLAYER_ORIGIN_SKIP_DB")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+    let (database, db_diag) = if skip_db {
+        (
+            Vec::new(),
+            json!({
+                "status": "skipped",
+                "message": "PLAYER_ORIGIN_SKIP_DB=1 — validate managed-squad bytes only",
+            }),
+        )
+    } else {
+        resolve_db_origin_samples(&mut reader, profile)
+    };
+
+    // Regen ground truth: managed Club.Teams with under19s / U19 TeamType.
+    let seeds = HashSet::from([selected.team]);
+    let discovered = discover_managed_club_teams(
+        &mut reader,
+        module,
+        profile,
+        selected.club,
+        selected.club_uid,
+        &selected.club_name,
+        selected.team,
+        &seeds,
+    );
+    let mut regen = Vec::new();
+    let mut first_team_samples = Vec::new();
+    let mut u19_teams = Vec::new();
+    const ORIGIN_CANDIDATE_OFFSET: u64 = 0xD5;
+    for entry in &discovered {
+        let label = entry.name.to_ascii_lowercase();
+        let is_u19 = entry.squad_unit == "under19s"
+            || label.contains("u19")
+            || label.contains("u-19");
+        let is_first = entry.squad_unit == "firstTeam" || entry.team == selected.team;
+        if !is_u19 && !is_first {
+            continue;
+        }
+        if is_u19 {
+            u19_teams.push(json!({
+                "team": format!("0x{:X}", entry.team),
+                "teamUid": entry.team_uid,
+                "label": entry.name,
+                "teamType": entry.team_type,
+                "squadUnit": entry.squad_unit,
+            }));
+        }
+        let Some(players_start) = reader
+            .read_pointer(entry.team + profile.constants.team_players_start_offset)
         else {
             continue;
         };
-        let Some(person) = reader
-            .read_pointer(raw_player + profile.constants.player_person_offset)
-            .filter(|value| *value != 0)
+        let Some(players_end) = reader
+            .read_pointer(entry.team + profile.constants.team_players_end_offset)
         else {
             continue;
         };
-        let Some(uid) = reader
-            .read_u32(person + profile.constants.entity_uid_offset)
-            .filter(|uid| is_plausible_fm_unique_id(*uid))
-        else {
-            continue;
-        };
-        samples.push((raw_player, uid, person, 0));
+        let player_count = ((players_end.saturating_sub(players_start)) / 8) as usize;
+        for index in 0..player_count.min(40) {
+            let Some(raw_player) = reader
+                .read_pointer(players_start + (index as u64 * 8))
+                .filter(|value| *value != 0)
+            else {
+                continue;
+            };
+            let Some(resolved) = resolve_person_and_player_base(&mut reader, raw_player, profile)
+            else {
+                continue;
+            };
+            let Some(uid) = reader
+                .read_u32(resolved.person + profile.constants.entity_uid_offset)
+                .filter(|uid| is_plausible_fm_unique_id(*uid))
+            else {
+                continue;
+            };
+            let Some(name) = display_name(
+                read_name_field(
+                    &mut reader,
+                    resolved.person + profile.constants.person_first_name_offset,
+                ),
+                read_name_field(
+                    &mut reader,
+                    resolved.person + profile.constants.person_second_name_offset,
+                ),
+                read_name_field(
+                    &mut reader,
+                    resolved.person + profile.constants.person_common_name_offset,
+                ),
+            ) else {
+                continue;
+            };
+            let origin_byte = reader
+                .read_bytes(resolved.person + ORIGIN_CANDIDATE_OFFSET, 1)
+                .and_then(|b| b.first().copied());
+            if is_u19 && regen.len() < 8 {
+                regen.push(OriginSample {
+                    uid,
+                    name: name.clone(),
+                    person: resolved.person,
+                    player_base: resolved.player_base,
+                    bucket: "regen",
+                });
+            }
+            if is_first && first_team_samples.len() < 16 {
+                first_team_samples.push(json!({
+                    "uid": uid,
+                    "name": name,
+                    "person": format!("0x{:X}", resolved.person),
+                    "person0xd5": origin_byte,
+                    "squadUnit": entry.squad_unit,
+                }));
+            }
+        }
     }
-    Ok(probe_player_origin_fields(&mut reader, profile, &samples))
+
+    eprintln!(
+        "player-origin: DB={} regen={} firstTeam={} — byte split…",
+        database.len(),
+        regen.len(),
+        first_team_samples.len()
+    );
+    let split = if database.is_empty() {
+        json!({
+            "status": "validate_only",
+            "message": "DB resolve skipped; see firstTeamPerson0xd5 vs prior DB=1 / U19=0 lock.",
+            "regenSampleCount": regen.len(),
+        })
+    } else {
+        probe_origin_byte_split(&mut reader, &database, &regen)
+    };
+
+    let first_team_d5: Vec<u8> = first_team_samples
+        .iter()
+        .filter_map(|s| s.get("person0xd5").and_then(Value::as_u64).map(|v| v as u8))
+        .collect();
+    let first_team_d5_summary = json!({
+        "offset": ORIGIN_CANDIDATE_OFFSET,
+        "offsetHex": "0xD5",
+        "samples": first_team_samples.len(),
+        "values": first_team_d5.clone(),
+        "allZero": !first_team_d5.is_empty() && first_team_d5.iter().all(|v| *v == 0),
+        "allOne": !first_team_d5.is_empty() && first_team_d5.iter().all(|v| *v == 1),
+        "note": "Owner: managed first team are regens — expect 0 if 0xD5 is DB(1)/regen(0)",
+    });
+
+    Ok(json!({
+        "status": split["status"],
+        "managedClub": {
+            "uid": selected.club_uid,
+            "name": selected.club_name,
+        },
+        "databaseResolve": db_diag,
+        "u19Teams": u19_teams,
+        "regenSampleCount": regen.len(),
+        "firstTeamPerson0xd5": first_team_d5_summary,
+        "firstTeamSamples": first_team_samples,
+        "split": split,
+        "candidateLock": {
+            "personOffset": ORIGIN_CANDIDATE_OFFSET,
+            "offsetHex": "0xD5",
+            "databaseValue": 1,
+            "regenValue": 0,
+            "isRegenWhen": "person+0xD5 == 0",
+            "reject": "FSS person+0x18 bit0x08 is youth-team (U19), not newgen — do not wire",
+        },
+    }))
 }
 
 #[cfg(all(feature = "probe", target_os = "windows"))]
@@ -2750,6 +2898,13 @@ fn push_squad_player_from_raw(
         .read_bytes(person + profile.constants.person_personality_offset, 8)
         .unwrap_or_default();
     let personality_attributes = personality_attribute_map(&personality_bytes);
+    let is_regen = reader
+        .read_bytes(
+            person + profile.constants.person_database_origin_offset,
+            1,
+        )
+        .and_then(|b| b.first().copied())
+        .map(|byte| byte == 0);
     let current_ability = reader
         .read_u16(player_base + profile.constants.player_ca_offset)
         .filter(|value| (1..=200).contains(value));
@@ -2879,6 +3034,7 @@ fn push_squad_player_from_raw(
         "attributes": visible_attributes,
         "hiddenAttributes": hidden_attributes,
         "personalityAttributes": personality_attributes,
+        "isRegen": is_regen,
         "recentAttrDeltas": recent_attr_deltas,
         "allTimeAttrDeltas": all_time_attr_deltas,
         "caPackPointCount": ca_pack_point_count,

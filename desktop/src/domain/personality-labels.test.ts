@@ -142,11 +142,35 @@ describe("livePersonalityLabels", () => {
           Temperament: 13,
           Controversy: 5,
         },
+        isRegen: false,
       }),
     );
     expect(labels).toEqual({
       personality: "Light-Hearted",
       mediaHandling: "Evasive, Reserved",
+    });
+  });
+
+  it("uses live isRegen for regen-only personalities (T216)", () => {
+    const attrs = {
+      attributes: { Determination: 13, Leadership: 14 },
+      personalityAttributes: {
+        Ambition: 3,
+        Loyalty: 16,
+        Pressure: 17,
+        Professionalism: 14,
+        Sportsmanship: 16,
+        Temperament: 16,
+        Controversy: 1,
+      },
+    };
+    expect(livePersonalityLabels(player({ ...attrs, isRegen: false }))).toEqual({
+      personality: "Light-Hearted",
+      mediaHandling: "Unflappable",
+    });
+    expect(livePersonalityLabels(player({ ...attrs, isRegen: true }))).toEqual({
+      personality: "Unambitious",
+      mediaHandling: "Unflappable",
     });
   });
 

@@ -1,10 +1,10 @@
 ﻿# Status
 
-Last updated: 2026-09-04 (T214 done — club+0x118 type filter + map reminders)
+Last updated: 2026-09-05 (T216 done — person+0xD5 isRegen)
 
 ## Now
 
-**Board clear of T214.** Next: pick highest-priority `ready` ticket (T209 after T208, or ask HQ).
+**Board clear of T216.** Next: highest-priority `ready` (T209 after T208, or ask HQ).
 
 **T208** Five-band attr tones — Super deferred; await archive confirm.
 
@@ -31,6 +31,7 @@ Last updated: 2026-09-04 (T214 done — club+0x118 type filter + map reminders)
 
 ## Recently done
 
+- **T216** Live isRegen from person+0xD5 (DB=1 / regen=0); personality labels use real origin
 - **T214** Lock durable Squad-tab affiliate discovery (`club+0x118` + type `+0x30`; T212 bridge for NPL)
 - **T212** Load managed affiliate squads (Schalke II + Melbourne NPL; totals 79/55)
 - **T213** Diagnostics — rename, game date, load-order fields
