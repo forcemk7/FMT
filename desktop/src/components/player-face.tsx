@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { UserRound } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
+import { whenFmtCosmeticsReady, isFmtCosmeticsReady } from "@/domain/cosmetics-ready";
 import { cn } from "@/lib/utils";
 
 type PlayerFaceResult = {
@@ -84,13 +85,23 @@ export function PlayerFace({ playerId, name, size = "md", highResolution = false
         });
     };
 
-    load(0);
     const onUpdate = () => {
       faceCache.delete(cacheKey);
       if (active) setSource(undefined);
       load(0);
     };
+
+    const startLoad = () => {
+      load(0);
+    };
+
     window.addEventListener("fmt-faces-updated", onUpdate);
+    if (isFmtCosmeticsReady()) {
+      startLoad();
+    } else {
+      whenFmtCosmeticsReady(startLoad);
+    }
+
     return () => {
       active = false;
       timers.forEach((id) => window.clearTimeout(id));

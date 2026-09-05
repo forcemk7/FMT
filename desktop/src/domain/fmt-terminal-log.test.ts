@@ -1,0 +1,118 @@
+import { describe, expect, it } from "vitest";
+import { loadStageLabel, shellLoadLabel, shellStatusLine } from "./fmt-terminal-log";
+import type { LiveFootballSnapshot } from "./adapters";
+
+const baseSnapshot: LiveFootballSnapshot = {
+  status: {
+    processDetected: true,
+    processId: 1,
+    processPath: null,
+    saveDetected: true,
+    memoryAccess: "read_only_handle_open",
+    parserStatus: "ready",
+    state: "connected",
+    playersLoaded: 2,
+    managedSquadPlayers: 2,
+    clubEmployees: 2,
+    databasePlayersIndexed: 0,
+    backgroundPlayersIndexed: 0,
+    visiblePlayersLoaded: 2,
+    fullyScoutedPlayers: 2,
+    partialScoutReports: 0,
+    databaseIndexStatus: "not_run",
+    databaseScope: "managed-squad",
+    clubsLoaded: 1,
+    lastSync: null,
+    bytesRead: 100,
+    executableHeaderValid: true,
+    canWriteMemory: false,
+    message: "Connected",
+    warnings: [],
+  },
+  managedClubId: "club-1",
+  managerName: null,
+  gameDate: null,
+  season: null,
+  clubs: [],
+  clubTeams: [],
+  players: [
+    {
+      id: "1",
+      name: "A",
+      age: 20,
+      nationality: null,
+      positions: [],
+      bestRole: null,
+      currentAbility: 100,
+      potentialAbility: 120,
+      form: null,
+      averageRating: null,
+      minutesPlayed: null,
+      goals: null,
+      assists: null,
+      contractStatus: null,
+      value: null,
+      wage: null,
+      squadImportance: null,
+      developmentTrend: null,
+      tacticalFit: null,
+      roleFit: null,
+      strengths: [],
+      weaknesses: [],
+      clubId: "club-1",
+      transferInterest: null,
+      loanInterest: null,
+      transferAvailable: null,
+      loanAvailable: null,
+      squadUnit: "firstTeam",
+    },
+    {
+      id: "2",
+      name: "B",
+      age: 17,
+      nationality: null,
+      positions: [],
+      bestRole: null,
+      currentAbility: 80,
+      potentialAbility: 140,
+      form: null,
+      averageRating: null,
+      minutesPlayed: null,
+      goals: null,
+      assists: null,
+      contractStatus: null,
+      value: null,
+      wage: null,
+      squadImportance: null,
+      developmentTrend: null,
+      tacticalFit: null,
+      roleFit: null,
+      strengths: [],
+      weaknesses: [],
+      clubId: "club-1",
+      transferInterest: null,
+      loanInterest: null,
+      transferAvailable: null,
+      loanAvailable: null,
+      squadUnit: "under19s",
+      loanedOut: true,
+    },
+  ],
+  tactic: null,
+  tacticSource: "none",
+  dataError: null,
+  dataSource: "live-memory",
+  dataWarnings: [],
+};
+
+describe("fmt-terminal-log", () => {
+  it("maps load stage keys to app labels", () => {
+    expect(loadStageLabel("detecting_fm26")).toBe("Detecting FM26…");
+    expect(loadStageLabel("loading_club_teams")).toBe("Loading club teams…");
+  });
+
+  it("builds shell status from snapshot", () => {
+    expect(shellLoadLabel(baseSnapshot, false)).toBe("Synced · 2 players");
+    expect(shellStatusLine(baseSnapshot, true, "detecting_fm26")).toBe("Detecting FM26…");
+  });
+});

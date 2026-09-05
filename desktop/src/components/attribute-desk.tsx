@@ -19,9 +19,9 @@ import {
 } from "@/domain/attribute-desk";
 import { abilityToneFromScore, attributeTone } from "@/domain/attribute-tone";
 import {
-  allTimeDeltasForPlayer,
   colorForPlotField,
-  recentDeltasForPlayer,
+  getPlayerAttrHistory,
+  recentDeltasFromPoints,
 } from "@/domain/attribute-history";
 import { AttrDeltaBadge } from "@/components/attr-delta-badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -356,17 +356,29 @@ export function AttributeDesk({
   const gk = isGoalkeeperPosition(player.positions);
   const attrs = player.attributes;
   const deltas = useMemo(() => {
+    if (deltaMode === "none") return undefined;
+
+    // Attributes (recent): Load history — frozen; same clock as Movers.
     if (deltaMode === "recent") {
-      return player.recentAttrDeltas ?? recentDeltasForPlayer(player.id);
+      return recentDeltasFromPoints(getPlayerAttrHistory(player.id));
     }
-    if (deltaMode === "allTime") {
-      return player.allTimeAttrDeltas ?? allTimeDeltasForPlayer(player.id);
+
+    // Development (all-time): Progress Report CA strip stamped on the player when
+    // save-copy extract found pack points. Do not fall back to Load history (wrong clock).
+    const packPoints = player.caPackPointCount ?? 0;
+    const pack = player.allTimeAttrDeltas;
+    if (
+      packPoints >= 1 &&
+      pack &&
+      Object.values(pack).some((value) => typeof value === "number")
+    ) {
+      return pack;
     }
-    return undefined;
+    return {};
   }, [
     player.id,
-    player.recentAttrDeltas,
     player.allTimeAttrDeltas,
+    player.caPackPointCount,
     deltaMode,
     historySyncKey,
   ]);
