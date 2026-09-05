@@ -91,8 +91,8 @@ body.fmt-shell {
   --panel-shadow: 0 12px 40px rgba(0, 0, 0, 0.38);
   --shell-top: var(--shell-0);
 
-  --attr-tone-super: #1b7a34;
-  --attr-tone-high: #65e53a;
+  --attr-tone-super: #65e53a;
+  --attr-tone-high: #1b7a34;
   --attr-tone-upper: #3a8acf;
   --attr-tone-mid: #e6e6fa;
   --attr-tone-low: #bd4e4e;

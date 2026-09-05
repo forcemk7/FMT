@@ -25,7 +25,7 @@ Loop A/B: elite attrs need a fifth band that beats neon. Owner wants to **try** 
 
 - [x] SD bands: Super z≥+3 (19–20), High z≥+2 (16–18), Upper z≥+1 (13–15), Mid |z|<1 (8–12), Low z≤−1 (1–7)
 - [x] Inverse: only 1–2 Super
-- [x] Super dark green `#1b7a34` above neon `#65e53a`
+- [x] Super neon `#65e53a` (eye-catcher); High matte green `#1b7a34` (blue-weight)
 - [x] Vitest
 - [ ] Owner QA on squad / desk — keep or revert both
 
@@ -35,4 +35,4 @@ Prior 4-band fixed cuts were 16–20 / 11–15 / 6–10 / 1–5 (no Super). If e
 
 ## Progress
 
-Shipped SD + Super for try-on. Verified: vitest attribute-tone / attr-colors / hasBand. **Awaiting owner visual QA** before archive/commit preference.
+Shipped SD + Super for try-on. **Color roles (owner):** Super = neon eye-catcher; High = matte dark green (solid like blue). Verified: vitest. **Awaiting owner visual QA** before archive.

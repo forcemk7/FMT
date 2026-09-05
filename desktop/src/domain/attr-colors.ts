@@ -12,10 +12,10 @@ export type AppTone = AttributeTone;
 
 export type AttrColorPalette = Record<AttrColorBand, string>;
 
-/** FMT default tone hexes. Super = FM-ish dark green above neon high. */
+/** FMT default tone hexes. Super = neon eye-catcher; High = matte green (blue-weight). */
 export const FMT_ATTR_TONE_COLORS: AttrColorPalette = {
-  super: "#1b7a34", // 19–20 (z≥+3)
-  high: "#65e53a", // 16–18 (z≥+2)
+  super: "#65e53a", // 19–20 (z≥+3) — eye-catcher
+  high: "#1b7a34", // 16–18 (z≥+2) — matte good (like upper blue)
   upper: "#3a8acf", // 13–15 (z≥+1)
   mid: "#e6e6fa", // 8–12 (|z|<1)
   low: "#bd4e4e", // 1–7 (z≤−1)
