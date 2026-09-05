@@ -40,4 +40,4 @@ Owner’s Loop A habit is in-game → FMT header search → player desk (attrs /
 
 ## Progress
 
-Shipped: `foldSearchText` / `playerMatchesSquadSearch` (NFD + strip marks); header search uses fold match; Ctrl/Cmd+F focus+select; ↓/↑ highlight; Enter opens hit; Esc clears; click path unchanged. Verified: `npx vitest run src/domain/squad-search.test.ts` (4 pass). Manual: load save → type `kramaric` / Ctrl+F / arrows / Enter.
+Shipped: `foldSearchText` / `playerMatchesSquadSearch` (NFD + strip marks); header search uses fold match; Ctrl/Cmd+F focus+select; ↓/↑ highlight; Enter opens hit; Esc clears; click path unchanged. Verified: `npx vitest run src/domain/squad-search.test.ts` (4 pass). Manual: load save → type `kramaric` / Ctrl+F / arrows / Enter. Commit: `0817d4d`. T218 ready next (dead-code hygiene).
