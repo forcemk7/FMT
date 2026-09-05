@@ -87,7 +87,7 @@
     --amber: #e5a125;
     --amber-soft: #3a2e14;
     --panel-shadow: 0 14px 36px rgba(0, 0, 0, 0.28), 0 2px 8px rgba(0, 0, 0, 0.18);
-    --attr-tone-high: #2f9e4f;
+    --attr-tone-high: #3abd52;
     --attr-tone-upper: #3a8acf;
     --attr-tone-mid: #e6e6fa;
     --attr-tone-low: #bd4e4e;
@@ -1724,7 +1724,7 @@ button:active,
   font-variant-numeric:tabular-nums;font-weight:700;
 }
 :root{
-  --attr-tone-high: #2f9e4f;
+  --attr-tone-high: #3abd52;
   --attr-tone-upper:#3a8acf;
   --attr-tone-mid:#e6e6fa;
   --attr-tone-low:#bd4e4e;
@@ -3740,8 +3740,8 @@ ul.attr-history-timeline-moves{display:flex;flex-direction:column;gap:3px}
 ul.attr-history-timeline-moves>li{
   display:flex;justify-content:space-between;gap:10px;
 }
-ul.attr-history-timeline-moves em[data-delta="up"]{color:#0f7a4a;font-style:normal;font-weight:700}
-ul.attr-history-timeline-moves em[data-delta="down"]{color:#b42318;font-style:normal;font-weight:700}
+ul.attr-history-timeline-moves em[data-delta="up"]{color:var(--attr-tone-super,#65e53a);font-style:normal;font-weight:700}
+ul.attr-history-timeline-moves em[data-delta="down"]{color:var(--attr-tone-low,#bd4e4e);font-style:normal;font-weight:700}
 .attr-history-teach{
   margin:0 0 12px;padding:10px 12px;border-radius:8px;
   background:#f3faf8;border:1px solid #d7ebe6;color:#1d4f48;

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  abilityProgress,
   abilityToneFromScore,
+  attrProgress,
   attributeDeltaTone,
   attributeTone,
   attributeZ,
@@ -54,17 +56,27 @@ describe("attributeTone (SD experiment)", () => {
   });
 });
 
+describe("ring progress (range %; color stays zigma)", () => {
+  it("fills attrs and CA/PA as percent of native scale", () => {
+    expect(attrProgress(19)).toBeCloseTo(0.95, 5);
+    expect(attrProgress(20)).toBe(1);
+    expect(abilityProgress(190)).toBeCloseTo(0.95, 5);
+    expect(abilityProgress(180)).toBeCloseTo(0.9, 5);
+    expect(abilityProgress(200)).toBe(1);
+  });
+});
+
 describe("attributeDeltaTone", () => {
-  it("uses green for gains and red for drops on standard attrs", () => {
-    expect(attributeDeltaTone("Passing", 1)).toBe("high");
+  it("uses Super neon for gains and Low red for drops on standard attrs", () => {
+    expect(attributeDeltaTone("Passing", 1)).toBe("super");
     expect(attributeDeltaTone("CA", -1)).toBe("low");
     expect(attributeDeltaTone("Pace", 0)).toBeNull();
   });
 
   it("inverts Controversy and Injury Proneness", () => {
-    expect(attributeDeltaTone("Controversy", -1)).toBe("high");
+    expect(attributeDeltaTone("Controversy", -1)).toBe("super");
     expect(attributeDeltaTone("Controversy", 1)).toBe("low");
-    expect(attributeDeltaTone("Injury Proneness", -2)).toBe("high");
+    expect(attributeDeltaTone("Injury Proneness", -2)).toBe("super");
     expect(attributeDeltaTone("Injury Proneness", 1)).toBe("low");
   });
 });

@@ -3,11 +3,13 @@ import type { LivePlayer } from "./adapters";
 import {
   diminishingPersonalityValue,
   hasBand,
+  hasProgress,
   HAS_PRACTICAL_CEILING,
   HAS_PRACTICAL_FLOOR,
   HAS_SCORE_CEILING,
   liveHasScore,
 } from "./has-score";
+import { abilityProgress, abilityToneFromScore } from "./attribute-tone";
 
 function player(partial: Partial<LivePlayer>): LivePlayer {
   return {
@@ -110,5 +112,19 @@ describe("hasBand", () => {
 
     // Top of practical span → ~20 on mapped 1–20 → super
     expect(hasBand(HAS_PRACTICAL_CEILING)).toBe("super");
+  });
+});
+
+describe("hasProgress", () => {
+  it("fills as % of practical span; Super HAS fills more than Excellent PA", () => {
+    expect(hasProgress(HAS_PRACTICAL_FLOOR)).toBe(0);
+    expect(hasProgress(HAS_PRACTICAL_CEILING)).toBe(1);
+    expect(hasProgress(HAS_PRACTICAL_CEILING + 1)).toBe(1);
+    expect(hasProgress(HAS_PRACTICAL_FLOOR - 1)).toBe(0);
+
+    const superHas = 15.6;
+    expect(hasBand(superHas)).toBe("super");
+    expect(hasProgress(superHas)).toBeGreaterThan(abilityProgress(180));
+    expect(abilityToneFromScore(180)).toBe("high");
   });
 });

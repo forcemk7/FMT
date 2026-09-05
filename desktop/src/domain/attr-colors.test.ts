@@ -13,10 +13,10 @@ describe("attr tone palette", () => {
     expect(toneDefaultHex("mid")).toBe("#e6e6fa");
   });
 
-  it("exposes Super neon above matte high green", () => {
+  it("exposes Super neon and High solid green matched to Upper blue", () => {
     expect(FMT_ATTR_TONE_COLORS.super).toBe("#65e53a");
     expect(APP_TONE_SUPER).toBe("#65e53a");
-    expect(FMT_ATTR_TONE_COLORS.high).toBe("#2f9e4f");
+    expect(FMT_ATTR_TONE_COLORS.high).toBe("#3abd52");
     expect(toneCssVar("super")).toBe("--attr-tone-super");
     expect(toneClassName("super")).toBe("attr-tone-super");
     expect(toneCssVar("high")).toBe("--attr-tone-high");

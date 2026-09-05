@@ -1,6 +1,6 @@
 /**
  * App-wide attribute / score tone palette — FMT design scheme.
- * Hex defaults are owner preference (not SI / FM in-game chrome).
+ * Low/mid/upper kept; High = solid green matched to Upper blue weight; Super = neon.
  * Band cutoffs: `attribute-tone.ts` (T208 SD + Super experiment).
  */
 
@@ -12,10 +12,10 @@ export type AppTone = AttributeTone;
 
 export type AttrColorPalette = Record<AttrColorBand, string>;
 
-/** FMT default tone hexes. Super = neon eye-catcher; High = solid matte green (blue-weight). */
+/** FMT default tone hexes — High solid like Upper blue; Super neon eye-catcher. */
 export const FMT_ATTR_TONE_COLORS: AttrColorPalette = {
-  super: "#65e53a", // 19–20 (z≥+3) — eye-catcher
-  high: "#2f9e4f", // 16–18 (z≥+2) — solid matte (match blue weight)
+  super: "#65e53a", // 19–20 — neon, stands out
+  high: "#3abd52", // 16–18 — solid/matte, blue-equivalent visibility
   upper: "#3a8acf", // 13–15 (z≥+1)
   mid: "#e6e6fa", // 8–12 (|z|<1)
   low: "#bd4e4e", // 1–7 (z≤−1)
@@ -32,7 +32,7 @@ export const ATTR_COLOR_BANDS: Array<{ key: AttrColorBand; label: string; range:
   { key: "low", label: "Low", range: "1–7 · z≤−1" },
 ];
 
-const STORAGE_KEY = "fmt.attr-color-palette.v2";
+const STORAGE_KEY = "fmt.attr-color-palette.v4";
 
 const CSS_VARS: Record<AttrColorBand, string> = {
   super: "--attr-tone-super",

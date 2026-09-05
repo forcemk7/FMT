@@ -2,8 +2,8 @@
 
 import { useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
 import type { LiveFootballSnapshot, LivePlayer } from "@/domain/adapters";
-import { abilityToneFromScore } from "@/domain/attribute-tone";
-import { formatHasScore, hasBand, liveHasScore } from "@/domain/has-score";
+import { abilityProgress, abilityToneFromScore } from "@/domain/attribute-tone";
+import { formatHasScore, hasBand, hasProgress, liveHasScore } from "@/domain/has-score";
 import {
   formatPlayerPositions,
   gmAdvice,
@@ -127,24 +127,22 @@ function SquadMetricRing({
 }
 
 function AbilityRing({ value }: { value: number | null | undefined }) {
-  const safeValue = value == null ? 0 : Math.max(0, Math.min(200, value));
   const tone = value == null || !Number.isFinite(value) ? "unknown" : abilityToneFromScore(value);
   return (
     <SquadMetricRing
       display={value ?? "—"}
-      progress={value == null ? 0 : safeValue / 200}
+      progress={value == null ? 0 : abilityProgress(value)}
       tone={tone}
     />
   );
 }
 
 function PersonalityRing({ value }: { value: number | null }) {
-  const safeValue = value == null ? 0 : Math.max(0, Math.min(20, value));
   const tone = value == null || !Number.isFinite(value) ? "unknown" : hasBand(value);
   return (
     <SquadMetricRing
       display={formatHasScore(value)}
-      progress={value == null ? 0 : safeValue / 20}
+      progress={value == null ? 0 : hasProgress(value)}
       tone={tone}
     />
   );

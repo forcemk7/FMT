@@ -1,12 +1,10 @@
 ﻿# Status
 
-Last updated: 2026-09-05 (T220 done — research/ knowledge home)
+Last updated: 2026-09-06 (T208 done — SD bands + Super/High + Super/Low deltas + range-% rings)
 
 ## Now
 
-**Board clear of T220.** Next: highest-priority `ready` (T209 after T208, or ask HQ).
-
-**T208** Five-band SD tones + dark-green Super — **in_progress**; awaiting owner visual QA (revert both if fail).
+**Board clear of T208.** Next: highest-priority `ready` (**T209** roster Filter dropdown).
 
 **T190 parked** — Save ID in RAM before save-copy CA path.
 
@@ -18,9 +16,8 @@ Last updated: 2026-09-05 (T220 done — research/ knowledge home)
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
-| T208 | Five-band SD tones + dark-green Super | in_progress | 2 | cursor-agent — QA try; revert both if fail |
 | T190 | Development all-time from Progress Report CA strip | blocked | 2 | **parked** |
-| T209 | Squad — roster status as single select | ready | 5 | after T208; multi→single |
+| T209 | Squad — roster status Filter dropdown | ready | 5 | FM-style Filter; Hide players status only |
 | T124 | Quiet dev launch | ready | 9 | behind Loop A |
 | T210 | Squad — card / list density toggle | deferred | — | not now; after T209 if unfrozen |
 | T215 | Diagnostics — source-of-truth skeleton + live fill | deferred | — | after product loops; quality/compress phase |
@@ -33,6 +30,7 @@ Last updated: 2026-09-05 (T220 done — research/ knowledge home)
 
 ## Recently done
 
+- **T208** Five-band SD tones + Super/High greens; deltas Super/Low; range-% rings
 - **T220** Move R&D knowledge to `research/` (`ecosystem.md` + `recipes.md`)
 - **T219** First-party recipes + strip probe fossils / dumps / fmt-probe
 - **T218** Dead code hygiene — ~376 orphan GS/root/vite files + unused UI

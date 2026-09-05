@@ -345,6 +345,20 @@ export function hasBand(score: number): HasTone {
   return attributeBand(on20);
 }
 
+/**
+ * HAS ring fill — % of practical [floor, ceil] (same span as {@link hasBand}).
+ * Color stays zigma via hasBand; fill is linear range progress (Super ≈ near-full).
+ */
+export function hasProgress(score: number): number {
+  if (!Number.isFinite(score)) return 0;
+  const span = HAS_PRACTICAL_CEILING - HAS_PRACTICAL_FLOOR;
+  if (span <= 0) return 0;
+  const t = (score - HAS_PRACTICAL_FLOOR) / span;
+  if (t <= 0) return 0;
+  if (t >= 1) return 1;
+  return t;
+}
+
 /** @deprecated Use {@link hasBand} — kept as alias for call sites. */
 export function hasTone(score: number): HasTone {
   return hasBand(score);

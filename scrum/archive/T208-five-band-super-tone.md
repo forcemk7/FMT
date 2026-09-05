@@ -1,12 +1,12 @@
 ---
 id: T208
 title: Five-band attr tones + SD model + dark-green Super
-status: in_progress
+status: done
 priority: 2
 owner: cursor-agent
 claimed_at: "2026-09-04T06:45:00+02:00"
 started_at: "2026-09-04T06:46:00+02:00"
-completed_at: null
+completed_at: "2026-09-06T00:10:00+02:00"
 depends_on: []
 ---
 
@@ -25,14 +25,16 @@ Loop A/B: elite attrs need a fifth band that beats neon. Owner wants to **try** 
 
 - [x] SD bands: Super z≥+3 (19–20), High z≥+2 (16–18), Upper z≥+1 (13–15), Mid |z|<1 (8–12), Low z≤−1 (1–7)
 - [x] Inverse: only 1–2 Super
-- [x] Super neon `#65e53a` (eye-catcher); High matte green `#1b7a34` (blue-weight)
+- [x] Roles: Low/Mid/Upper kept; High solid green `#3abd52` (blue-weight); Super neon `#65e53a`
+- [x] Deltas: gains → Super neon; drops → Low red (inverse attrs flipped)
+- [x] Ring fill: range % (attr/20, CA·PA/200, HAS practical span); color stays zigma
 - [x] Vitest
-- [ ] Owner QA on squad / desk — keep or revert both
+- [x] Owner QA — keep SD bands + palette for now (neon/High separation imperfect but ok)
 
 ## Notes / revert
 
-Prior 4-band fixed cuts were 16–20 / 11–15 / 6–10 / 1–5 (no Super). If experiment fails: restore that + park Super, then `done`→archive as cancelled/deferred.
+Prior 4-band fixed cuts were 16–20 / 11–15 / 6–10 / 1–5 (no Super). Experiment kept.
 
 ## Progress
 
-Shipped SD + Super for try-on. **Color roles (owner):** Super = neon eye-catcher; High = matte dark green (solid like blue). Verified: vitest. **Awaiting owner visual QA** before archive.
+Owner kept SD bands + palette (High `#3abd52`, Super `#65e53a`). Deltas Super/Low. Squad rings: color via zigma; fill via range % (HAS practical floor→ceil). Vitest OK.

@@ -2,7 +2,8 @@
  * FMT attribute / ability tone bands on the 1–20 scale (T208 experiment).
  *
  * Assumed normal N(μ=10, σ=3); band by z-score. Inverse attrs band on (21 − value).
- * Hex: `attr-colors.ts`. Revert this file + palette together if the experiment fails QA.
+ * Hex: `attr-colors.ts`. Color = zigma bands; ring fill = range % (`attrProgress` /
+ * `abilityProgress` / `hasProgress`). Revert this + palette together if QA fails.
  *
  * | Band  | z        | ≈ value | Inverse |
  * |-------|----------|---------|---------|
@@ -49,19 +50,34 @@ export function attributeTone(attribute: string, value: number): AttributeTone {
 
 /**
  * Binary development color for recent deltas.
- * Positive raw change is good (green) except inverse attrs
- * (Controversy, Injury Proneness), where a drop is good.
+ * Gains → Super neon; drops → Low red. Inverse attrs flip which raw sign is good.
  */
 export function attributeDeltaTone(
   attribute: string,
   delta: number,
-): "high" | "low" | null {
+): "super" | "low" | null {
   if (!Number.isFinite(delta) || delta === 0) return null;
   const improved = isInverseAttribute(attribute) ? delta < 0 : delta > 0;
-  return improved ? "high" : "low";
+  return improved ? "super" : "low";
 }
 
 /** CA/PA (1–200) use the same bands on tenths — continuous, no gaps. */
 export function abilityToneFromScore(value: number): AttributeTone {
   return attributeBand(value / 10);
+}
+
+/** Clamp to [0, 1] for ring fill. Color still comes from {@link attributeBand}. */
+export function unitProgress(ratio: number): number {
+  if (!Number.isFinite(ratio)) return 0;
+  return Math.max(0, Math.min(1, ratio));
+}
+
+/** Attr ring fill — % of 1–20 scale (19 → 0.95). */
+export function attrProgress(value: number): number {
+  return unitProgress(value / 20);
+}
+
+/** CA/PA ring fill — % of 0–200 scale (190 → 0.95). */
+export function abilityProgress(value: number): number {
+  return unitProgress(value / 200);
 }
