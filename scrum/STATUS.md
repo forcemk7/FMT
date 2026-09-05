@@ -1,18 +1,18 @@
 ﻿# Status
 
-Last updated: 2026-09-05 (T218 done — dead-code hygiene)
+Last updated: 2026-09-05 (T219 done — R&D recipes + strip probe fossils)
 
 ## Now
 
-**Board clear of T218.** Next: highest-priority `ready` (T209 after T208, or ask HQ).
+**Board clear of T219.** Next: highest-priority `ready` (T209 after T208, or ask HQ).
 
 **T208** Five-band attr tones — Super deferred; await archive confirm.
 
 **T190 parked** — Save ID in RAM before save-copy CA path.
 
-**Deferred:** T215 Diagnostics source-of-truth skeleton + live fill. T210 Squad card/list density. T139 theme. T162 trophy cabinet. T124 quiet dev launch. Empty Youth(0) tab. Loop D full-world load parked — catalog `scrum/FM-ECOSYSTEM.md`. Placement ladder (affiliate hierarchy) — not now (needs minutes/league RE).
+**Deferred:** T215 Diagnostics source-of-truth skeleton + live fill. T210 Squad card/list density. T139 theme. T162 trophy cabinet. T124 quiet dev launch. Empty Youth(0) tab. Loop D full-world load parked — catalog `scrum/FM-ECOSYSTEM.md` + first-party `scrum/FM-RECIPES.md`. Placement ladder — not now.
 
-**T218 residuals (not tickets):** ~350 cargo dead_code/probe warnings; CSS `.confidence-ring*` / `.startup-screen`; test-only `scout-knowledge` / `player-evaluation`; cfg `probe` FMLE helpers.
+**Residuals (not tickets):** orphan GS CSS in `globals.css` (`.confidence-ring*`, `.startup-screen`, `.app-sidebar`, scout-room chrome); Main/Permanent/PMF affiliation bytes still open (see FM-RECIPES).
 
 ## Board
 
@@ -33,7 +33,8 @@ Last updated: 2026-09-05 (T218 done — dead-code hygiene)
 
 ## Recently done
 
-- **T218** Dead code hygiene — ~376 orphan GS/root/vite files + unused UI; connector import fix
+- **T219** First-party `FM-RECIPES.md` + strip probe fossils / dumps / fmt-probe
+- **T218** Dead code hygiene — ~376 orphan GS/root/vite files + unused UI
 - **T217** Forgiving squad search (diacritic fold) + Ctrl/Cmd+F / arrows / Enter / Esc
 - **T216** Live isRegen from person+0xD5 (DB=1 / regen=0); personality labels use real origin
 - **T214** Lock durable Squad-tab affiliate discovery (`club+0x118` + type `+0x30`; T212 bridge for NPL)

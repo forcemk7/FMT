@@ -1,22 +1,17 @@
-﻿[package]
+[package]
 name = "fmt"
-version = "0.1.20"
+version = "0.1.25"
 description = "Read-only desktop recruitment workspace for Football Manager 2026"
 authors = ["FMT"]
 edition = "2021"
+default-run = "fmt"
 
 [features]
 default = []
-affiliate_flags_probe = []
 
 [lib]
 name = "glassscout_fm26_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
-
-[[bin]]
-name = "fmt-probe"
-path = "src/bin/fmt-probe.rs"
-required-features = ["affiliate_flags_probe"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }

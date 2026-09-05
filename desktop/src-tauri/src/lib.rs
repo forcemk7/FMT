@@ -2,7 +2,6 @@
 
 mod commands;
 pub mod connector;
-mod data;
 mod fm26;
 mod fmt_log;
 mod graphics;

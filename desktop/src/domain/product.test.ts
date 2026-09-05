@@ -1,54 +1,36 @@
 import { describe, expect, it } from "vitest";
-import { buildKnowledgeProfile, describeField } from "./scout-knowledge";
 import { groupPlayerPosition, formatPlayerPositions, resolveFavorites, toggleFavorite, updateFavoriteNote } from "./live-data";
 import type { LivePlayer } from "./adapters";
-import { estimateTruePrice, evaluateRoleDna } from "./player-evaluation";
-
-describe("scouting knowledge", () => {
-  it("keeps unknown information unknown and excludes blocked fields from coverage", () => {
-    const fields = [
-      { value: 15, state: "known" as const, confidence: 90, source: "scout-report" as const, lastSeen: "2026-07-01" },
-      { value: null, range: [11, 14] as [number, number], state: "ranged" as const, confidence: 65, source: "scout-report" as const, lastSeen: "2026-07-01" },
-      { value: null, state: "unknown" as const, confidence: 0, source: "scout-report" as const, lastSeen: null },
-      { value: 190, state: "blocked" as const, confidence: 100, source: "live-visible" as const, lastSeen: "2026-07-01" },
-    ];
-    const profile = buildKnowledgeProfile(fields);
-    expect(profile).toMatchObject({ known: 33, estimated: 33, unknown: 33 });
-    expect(describeField(fields[1])).toBe("11–14");
-    expect(describeField(fields[2])).toBe("Unknown");
-    expect(describeField(fields[3])).toBe("Unknown");
-  });
-});
 
 const livePlayer: LivePlayer = {
-    id: "1",
-    name: "Player One",
-    age: 21,
-    nationality: "France",
-    positions: ["CB"],
-    bestRole: null,
-    currentAbility: null,
-    potentialAbility: null,
-    form: null,
-    averageRating: null,
-    minutesPlayed: null,
-    goals: null,
-    assists: null,
-    contractStatus: null,
-    value: null,
-    wage: null,
-    squadImportance: null,
-    developmentTrend: null,
-    tacticalFit: null,
-    roleFit: 78,
-    transferInterest: "Somewhat interested",
-    loanInterest: "Unknown",
-    transferAvailable: true,
-    loanAvailable: false,
-    strengths: [],
-    weaknesses: [],
-    clubId: "club-1",
-  };
+  id: "1",
+  name: "Player One",
+  age: 21,
+  nationality: "France",
+  positions: ["CB"],
+  bestRole: null,
+  currentAbility: null,
+  potentialAbility: null,
+  form: null,
+  averageRating: null,
+  minutesPlayed: null,
+  goals: null,
+  assists: null,
+  contractStatus: null,
+  value: null,
+  wage: null,
+  squadImportance: null,
+  developmentTrend: null,
+  tacticalFit: null,
+  roleFit: 78,
+  transferInterest: "Somewhat interested",
+  loanInterest: "Unknown",
+  transferAvailable: true,
+  loanAvailable: false,
+  strengths: [],
+  weaknesses: [],
+  clubId: "club-1",
+};
 
 describe("live squad grouping", () => {
   it("groups extracted players by their live position data", () => {
@@ -94,18 +76,5 @@ describe("favorites", () => {
 
   it("does not preserve stale player payloads when a live entity disappears", () => {
     expect(resolveFavorites([{ playerId: "missing", note: "Old target" }], [livePlayer])).toEqual([]);
-  });
-});
-
-describe("transparent player evaluation", () => {
-  it("can recommend a position outside the player's current listing from visible attributes", () => {
-    const result = evaluateRoleDna({ passing: 17, vision: 18, decisions: 16, firsttouch: 10, positioning: 18, teamwork: 18, composure: 17 });
-    expect(result.position).toBe("DM");
-    expect(result.score).toBeGreaterThan(70);
-    expect(result.reasoning.length).toBeGreaterThan(0);
-  });
-
-  it("does not estimate true price without a visible FM market value", () => {
-    expect(estimateTruePrice({ marketValueAmount: null, age: 22, averageRating: 7.2, minutesPlayed: 900, roleFit: 80, contractStatus: null }).estimate).toBeNull();
   });
 });

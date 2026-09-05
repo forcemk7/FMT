@@ -1,6 +1,6 @@
 {
   "name": "fmt",
-  "version": "0.1.24",
+  "version": "0.1.25",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -11,13 +11,6 @@
     "desktop:stable": "tauri dev --no-watch",
     "desktop:build": "tauri build",
     "desktop:ship": "node scripts/bump-desktop-version.mjs && npm run desktop:build",
-    "probe:affiliate-flags": "cargo run --manifest-path src-tauri/Cargo.toml --features affiliate_flags_probe --bin fmt-probe -- affiliate-flags",
-    "probe:club-teams": "cargo run --manifest-path src-tauri/Cargo.toml --features affiliate_flags_probe --bin fmt-probe -- club-teams",
-    "probe:club-affiliates": "cargo run --manifest-path src-tauri/Cargo.toml --features affiliate_flags_probe --bin fmt-probe -- club-affiliates",
-    "probe:affiliate-containers": "cargo run --manifest-path src-tauri/Cargo.toml --features affiliate_flags_probe --bin fmt-probe -- affiliate-containers",
-    "probe:agreement-table": "cargo run --manifest-path src-tauri/Cargo.toml --features affiliate_flags_probe --bin fmt-probe -- agreement-table",
-    "probe:editor-affiliations": "cargo run --manifest-path src-tauri/Cargo.toml --features affiliate_flags_probe --bin fmt-probe -- editor-affiliations",
-    "probe:player-origin": "cargo run --manifest-path src-tauri/Cargo.toml --features affiliate_flags_probe --bin fmt-probe -- player-origin",
     "lint": "eslint .",
     "test": "vitest run"
   },

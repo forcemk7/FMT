@@ -25,6 +25,22 @@ data/history.json
 data/history.json.bak
 *.fm
 
+# RE probe scratch (never commit — knowledge lives in scrum/FM-RECIPES.md)
+desktop/*.json
+desktop/*.inflated.bin
+desktop/*.err
+desktop/*-stderr.txt
+desktop/*-err.txt
+desktop/src-tauri/target-*/
+desktop/target-*/
+!desktop/package.json
+!desktop/package-lock.json
+!desktop/tsconfig.json
+!desktop/next-env.d.ts
+!desktop/src-tauri/tauri.conf.json
+!desktop/src-tauri/Cargo.toml
+!desktop/src-tauri/Cargo.lock
+
 .env
 .env.*
 !.env.example
