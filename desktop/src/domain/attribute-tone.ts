@@ -1,27 +1,39 @@
 /**
- * FMT attribute / ability tone bands on the 1–20 scale (design scheme).
- * Standard: 16–20 high, 11–15 upper, 6–10 mid, 1–5 low.
- * Inverse (low better): Controversy, Injury Proneness — mirrored bands.
- * Hex colors: see `attr-colors.ts` (FMT preference palette, not FM chrome).
+ * FMT attribute / ability tone bands on the 1–20 scale (T208 experiment).
+ *
+ * Assumed normal N(μ=10, σ=3); band by z-score. Inverse attrs band on (21 − value).
+ * Hex: `attr-colors.ts`. Revert this file + palette together if the experiment fails QA.
+ *
+ * | Band  | z        | ≈ value | Inverse |
+ * |-------|----------|---------|---------|
+ * | Super | ≥ +3     | 19–20   | 1–2     |
+ * | High  | ≥ +2     | 16–18   | 3–5     |
+ * | Upper | ≥ +1     | 13–15   | 6–8     |
+ * | Mid   | > −1     | 8–12    | 9–13    |
+ * | Low   | ≤ −1     | 1–7     | 14–20   |
  */
 
-export type AttributeTone = "high" | "upper" | "mid" | "low";
+export type AttributeTone = "super" | "high" | "upper" | "mid" | "low";
+
+/** Assumed mean on the 1–20 attr scale (SD experiment). */
+export const ATTR_TONE_MEAN = 10;
+/** Assumed standard deviation on the 1–20 attr scale (SD experiment). */
+export const ATTR_TONE_SD = 3;
 
 const INVERSE_ATTRIBUTES = new Set(["controversy", "injury proneness"]);
 
-const BAND_INVERT: Record<AttributeTone, AttributeTone> = {
-  high: "low",
-  upper: "mid",
-  mid: "upper",
-  low: "high",
-};
+export function attributeZ(value: number): number {
+  return (value - ATTR_TONE_MEAN) / ATTR_TONE_SD;
+}
 
-/** Fixed FMT tone ranges — not user-editable (T153). */
+/** SD-based tone ranges — not user-editable. */
 export function attributeBand(value: number): AttributeTone {
   if (!Number.isFinite(value)) return "mid";
-  if (value >= 16) return "high";
-  if (value >= 11) return "upper";
-  if (value >= 6) return "mid";
+  const z = attributeZ(value);
+  if (z >= 3) return "super";
+  if (z >= 2) return "high";
+  if (z >= 1) return "upper";
+  if (z > -1) return "mid";
   return "low";
 }
 
@@ -31,8 +43,8 @@ export function isInverseAttribute(attribute: string): boolean {
 
 export function attributeTone(attribute: string, value: number): AttributeTone {
   if (!Number.isFinite(value)) return "mid";
-  const band = attributeBand(value);
-  return isInverseAttribute(attribute) ? BAND_INVERT[band] : band;
+  const scored = isInverseAttribute(attribute) ? 21 - value : value;
+  return attributeBand(scored);
 }
 
 /**
@@ -49,7 +61,7 @@ export function attributeDeltaTone(
   return improved ? "high" : "low";
 }
 
-/** CA/PA (1–200) use the same bands on tenths. */
+/** CA/PA (1–200) use the same bands on tenths — continuous, no gaps. */
 export function abilityToneFromScore(value: number): AttributeTone {
   return attributeBand(value / 10);
 }

@@ -13,12 +13,13 @@ describe("attr tone palette", () => {
     expect(toneDefaultHex("mid")).toBe("#e6e6fa");
   });
 
-  it("exposes CSS var and class helpers for any app tone", () => {
-    expect(toneCssVar("high")).toBe("--attr-tone-high");
-    expect(toneCssVar("mid")).toBe("--attr-tone-mid");
+  it("exposes Super dark green above neon high", () => {
+    expect(FMT_ATTR_TONE_COLORS.super).toBe("#1b7a34");
+    expect(APP_TONE_SUPER).toBe("#1b7a34");
+    expect(FMT_ATTR_TONE_COLORS.high).toBe("#65e53a");
     expect(toneCssVar("super")).toBe("--attr-tone-super");
-    expect(toneClassName("upper")).toBe("attr-tone-upper");
     expect(toneClassName("super")).toBe("attr-tone-super");
-    expect(toneDefaultHex("super")).toBe(APP_TONE_SUPER);
+    expect(toneCssVar("high")).toBe("--attr-tone-high");
+    expect(toneClassName("upper")).toBe("attr-tone-upper");
   });
 });

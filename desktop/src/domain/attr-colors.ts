@@ -1,46 +1,46 @@
 /**
  * App-wide attribute / score tone palette — FMT design scheme.
- * Hex defaults are owner preference inherited by FMT (not SI / FM in-game chrome).
- * Band cutoffs live in `attribute-tone.ts`; call `toneCssVar` / `toneClassName` / `toneHex` anywhere.
+ * Hex defaults are owner preference (not SI / FM in-game chrome).
+ * Band cutoffs: `attribute-tone.ts` (T208 SD + Super experiment).
  */
 
 import type { AttributeTone } from "./attribute-tone";
 
 export type AttrColorBand = AttributeTone;
 
-/** Attr bands + HAS elite overflow (gold). */
-export type AppTone = AttrColorBand | "super";
+export type AppTone = AttributeTone;
 
 export type AttrColorPalette = Record<AttrColorBand, string>;
 
-/** FMT default tone hexes (design scheme, not FM in-game). */
+/** FMT default tone hexes. Super = FM-ish dark green above neon high. */
 export const FMT_ATTR_TONE_COLORS: AttrColorPalette = {
-  high: "#65e53a", // 16–20  R101 G229 B58
-  upper: "#3a8acf", // 11–15  R58 G138 B207
-  mid: "#e6e6fa", // 6–10   R230 G230 B250
-  low: "#bd4e4e", // 1–5    R189 G78 B78
+  super: "#1b7a34", // 19–20 (z≥+3)
+  high: "#65e53a", // 16–18 (z≥+2)
+  upper: "#3a8acf", // 13–15 (z≥+1)
+  mid: "#e6e6fa", // 8–12 (|z|<1)
+  low: "#bd4e4e", // 1–7 (z≤−1)
 };
 
-/** HAS-only elite above practical ceiling. */
-export const APP_TONE_SUPER = "#d4b45a";
+/** Alias kept for call sites / tests. */
+export const APP_TONE_SUPER = FMT_ATTR_TONE_COLORS.super;
 
 export const ATTR_COLOR_BANDS: Array<{ key: AttrColorBand; label: string; range: string }> = [
-  { key: "high", label: "High", range: "16–20" },
-  { key: "upper", label: "Upper", range: "11–15" },
-  { key: "mid", label: "Mid", range: "6–10" },
-  { key: "low", label: "Low", range: "1–5" },
+  { key: "super", label: "Super", range: "19–20 · z≥+3" },
+  { key: "high", label: "High", range: "16–18 · z≥+2" },
+  { key: "upper", label: "Upper", range: "13–15 · z≥+1" },
+  { key: "mid", label: "Mid", range: "8–12 · |z|<1" },
+  { key: "low", label: "Low", range: "1–7 · z≤−1" },
 ];
 
-const STORAGE_KEY = "fmt.attr-color-palette.v1";
+const STORAGE_KEY = "fmt.attr-color-palette.v2";
 
 const CSS_VARS: Record<AttrColorBand, string> = {
+  super: "--attr-tone-super",
   high: "--attr-tone-high",
   upper: "--attr-tone-upper",
   mid: "--attr-tone-mid",
   low: "--attr-tone-low",
 };
-
-const SUPER_CSS_VAR = "--attr-tone-super";
 
 function normalizeHex(value: string): string | null {
   const trimmed = value.trim().toLowerCase();
@@ -59,6 +59,7 @@ export function loadAttrColorPalette(): AttrColorPalette {
     if (!raw) return { ...FMT_ATTR_TONE_COLORS };
     const parsed = JSON.parse(raw) as Partial<AttrColorPalette>;
     return {
+      super: normalizeHex(parsed.super ?? "") ?? FMT_ATTR_TONE_COLORS.super,
       high: normalizeHex(parsed.high ?? "") ?? FMT_ATTR_TONE_COLORS.high,
       upper: normalizeHex(parsed.upper ?? "") ?? FMT_ATTR_TONE_COLORS.upper,
       mid: normalizeHex(parsed.mid ?? "") ?? FMT_ATTR_TONE_COLORS.mid,
@@ -80,12 +81,10 @@ export function applyAttrColorPalette(palette: AttrColorPalette) {
   for (const band of ATTR_COLOR_BANDS) {
     root.style.setProperty(CSS_VARS[band.key], palette[band.key]);
   }
-  root.style.setProperty(SUPER_CSS_VAR, APP_TONE_SUPER);
 }
 
 /** CSS custom property name for a tone (`--attr-tone-mid`, …). */
 export function toneCssVar(tone: AppTone): string {
-  if (tone === "super") return SUPER_CSS_VAR;
   return CSS_VARS[tone];
 }
 
@@ -96,12 +95,10 @@ export function toneClassName(tone: AppTone): string {
 
 /** Default hex for a tone (ignores user Settings overrides). */
 export function toneDefaultHex(tone: AppTone): string {
-  if (tone === "super") return APP_TONE_SUPER;
   return FMT_ATTR_TONE_COLORS[tone];
 }
 
-/** Resolve hex from palette (or default), including super. */
+/** Resolve hex from palette (or default). */
 export function toneHex(tone: AppTone, palette: AttrColorPalette = FMT_ATTR_TONE_COLORS): string {
-  if (tone === "super") return APP_TONE_SUPER;
   return palette[tone] ?? FMT_ATTR_TONE_COLORS[tone];
 }

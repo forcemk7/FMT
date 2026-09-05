@@ -6,7 +6,7 @@ Last updated: 2026-09-05 (T220 done — research/ knowledge home)
 
 **Board clear of T220.** Next: highest-priority `ready` (T209 after T208, or ask HQ).
 
-**T208** Five-band attr tones — Super deferred; await archive confirm.
+**T208** Five-band SD tones + dark-green Super — **in_progress**; awaiting owner visual QA (revert both if fail).
 
 **T190 parked** — Save ID in RAM before save-copy CA path.
 
@@ -18,7 +18,7 @@ Last updated: 2026-09-05 (T220 done — research/ knowledge home)
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
-| T208 | Five-band attr tones + hot-amber super | in_progress | 2 | cursor-agent — Super deferred; await archive confirm |
+| T208 | Five-band SD tones + dark-green Super | in_progress | 2 | cursor-agent — QA try; revert both if fail |
 | T190 | Development all-time from Progress Report CA strip | blocked | 2 | **parked** |
 | T209 | Squad — roster status as single select | ready | 5 | after T208; multi→single |
 | T124 | Quiet dev launch | ready | 9 | behind Loop A |

@@ -1,40 +1,56 @@
 import { describe, expect, it } from "vitest";
-import { abilityToneFromScore, attributeDeltaTone, attributeTone } from "./attribute-tone";
+import {
+  abilityToneFromScore,
+  attributeDeltaTone,
+  attributeTone,
+  attributeZ,
+} from "./attribute-tone";
 
-describe("attributeTone", () => {
-  it("uses FMT four-band ranges for standard attrs", () => {
+describe("attributeTone (SD experiment)", () => {
+  it("bands by z vs N(10,3)", () => {
+    expect(attributeZ(19)).toBeCloseTo(3, 5);
+    expect(attributeZ(16)).toBeCloseTo(2, 5);
+    expect(attributeZ(13)).toBeCloseTo(1, 5);
+    expect(attributeZ(7)).toBeCloseTo(-1, 5);
+
+    expect(attributeTone("Passing", 20)).toBe("super");
+    expect(attributeTone("Passing", 19)).toBe("super");
+    expect(attributeTone("Passing", 18)).toBe("high");
     expect(attributeTone("Passing", 16)).toBe("high");
-    expect(attributeTone("Passing", 20)).toBe("high");
     expect(attributeTone("Technique", 15)).toBe("upper");
-    expect(attributeTone("Technique", 11)).toBe("upper");
-    expect(attributeTone("Crossing", 10)).toBe("mid");
-    expect(attributeTone("Crossing", 6)).toBe("mid");
-    expect(attributeTone("Crossing", 5)).toBe("low");
+    expect(attributeTone("Technique", 13)).toBe("upper");
+    expect(attributeTone("Crossing", 12)).toBe("mid");
+    expect(attributeTone("Crossing", 8)).toBe("mid");
+    expect(attributeTone("Crossing", 7)).toBe("low");
     expect(attributeTone("Crossing", 1)).toBe("low");
   });
 
-  it("colors Important Matches like any standard attr", () => {
-    expect(attributeTone("Important Matches", 16)).toBe("high");
-    expect(attributeTone("Important Matches", 10)).toBe("mid");
-    expect(attributeTone("Important Matches", 4)).toBe("low");
-  });
-
-  it("mirrors bands for Controversy and Injury Proneness", () => {
+  it("mirrors Controversy / Injury Proneness — Super only at 1–2", () => {
+    expect(attributeTone("Controversy", 1)).toBe("super");
+    expect(attributeTone("Controversy", 2)).toBe("super");
     expect(attributeTone("Controversy", 3)).toBe("high");
-    expect(attributeTone("Controversy", 7)).toBe("upper");
-    expect(attributeTone("Controversy", 12)).toBe("mid");
-    expect(attributeTone("Controversy", 16)).toBe("low");
-    expect(attributeTone("Injury Proneness", 2)).toBe("high");
+    expect(attributeTone("Controversy", 5)).toBe("high");
+    expect(attributeTone("Controversy", 6)).toBe("upper");
+    expect(attributeTone("Controversy", 8)).toBe("upper");
+    expect(attributeTone("Controversy", 9)).toBe("mid");
+    expect(attributeTone("Controversy", 13)).toBe("mid");
+    expect(attributeTone("Controversy", 14)).toBe("low");
+    expect(attributeTone("Controversy", 20)).toBe("low");
+    expect(attributeTone("Injury Proneness", 2)).toBe("super");
     expect(attributeTone("Injury Proneness", 18)).toBe("low");
   });
 
-  it("maps CA/PA via tenths", () => {
+  it("maps CA/PA via tenths with continuous SD bands", () => {
+    expect(abilityToneFromScore(200)).toBe("super");
+    expect(abilityToneFromScore(190)).toBe("super");
+    expect(abilityToneFromScore(189)).toBe("high");
     expect(abilityToneFromScore(160)).toBe("high");
     expect(abilityToneFromScore(159)).toBe("upper");
-    expect(abilityToneFromScore(110)).toBe("upper");
-    expect(abilityToneFromScore(109)).toBe("mid");
-    expect(abilityToneFromScore(60)).toBe("mid");
-    expect(abilityToneFromScore(59)).toBe("low");
+    expect(abilityToneFromScore(130)).toBe("upper");
+    expect(abilityToneFromScore(129)).toBe("mid");
+    expect(abilityToneFromScore(80)).toBe("mid");
+    expect(abilityToneFromScore(70)).toBe("low");
+    expect(abilityToneFromScore(69)).toBe("low");
   });
 });
 

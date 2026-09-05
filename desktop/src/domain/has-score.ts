@@ -1,6 +1,6 @@
 import type { LivePlayer } from "./adapters";
 import type { AppTone } from "./attr-colors";
-import { attributeTone, type AttributeTone } from "./attribute-tone";
+import { attributeBand, attributeTone, type AttributeTone } from "./attribute-tone";
 
 /**
  * HAS weights — development + squad-impact hierarchy (FM Dossier / FM Stats).
@@ -231,7 +231,7 @@ export const FRONTEND_CALCULATION_CARDS: FrontendCalculationCard[] = [
   },
 ];
 
-/** HAS display tones — same palette as attrs (`attr-colors`); `super` = elite overflow. */
+/** HAS display tones — same palette as attrs (`attr-colors`). */
 export type HasTone = AppTone;
 
 /**
@@ -332,8 +332,7 @@ export function formatHasScore(score: number | null) {
 
 /**
  * Absolute HAS color band (uses the app-wide attr tone palette).
- * Above practical ceiling → super. Inside [floor_p, ceil_p] → four equal attr bands.
- * Below practical floor → low.
+ * Maps practical [floor, ceil] onto the 1–20 SD bands; above ceiling → super.
  */
 export function hasBand(score: number): HasTone {
   if (!Number.isFinite(score)) return "mid";
@@ -342,10 +341,8 @@ export function hasBand(score: number): HasTone {
   const span = HAS_PRACTICAL_CEILING - HAS_PRACTICAL_FLOOR;
   if (span <= 0) return "mid";
   const t = (score - HAS_PRACTICAL_FLOOR) / span;
-  if (t >= 0.75) return "high";
-  if (t >= 0.5) return "upper";
-  if (t >= 0.25) return "mid";
-  return "low";
+  const on20 = 1 + t * 19;
+  return attributeBand(on20);
 }
 
 /** @deprecated Use {@link hasBand} — kept as alias for call sites. */

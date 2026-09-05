@@ -100,20 +100,15 @@ describe("liveHasScore", () => {
 });
 
 describe("hasBand", () => {
-  it("uses practical offset bands and gold above ceiling", () => {
+  it("maps practical range onto SD attr bands; overflow is super", () => {
     expect(HAS_PRACTICAL_FLOOR).toBe(3.5);
     expect(HAS_PRACTICAL_CEILING).toBeCloseTo(HAS_SCORE_CEILING - 2.5, 10);
 
     expect(hasBand(HAS_PRACTICAL_CEILING + 0.01)).toBe("super");
-    expect(hasBand(HAS_PRACTICAL_CEILING)).toBe("high");
-    expect(hasBand(15.6)).toBe("high");
     expect(hasBand(HAS_PRACTICAL_FLOOR - 0.01)).toBe("low");
     expect(hasBand(HAS_PRACTICAL_FLOOR)).toBe("low");
 
-    const span = HAS_PRACTICAL_CEILING - HAS_PRACTICAL_FLOOR;
-    expect(hasBand(HAS_PRACTICAL_FLOOR + span * 0.2)).toBe("low");
-    expect(hasBand(HAS_PRACTICAL_FLOOR + span * 0.3)).toBe("mid");
-    expect(hasBand(HAS_PRACTICAL_FLOOR + span * 0.6)).toBe("upper");
-    expect(hasBand(HAS_PRACTICAL_FLOOR + span * 0.8)).toBe("high");
+    // Top of practical span → ~20 on mapped 1–20 → super
+    expect(hasBand(HAS_PRACTICAL_CEILING)).toBe("super");
   });
 });
