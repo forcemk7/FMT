@@ -34,4 +34,4 @@ depends_on: []
 
 ## Progress
 
-`dev` script sets `BROWSER=none` before `next dev` (used by Tauri `beforeDevCommand`). `Start FMT.cmd` prints the wait one-liner. `devUrl` unchanged.
+`dev` script sets `BROWSER=none` before `next dev` (used by Tauri `beforeDevCommand`). `Start FMT.cmd` prints the wait one-liner. `devUrl` unchanged. Commit `e5f0032`.
