@@ -19,15 +19,13 @@ describe("squad-desk-session", () => {
     expect(getSquadDeskSelectedTeamUid()).toBeNull();
   });
 
-  it("remembers a single roster status per team within the session", () => {
+  it("remembers roster filters per team within the session", () => {
     clearSquadDeskRosterFilters();
-    setSquadDeskRosterFilters("team-1", ["atClub"]);
-    expect(getSquadDeskRosterFilters("team-1")).toEqual(["atClub"]);
+    setSquadDeskRosterFilters("team-1", ["atClub", "loanedIn"]);
+    expect(getSquadDeskRosterFilters("team-1")).toEqual(["atClub", "loanedIn"]);
     expect(getSquadDeskRosterFilters("team-2")).toBeNull();
     setSquadDeskRosterFilters("team-1", ["loanedOut"]);
     expect(getSquadDeskRosterFilters("team-1")).toEqual(["loanedOut"]);
-    setSquadDeskRosterFilters("team-1", ["atClub", "loanedIn"]);
-    expect(getSquadDeskRosterFilters("team-1")).toEqual(["atClub"]);
     clearSquadDeskRosterFilters();
     expect(getSquadDeskRosterFilters("team-1")).toBeNull();
   });

@@ -56,27 +56,39 @@ const SQUAD_ROSTER_FILTER_OPTIONS: Array<{
   { status: "loanedOut", label: "Loaned out", countKey: "loanedOut" },
 ];
 
-/** Default: At club when present, else first available status. */
-function defaultRosterStatus(counts: SquadTeamRosterCounts): SquadRosterStatus | null {
-  if (counts.atClub > 0) return "atClub";
-  for (const { status, countKey } of SQUAD_ROSTER_FILTER_OPTIONS) {
-    if (counts[countKey] > 0) return status;
+/** Default: At club when present; else first available. Multi-select after that. */
+function defaultEnabledRosterStatuses(
+  counts: SquadTeamRosterCounts,
+): Set<SquadRosterStatus> {
+  const next = new Set<SquadRosterStatus>();
+  if (counts.atClub > 0) next.add("atClub");
+  if (next.size === 0) {
+    for (const { status, countKey } of SQUAD_ROSTER_FILTER_OPTIONS) {
+      if (counts[countKey] > 0) next.add(status);
+    }
   }
-  return null;
+  return next;
 }
 
-function resolveRosterStatus(
+function resolveEnabledRosterStatuses(
   teamUid: string,
   counts: SquadTeamRosterCounts,
-): SquadRosterStatus | null {
+): Set<SquadRosterStatus> {
   const available = new Set(
     SQUAD_ROSTER_FILTER_OPTIONS.filter(
       ({ countKey }) => counts[countKey] > 0,
     ).map(({ status }) => status),
   );
-  const remembered = getSquadDeskRosterFilters(teamUid)?.[0];
-  if (remembered && available.has(remembered)) return remembered;
-  return defaultRosterStatus(counts);
+  const remembered = getSquadDeskRosterFilters(teamUid);
+  if (remembered?.length) {
+    const kept = new Set(
+      remembered.filter((status): status is SquadRosterStatus =>
+        available.has(status),
+      ),
+    );
+    if (kept.size > 0) return kept;
+  }
+  return defaultEnabledRosterStatuses(counts);
 }
 
 const GM_ADVICE_LANES: Array<{ advice: GmAdvice; title: string; empty: string }> = [
@@ -369,12 +381,15 @@ export function MyTeamScreen({
     const remembered = getSquadDeskSelectedTeamUid();
     return remembered ?? defaultTeamUid;
   });
-  const [rosterStatus, setRosterStatus] = useState<SquadRosterStatus | null>(() => {
-    if (!squadDeskMode) return "atClub";
+  const [enabledRosterStatuses, setEnabledRosterStatuses] = useState(() => {
+    if (!squadDeskMode) return new Set<SquadRosterStatus>(["atClub"]);
     const teamUid = getSquadDeskSelectedTeamUid() ?? defaultTeamUid;
-    if (!teamUid) return "atClub";
-    const remembered = getSquadDeskRosterFilters(teamUid)?.[0];
-    return remembered ?? "atClub";
+    if (!teamUid) return new Set<SquadRosterStatus>(["atClub"]);
+    const remembered = getSquadDeskRosterFilters(teamUid);
+    if (remembered?.length) {
+      return new Set(remembered as SquadRosterStatus[]);
+    }
+    return new Set<SquadRosterStatus>(["atClub"]);
   });
   const [rosterFilterOpen, setRosterFilterOpen] = useState(false);
   const rosterFilterRef = useRef<HTMLDivElement | null>(null);
@@ -452,10 +467,13 @@ export function MyTeamScreen({
   );
   useEffect(() => {
     if (!squadDeskMode || !selectedTeam) return;
-    const next = resolveRosterStatus(selectedTeam.teamUid, selectedTeamCounts);
-    setRosterStatus(next);
-    if (next) {
-      setSquadDeskRosterFilters(selectedTeam.teamUid, [next]);
+    const next = resolveEnabledRosterStatuses(
+      selectedTeam.teamUid,
+      selectedTeamCounts,
+    );
+    setEnabledRosterStatuses(next);
+    if (next.size > 0) {
+      setSquadDeskRosterFilters(selectedTeam.teamUid, next);
     }
   }, [
     squadDeskMode,
@@ -464,10 +482,6 @@ export function MyTeamScreen({
     selectedTeamCounts.loanedIn,
     selectedTeamCounts.loanedOut,
   ]);
-  const enabledRosterStatuses = useMemo(() => {
-    if (!rosterStatus) return new Set<SquadRosterStatus>();
-    return new Set<SquadRosterStatus>([rosterStatus]);
-  }, [rosterStatus]);
   const teamRoster = useMemo(
     () =>
       snapshot.players.filter((player) => {
@@ -560,16 +574,27 @@ export function MyTeamScreen({
                 selectedTeamCounts.loanedIn +
                 selectedTeamCounts.loanedOut >
               0
-            ? "No players match the selected roster filter."
+            ? "No players match the selected roster filters."
             : `No players loaded for ${selectedTeam.name.trim() || "this team"} — check FM squad screen vs FMT read.`
           : null;
 
-  function selectRosterStatus(status: SquadRosterStatus) {
-    setRosterStatus(status);
-    if (selectedTeam) {
-      setSquadDeskRosterFilters(selectedTeam.teamUid, [status]);
-    }
-    setRosterFilterOpen(false);
+  function toggleRosterStatus(status: SquadRosterStatus) {
+    setEnabledRosterStatuses((current) => {
+      const next = new Set(current);
+      if (next.has(status)) {
+        const enabledVisible = availableRosterFilters.filter(({ status: option }) =>
+          next.has(option),
+        );
+        if (enabledVisible.length <= 1) return current;
+        next.delete(status);
+      } else {
+        next.add(status);
+      }
+      if (selectedTeam) {
+        setSquadDeskRosterFilters(selectedTeam.teamUid, next);
+      }
+      return next;
+    });
   }
 
   function openPlayerFromDesk(playerId: string) {
@@ -648,7 +673,7 @@ export function MyTeamScreen({
                 type="button"
                 className={`squad-roster-filter-trigger${rosterFilterOpen ? " is-open" : ""}`}
                 aria-expanded={rosterFilterOpen}
-                aria-haspopup="listbox"
+                aria-haspopup="true"
                 aria-label="Roster status filter"
                 onClick={() => setRosterFilterOpen((open) => !open)}
               >
@@ -660,24 +685,34 @@ export function MyTeamScreen({
               {rosterFilterOpen ? (
                 <div
                   className="squad-roster-filter-panel"
-                  role="listbox"
+                  role="group"
                   aria-label="Roster status"
                 >
                   <div className="squad-roster-filter-section">Status</div>
                   {availableRosterFilters.map(({ status, label, countKey }) => {
-                    const selected = rosterStatus === status;
+                    const checked = enabledRosterStatuses.has(status);
                     const count = selectedTeamCounts[countKey];
+                    const lastChecked =
+                      checked &&
+                      availableRosterFilters.filter(({ status: option }) =>
+                        enabledRosterStatuses.has(option),
+                      ).length <= 1;
                     return (
                       <button
                         key={status}
                         type="button"
-                        role="option"
-                        aria-selected={selected}
-                        className={`squad-roster-filter-option${selected ? " is-selected" : ""}`}
-                        onClick={() => selectRosterStatus(status)}
+                        role="checkbox"
+                        aria-checked={checked}
+                        aria-disabled={lastChecked}
+                        disabled={lastChecked}
+                        className={`squad-roster-filter-option${checked ? " is-selected" : ""}${lastChecked ? " is-locked" : ""}`}
+                        onClick={() => {
+                          if (lastChecked) return;
+                          toggleRosterStatus(status);
+                        }}
                       >
                         <span
-                          className={`squad-roster-filter-check${selected ? " is-on" : ""}`}
+                          className={`squad-roster-filter-check${checked ? " is-on" : ""}`}
                           aria-hidden
                         />
                         <span className="squad-roster-filter-option-label">

@@ -930,6 +930,10 @@ h1, h2, h3, [data-slot="card-title"] { font-family: "Inter Variable", Inter, "Se
 .squad-roster-filter-option.is-selected{
   background:rgba(255,255,255,.06);
 }
+.squad-roster-filter-option.is-locked{
+  opacity:.72;
+  cursor:default;
+}
 .squad-roster-filter-check{
   width:14px;
   height:14px;

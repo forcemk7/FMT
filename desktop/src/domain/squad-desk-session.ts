@@ -28,8 +28,7 @@ export function setSquadDeskRosterFilters(
   teamUid: string,
   statuses: Iterable<SquadDeskRosterFilter>,
 ): void {
-  // Squad Filter is single-status (T209); keep only the first entry.
-  const unique = [...new Set(statuses)].slice(0, 1);
+  const unique = [...new Set(statuses)];
   if (unique.length === 0) {
     rosterFiltersByTeamUid.delete(teamUid);
     return;
