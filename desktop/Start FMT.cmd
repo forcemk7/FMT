@@ -27,10 +27,7 @@ if errorlevel 1 (
 )
 
 echo.
-echo Starting FMT (stable) from: %CD%
-echo Use the desktop window (not the browser tab).
-echo This launch uses --no-watch so Cursor/file saves do not kill the window.
-echo Closing the FMT window exits normally. Ctrl+C in this console also quits.
+echo Wait for the FMT desktop window — ignore any browser
 echo.
 call npm run desktop:stable
 echo.

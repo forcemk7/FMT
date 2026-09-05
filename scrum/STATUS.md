@@ -1,10 +1,10 @@
 ﻿# Status
 
-Last updated: 2026-09-06 (T209 done — Squad Filter dropdown for roster status)
+Last updated: 2026-09-06 (T124 done — quiet Start FMT; board empty of ready Loop A)
 
 ## Now
 
-**Board clear of T209.** Next: highest-priority `ready` (**T124** quiet dev launch) or ask HQ.
+**Board clear of T124.** No other `ready` Loop A tickets — ask HQ / deferrals only (T210 deferred, T190 parked).
 
 **T190 parked** — Save ID in RAM before save-copy CA path.
 
@@ -17,7 +17,6 @@ Last updated: 2026-09-06 (T209 done — Squad Filter dropdown for roster status)
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
 | T190 | Development all-time from Progress Report CA strip | blocked | 2 | **parked** |
-| T124 | Quiet dev launch | ready | 9 | behind Loop A |
 | T210 | Squad — card / list density toggle | deferred | — | not now |
 | T215 | Diagnostics — source-of-truth skeleton + live fill | deferred | — | after product loops; quality/compress phase |
 | T139 | FMT visual theme | deferred | — | overlapped |
@@ -29,7 +28,8 @@ Last updated: 2026-09-06 (T209 done — Squad Filter dropdown for roster status)
 
 ## Recently done
 
-- **T209** Squad roster status Filter dropdown (single status + counts)
+- **T124** Quiet dev launch — BROWSER=none + Start FMT wait line
+- **T209** Squad roster Filter dropdown (multi-select status + counts)
 - **T208** Five-band SD tones + Super/High greens; deltas Super/Low; range-% rings
 - **T220** Move R&D knowledge to `research/` (`ecosystem.md` + `recipes.md`)
 - **T219** First-party recipes + strip probe fossils / dumps / fmt-probe
