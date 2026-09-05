@@ -41,4 +41,4 @@ Reject: UID band; face `r-`; FSS `person+0x18` bit `0x08` (youth team, not newge
 
 - Probe resolved all 5 DB UIDs + 8 U19; first-team×16 also `0` at `0xD5`.
 - Wired live `isRegen` + personality-labels; vitest 8/8; cargo check ok.
-- Commit SHA filled after git commit.
+- Commit: `9a47552`
