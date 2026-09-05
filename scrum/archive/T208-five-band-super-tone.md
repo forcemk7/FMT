@@ -37,4 +37,4 @@ Prior 4-band fixed cuts were 16–20 / 11–15 / 6–10 / 1–5 (no Super). Expe
 
 ## Progress
 
-Owner kept SD bands + palette (High `#3abd52`, Super `#65e53a`). Deltas Super/Low. Squad rings: color via zigma; fill via range % (HAS practical floor→ceil). Vitest OK.
+Owner kept SD bands + palette (High `#3abd52`, Super `#65e53a`). Deltas Super/Low. Squad rings: color via zigma; fill via range % (HAS practical floor→ceil). Vitest OK. Commit `4ea2285`.
