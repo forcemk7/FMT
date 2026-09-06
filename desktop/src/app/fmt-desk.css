@@ -319,11 +319,22 @@ body.fmt-shell .match-experience-pos-select select {
   border-color: var(--hairline);
   color: var(--text);
 }
+body.fmt-shell .match-experience-list .player-face,
+body.fmt-shell .match-experience-list .player-face-sm {
+  width: 22px !important;
+  height: 22px !important;
+  min-width: 22px !important;
+  min-height: 22px !important;
+  max-width: 22px !important;
+  max-height: 22px !important;
+  flex: 0 0 22px !important;
+  border-color: var(--hairline);
+}
 body.fmt-shell .match-experience-row-focus .match-experience-row-btn {
   background: rgba(143, 215, 200, 0.1);
 }
 body.fmt-shell .match-experience-row-projected .match-experience-row-btn {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 215, 200, 0.04);
 }
 body.fmt-shell button.match-experience-row-btn:hover {
   background: rgba(255, 255, 255, 0.05);

@@ -14,6 +14,7 @@ export type MatchExperienceRow = {
   currentAbility: number | null;
   rank: number;
   isFocus: boolean;
+  /** Competing on this team now (roster at club, or loaned *to* this club). */
   isOnRoster: boolean;
 };
 
@@ -22,11 +23,9 @@ export type MatchExperienceCard = {
   teamLabel: string;
   position: string;
   focusRank: number | null;
-  /** Players resolved onto this team (any position). */
+  /** Resolved players on this team (any status / position) — Squad-tab style presence. */
   teamPlayerCount: number;
-  /** Visible window (≤ PAGE_SIZE); ranks stay global. */
   rows: MatchExperienceRow[];
-  /** Total ranked rows before windowing. */
   totalRows: number;
 };
 
@@ -73,43 +72,83 @@ function caSortKey(value: number | null | undefined): number {
   return typeof value === "number" && Number.isFinite(value) ? value : -Infinity;
 }
 
+/** Higher youth age band first (U23 → … → U18 → Youth). */
+export function underNTeamTypeSortKey(teamType: number | null | undefined): number {
+  switch (teamType) {
+    case 9:
+      return 0; // Under 23s
+    case 10:
+      return 1; // Under 21s
+    case 18:
+      return 2; // Under 20s
+    case 11:
+      return 3; // Under 19s
+    case 12:
+      return 4; // Under 18s
+    case 21:
+    case 22:
+      return 5; // Youth
+    default:
+      return 6;
+  }
+}
+
+function isNormalAffiliate(
+  team: Pick<LiveClubTeam, "affiliationType">,
+): boolean {
+  return team.affiliationType === 0x01;
+}
+
+function isIiOrReserveAffiliate(
+  team: Pick<LiveClubTeam, "affiliationType">,
+): boolean {
+  const aff = team.affiliationType;
+  return aff === 0x08 || (typeof aff === "number" && aff !== 0x01);
+}
+
 /**
- * Sort: managed Senior → Under N → 2nd/II → Normal aff Senior → Normal aff Under N.
+ * Ladder (Match experience only — does not change Squad desk):
+ * 0 managed First
+ * 1 managed Res/II/2 + II Club affiliates
+ * 2 managed Under Ns
+ * 3+ Normal Affiliated Club (First / Res / Under N)
  */
+export function matchExperienceTeamBand(
+  team: Pick<LiveClubTeam, "squadUnit" | "affiliationType" | "teamType">,
+): number {
+  if (isNormalAffiliate(team)) {
+    if (team.squadUnit === "firstTeam" || team.teamType === 0) return 3;
+    if (team.squadUnit === "under19s") return 5;
+    return 4; // reserves / II / 2 Club under Normal
+  }
+
+  if (isIiOrReserveAffiliate(team) || team.squadUnit === "reserves") {
+    return 1;
+  }
+  if (team.squadUnit === "firstTeam") return 0;
+  if (team.squadUnit === "under19s") return 2;
+  return 1;
+}
+
 export function sortClubTeamsForMatchExperience(
   teams: LiveClubTeam[],
 ): LiveClubTeam[] {
   return [...teams].sort((left, right) => {
     const band = matchExperienceTeamBand(left) - matchExperienceTeamBand(right);
     if (band !== 0) return band;
+
+    const leftUnder = left.squadUnit === "under19s" || (isNormalAffiliate(left) && left.squadUnit === "under19s");
+    const rightUnder = right.squadUnit === "under19s" || (isNormalAffiliate(right) && right.squadUnit === "under19s");
+    if (leftUnder && rightUnder) {
+      const n = underNTeamTypeSortKey(left.teamType) - underNTeamTypeSortKey(right.teamType);
+      if (n !== 0) return n;
+    }
+
     if (right.rosterLen !== left.rosterLen) return right.rosterLen - left.rosterLen;
     return squadTeamDisplayName(left).localeCompare(squadTeamDisplayName(right));
   });
 }
 
-/** Band index for Match experience ladder (lower = higher on ladder). */
-export function matchExperienceTeamBand(
-  team: Pick<LiveClubTeam, "squadUnit" | "affiliationType" | "teamType">,
-): number {
-  const aff = team.affiliationType;
-  const normal = aff === 0x01;
-  const iiOrSatellite =
-    aff === 0x08 || (typeof aff === "number" && aff !== 0x01);
-
-  if (normal) {
-    if (team.squadUnit === "firstTeam" || team.teamType === 0) return 3;
-    if (team.squadUnit === "under19s") return 4;
-    return 5;
-  }
-
-  if (!iiOrSatellite && team.squadUnit === "firstTeam") return 0;
-  if (!iiOrSatellite && team.squadUnit === "under19s") return 1;
-  return 2;
-}
-
-/**
- * Slice start so `focusRank` (1-based) sits in a PAGE_SIZE window.
- */
 export function matchExperienceWindowStart(
   rowCount: number,
   focusRank: number | null,
@@ -122,10 +161,44 @@ export function matchExperienceWindowStart(
   return Math.max(0, Math.min(ideal, rowCount - pageSize));
 }
 
+/** All resolved players listed on this FM team object. */
+export function matchExperienceResolvedPlayers(
+  players: LivePlayer[],
+  teamUid: string,
+): LivePlayer[] {
+  return players.filter((player) => player.squadTeamUid === teamUid);
+}
+
 /**
- * One card for a clubTeam at a chosen position.
- * Returns null when the team has zero resolved players (any position).
+ * Infer club UniqueID for a team from its resolved players (affiliate First etc.).
  */
+export function matchExperienceTeamClubId(
+  teamPlayers: Array<Pick<LivePlayer, "clubId">>,
+): string | null {
+  for (const player of teamPlayers) {
+    const id = player.clubId?.trim();
+    if (id) return id;
+  }
+  return null;
+}
+
+/**
+ * True when this player competes for game time on this team card.
+ * Loaned-out players leave their parent roster; they compete on the loan club if loaded.
+ */
+export function matchExperiencePlayerCompetesOnTeam(
+  player: Pick<LivePlayer, "squadTeamUid" | "loanedOut" | "loanClubId" | "id">,
+  teamUid: string,
+  teamClubId: string | null,
+): boolean {
+  if (player.loanedOut === true) {
+    const loanClub = player.loanClubId?.trim();
+    if (!loanClub || !teamClubId) return false;
+    return loanClub === teamClubId;
+  }
+  return player.squadTeamUid === teamUid;
+}
+
 export function buildMatchExperienceCard(
   focus: LivePlayer,
   players: LivePlayer[],
@@ -136,16 +209,29 @@ export function buildMatchExperienceCard(
   const pos = position.trim();
   if (!pos) return null;
 
-  const teamPlayers = players.filter(
-    (player) => player.squadTeamUid === team.teamUid,
-  );
+  const teamPlayers = matchExperienceResolvedPlayers(players, team.teamUid);
   if (teamPlayers.length === 0) return null;
 
-  const onRoster = teamPlayers.filter((player) =>
+  const teamClubId = matchExperienceTeamClubId(teamPlayers);
+  const competing = teamPlayers.filter((player) =>
+    matchExperiencePlayerCompetesOnTeam(player, team.teamUid, teamClubId),
+  );
+  const onRosterSamePos = competing.filter((player) =>
     hasPrimaryPosition(player, pos),
   );
-  const focusOnRoster = onRoster.some((player) => player.id === focus.id);
-  const pool: LivePlayer[] = focusOnRoster ? onRoster : [...onRoster, focus];
+
+  const focusCompetes = matchExperiencePlayerCompetesOnTeam(
+    focus,
+    team.teamUid,
+    teamClubId,
+  );
+  const focusAlreadyListed = onRosterSamePos.some((player) => player.id === focus.id);
+  const pool: LivePlayer[] =
+    focusCompetes && !focusAlreadyListed
+      ? [...onRosterSamePos, focus]
+      : focusAlreadyListed
+        ? onRosterSamePos
+        : [...onRosterSamePos, focus];
 
   const sorted = [...pool].sort((left, right) => {
     const ca = caSortKey(right.currentAbility) - caSortKey(left.currentAbility);
@@ -164,7 +250,11 @@ export function buildMatchExperienceCard(
       currentAbility: player.currentAbility ?? null,
       rank,
       isFocus,
-      isOnRoster: player.squadTeamUid === team.teamUid,
+      isOnRoster: matchExperiencePlayerCompetesOnTeam(
+        player,
+        team.teamUid,
+        teamClubId,
+      ),
     };
   });
 
@@ -182,10 +272,6 @@ export function buildMatchExperienceCard(
   };
 }
 
-/**
- * Cards for loaded clubTeams with ≥1 resolved player.
- * `positionByTeamUid` overrides default per card.
- */
 export function buildMatchExperienceCards(
   focus: LivePlayer,
   players: LivePlayer[],

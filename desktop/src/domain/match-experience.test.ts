@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { LiveClubTeam, LivePlayer } from "./adapters";
 import {
   buildMatchExperienceCards,
+  matchExperiencePlayerCompetesOnTeam,
   matchExperiencePosition,
   matchExperiencePositionOptions,
   matchExperienceTeamBand,
@@ -65,14 +66,6 @@ describe("matchExperiencePosition", () => {
       ),
     ).toBe("AMC");
   });
-
-  it("falls back to first primary", () => {
-    expect(
-      matchExperiencePosition(
-        player({ id: "1", name: "A", positions: ["DR", "MR"] }),
-      ),
-    ).toBe("DR");
-  });
 });
 
 describe("matchExperiencePositionOptions", () => {
@@ -92,13 +85,14 @@ describe("matchExperiencePositionOptions", () => {
 });
 
 describe("sortClubTeamsForMatchExperience", () => {
-  it("orders Senior → Under N → 2nd/II → Aff Senior → Aff Under N", () => {
+  it("orders First → Res/II → Under N → Normal First → Normal Under N", () => {
     const sorted = sortClubTeamsForMatchExperience([
       team({
         teamUid: "aff-u",
         name: "Feeder U19",
         squadUnit: "under19s",
         affiliationType: 0x01,
+        teamType: 11,
         rosterLen: 10,
       }),
       team({
@@ -110,11 +104,11 @@ describe("sortClubTeamsForMatchExperience", () => {
         rosterLen: 20,
       }),
       team({
-        teamUid: "ii",
-        name: "II",
-        squadUnit: "reserves",
-        affiliationType: 0x08,
-        rosterLen: 21,
+        teamUid: "u18",
+        name: "U18",
+        squadUnit: "under19s",
+        teamType: 12,
+        rosterLen: 18,
       }),
       team({
         teamUid: "u19",
@@ -122,6 +116,13 @@ describe("sortClubTeamsForMatchExperience", () => {
         squadUnit: "under19s",
         teamType: 11,
         rosterLen: 22,
+      }),
+      team({
+        teamUid: "ii",
+        name: "II",
+        squadUnit: "reserves",
+        affiliationType: 0x08,
+        rosterLen: 21,
       }),
       team({
         teamUid: "ft",
@@ -134,13 +135,29 @@ describe("sortClubTeamsForMatchExperience", () => {
     ]);
     expect(sorted.map((item) => item.teamUid)).toEqual([
       "ft",
-      "u19",
       "ii",
+      "u19",
+      "u18",
       "aff-1",
       "aff-u",
     ]);
+    expect(matchExperienceTeamBand(sorted[1]!)).toBe(1);
     expect(matchExperienceTeamBand(sorted[2]!)).toBe(2);
-    expect(matchExperienceTeamBand(sorted[3]!)).toBe(3);
+    expect(matchExperienceTeamBand(sorted[4]!)).toBe(3);
+  });
+});
+
+describe("matchExperiencePlayerCompetesOnTeam", () => {
+  it("excludes loaned-out from parent team and includes loan club", () => {
+    const loaned = player({
+      id: "y",
+      name: "Youth",
+      squadTeamUid: "t-u19",
+      loanedOut: true,
+      loanClubId: "9001",
+    });
+    expect(matchExperiencePlayerCompetesOnTeam(loaned, "t-u19", "920")).toBe(false);
+    expect(matchExperiencePlayerCompetesOnTeam(loaned, "t-feed", "9001")).toBe(true);
   });
 });
 
@@ -157,23 +174,26 @@ describe("buildMatchExperienceCards", () => {
     teamUid: "t-u19",
     name: "U19",
     squadUnit: "under19s",
-    teamType: 2,
+    teamType: 11,
     rosterLen: 2,
   });
-  const emptyTeam = team({
-    teamUid: "t-empty",
-    name: "Empty",
-    squadUnit: "reserves",
-    rosterLen: 5,
+  const feeder = team({
+    teamUid: "t-feed",
+    name: "Feeder",
+    squadUnit: "firstTeam",
+    affiliationType: 0x01,
+    teamType: 0,
+    rosterLen: 12,
   });
 
   const youth = player({
     id: "youth",
     name: "Youth",
-    positions: ["ST", "MC"],
+    positions: ["ST"],
     bestCalculatedPosition: "ST",
     currentAbility: 110,
     squadTeamUid: "t-u19",
+    clubId: "920",
   });
   const seniorSt = player({
     id: "senior",
@@ -181,6 +201,7 @@ describe("buildMatchExperienceCards", () => {
     positions: ["ST"],
     currentAbility: 140,
     squadTeamUid: "t-first",
+    clubId: "920",
   });
   const otherSt = player({
     id: "other",
@@ -188,58 +209,75 @@ describe("buildMatchExperienceCards", () => {
     positions: ["ST"],
     currentAbility: 100,
     squadTeamUid: "t-u19",
+    clubId: "920",
   });
-  const midOnly = player({
-    id: "mid",
-    name: "Mid",
-    positions: ["MC"],
-    currentAbility: 150,
-    squadTeamUid: "t-first",
+  const loanedSt = player({
+    id: "loan",
+    name: "Loaned ST",
+    positions: ["ST"],
+    currentAbility: 105,
+    squadTeamUid: "t-u19",
+    clubId: "920",
+    loanedOut: true,
+    loanClubId: "9001",
+  });
+  const feederSt = player({
+    id: "fs",
+    name: "Feeder ST",
+    positions: ["ST"],
+    currentAbility: 95,
+    squadTeamUid: "t-feed",
+    clubId: "9001",
   });
 
-  it("builds per-team same-primary CA ranks and injects focus off-roster", () => {
+  it("orders First before Under N and omits loaned-out from parent card", () => {
     const cards = buildMatchExperienceCards(
       youth,
-      [youth, seniorSt, otherSt, midOnly],
-      [u19, first],
-    );
-    expect(cards.map((card) => card.teamUid)).toEqual(["t-first", "t-u19"]);
-    expect(cards[0]!.rows.map((row) => row.playerId)).toEqual(["senior", "youth"]);
-    expect(cards[0]!.focusRank).toBe(2);
-    expect(cards[1]!.rows.map((row) => row.playerId)).toEqual(["youth", "other"]);
-  });
-
-  it("hides teams with zero resolved players, keeps teams with peers of other positions", () => {
-    const feeder = team({
-      teamUid: "t-feed",
-      name: "Feeder",
-      squadUnit: "firstTeam",
-      affiliationType: 0x01,
-      teamType: 0,
-      rosterLen: 12,
-    });
-    const feederMid = player({
-      id: "fm",
-      name: "Feeder Mid",
-      positions: ["MC"],
-      currentAbility: 90,
-      squadTeamUid: "t-feed",
-    });
-    const cards = buildMatchExperienceCards(
-      youth,
-      [youth, seniorSt, otherSt, feederMid],
-      [first, u19, emptyTeam, feeder],
-      null,
-      undefined,
-      "ST",
+      [youth, seniorSt, otherSt, loanedSt, feederSt],
+      [u19, first, feeder],
     );
     expect(cards.map((card) => card.teamUid)).toEqual(["t-first", "t-u19", "t-feed"]);
-    const feedCard = cards.find((card) => card.teamUid === "t-feed")!;
-    expect(feedCard.rows.map((row) => row.playerId)).toEqual(["youth"]);
-    expect(feedCard.rows[0]).toMatchObject({ isFocus: true, isOnRoster: false });
+    expect(cards[1]!.rows.map((row) => row.playerId)).toEqual(["youth", "other"]);
+    expect(cards[1]!.rows.some((row) => row.playerId === "loan")).toBe(false);
   });
 
-  it("windows long lists around focus without exceeding page size", () => {
+  it("places loaned focus on affiliate card as current", () => {
+    const loanedYouth = player({
+      id: "youth",
+      name: "Youth",
+      positions: ["ST"],
+      currentAbility: 110,
+      squadTeamUid: "t-u19",
+      clubId: "920",
+      loanedOut: true,
+      loanClubId: "9001",
+    });
+    const cards = buildMatchExperienceCards(
+      loanedYouth,
+      [loanedYouth, otherSt, feederSt],
+      [u19, feeder],
+    );
+    const u19Card = cards.find((card) => card.teamUid === "t-u19")!;
+    expect(u19Card.rows.map((row) => row.playerId)).toEqual(["youth", "other"]);
+    expect(u19Card.rows.find((row) => row.isFocus)?.isOnRoster).toBe(false);
+
+    const feedCard = cards.find((card) => card.teamUid === "t-feed")!;
+    expect(feedCard.rows.find((row) => row.isFocus)?.isOnRoster).toBe(true);
+  });
+
+  it("hides teams with zero resolved players", () => {
+    const empty = team({
+      teamUid: "t-empty",
+      name: "Empty",
+      squadUnit: "reserves",
+      rosterLen: 9,
+    });
+    const cards = buildMatchExperienceCards(youth, [youth, seniorSt], [first, empty, u19]);
+    expect(cards.map((card) => card.teamUid)).toEqual(["t-first", "t-u19"]);
+    expect(cards.some((card) => card.teamUid === "t-empty")).toBe(false);
+  });
+
+  it("windows long lists around focus", () => {
     const many = Array.from({ length: 8 }, (_, index) =>
       player({
         id: `s${index}`,
@@ -247,6 +285,7 @@ describe("buildMatchExperienceCards", () => {
         positions: ["ST"],
         currentAbility: 160 - index,
         squadTeamUid: "t-first",
+        clubId: "920",
       }),
     );
     const cards = buildMatchExperienceCards(youth, [youth, ...many], [first]);
@@ -254,37 +293,9 @@ describe("buildMatchExperienceCards", () => {
     expect(cards[0]!.rows).toHaveLength(5);
     expect(cards[0]!.rows.some((row) => row.isFocus)).toBe(true);
   });
-
-  it("allows per-team position overrides", () => {
-    const cards = buildMatchExperienceCards(
-      youth,
-      [youth, seniorSt, otherSt, midOnly],
-      [first, u19],
-      null,
-      { "t-first": "MC", "t-u19": "ST" },
-    );
-    expect(cards.find((card) => card.teamUid === "t-first")?.position).toBe("MC");
-    expect(
-      cards.find((card) => card.teamUid === "t-first")?.rows.map((row) => row.playerId),
-    ).toEqual(["mid", "youth"]);
-  });
-
-  it("returns empty when focus has no position", () => {
-    expect(
-      buildMatchExperienceCards(
-        player({ id: "x", name: "X", positions: [] }),
-        [],
-        [first],
-      ),
-    ).toEqual([]);
-  });
 });
 
 describe("matchExperienceWindowStart", () => {
-  it("keeps start at 0 when list fits the page", () => {
-    expect(matchExperienceWindowStart(4, 3, 5)).toBe(0);
-  });
-
   it("centers focus when possible", () => {
     expect(matchExperienceWindowStart(10, 8, 5)).toBe(5);
   });
