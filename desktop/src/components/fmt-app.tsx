@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { ShellHeader, type Screen } from "@/components/shell-header";
 import { MyTeamScreen } from "@/components/my-team-screen";
-import { LaterRoleScreen } from "@/components/later-role-screen";
 import { PlayerProfileScreen } from "@/components/player-profile-screen";
 import { SettingsScreen } from "@/components/settings-screen";
 import { ClubProfileScreen } from "@/components/club-profile-screen";
@@ -87,11 +86,6 @@ const initialSnapshot: LiveFootballSnapshot = {
   dataSource: "none",
   dataWarnings: [],
 };
-
-const LATER_ROLES: Screen[] = [
-  "Tactic",
-  "Technical Director",
-];
 
 export function FMTApp() {
   const [screen, setScreenState] = useState<Screen>("Dashboard");
@@ -376,8 +370,6 @@ export function FMTApp() {
         onRefresh={checkConnection}
         onOpenPlayer={openPlayer}
       />
-    ) : LATER_ROLES.includes(screen) ? (
-      <LaterRoleScreen role={screen} />
     ) : screen === "Player Profile" ? (
       <PlayerProfileScreen
         player={snapshot.players.find((player) => player.id === selectedPlayerId) ?? null}

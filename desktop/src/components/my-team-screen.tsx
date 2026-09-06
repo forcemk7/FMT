@@ -8,6 +8,7 @@ import {
   formatPlayerPositions,
   gmAdvice,
   groupSquad,
+  countManagedClubRoster,
   countSquadTeamRoster,
   isAtClubEmployee,
   isHoydProspect,
@@ -43,6 +44,8 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 
 const CARD_RING_SIZE = 28;
 const CARD_RING_STROKE = 1.25;
+/** Session key for HoYD/GM club-wide roster filters (no team tab). */
+const ROLE_DESK_FILTER_KEY = "__role-desk__";
 
 export type SquadDeskMode = "at-club" | "loaned-out" | "move-on" | "hoyd";
 
@@ -348,6 +351,7 @@ export function MyTeamScreen({
   const moveOnMode = mode === "move-on";
   const hoydMode = mode === "hoyd";
   const squadDeskMode = !loanedMode && !moveOnMode && !hoydMode;
+  const roleFilterMode = moveOnMode || hoydMode;
   const clubTeams = useMemo(
     () =>
       sortClubTeamsForSquadDesk(
@@ -372,6 +376,10 @@ export function MyTeamScreen({
     }
     return counts;
   }, [clubTeams, snapshot.managedClubId, snapshot.players]);
+  const managedClubCounts = useMemo(
+    () => countManagedClubRoster(snapshot.players, snapshot.managedClubId),
+    [snapshot.managedClubId, snapshot.players],
+  );
   const defaultTeamUid =
     clubTeams.find((team) => team.isManagerTeam)?.teamUid ??
     clubTeams[0]?.teamUid ??
@@ -382,6 +390,12 @@ export function MyTeamScreen({
     return remembered ?? defaultTeamUid;
   });
   const [enabledRosterStatuses, setEnabledRosterStatuses] = useState(() => {
+    if (loanedMode) return new Set<SquadRosterStatus>(["loanedOut"]);
+    if (roleFilterMode) {
+      const remembered = getSquadDeskRosterFilters(ROLE_DESK_FILTER_KEY);
+      if (remembered?.length) return new Set(remembered as SquadRosterStatus[]);
+      return new Set<SquadRosterStatus>(["atClub"]);
+    }
     if (!squadDeskMode) return new Set<SquadRosterStatus>(["atClub"]);
     const teamUid = getSquadDeskSelectedTeamUid() ?? defaultTeamUid;
     if (!teamUid) return new Set<SquadRosterStatus>(["atClub"]);
@@ -450,37 +464,44 @@ export function MyTeamScreen({
   }, [squadDeskMode]);
   const selectedTeam =
     clubTeams.find((team) => team.teamUid === selectedTeamUid) ?? clubTeams[0] ?? null;
-  const selectedTeamCounts =
-    (selectedTeam
-      ? rosterCountsByTeamUid.get(selectedTeam.teamUid)
-      : null) ?? { atClub: 0, loanedIn: 0, loanedOut: 0 };
+  const filterCounts: SquadTeamRosterCounts = squadDeskMode
+    ? (selectedTeam
+        ? rosterCountsByTeamUid.get(selectedTeam.teamUid)
+        : null) ?? { atClub: 0, loanedIn: 0, loanedOut: 0 }
+    : managedClubCounts;
   const availableRosterFilters = useMemo(
     () =>
       SQUAD_ROSTER_FILTER_OPTIONS.filter(
-        ({ countKey }) => selectedTeamCounts[countKey] > 0,
+        ({ countKey }) => filterCounts[countKey] > 0,
       ),
-    [
-      selectedTeamCounts.atClub,
-      selectedTeamCounts.loanedIn,
-      selectedTeamCounts.loanedOut,
-    ],
+    [filterCounts.atClub, filterCounts.loanedIn, filterCounts.loanedOut],
   );
   useEffect(() => {
-    if (!squadDeskMode || !selectedTeam) return;
-    const next = resolveEnabledRosterStatuses(
-      selectedTeam.teamUid,
-      selectedTeamCounts,
-    );
+    if (squadDeskMode) {
+      if (!selectedTeam) return;
+      const next = resolveEnabledRosterStatuses(
+        selectedTeam.teamUid,
+        filterCounts,
+      );
+      setEnabledRosterStatuses(next);
+      if (next.size > 0) {
+        setSquadDeskRosterFilters(selectedTeam.teamUid, next);
+      }
+      return;
+    }
+    if (!roleFilterMode) return;
+    const next = resolveEnabledRosterStatuses(ROLE_DESK_FILTER_KEY, filterCounts);
     setEnabledRosterStatuses(next);
     if (next.size > 0) {
-      setSquadDeskRosterFilters(selectedTeam.teamUid, next);
+      setSquadDeskRosterFilters(ROLE_DESK_FILTER_KEY, next);
     }
   }, [
     squadDeskMode,
+    roleFilterMode,
     selectedTeam?.teamUid,
-    selectedTeamCounts.atClub,
-    selectedTeamCounts.loanedIn,
-    selectedTeamCounts.loanedOut,
+    filterCounts.atClub,
+    filterCounts.loanedIn,
+    filterCounts.loanedOut,
   ]);
   const teamRoster = useMemo(
     () =>
@@ -501,10 +522,18 @@ export function MyTeamScreen({
             enabledRosterStatuses,
           );
         }
+        if (roleFilterMode) {
+          return playerMatchesSquadRosterFilters(
+            player,
+            snapshot.managedClubId,
+            enabledRosterStatuses,
+          );
+        }
         return isAtClubEmployee(player, snapshot.managedClubId);
       }),
     [
       enabledRosterStatuses,
+      roleFilterMode,
       selectedTeam,
       snapshot.managedClubId,
       snapshot.players,
@@ -541,7 +570,6 @@ export function MyTeamScreen({
             : teamRoster,
     [teamRoster, gmByAdvice.loan, gmByAdvice.sell, hoydMode, hoydProspects, loanedMode, moveOnMode, snapshot.managedClubId, snapshot.players],
   );
-  const managedClub = snapshot.clubs.find((club) => club.id === snapshot.managedClubId);
   const connected =
     snapshot.status.state === "connected" && Boolean(snapshot.managedClubId);
   const allowEmpty = loanedMode || moveOnMode || hoydMode || (squadDeskMode && connected);
@@ -554,15 +582,6 @@ export function MyTeamScreen({
       : hoydMode
         ? "Top talent to groom (age ≤24) — load when FM26 has a save open"
         : "Load when FM26 has a save open";
-  const medianLabel =
-    medianCA == null ? null : Number.isInteger(medianCA) ? String(medianCA) : medianCA.toFixed(1);
-  const readyBlurb = loanedMode
-    ? `${managedClub?.name} · ${squad.length} out on loan`
-    : moveOnMode
-      ? `${managedClub?.name} · squad median CA ${medianLabel ?? "—"} · ${gmByAdvice.sell.length} sell · ${gmByAdvice.loan.length} loan`
-      : hoydMode
-        ? `${managedClub?.name} · squad median CA ${medianLabel ?? "—"} · ${squad.length} to groom`
-        : `${managedClub?.name} · ${selectedTeam?.name.trim() || "Squad"} · ${teamRoster.length} on roster`;
   const emptyConnectedMessage = loanedMode
     ? "No players out on loan."
     : moveOnMode
@@ -570,9 +589,7 @@ export function MyTeamScreen({
       : hoydMode
         ? "No high-PA groom prospects (age ≤24) vs squad median CA."
         : selectedTeam && squad.length === 0
-          ? selectedTeamCounts.atClub +
-                selectedTeamCounts.loanedIn +
-                selectedTeamCounts.loanedOut >
+          ? filterCounts.atClub + filterCounts.loanedIn + filterCounts.loanedOut >
               0
             ? "No players match the selected roster filters."
             : `No players loaded for ${selectedTeam.name.trim() || "this team"} — check FM squad screen vs FMT read.`
@@ -590,8 +607,10 @@ export function MyTeamScreen({
       } else {
         next.add(status);
       }
-      if (selectedTeam) {
+      if (squadDeskMode && selectedTeam) {
         setSquadDeskRosterFilters(selectedTeam.teamUid, next);
+      } else if (roleFilterMode) {
+        setSquadDeskRosterFilters(ROLE_DESK_FILTER_KEY, next);
       }
       return next;
     });
@@ -633,41 +652,55 @@ export function MyTeamScreen({
     });
   }
 
+  const showTeamTabs = squadDeskMode && connected && clubTeams.length > 0;
+  const showStatusFilter =
+    (squadDeskMode || roleFilterMode) &&
+    connected &&
+    availableRosterFilters.length > 0;
+  const showDeskToolbar = showTeamTabs || showStatusFilter;
+  const compactDesk = connected && (squadDeskMode || loanedMode || moveOnMode || hoydMode);
+
   return (
     <main
-      className={`screen my-team-screen${loanedMode ? " is-loans-desk" : ""}${moveOnMode ? " is-gm-desk" : ""}${hoydMode ? " is-hoyd-desk" : ""}${squadDeskMode && connected ? " is-squad-desk-compact" : ""}`}
+      className={`screen my-team-screen${loanedMode ? " is-loans-desk" : ""}${moveOnMode ? " is-gm-desk" : ""}${hoydMode ? " is-hoyd-desk" : ""}${compactDesk ? " is-squad-desk-compact" : ""}`}
     >
-      {squadDeskMode && connected && clubTeams.length > 0 ? (
-        <div className="squad-desk-toolbar" role="toolbar" aria-label="Club teams">
-          <div className="squad-unit-tabs" role="tablist" aria-label="Club teams">
-            {clubTeams.map((team) => {
-              const active = selectedTeam?.teamUid === team.teamUid;
-              return (
-                <button
-                  key={team.teamUid}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  className={`squad-unit-tab${active ? " is-active" : ""}`}
-                  onClick={() => {
-                    if (team.teamUid === selectedTeamUid) return;
-                    unfreezeSquadScroll();
-                    setSquadDeskScrollTop(0);
-                    writeAppMainScrollTop(0);
-                    setRosterFilterOpen(false);
-                    setSelectedTeamUid(team.teamUid);
-                  }}
-                >
-                  {squadTeamTabLabel(
-                    team,
-                    managedClubName,
-                    rosterCountsByTeamUid.get(team.teamUid),
-                  )}
-                </button>
-              );
-            })}
-          </div>
-          {availableRosterFilters.length > 0 ? (
+      {showDeskToolbar ? (
+        <div
+          className="squad-desk-toolbar"
+          role="toolbar"
+          aria-label={showTeamTabs ? "Club teams" : "Roster filters"}
+        >
+          {showTeamTabs ? (
+            <div className="squad-unit-tabs" role="tablist" aria-label="Club teams">
+              {clubTeams.map((team) => {
+                const active = selectedTeam?.teamUid === team.teamUid;
+                return (
+                  <button
+                    key={team.teamUid}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    className={`squad-unit-tab${active ? " is-active" : ""}`}
+                    onClick={() => {
+                      if (team.teamUid === selectedTeamUid) return;
+                      unfreezeSquadScroll();
+                      setSquadDeskScrollTop(0);
+                      writeAppMainScrollTop(0);
+                      setRosterFilterOpen(false);
+                      setSelectedTeamUid(team.teamUid);
+                    }}
+                  >
+                    {squadTeamTabLabel(
+                      team,
+                      managedClubName,
+                      rosterCountsByTeamUid.get(team.teamUid),
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
+          {showStatusFilter ? (
             <div className="squad-roster-filter-menu" ref={rosterFilterRef}>
               <button
                 type="button"
@@ -691,7 +724,7 @@ export function MyTeamScreen({
                   <div className="squad-roster-filter-section">Status</div>
                   {availableRosterFilters.map(({ status, label, countKey }) => {
                     const checked = enabledRosterStatuses.has(status);
-                    const count = selectedTeamCounts[countKey];
+                    const count = filterCounts[countKey];
                     const lastChecked =
                       checked &&
                       availableRosterFilters.filter(({ status: option }) =>
@@ -726,20 +759,14 @@ export function MyTeamScreen({
             </div>
           ) : null}
         </div>
-      ) : (
+      ) : !connected ? (
         <div className="planner-heading">
           <div>
             <h1>{title}</h1>
-            <p>{ready ? readyBlurb : emptyHint}</p>
+            <p>{emptyHint}</p>
           </div>
-          {ready ? (
-            <div className="live-source-label">
-              <span className="live-dot" />
-              Live
-            </div>
-          ) : null}
         </div>
-      )}
+      ) : null}
       <section className="squad-matrix">
         {!connected ? (
           <div className="squad-table-empty">

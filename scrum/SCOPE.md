@@ -22,7 +22,7 @@ Nav stubs stay **Later** until they have load → desk → decision. Empty chrom
 - **Loans** — live: Squad twin filtered to outgoing `loanedOut` (honesty / tracking).
 - **GM** — live: Squad twin that **advises Sell vs Loan** from squad **median CA**. Sell = capped low PA, or past dev age (25+) with CA far below PA (decline). Loan = age ≤24 with CA far below PA — youth below median (loan then sell) or CA still below median. Not a transfer market, not a loan finder.
 - **HoYD** — live: Squad twin filtered to **high-PA groom prospects** (age ≤24, `PA ≥ squad median CA`, headroom > 8), sorted PA desc. Not mentoring, not world search.
-- **Tactic · TD** — still Later until each has its own proven loop.
+- **Tactic · TD** — not in nav until a proven loop + recipes exist (no empty stubs).
 
 **Loop D — Shared scouting core / replace FMLE read speed (Step 2, not funded)**  
 Full-world live index in ~&lt;2s (FMLE-class **read** core; FMT does not ship live editing). Parked until Loop A is daily habit. Direction: load `game_plugin` object tables first, then attach managed club/teams. Catalog: `research/ecosystem.md` + `research/recipes.md`. Law: `.cursor/rules/fm-live-read.mdc`. FMLE binary = A/B only.
@@ -31,7 +31,7 @@ Full-world live index in ~&lt;2s (FMLE-class **read** core; FMT does not ship li
 
 - Squad-only live load; correct attrs; history that replaces sheets (Loop A)
 - One main header row (merge GS double header) so the shell is usable
-- Nav = Dashboard · Squad · Tactic · HoYD · GM · Loan · TD (+ Settings) — **Squad + Dashboard + Loans + GM + HoYD live**; others muted roadmap
+- Nav = Dashboard · Squad · Loans · HoYD · GM (+ Settings) — all live; no Tactic/TD stubs
 - Dashboard = collective squad/profile signals (feeds Loop B), reusable “dashboard blocks” only when a second live tab needs them — no platform rewrite
 - Player profile desk + history teaching (CA/HA / movement) on Squad path
 - Installer daily driver; no empty console
@@ -46,7 +46,7 @@ Full-world live index in ~&lt;2s (FMLE-class **read** core; FMT does not ship li
 ## Not need-to-have (discard)
 
 - Six layers of headers / GS recruitment chrome
-- Building Tactic/HoYD/TD (or GM beyond filtered Squad) as fake working products
+- Building Tactic/TD as fake working products; empty Later nav stubs
 - GM sell/loan recommenders, listing workflows, world search
 - Blind heap/idiom world RE / beat FMLE this week (table-walk path is Loop D, parked)
 - Offline `.fm` extract / BepInEx

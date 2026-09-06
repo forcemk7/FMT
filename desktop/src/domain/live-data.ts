@@ -93,6 +93,22 @@ export function countSquadTeamRoster(
   return counts;
 }
 
+/** Club-wide roster status counts (any team) for Loans/HoYD/GM filters. */
+export function countManagedClubRoster(
+  players: Array<Pick<LivePlayer, "clubId" | "loanedOut" | "loanedIn">>,
+  managedClubId: string | null | undefined,
+): SquadTeamRosterCounts {
+  const counts: SquadTeamRosterCounts = { atClub: 0, loanedIn: 0, loanedOut: 0 };
+  if (!managedClubId) return counts;
+  for (const player of players) {
+    const status = squadRosterStatus(player, managedClubId);
+    if (status === "atClub") counts.atClub += 1;
+    else if (status === "loanedIn") counts.loanedIn += 1;
+    else if (status === "loanedOut") counts.loanedOut += 1;
+  }
+  return counts;
+}
+
 export const ALL_SQUAD_ROSTER_STATUSES: readonly SquadRosterStatus[] = [
   "atClub",
   "loanedIn",

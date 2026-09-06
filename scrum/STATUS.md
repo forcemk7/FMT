@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-06 (T225 done — facts align + FM plot)
+Last updated: 2026-09-06 (T226 done — nav cleanup)
 
 ## Now
 
@@ -26,6 +26,7 @@ Last updated: 2026-09-06 (T225 done — facts align + FM plot)
 
 ## Recently done
 
+- **T226** Nav cleanup — drop Tactic/TD; desk chrome; order Squad·Loans·HoYD·GM
 - **T225** Facts strip align + FM-faithful Development plot
 - **T224** Player facts strip + Development plot (align, fixed Y, linear, gameDate X)
 - **T223** Rip empty player profile tabs (Attributes + Development only)
@@ -67,4 +68,4 @@ Last updated: 2026-09-06 (T225 done — facts align + FM plot)
 
 ## Loop
 
-Loop A funded. Loop B = Dashboard. Loop C: Loans + GM + HoYD live; Tactic/TD Later. Loop D parked.
+Loop A funded. Loop B = Dashboard. Loop C: Loans + HoYD + GM live; Tactic/TD out of nav until recipes. Loop D parked.

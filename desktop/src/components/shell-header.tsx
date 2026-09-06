@@ -3,7 +3,6 @@
 import { useEffect, useId, useRef, useState, type RefObject } from "react";
 import {
   ChevronDown,
-  CircleDashed,
   LayoutDashboard,
   Menu,
   RefreshCw,
@@ -21,11 +20,9 @@ import { shellLoadLabel } from "@/domain/fmt-terminal-log";
 export type Screen =
   | "Dashboard"
   | "Squad"
-  | "Tactic"
   | "HoYD"
   | "General Manager"
   | "Loan Manager"
-  | "Technical Director"
   | "Player Profile"
   | "Club Profile"
   | "Settings"
@@ -44,11 +41,9 @@ type NavItem = {
 const navigation: NavItem[] = [
   { label: "Dashboard", short: "Dashboard", live: true, icon: LayoutDashboard },
   { label: "Squad", short: "Squad", live: true, icon: UsersRound },
-  { label: "Tactic", short: "Tactic", live: false },
+  { label: "Loan Manager", short: "Loans", live: true, icon: UsersRound },
   { label: "HoYD", short: "HoYD", live: true, icon: UsersRound },
   { label: "General Manager", short: "GM", live: true, icon: UsersRound },
-  { label: "Loan Manager", short: "Loans", live: true, icon: UsersRound },
-  { label: "Technical Director", short: "TD", live: false },
 ];
 
 /** Collapse the horizontal tab row when the header can't fit it cleanly. */
@@ -67,25 +62,23 @@ function NavButtons({
 }) {
   return (
     <>
-      {navigation.map(({ label, short, live, icon: Icon }) => (
+      {navigation.map(({ label, short, icon: Icon }) => (
         <button
           key={label}
           type="button"
           className={cn(
             className,
             activeNav === label && "is-active",
-            !live && "is-later",
           )}
           onClick={() => {
             onNavigate(label);
             onPicked?.();
           }}
-          title={live ? label : `${label} — later (roadmap)`}
-          aria-label={live ? label : `${label}, later roadmap`}
+          title={label}
+          aria-label={label}
         >
           {Icon ? <Icon aria-hidden="true" /> : null}
           <span>{short}</span>
-          {!live ? <CircleDashed className="shell-nav-tbd" aria-hidden="true" /> : null}
         </button>
       ))}
     </>
