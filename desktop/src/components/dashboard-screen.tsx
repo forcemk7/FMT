@@ -15,12 +15,14 @@ import { squadHasRankings } from "@/domain/has-score";
 import { rankSquadProspects } from "@/domain/squad-prospects";
 import {
   DashHasRow,
+  DashMatchExperienceRow,
   DashMoverRow,
   DashProspectRow,
 } from "@/components/dashboard-widgets";
 import { LiveDataState } from "@/components/live-data-state";
 import { Button } from "@/components/ui/button";
 import { isAtClubEmployee } from "@/domain/live-data";
+import { rankMatchExperienceOpportunities } from "@/domain/match-experience-opportunities";
 
 function WidgetShell({
   title,
@@ -77,6 +79,10 @@ export function DashboardScreen({
     [squad, snapshot.status.lastSync, snapshot.status.lastSuccessfulRead],
   );
   const prospects = useMemo(() => rankSquadProspects(squad, DASH_PEEK_SIZE), [squad]);
+  const matchExperience = useMemo(
+    () => rankMatchExperienceOpportunities(snapshot, DASH_PEEK_SIZE),
+    [snapshot],
+  );
   const ready =
     snapshot.status.state === "connected" && Boolean(snapshot.managedClubId) && squad.length > 0;
 
@@ -130,6 +136,30 @@ export function DashboardScreen({
               <div className="dash-peek-list">
                 {prospects.map((row) => (
                   <DashProspectRow key={row.player.id} row={row} onOpen={onOpenPlayer} compact />
+                ))}
+              </div>
+            ) : null}
+          </WidgetShell>
+
+          <WidgetShell
+            title={dashViewTitle("Match experience")}
+            viewId="Match experience"
+            onOpenView={onOpenView}
+            empty={
+              matchExperience.length
+                ? null
+                : "No Under N / Reserves players who would be #1–2 on a First Team."
+            }
+          >
+            {matchExperience.length ? (
+              <div className="dash-peek-list">
+                {matchExperience.map((row) => (
+                  <DashMatchExperienceRow
+                    key={row.player.id}
+                    row={row}
+                    onOpen={onOpenPlayer}
+                    compact
+                  />
                 ))}
               </div>
             ) : null}
@@ -212,6 +242,10 @@ export function DashboardViewScreen({
     [squad, snapshot.status.lastSync, snapshot.status.lastSuccessfulRead],
   );
   const prospects = useMemo(() => rankSquadProspects(squad, 64), [squad]);
+  const matchExperience = useMemo(
+    () => rankMatchExperienceOpportunities(snapshot, 64),
+    [snapshot],
+  );
   const has = useMemo(() => squadHasRankings(squad, Math.max(squad.length, 1)), [squad]);
 
   let body: ReactNode = null;
@@ -244,6 +278,18 @@ export function DashboardViewScreen({
     ) : (
       <p className="evidence-caption">
         No young high-PA players with a clear Professionalism mentor on squad.
+      </p>
+    );
+  } else if (view === "Match experience") {
+    body = matchExperience.length ? (
+      <div className="dash-has-list dash-view-list">
+        {matchExperience.map((row) => (
+          <DashMatchExperienceRow key={row.player.id} row={row} onOpen={onOpenPlayer} />
+        ))}
+      </div>
+    ) : (
+      <p className="evidence-caption">
+        No Under N / Reserves players who would be #1 or #2 same-pos on a First Team.
       </p>
     );
   } else if (view === "HAS Top") {

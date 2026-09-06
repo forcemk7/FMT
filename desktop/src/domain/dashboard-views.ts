@@ -1,6 +1,12 @@
 /** Filtered Dashboard views — peeks on Dashboard, full lists on dedicated screens. */
 
-export const DASH_VIEW_IDS = ["Movers", "Prospects", "HAS Top", "HAS Bottom"] as const;
+export const DASH_VIEW_IDS = [
+  "Movers",
+  "Prospects",
+  "Match experience",
+  "HAS Top",
+  "HAS Bottom",
+] as const;
 
 export type DashViewId = (typeof DASH_VIEW_IDS)[number];
 
@@ -16,6 +22,8 @@ export function dashViewTitle(id: DashViewId): string {
       return "Development";
     case "Prospects":
       return "Best talent";
+    case "Match experience":
+      return "Match experience";
     case "HAS Top":
       return "Top personalities";
     case "HAS Bottom":
@@ -29,6 +37,8 @@ export function dashViewBlurb(id: DashViewId): string {
       return "Attribute changes since the last recorded change-point";
     case "Prospects":
       return "Young high-PA players with Professionalism mentor room";
+    case "Match experience":
+      return "Under N / Reserves players who would be #1 or #2 same-pos on a First Team";
     case "HAS Top":
       return "Highest hidden-attribute scores on the managed squad";
     case "HAS Bottom":
