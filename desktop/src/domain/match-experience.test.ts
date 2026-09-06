@@ -251,13 +251,20 @@ describe("buildMatchExperienceCards", () => {
       [youth, seniorSt, otherSt, loanedSt, feederSt],
       [u19, first, feeder],
       "920",
+      undefined,
+      undefined,
+      [
+        { id: "920", name: "Schalke" },
+        { id: "9001", name: "Feeder FC" },
+      ],
     );
     expect(cards.map((card) => card.teamUid)).toEqual(["t-first", "t-u19", "t-feed"]);
     expect(cards[0]!.teamLabel).toBe("First Team");
     expect(cards[0]!.clubId).toBe("920");
+    expect(cards[0]!.clubName).toBe("Schalke");
     expect(cards[2]!.teamLabel).toBe("First Team");
     expect(cards[2]!.clubId).toBe("9001");
-    expect(cards[2]!.clubName).toBe("Feeder");
+    expect(cards[2]!.clubName).toBe("Feeder FC");
     expect(cards[1]!.rows.map((row) => row.playerId)).toEqual(["youth", "other"]);
     expect(cards[1]!.rows.some((row) => row.playerId === "loan")).toBe(false);
   });

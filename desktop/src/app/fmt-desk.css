@@ -311,8 +311,11 @@ body.fmt-shell .match-experience-card-header {
   background: rgba(0, 0, 0, 0.22);
   border-color: var(--hairline);
 }
-body.fmt-shell .match-experience-card-title h3 {
+body.fmt-shell .match-experience-club-name {
   color: var(--text);
+}
+body.fmt-shell .match-experience-team-type {
+  color: var(--text-muted);
 }
 body.fmt-shell .match-experience-pos-select select {
   background: rgba(0, 0, 0, 0.25);

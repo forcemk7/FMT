@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-06 (T244 done — ME logo + TeamType header)
+Last updated: 2026-09-06 (T246 done — ME header logo + club + subtitle)
 
 ## Now
 
@@ -29,11 +29,11 @@ Last updated: 2026-09-06 (T244 done — ME logo + TeamType header)
 
 ## Recently done
 
+- **T246** ME card header — logo + club + TeamType subtitle
 - **T244** ME cards — club logo + TeamType header
 - **T243** Unclip attr Δ glyphs without row-height shift
 - **T242** ME affiliate labels + loan-flag wrapper diff
 - **T241** Roster-load AffiliationType 0x03 feeders (Match experience)
-- **T240** Match experience layout, sort, loans, hide
 
 ## Loop
 

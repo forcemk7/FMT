@@ -81,9 +81,6 @@ function MatchExperienceCardView({
   onPositionChange: (teamUid: string, position: string) => void;
   onOpenPlayer: (playerId: string) => void;
 }) {
-  const rankLabel =
-    card.focusRank != null ? `${card.focusRank}/${card.totalRows}` : "—";
-
   const slots: Array<MatchExperienceRow | null> = [...card.rows];
   while (slots.length < MATCH_EXPERIENCE_PAGE_SIZE) slots.push(null);
 
@@ -91,29 +88,25 @@ function MatchExperienceCardView({
     ? card.position
     : (positionOptions[0] ?? card.position);
 
+  const identityTitle = `${card.clubName} · ${card.teamLabel}`;
+
   return (
     <article className="match-experience-card">
       <header className="match-experience-card-header">
-        <div className="match-experience-card-title" title={card.clubName}>
-          <h3>
-            {card.clubId ? (
-              <ClubLogo clubId={card.clubId} name={card.clubName} size="sm" />
-            ) : (
-              <span className="club-logo club-logo-sm club-logo-empty" aria-hidden="true" />
-            )}
+        <div className="match-experience-card-identity" title={identityTitle}>
+          {card.clubId ? (
+            <ClubLogo clubId={card.clubId} name={card.clubName} size="sm" />
+          ) : (
+            <span className="club-logo club-logo-sm club-logo-empty" aria-hidden="true" />
+          )}
+          <div className="match-experience-card-text">
+            <strong className="match-experience-club-name">{card.clubName}</strong>
             <span className="match-experience-team-type">{card.teamLabel}</span>
-          </h3>
-          <span className="match-experience-card-meta">
-            <span>{card.position}</span>
-            <span aria-hidden="true">·</span>
-            <span>{rankLabel}</span>
-          </span>
+          </div>
         </div>
         {positionOptions.length > 0 ? (
           <label className="match-experience-pos-select">
-            <span className="sr-only">
-              Position for {card.clubName} {card.teamLabel}
-            </span>
+            <span className="sr-only">Position for {identityTitle}</span>
             <select
               value={selectValue}
               onChange={(event) => onPositionChange(card.teamUid, event.target.value)}
@@ -167,6 +160,7 @@ export function MatchExperiencePanel({
         managedClubId,
         positionByTeam,
         defaultPosition,
+        snapshot.clubs,
       ),
     [
       player,
@@ -175,6 +169,7 @@ export function MatchExperiencePanel({
       managedClubId,
       positionByTeam,
       defaultPosition,
+      snapshot.clubs,
     ],
   );
 

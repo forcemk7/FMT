@@ -226,6 +226,7 @@ export function buildMatchExperienceCard(
   team: LiveClubTeam,
   position: string,
   managedClubId?: string | null,
+  clubs?: Array<{ id: string; name: string }>,
 ): MatchExperienceCard | null {
   const pos = position.trim();
   if (!pos) return null;
@@ -287,11 +288,18 @@ export function buildMatchExperienceCard(
   const start = matchExperienceWindowStart(allRows.length, focusRank);
   const rows = allRows.slice(start, start + MATCH_EXPERIENCE_PAGE_SIZE);
 
+  const clubName =
+    (teamClubId
+      ? clubs?.find((club) => club.id === teamClubId)?.name?.trim()
+      : null) ||
+    team.name.trim() ||
+    `Map club (?): uid-${team.teamUid}`;
+
   return {
     teamUid: team.teamUid,
     teamLabel: matchExperienceTeamLabel(team),
     clubId: teamClubId,
-    clubName: team.name.trim() || `Map club (?): uid-${team.teamUid}`,
+    clubName,
     position: pos,
     focusRank,
     teamPlayerCount: teamPlayers.length,
@@ -307,6 +315,7 @@ export function buildMatchExperienceCards(
   managedClubId?: string | null,
   positionByTeamUid?: Record<string, string | null | undefined>,
   defaultPosition?: string | null,
+  clubs?: Array<{ id: string; name: string }>,
 ): MatchExperienceCard[] {
   const fallback =
     defaultPosition?.trim() || matchExperiencePosition(focus);
@@ -323,6 +332,7 @@ export function buildMatchExperienceCards(
       team,
       position,
       managedClubId,
+      clubs,
     );
     if (card) cards.push(card);
   }
