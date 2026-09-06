@@ -35,4 +35,4 @@ Fullscreen should show all dash widgets without scrolling the page. Ability peek
 - Dash grid `repeat(3, 1fr)` rows + screen/slot fill; widget bodies scroll
 - Ability extras: logo · teamType · age · secondary; main CA/PA
 - Personality chips: full `label value`
-- Commit: (pending)
+- Commit: `0bd396a`
