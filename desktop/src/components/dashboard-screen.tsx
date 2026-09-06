@@ -99,9 +99,6 @@ export function DashboardScreen({
     Boolean(snapshot.managedClubId) &&
     (squad.length > 0 || bestPlayers.length > 0 || bestTalent.length > 0);
 
-  const managedClubName =
-    snapshot.clubs.find((club) => club.id === snapshot.managedClubId)?.name ?? null;
-
   const openFromView = (viewId: DashViewId) => (playerId: string) =>
     onOpenPlayer(playerId, { tab: dashViewProfileTab(viewId) });
 
@@ -157,7 +154,7 @@ export function DashboardScreen({
                     onOpen={openFromView("Best players")}
                     compact
                     clubTeams={snapshot.clubTeams}
-                    managedClubName={managedClubName}
+                    clubs={snapshot.clubs}
                   />
                 ))}
               </div>
@@ -184,7 +181,7 @@ export function DashboardScreen({
                     onOpen={openFromView("Best talent")}
                     compact
                     clubTeams={snapshot.clubTeams}
-                    managedClubName={managedClubName}
+                    clubs={snapshot.clubs}
                   />
                 ))}
               </div>
@@ -308,8 +305,6 @@ export function DashboardViewScreen({
     [snapshot],
   );
   const has = useMemo(() => squadHasRankings(squad, Math.max(squad.length, 1)), [squad]);
-  const managedClubName =
-    snapshot.clubs.find((club) => club.id === snapshot.managedClubId)?.name ?? null;
   const openPlayer = (playerId: string) =>
     onOpenPlayer(playerId, { tab: dashViewProfileTab(view) });
 
@@ -343,7 +338,7 @@ export function DashboardViewScreen({
             mode="players"
             onOpen={openPlayer}
             clubTeams={snapshot.clubTeams}
-            managedClubName={managedClubName}
+            clubs={snapshot.clubs}
           />
         ))}
       </div>
@@ -360,7 +355,7 @@ export function DashboardViewScreen({
             mode="talent"
             onOpen={openPlayer}
             clubTeams={snapshot.clubTeams}
-            managedClubName={managedClubName}
+            clubs={snapshot.clubs}
           />
         ))}
       </div>

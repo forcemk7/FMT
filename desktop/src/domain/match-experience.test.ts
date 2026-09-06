@@ -170,7 +170,7 @@ describe("matchExperienceTeamLabel", () => {
 });
 
 describe("matchExperiencePlayerCompetesOnTeam", () => {
-  it("excludes loaned-out from parent team and includes loan club", () => {
+  it("excludes loaned-out from parent and non-First loan teams; includes loan First", () => {
     const loaned = player({
       id: "y",
       name: "Youth",
@@ -178,8 +178,11 @@ describe("matchExperiencePlayerCompetesOnTeam", () => {
       loanedOut: true,
       loanClubId: "9001",
     });
-    expect(matchExperiencePlayerCompetesOnTeam(loaned, "t-u19", "920")).toBe(false);
-    expect(matchExperiencePlayerCompetesOnTeam(loaned, "t-feed", "9001")).toBe(true);
+    expect(matchExperiencePlayerCompetesOnTeam(loaned, "t-u19", "920", 2)).toBe(false);
+    expect(matchExperiencePlayerCompetesOnTeam(loaned, "t-feed", "9001", 0)).toBe(true);
+    expect(matchExperiencePlayerCompetesOnTeam(loaned, "t-legia-u19", "9001", 2)).toBe(
+      false,
+    );
   });
 });
 
@@ -206,6 +209,8 @@ describe("buildMatchExperienceCards", () => {
     affiliationType: 0x03,
     teamType: 0,
     rosterLen: 12,
+    clubId: "9001",
+    clubName: "Feeder FC",
   });
 
   const youth = player({
@@ -278,9 +283,57 @@ describe("buildMatchExperienceCards", () => {
     expect(feedCard.clubId).toBe("9001");
     expect(feedCard.clubName).toBe("Feeder FC");
     expect(feedCard.maxSamePosCa).toBe(110);
+    expect(feedCard.rows.some((row) => row.playerId === "loan")).toBe(true);
     expect(u19Card.rows.map((row) => row.playerId)).toEqual(["youth", "other"]);
     expect(u19Card.rows.some((row) => row.playerId === "loan")).toBe(false);
     expect(u19Card.isFocusCurrentTeam).toBe(true);
+  });
+
+  it("counts loaned-out same-pos CA on destination First Team ranks", () => {
+    const florin = player({
+      id: "florin",
+      name: "Florin",
+      positions: ["GK"],
+      bestCalculatedPosition: "GK",
+      currentAbility: 100,
+      squadTeamUid: "t-u19",
+      clubId: "920",
+    });
+    const joao = player({
+      id: "joao",
+      name: "Joao",
+      positions: ["GK"],
+      bestCalculatedPosition: "GK",
+      currentAbility: 140,
+      squadTeamUid: "t-u19",
+      clubId: "920",
+      loanedOut: true,
+      loanClubId: "9001",
+    });
+    const weakGk = player({
+      id: "weak",
+      name: "Weak GK",
+      positions: ["GK"],
+      currentAbility: 80,
+      squadTeamUid: "t-feed",
+      clubId: "9001",
+    });
+    const cards = buildMatchExperienceCards(
+      florin,
+      [florin, joao, weakGk],
+      [u19, feeder],
+      "920",
+      undefined,
+      "GK",
+      [
+        { id: "920", name: "Schalke" },
+        { id: "9001", name: "Feeder FC" },
+      ],
+    );
+    const feedCard = cards.find((card) => card.teamUid === "t-feed")!;
+    expect(feedCard.maxSamePosCa).toBe(140);
+    expect(feedCard.focusRank).toBe(2);
+    expect(feedCard.rows.map((row) => row.playerId)).toEqual(["joao", "florin", "weak"]);
   });
 
   it("prefers clubTeam owner club over player clubId for II", () => {

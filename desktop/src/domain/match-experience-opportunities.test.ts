@@ -192,4 +192,45 @@ describe("rankMatchExperienceOpportunities", () => {
     );
     expect(rows.map((row) => row.player.id)).toEqual([]);
   });
+
+  it("does not suggest #1 First when a stronger loaned GK is already there", () => {
+    const florin = player({
+      id: "florin",
+      name: "Florin",
+      positions: ["GK"],
+      bestCalculatedPosition: "GK",
+      currentAbility: 100,
+      potentialAbility: 140,
+      squadTeamUid: "t-u19",
+      clubId: "920",
+    });
+    const joao = player({
+      id: "joao",
+      name: "Joao",
+      positions: ["GK"],
+      bestCalculatedPosition: "GK",
+      currentAbility: 140,
+      squadTeamUid: "t-u19",
+      clubId: "920",
+      loanedOut: true,
+      loanClubId: "9001",
+    });
+    const weakGk = player({
+      id: "weak-gk",
+      name: "Weak GK",
+      positions: ["GK"],
+      currentAbility: 80,
+      squadTeamUid: "t-feed",
+      clubId: "9001",
+    });
+
+    const rows = rankMatchExperienceOpportunities(
+      snapshot([florin, joao, weakGk], [u19, feeder]),
+      8,
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.player.id).toBe("florin");
+    expect(rows[0]!.toTeamUid).toBe("t-feed");
+    expect(rows[0]!.focusRank).toBe(2);
+  });
 });

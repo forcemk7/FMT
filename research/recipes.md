@@ -6,7 +6,7 @@
 
 Update this file when a ticket locks or discards a recipe. Prefer recipes here over resurrecting deleted probe modules.
 
-**Last updated:** 2026-09-07 (T257 — Squad desk hide empty / ME clubTeams)
+**Last updated:** 2026-09-07 (T260 — ME counts loans on destination First)
 
 ---
 
@@ -43,6 +43,8 @@ Update this file when a ticket locks or discards a recipe. Prefer recipes here o
 **Loan honesty (T256):** `loanedOut` suppresses only loans whose destination UID is an **internal reserve** affiliate — Squad-tab `0x08` II (and type-less satellite / NPL). **Do not** put `0x01`/`0x03` feeders or ME-only feeder→II UIDs in that set — U19→Legia/Kaiser etc. must stay outgoing.
 
 **Squad desk clubTeams (T257):** Show only managed First / U19 / II (and satellites) with **loaded players > 0** (or manager First). Hide empty shells (Youth(0)). Feeders (`0x01`/`0x03`) and `matchExperienceOnly` hops stay off Squad — stamped ME-only at load.
+
+**ME loan competition (T260):** Outgoing `loanedOut` players keep parent `squadTeamUid`. Same-pos ranks must still pull them onto the **loan club First Team** via `loanClubId` (not parent roster). Without loan team uid, do **not** place them on loan-club Under N / Reserves cards.
 
 **Schalke evidence (2026-09-06):** `7/12` links mapped labels; `Map AffiliationType 0x03`; only `0x08` II was resolving before `0x03` allow-list. FMLE-only friendlies (Duisburg, Twente, …) stay out (`0x10` / `0x11`).
 

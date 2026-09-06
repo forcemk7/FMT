@@ -6,14 +6,17 @@ import {
   type SquadMoverChange,
 } from "@/domain/attribute-history";
 import { attributeDeltaTone } from "@/domain/attribute-tone";
-import { formatPlayerPositions, squadTeamDisplayName } from "@/domain/live-data";
+import { formatPlayerPositions } from "@/domain/live-data";
 import {
   dashPersonalityHighlights,
   formatHasScore,
   hasBand,
   type HasTone,
 } from "@/domain/has-score";
-import type { SquadAbilityRank } from "@/domain/squad-ability-rank";
+import {
+  dashClubTeamSpellout,
+  type SquadAbilityRank,
+} from "@/domain/squad-ability-rank";
 import type { MatchExperienceOpportunity } from "@/domain/match-experience-opportunities";
 import { HasBreakdownGridFromPlayer } from "@/components/has-breakdown-grid";
 import { ClubLogo } from "@/components/club-logo";
@@ -22,20 +25,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 
 function abilityLabel(value: number | null | undefined): string {
   return typeof value === "number" && Number.isFinite(value) ? String(Math.round(value)) : "—";
-}
-
-function teamLabelForPlayer(
-  player: LivePlayer,
-  clubTeams?: LiveClubTeam[],
-  managedClubName?: string | null,
-): string | null {
-  const team = clubTeams?.find((item) => item.teamUid === player.squadTeamUid);
-  if (team) return squadTeamDisplayName(team, managedClubName);
-  if (player.squadUnit === "under19s") return "Under 19s";
-  if (player.squadUnit === "reserves") return "Reserves";
-  if (player.squadUnit === "firstTeam") return "First Team";
-  if (player.loanedOut) return "On loan";
-  return null;
 }
 
 export function DashHasRow({
@@ -160,17 +149,17 @@ export function DashAbilityRow({
   onOpen,
   compact,
   clubTeams,
-  managedClubName,
+  clubs,
 }: {
   row: SquadAbilityRank;
   mode: "players" | "talent";
   onOpen: (id: string) => void;
   compact?: boolean;
   clubTeams?: LiveClubTeam[];
-  managedClubName?: string | null;
+  clubs?: Array<{ id: string; name: string }>;
 }) {
   const { player, ca, pa } = row;
-  const teamLabel = teamLabelForPlayer(player, clubTeams, managedClubName);
+  const teamLabel = dashClubTeamSpellout(player, clubTeams ?? [], clubs ?? []);
   const secondary =
     mode === "players" ? (
       <>

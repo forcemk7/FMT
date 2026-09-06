@@ -245,17 +245,22 @@ export function matchExperienceTeamClubId(
 
 /**
  * True when this player competes for game time on this team card.
- * Loaned-out players leave their parent roster; they compete on the loan club if loaded.
+ * Loaned-out players leave their parent roster; they compete on the loan
+ * club's First Team when that clubTeam is loaded (no loan team uid yet).
  */
 export function matchExperiencePlayerCompetesOnTeam(
   player: Pick<LivePlayer, "squadTeamUid" | "loanedOut" | "loanClubId" | "id">,
   teamUid: string,
   teamClubId: string | null,
+  teamBand?: number,
 ): boolean {
   if (player.loanedOut === true) {
     const loanClub = player.loanClubId?.trim();
     if (!loanClub || !teamClubId) return false;
-    return loanClub === teamClubId;
+    if (loanClub !== teamClubId) return false;
+    // Without loan squadTeamUid, treat destination First as the competition step.
+    if (typeof teamBand === "number") return teamBand === 0;
+    return true;
   }
   return player.squadTeamUid === teamUid;
 }
@@ -272,8 +277,6 @@ export function buildMatchExperienceCard(
   if (!pos) return null;
 
   const teamPlayers = matchExperienceResolvedPlayers(players, team.teamUid);
-  if (teamPlayers.length === 0) return null;
-
   const fromRoster = matchExperienceTeamClubId(teamPlayers);
   const fromTeam = team.clubId?.trim() || null;
   const teamClubId =
@@ -282,9 +285,14 @@ export function buildMatchExperienceCard(
     (isFeederAffiliate(team) || isIiClubAffiliate(team)
       ? null
       : managedClubId?.trim() || null);
-  const competing = teamPlayers.filter((player) =>
-    matchExperiencePlayerCompetesOnTeam(player, team.teamUid, teamClubId),
+  const teamBand = matchExperienceTeamBand(team);
+
+  const competing = players.filter((player) =>
+    matchExperiencePlayerCompetesOnTeam(player, team.teamUid, teamClubId, teamBand),
   );
+  // Need a loaded roster (or at least competitors) so empty shells stay hidden.
+  if (teamPlayers.length === 0 && competing.length === 0) return null;
+
   const onRosterSamePos = competing.filter((player) =>
     hasPrimaryPosition(player, pos),
   );
@@ -293,6 +301,7 @@ export function buildMatchExperienceCard(
     focus,
     team.teamUid,
     teamClubId,
+    teamBand,
   );
   const focusAlreadyListed = onRosterSamePos.some((player) => player.id === focus.id);
   const pool: LivePlayer[] =
@@ -323,6 +332,7 @@ export function buildMatchExperienceCard(
         player,
         team.teamUid,
         teamClubId,
+        teamBand,
       ),
     };
   });
@@ -350,10 +360,10 @@ export function buildMatchExperienceCard(
     clubName,
     position: pos,
     focusRank,
-    teamPlayerCount: teamPlayers.length,
+    teamPlayerCount: Math.max(teamPlayers.length, competing.length),
     rows,
     totalRows: allRows.length,
-    band: matchExperienceTeamBand(team),
+    band: teamBand,
     maxSamePosCa,
     isFocusCurrentTeam: focusCompetes,
   };

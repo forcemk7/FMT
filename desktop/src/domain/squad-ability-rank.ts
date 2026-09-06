@@ -3,7 +3,11 @@
  * Pool = owned managed-club players including loaned-out.
  */
 
-import type { LivePlayer } from "./adapters";
+import type { LiveClubTeam, LivePlayer } from "./adapters";
+import {
+  matchExperienceTeamBand,
+  matchExperienceTeamLabel,
+} from "./match-experience";
 
 const TALENT_AGE_MAX = 20;
 const DEFAULT_LIMIT = 8;
@@ -24,6 +28,58 @@ export function isOwnedManagedPlayer(
   managedClubId: string | null | undefined,
 ): boolean {
   return Boolean(managedClubId) && player.clubId === managedClubId;
+}
+
+function resolveClubName(
+  clubId: string | null | undefined,
+  clubTeams: LiveClubTeam[],
+  clubs: Array<{ id: string; name: string }>,
+  fallback?: string | null,
+): string | null {
+  const trimmed = fallback?.trim();
+  if (trimmed) return trimmed;
+  const id = clubId?.trim();
+  if (!id) return null;
+  const fromClubs = clubs.find((club) => club.id === id)?.name?.trim();
+  if (fromClubs) return fromClubs;
+  const fromTeam = clubTeams.find((team) => team.clubId === id)?.clubName?.trim();
+  return fromTeam || null;
+}
+
+/**
+ * Actual clubTeam for ability peeks: `{clubName} {teamType}`.
+ * Loaned-out → destination First Team when loaded.
+ */
+export function dashClubTeamSpellout(
+  player: LivePlayer,
+  clubTeams: LiveClubTeam[],
+  clubs: Array<{ id: string; name: string }> = [],
+): string | null {
+  if (player.loanedOut === true) {
+    const loanId = player.loanClubId?.trim() || null;
+    const first =
+      clubTeams.find(
+        (team) => team.clubId === loanId && matchExperienceTeamBand(team) === 0,
+      ) ?? clubTeams.find((team) => team.clubId === loanId);
+    const clubName = resolveClubName(loanId, clubTeams, clubs, player.loanClubName);
+    if (clubName && first) return `${clubName} ${matchExperienceTeamLabel(first)}`;
+    if (clubName) return `${clubName} First Team`;
+    return null;
+  }
+
+  const teamUid = player.squadTeamUid?.trim();
+  const team = teamUid
+    ? clubTeams.find((item) => item.teamUid === teamUid)
+    : undefined;
+  if (!team) return null;
+  const clubName = resolveClubName(
+    team.clubId,
+    clubTeams,
+    clubs,
+    team.clubName ?? player.clubName,
+  );
+  const type = matchExperienceTeamLabel(team);
+  return clubName ? `${clubName} ${type}` : type;
 }
 
 function byName(a: LivePlayer, b: LivePlayer): number {

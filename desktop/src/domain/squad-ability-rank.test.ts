@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { LivePlayer } from "./adapters";
 import {
+  dashClubTeamSpellout,
   isOwnedManagedPlayer,
   rankBestPlayers,
   rankBestTalent,
 } from "./squad-ability-rank";
+import type { LiveClubTeam } from "./adapters";
 
 function player(partial: Partial<LivePlayer> & { id: string; name: string }): LivePlayer {
   return {
@@ -104,5 +106,56 @@ describe("rankBestTalent", () => {
     const ranked = rankBestTalent(squad, "920", 5);
     expect(ranked.map((row) => row.player.id)).toEqual(["ft-kid", "loan-kid", "u19"]);
     expect(ranked[0]!.pa).toBe(170);
+  });
+});
+
+describe("dashClubTeamSpellout", () => {
+  const teams: LiveClubTeam[] = [
+    {
+      teamUid: "t-u19",
+      name: "U19",
+      clubName: "Schalke",
+      clubId: "920",
+      squadUnit: "under19s",
+      teamType: 11,
+      rosterLen: 2,
+      isManagerTeam: false,
+    },
+    {
+      teamUid: "t-legia",
+      name: "First Team",
+      clubName: "Legia",
+      clubId: "9001",
+      squadUnit: "firstTeam",
+      teamType: 0,
+      rosterLen: 20,
+      isManagerTeam: false,
+      affiliationType: 0x03,
+    },
+  ];
+
+  it("spells managed clubTeam as clubName + teamType", () => {
+    const kid = player({
+      id: "1",
+      name: "Kid",
+      squadTeamUid: "t-u19",
+      clubId: "920",
+    });
+    expect(dashClubTeamSpellout(kid, teams, [{ id: "920", name: "Schalke" }])).toBe(
+      "Schalke Under 19s",
+    );
+  });
+
+  it("spells loaned-out as destination First Team", () => {
+    const loan = player({
+      id: "2",
+      name: "Loan",
+      squadTeamUid: "t-u19",
+      clubId: "920",
+      loanedOut: true,
+      loanClubId: "9001",
+      loanClubName: "Legia",
+    });
+    expect(dashClubTeamSpellout(loan, teams)).toBe("Legia First Team");
   });
 });

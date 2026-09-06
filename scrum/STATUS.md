@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-07 (T259 done — Best players / Best talent)
+Last updated: 2026-09-07 (T260 done — ME loans + clubTeam spellout)
 
 ## Now
 
@@ -29,6 +29,7 @@ Last updated: 2026-09-07 (T259 done — Best players / Best talent)
 
 ## Recently done
 
+- **T260** Dash `{clubName} {teamType}` + ME counts loans on destination First
 - **T259** Dashboard Best players (CA) / Best talent (PA ≤20, loans+FT) + horizontal rows
 - **T258** Dashboard polish — Attribute changes / First-team path rows, tabs, `goBack`
 - **T257** Squad desk — hide empty / ME-only clubTeams (`isSquadDeskClubTeam`)
@@ -36,7 +37,6 @@ Last updated: 2026-09-07 (T259 done — Best players / Best talent)
 - **T255** ME widget club→club labels, deeplink to ME tab, blue/green cards
 - **T254** Dashboard Match experience opportunities (Under N/Res → First #1–2)
 - **T250** ME card order by max same-pos CA + current-team chrome
-- **T252** ME clubTeam logos via same UniqueID path (no parent fallback)
 
 ## Loop
 
