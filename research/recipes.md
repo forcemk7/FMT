@@ -6,7 +6,7 @@
 
 Update this file when a ticket locks or discards a recipe. Prefer recipes here over resurrecting deleted probe modules.
 
-**Last updated:** 2026-09-06 (T242 — ME labels + loan-flag wrapper diff)
+**Last updated:** 2026-09-06 (T245 — FMLE nested loan terms; wider RE dump)
 
 ---
 
@@ -46,7 +46,11 @@ Update this file when a ticket locks or discards a recipe. Prefer recipes here o
 
 - PGE display name for `0x03` (still `Map AffiliationType 0x03` in UI).
 - Main / Permanent / Players Move Freely **bytes** still unlocked.
-- **Players Go On Loan** flag: static-diff on `club+0x118` wrapper/nested via Schalke needles (Legia/Sparta/KL = on, Daegu/Melbourne = off). Report fields `loanFlagLock` / `loanFlag*Candidates`; when locked, feeder load requires loan-on value.
+- **Players Go On Loan** (T245): FMLE shows this as a **nested agreement term**, not top-level Type.
+  - Schalke A/B: loan-on = Legia / Sparta Praha / Kaiserslautern; loan-off = Daegu / Melbourne (both still `Main` top-level).
+  - II Club: top-level Main+Permanent; nested Players Move Freely — different type `0x08`, not the feeder loan filter.
+  - Nested UID record @ wrapper `+0x08` may be the wrong object for terms (0 nested u8 seps observed); side ptrs from wrapper + bit-diff in flight.
+  - Do **not** ship runtime name-needle auto-lock; lock offset once, then hardcoded read.
 - Sub / B / C / 2 / 3 / Feeder / etc. other type values; NPL still needs satellite or a locked type.
 
 ### Do not revive

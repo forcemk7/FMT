@@ -1,11 +1,11 @@
 ---
 id: T245
 title: Lock Players-Go-On-Loan affiliation byte
-status: ready
-priority: 2
-owner: null
-claimed_at: null
-started_at: null
+status: blocked
+priority: 1
+owner: auto
+claimed_at: "2026-09-06T22:27:00+02:00"
+started_at: "2026-09-06T22:27:00+02:00"
 completed_at: null
 depends_on: [T244]
 ---
@@ -29,6 +29,16 @@ Match experience still loads feeders without a loan agreement (Daegu, Melbourne)
 - [ ] No production runtime “find separators from club names”
 - [ ] Commit `T245: …`
 
+## Blockers
+
+Need the new Diagnostics line after rebuild/reconnect:
+
+`Affiliation loan-flag RE (FMLE nested Players-Go-On-Loan): …`
+
+That line now includes wrapper/nested u8 offsets, nested bit candidates, side-ptr region counts, and per-club nestedLen samples. FMLE confirms loan terms are nested (not Main/Permanent).
+
 ## Progress
 
-Ready after T244. Align: figure byte in Cursor/RE first, then ship the read.
+- FMLE map recorded in recipes: loan-on Legia/Sparta/KL; loan-off Daegu/Melbourne; II separate.
+- Probe widened: nested 0x100, wrapper side ptrs, bit separators; warning prints offsets (not just counts).
+- Still no hardcoded lock — waiting on paste of the new RE warning line.
