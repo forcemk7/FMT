@@ -737,78 +737,7 @@ fn collect_snapshot(progress: Option<&dyn Fn(&'static str)>) -> ConnectorSnapsho
                         lock.get("loanOffValue").and_then(Value::as_u64),
                     ) {
                         status.warnings.push(format!(
-                            "Affiliation loan-flag lock: {region}{off} loanOn={on} loanOff={offv} (Schalke Legia/Sparta/KL vs Daegu/Melbourne)."
-                        ));
-                    }
-                } else {
-                    let mut parts = Vec::new();
-                    if let Some(samples) = report.get("loanFlagSamples").and_then(Value::as_array) {
-                        if !samples.is_empty() {
-                            parts.push(format!(
-                                "samples={}",
-                                samples
-                                    .iter()
-                                    .filter_map(Value::as_str)
-                                    .collect::<Vec<_>>()
-                                    .join("; ")
-                            ));
-                        }
-                    }
-                    let fmt_u8 = |key: &str| {
-                        report
-                            .get(key)
-                            .and_then(Value::as_array)
-                            .map(|arr| {
-                                arr.iter()
-                                    .filter_map(|c| {
-                                        let off = c.get("offsetHex")?.as_str()?;
-                                        let on = c.get("loanOn")?.as_u64()?;
-                                        let offv = c.get("loanOff")?.as_u64()?;
-                                        Some(format!("{off}:on={on}/off={offv}"))
-                                    })
-                                    .collect::<Vec<_>>()
-                                    .join(", ")
-                            })
-                            .unwrap_or_default()
-                    };
-                    let w = fmt_u8("loanFlagWrapperCandidates");
-                    let n = fmt_u8("loanFlagNestedCandidates");
-                    if !w.is_empty() {
-                        parts.push(format!("wrapper[{w}]"));
-                    }
-                    if !n.is_empty() {
-                        parts.push(format!("nestedU8[{n}]"));
-                    }
-                    if let Some(bits) = report
-                        .get("loanFlagNestedBitCandidates")
-                        .and_then(Value::as_array)
-                    {
-                        if !bits.is_empty() {
-                            let s = bits
-                                .iter()
-                                .filter_map(|c| {
-                                    let off = c.get("offsetHex")?.as_str()?;
-                                    let bit = c.get("bit")?.as_u64()?;
-                                    let on_one = c.get("loanOnBitIsOne")?.as_bool()?;
-                                    Some(format!("{off}.b{bit}={}", if on_one { 1 } else { 0 }))
-                                })
-                                .collect::<Vec<_>>()
-                                .join(", ");
-                            parts.push(format!("nestedBits[{s}]"));
-                        }
-                    }
-                    if let Some(sides) = report
-                        .get("loanFlagSideCandidates")
-                        .and_then(Value::as_array)
-                    {
-                        if !sides.is_empty() {
-                            parts.push(format!("{} side-ptr region(s) with separators", sides.len()));
-                        }
-                    }
-                    if !parts.is_empty() {
-                        status.warnings.push(format!(
-                            "Affiliation loan-flag RE (FMLE nested Players-Go-On-Loan): {}. Paste this line.",
-                            parts.join(" · ")
+                            "Affiliation Players-Go-On-Loan filter: {region}{off} on={on} off={offv} (hardcoded; feeders without loan-on skipped)."
                         ));
                     }
                 }

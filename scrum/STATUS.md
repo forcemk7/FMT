@@ -1,12 +1,12 @@
 ﻿# Status
 
-Last updated: 2026-09-06 (T245 blocked — need affiliation hex dump)
+Last updated: 2026-09-06 (T245 done — Players Go On Loan nested+0x65)
 
 ## Now
 
-**T245 blocked** — lock Players-Go-On-Loan byte (need wrapper/nested hex for loan-on vs loan-off clubs).
+**T249 ready** — load feeder Reserve clubTeams for ME.
 
-**Next (ready):** T249 feeder Reserve clubTeams · T250 ME strength order + chrome.
+**T250 ready** — ME strength order + status chrome (after T249).
 
 **T190 parked** — Save ID in RAM before save-copy CA path.
 
@@ -18,9 +18,8 @@ Last updated: 2026-09-06 (T245 blocked — need affiliation hex dump)
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
-| T245 | Lock Players-Go-On-Loan affiliation byte | blocked | 1 | owner auto — need hex dump |
-| T249 | Load feeder Reserve clubTeams for ME | ready | 2 | after T245; filter is intentional today |
-| T250 | ME card order by team strength + status chrome | ready | 3 | after T249; max-CA first |
+| T249 | Load feeder Reserve clubTeams for ME | ready | 2 | next |
+| T250 | ME card order by team strength + status chrome | ready | 3 | after T249 |
 | T190 | Development all-time from Progress Report CA strip | blocked | 2 | **parked** |
 | T210 | Squad — card / list density toggle | deferred | — | not now |
 | T215 | Diagnostics — source-of-truth skeleton + live fill | deferred | — | after product loops |
@@ -33,11 +32,11 @@ Last updated: 2026-09-06 (T245 blocked — need affiliation hex dump)
 
 ## Recently done
 
+- **T245** Lock Players-Go-On-Loan affiliation byte (nested+0x65)
 - **T248** ME header TeamType first; sort by TeamType
 - **T247** clubTeam owner clubId/name for ME headers
 - **T246** ME card header — logo + club + TeamType subtitle
 - **T244** ME cards — club logo + TeamType header
-- **T243** Unclip attr Δ glyphs without row-height shift
 
 ## Loop
 

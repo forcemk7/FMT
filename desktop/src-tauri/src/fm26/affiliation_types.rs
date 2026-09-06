@@ -21,6 +21,19 @@ pub(crate) const AFFILIATION_VECTOR_OFFSET: u64 = 0x118;
 pub(crate) const AFFILIATION_TYPE_OFFSET: usize = 0x30;
 /// Partner club UniqueID on the nested record (duplicated at +0x10).
 pub(crate) const NESTED_PARTNER_UID_OFFSET: usize = 0x0C;
+/// FMLE “Players Go On Loan” on nested agreement (Schalke 2026-09-06 lock).
+/// loan-on = Legia / Sparta Praha / Kaiserslautern (`1`); loan-off = Daegu / Melbourne (`0`).
+pub(crate) const PLAYERS_GO_ON_LOAN_NESTED_OFFSET: usize = 0x65;
+pub(crate) const PLAYERS_GO_ON_LOAN_ON: u8 = 1;
+pub(crate) const PLAYERS_GO_ON_LOAN_OFF: u8 = 0;
+
+/// True when nested agreement has Players-Go-On-Loan (hardcoded lock, not name needles).
+pub(crate) fn nested_players_go_on_loan(nested_bytes: &[u8]) -> bool {
+    nested_bytes
+        .get(PLAYERS_GO_ON_LOAN_NESTED_OFFSET)
+        .copied()
+        == Some(PLAYERS_GO_ON_LOAN_ON)
+}
 
 #[cfg(target_os = "windows")]
 const MAX_AFFILIATION_SLOTS: usize = 48;
@@ -77,8 +90,6 @@ pub(crate) struct AffiliationLinkSighting {
     pub wrapper_bytes: Vec<u8>,
     /// Nested partner/UID record bytes when readable.
     pub nested_bytes: Vec<u8>,
-    /// Extra heap objects pointed from the wrapper (offset → bytes), RE for term flags.
-    pub side_blobs: Vec<(usize, Vec<u8>)>,
 }
 
 #[derive(Debug, Clone)]
@@ -89,10 +100,8 @@ pub(crate) struct AffiliationTypeWalk {
 
 /// Bytes read from each affiliation wrapper for flag hunting.
 pub(crate) const AFFILIATION_WRAPPER_PROBE_BYTES: usize = 0x80;
-/// Bytes read from nested partner record (UID @ +0x0C) — enlarge for term-flag hunt.
-pub(crate) const AFFILIATION_NESTED_PROBE_BYTES: usize = 0x100;
-/// Side objects pointed from wrapper (agreement terms may not be the UID nested).
-pub(crate) const AFFILIATION_SIDE_PROBE_BYTES: usize = 0x80;
+/// Bytes read from nested partner record (must cover Players-Go-On-Loan @ +0x65).
+pub(crate) const AFFILIATION_NESTED_PROBE_BYTES: usize = 0x80;
 
 /// Offsets where every `loan_on` blob shares one u8 value and every `loan_off`
 /// blob shares a different u8 — candidates for “Players Go On Loan”.
@@ -320,23 +329,6 @@ pub(crate) fn walk_club_affiliation_links(
         if partner_uid == 0 {
             continue;
         }
-        let managed_club_ptr = u64::from_le_bytes(wrap[0..8].try_into().unwrap());
-        let mut side_blobs = Vec::new();
-        for field_off in (0x10..AFFILIATION_WRAPPER_PROBE_BYTES).step_by(8) {
-            if field_off == AFFILIATION_TYPE_OFFSET {
-                continue;
-            }
-            if field_off + 8 > wrap.len() {
-                break;
-            }
-            let ptr = u64::from_le_bytes(wrap[field_off..field_off + 8].try_into().unwrap());
-            if !looks_heap(ptr) || ptr == nested || ptr == managed_club_ptr || ptr == wrapper {
-                continue;
-            }
-            if let Some(blob) = reader.read_bytes(ptr, AFFILIATION_SIDE_PROBE_BYTES) {
-                side_blobs.push((field_off, blob));
-            }
-        }
         let mapped_label = affiliation_type_label(type_byte);
         if mapped_label.is_none() && !unmapped.contains(&type_byte) {
             unmapped.push(type_byte);
@@ -350,7 +342,6 @@ pub(crate) fn walk_club_affiliation_links(
             mapped_label,
             wrapper_bytes: wrap,
             nested_bytes,
-            side_blobs,
         });
     }
 
@@ -390,10 +381,7 @@ pub(crate) fn affiliation_walk_to_json(walk: &AffiliationTypeWalk) -> Value {
             "wrapperBytesHex": l.wrapper_bytes.iter().map(|b| format!("{b:02x}")).collect::<String>(),
             "nestedBytesHex": l.nested_bytes.iter().map(|b| format!("{b:02x}")).collect::<String>(),
             "nestedLen": l.nested_bytes.len(),
-            "sidePtrs": l.side_blobs.iter().map(|(off, blob)| json!({
-                "wrapperFieldHex": format!("0x{off:X}"),
-                "bytesHex": blob.iter().map(|b| format!("{b:02x}")).collect::<String>(),
-            })).collect::<Vec<_>>(),
+            "playersGoOnLoanByte": l.nested_bytes.get(PLAYERS_GO_ON_LOAN_NESTED_OFFSET).copied(),
         })).collect::<Vec<_>>(),
     })
 }
@@ -414,7 +402,8 @@ mod tests {
     use super::{
         affiliation_type_label, find_stable_bit_separators, find_stable_u8_separators,
         is_match_experience_feeder_type, is_roster_load_affiliation_type,
-        is_squad_tab_affiliation_type, schalke_loan_off_name, schalke_loan_on_name,
+        is_squad_tab_affiliation_type, nested_players_go_on_loan, schalke_loan_off_name,
+        schalke_loan_on_name, PLAYERS_GO_ON_LOAN_NESTED_OFFSET, PLAYERS_GO_ON_LOAN_ON,
     };
 
     #[test]
@@ -455,10 +444,19 @@ mod tests {
 
     #[test]
     fn stable_bit_separator_finds_flag_bit() {
-        // bit 2 set in on, clear in off
         let on = vec![vec![0b0000_0100], vec![0b0000_0100]];
         let off = vec![vec![0b0000_0000], vec![0b0000_0001]];
         let bits = find_stable_bit_separators(&on, &off);
         assert!(bits.contains(&(0, 2, true)));
+    }
+
+    #[test]
+    fn nested_players_go_on_loan_reads_locked_offset() {
+        let mut on = vec![0u8; PLAYERS_GO_ON_LOAN_NESTED_OFFSET + 1];
+        on[PLAYERS_GO_ON_LOAN_NESTED_OFFSET] = PLAYERS_GO_ON_LOAN_ON;
+        let off = vec![0u8; PLAYERS_GO_ON_LOAN_NESTED_OFFSET + 1];
+        assert!(nested_players_go_on_loan(&on));
+        assert!(!nested_players_go_on_loan(&off));
+        assert!(!nested_players_go_on_loan(&[]));
     }
 }

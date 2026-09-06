@@ -6,7 +6,7 @@
 
 Update this file when a ticket locks or discards a recipe. Prefer recipes here over resurrecting deleted probe modules.
 
-**Last updated:** 2026-09-06 (T245 — FMLE nested loan terms; wider RE dump)
+**Last updated:** 2026-09-06 (T245 — Players Go On Loan nested+0x65 locked)
 
 ---
 
@@ -30,13 +30,15 @@ Update this file when a ticket locks or discards a recipe. Prefer recipes here o
 
 | Byte | Meaning | Squad tab? | Roster load? |
 |------|---------|------------|--------------|
-| `0x01` | Normal Affiliated Club | no | **yes** (Match experience) |
-| `0x03` | Feeder partners (Schalke: Legia / Kaiserslautern / …) — **PGE label TBD** | no | **yes** (Match experience) |
+| `0x01` | Normal Affiliated Club | no | **yes** if nested+0x65 loan-on |
+| `0x03` | Feeder partners (Schalke: Legia / Kaiserslautern / …) — **PGE label TBD** | no | **yes** if nested+0x65 loan-on |
 | `0x08` | II Club | **yes** | **yes** |
 | `0x10` | Good Relations | no | no |
 | `0x11` | Likely Friendly | no | no |
 
-**Production:** type walk first — roster allow-list `0x08` \| `0x01` \| `0x03` (`is_roster_load_affiliation_type`); Squad desk filters out `0x01` / `0x03`. T212-style satellite merge only for NPL / unmapped types; other unmapped `+0x30` → Diagnostics `Map AffiliationType 0xNN`. Feeders: Club.Teams First + Under-N/Youth; II: First (or largest) as Squad 2nd side.
+**Players Go On Loan (locked T245):** nested agreement byte `@+0x65` — `1` = on, `0` = off. Evidence: Schalke Legia / Sparta Praha / Kaiserslautern vs Daegu / Melbourne (FMLE nested term). Production: `nested_players_go_on_loan`; no name needles.
+
+**Production:** type walk first — roster allow-list `0x08` \| (`0x01`/`0x03` + loan-on); Squad desk filters out `0x01` / `0x03`. T212-style satellite merge only for NPL / unmapped types; other unmapped `+0x30` → Diagnostics `Map AffiliationType 0xNN`. Feeders: Club.Teams First + Under-N/Youth; II: First (or largest) as Squad 2nd side.
 
 **Schalke evidence (2026-09-06):** `7/12` links mapped labels; `Map AffiliationType 0x03`; only `0x08` II was resolving before `0x03` allow-list. FMLE-only friendlies (Duisburg, Twente, …) stay out (`0x10` / `0x11`).
 
@@ -46,11 +48,6 @@ Update this file when a ticket locks or discards a recipe. Prefer recipes here o
 
 - PGE display name for `0x03` (still `Map AffiliationType 0x03` in UI).
 - Main / Permanent / Players Move Freely **bytes** still unlocked.
-- **Players Go On Loan** (T245): FMLE shows this as a **nested agreement term**, not top-level Type.
-  - Schalke A/B: loan-on = Legia / Sparta Praha / Kaiserslautern; loan-off = Daegu / Melbourne (both still `Main` top-level).
-  - II Club: top-level Main+Permanent; nested Players Move Freely — different type `0x08`, not the feeder loan filter.
-  - Nested UID record @ wrapper `+0x08` may be the wrong object for terms (0 nested u8 seps observed); side ptrs from wrapper + bit-diff in flight.
-  - Do **not** ship runtime name-needle auto-lock; lock offset once, then hardcoded read.
 - Sub / B / C / 2 / 3 / Feeder / etc. other type values; NPL still needs satellite or a locked type.
 
 ### Do not revive
@@ -59,6 +56,7 @@ Update this file when a ticket locks or discards a recipe. Prefer recipes here o
 - Byte-diff II heap (`link club@+0x160`) vs `@0x8E8` for Main/Permanent/PMF.
 - Port AppCake `Relationship.Permanent@0xD` for club affiliations.
 - Expect free FMLE checkbox A/B to write RAM (Save Changes needs license).
+- Runtime Schalke name-needle auto-diff / candidate lock for Players Go On Loan (replaced by nested+0x65).
 
 **Code today:** `fm26/affiliate_links.rs` + `affiliation_types.rs` (+ `blob_scan` helpers).
 
