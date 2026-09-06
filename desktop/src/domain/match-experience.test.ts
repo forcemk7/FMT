@@ -3,6 +3,7 @@ import type { LiveClubTeam, LivePlayer } from "./adapters";
 import {
   buildMatchExperienceCards,
   matchExperiencePosition,
+  matchExperiencePositionOptions,
   matchExperienceTeamBand,
   matchExperienceWindowStart,
   sortClubTeamsForMatchExperience,
@@ -71,6 +72,22 @@ describe("matchExperiencePosition", () => {
         player({ id: "1", name: "A", positions: ["DR", "MR"] }),
       ),
     ).toBe("DR");
+  });
+});
+
+describe("matchExperiencePositionOptions", () => {
+  it("unions best, primary, and secondary", () => {
+    expect(
+      matchExperiencePositionOptions(
+        player({
+          id: "1",
+          name: "A",
+          bestCalculatedPosition: "ST",
+          positions: ["ST"],
+          secondaryPositions: ["AMC", "MC"],
+        }),
+      ),
+    ).toEqual(["ST", "AMC", "MC"]);
   });
 });
 
@@ -143,6 +160,12 @@ describe("buildMatchExperienceCards", () => {
     teamType: 2,
     rosterLen: 2,
   });
+  const emptyTeam = team({
+    teamUid: "t-empty",
+    name: "Empty",
+    squadUnit: "reserves",
+    rosterLen: 5,
+  });
 
   const youth = player({
     id: "youth",
@@ -166,7 +189,7 @@ describe("buildMatchExperienceCards", () => {
     currentAbility: 100,
     squadTeamUid: "t-u19",
   });
-  const mid = player({
+  const midOnly = player({
     id: "mid",
     name: "Mid",
     positions: ["MC"],
@@ -177,54 +200,73 @@ describe("buildMatchExperienceCards", () => {
   it("builds per-team same-primary CA ranks and injects focus off-roster", () => {
     const cards = buildMatchExperienceCards(
       youth,
-      [youth, seniorSt, otherSt, mid],
+      [youth, seniorSt, otherSt, midOnly],
       [u19, first],
     );
     expect(cards.map((card) => card.teamUid)).toEqual(["t-first", "t-u19"]);
-
-    const firstCard = cards[0]!;
-    expect(firstCard.position).toBe("ST");
-    expect(firstCard.rows.map((row) => row.playerId)).toEqual(["senior", "youth"]);
-    expect(firstCard.focusRank).toBe(2);
-    expect(firstCard.rows[1]).toMatchObject({
-      isFocus: true,
-      isOnRoster: false,
-    });
-
-    const u19Card = cards[1]!;
-    expect(u19Card.rows.map((row) => row.playerId)).toEqual(["youth", "other"]);
-    expect(u19Card.focusRank).toBe(1);
+    expect(cards[0]!.rows.map((row) => row.playerId)).toEqual(["senior", "youth"]);
+    expect(cards[0]!.focusRank).toBe(2);
+    expect(cards[1]!.rows.map((row) => row.playerId)).toEqual(["youth", "other"]);
   });
 
-  it("hides teams with no same-pos roster peers", () => {
-    const emptySide = team({
-      teamUid: "t-empty",
-      name: "Empty",
-      squadUnit: "reserves",
-      rosterLen: 5,
+  it("hides teams with zero resolved players, keeps teams with peers of other positions", () => {
+    const feeder = team({
+      teamUid: "t-feed",
+      name: "Feeder",
+      squadUnit: "firstTeam",
+      affiliationType: 0x01,
+      teamType: 0,
+      rosterLen: 12,
+    });
+    const feederMid = player({
+      id: "fm",
+      name: "Feeder Mid",
+      positions: ["MC"],
+      currentAbility: 90,
+      squadTeamUid: "t-feed",
     });
     const cards = buildMatchExperienceCards(
       youth,
-      [youth, seniorSt, otherSt],
-      [first, u19, emptySide],
+      [youth, seniorSt, otherSt, feederMid],
+      [first, u19, emptyTeam, feeder],
+      null,
+      undefined,
+      "ST",
     );
-    expect(cards.map((card) => card.teamUid)).toEqual(["t-first", "t-u19"]);
+    expect(cards.map((card) => card.teamUid)).toEqual(["t-first", "t-u19", "t-feed"]);
+    const feedCard = cards.find((card) => card.teamUid === "t-feed")!;
+    expect(feedCard.rows.map((row) => row.playerId)).toEqual(["youth"]);
+    expect(feedCard.rows[0]).toMatchObject({ isFocus: true, isOnRoster: false });
+  });
+
+  it("windows long lists around focus without exceeding page size", () => {
+    const many = Array.from({ length: 8 }, (_, index) =>
+      player({
+        id: `s${index}`,
+        name: `Senior ${index}`,
+        positions: ["ST"],
+        currentAbility: 160 - index,
+        squadTeamUid: "t-first",
+      }),
+    );
+    const cards = buildMatchExperienceCards(youth, [youth, ...many], [first]);
+    expect(cards[0]!.totalRows).toBe(9);
+    expect(cards[0]!.rows).toHaveLength(5);
+    expect(cards[0]!.rows.some((row) => row.isFocus)).toBe(true);
   });
 
   it("allows per-team position overrides", () => {
     const cards = buildMatchExperienceCards(
       youth,
-      [youth, seniorSt, otherSt, mid],
+      [youth, seniorSt, otherSt, midOnly],
       [first, u19],
       null,
       { "t-first": "MC", "t-u19": "ST" },
     );
     expect(cards.find((card) => card.teamUid === "t-first")?.position).toBe("MC");
-    expect(cards.find((card) => card.teamUid === "t-first")?.rows.map((r) => r.playerId)).toEqual([
-      "mid",
-      "youth",
-    ]);
-    expect(cards.find((card) => card.teamUid === "t-u19")?.position).toBe("ST");
+    expect(
+      cards.find((card) => card.teamUid === "t-first")?.rows.map((row) => row.playerId),
+    ).toEqual(["mid", "youth"]);
   });
 
   it("returns empty when focus has no position", () => {

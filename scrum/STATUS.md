@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-06 (T237 done — Match experience UX + Normal affiliates)
+Last updated: 2026-09-06 (T238 done — fix Match experience cards)
 
 ## Now
 
@@ -26,13 +26,10 @@ Last updated: 2026-09-06 (T237 done — Match experience UX + Normal affiliates)
 
 ## Recently done
 
+- **T238** Fix Match experience cards + Normal 0x01 path
 - **T237** Match experience UX + Normal affiliate rosters
 - **T236** Match experience profile tab (same-pos CA by loaded clubTeam)
 - **T235** Drop shortName display; TeamType + full team name
-- **T234** Profile stop clubName substitute; shortName map honesty
-- **T233** Pure TeamType / shortName display rule (superseded by T235)
-- **T232** Drop FC prefix string hacks
-- **T231–T230** shortName profile attempts (superseded)
 
 ## Loop
 

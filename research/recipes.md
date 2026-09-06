@@ -6,7 +6,7 @@
 
 Update this file when a ticket locks or discards a recipe. Prefer recipes here over resurrecting deleted probe modules.
 
-**Last updated:** 2026-09-05 (T220 — moved to `research/`)
+**Last updated:** 2026-09-06 (T238 — Normal `0x01` roster load for Match experience)
 
 ---
 
@@ -28,18 +28,18 @@ Update this file when a ticket locks or discards a recipe. Prefer recipes here o
 
 **Type map (locked):**
 
-| Byte | Meaning | Squad tab? |
-|------|---------|------------|
-| `0x01` | Normal Affiliated Club | no |
-| `0x08` | II Club | **yes** |
-| `0x10` | Good Relations | no |
-| `0x11` | Likely Friendly | no |
+| Byte | Meaning | Squad tab? | Roster load? |
+|------|---------|------------|--------------|
+| `0x01` | Normal Affiliated Club | no | **yes** (Match experience) |
+| `0x08` | II Club | **yes** | **yes** |
+| `0x10` | Good Relations | no | no |
+| `0x11` | Likely Friendly | no | no |
 
-**Production:** type walk first (allow-list `0x08`); T212-style satellite merge only for NPL / unmapped types; unmapped `+0x30` → Diagnostics `Map AffiliationType 0xNN`.
+**Production:** type walk first — roster allow-list `0x08` \| `0x01` (`is_roster_load_affiliation_type`); Squad desk filters out `0x01`. T212-style satellite merge only for NPL / unmapped types; unmapped `+0x30` → Diagnostics `Map AffiliationType 0xNN`. Normal affiliates: Club.Teams First + Under-N/Youth; II: First (or largest) as Squad 2nd side.
 
 **Cancel A/B:** cancelling inbox affiliation shrinks `+0x118` by cancelled count (edge confirmed).
 
-**Schalke FM Affiliates (Squad-class ground truth):** II, Daegu, Kaiserslautern, Legia, Melbourne Victory, Sparta Praha. FMLE-only friendlies (Duisburg, Twente, …) are **not** Squad tabs.
+**Schalke FM Affiliates (Squad-class ground truth):** II, Daegu, Kaiserslautern, Legia, Melbourne Victory, Sparta Praha. FMLE-only friendlies (Duisburg, Twente, …) are **not** Squad tabs. Normal (`0x01`) feeders load for Match experience only.
 
 ### Open
 

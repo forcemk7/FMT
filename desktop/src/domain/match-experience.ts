@@ -5,7 +5,7 @@
 import type { LiveClubTeam, LivePlayer } from "./adapters";
 import { squadTeamDisplayName } from "./live-data";
 
-/** Visible rows per card — fixed height, scroll within card when longer. */
+/** Visible rows per card — fixed height, no scrollbar (window around focus). */
 export const MATCH_EXPERIENCE_PAGE_SIZE = 5;
 
 export type MatchExperienceRow = {
@@ -22,9 +22,12 @@ export type MatchExperienceCard = {
   teamLabel: string;
   position: string;
   focusRank: number | null;
-  /** Same-pos players actually on this roster (excludes projected-only inject). */
-  rosterPeerCount: number;
+  /** Players resolved onto this team (any position). */
+  teamPlayerCount: number;
+  /** Visible window (≤ PAGE_SIZE); ranks stay global. */
   rows: MatchExperienceRow[];
+  /** Total ranked rows before windowing. */
+  totalRows: number;
 };
 
 /** Best single position code for competition compare. */
@@ -35,6 +38,26 @@ export function matchExperiencePosition(
   if (best) return best;
   const primary = player.positions?.[0]?.trim();
   return primary || null;
+}
+
+/** Primary + secondary codes for per-card position select. */
+export function matchExperiencePositionOptions(
+  player: Pick<LivePlayer, "positions" | "secondaryPositions" | "bestCalculatedPosition">,
+): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const push = (code: string | null | undefined) => {
+    const trimmed = code?.trim();
+    if (!trimmed) return;
+    const key = trimmed.toUpperCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(trimmed);
+  };
+  push(player.bestCalculatedPosition);
+  for (const code of player.positions ?? []) push(code);
+  for (const code of player.secondaryPositions ?? []) push(code);
+  return out;
 }
 
 function hasPrimaryPosition(
@@ -79,16 +102,29 @@ export function matchExperienceTeamBand(
     return 5;
   }
 
-  // Managed club sides + II Club / NPL satellite (treated as 2nd side).
   if (!iiOrSatellite && team.squadUnit === "firstTeam") return 0;
   if (!iiOrSatellite && team.squadUnit === "under19s") return 1;
-  // Managed reserves, II Club, other affiliate reserves → "2nd club team"
   return 2;
 }
 
 /**
- * One card for a clubTeam at a chosen primary position.
- * Returns null when nobody on that roster plays the position (hide empty cards).
+ * Slice start so `focusRank` (1-based) sits in a PAGE_SIZE window.
+ */
+export function matchExperienceWindowStart(
+  rowCount: number,
+  focusRank: number | null,
+  pageSize: number = MATCH_EXPERIENCE_PAGE_SIZE,
+): number {
+  if (rowCount <= pageSize) return 0;
+  if (focusRank == null || focusRank < 1) return 0;
+  const focusIndex = focusRank - 1;
+  const ideal = focusIndex - Math.floor((pageSize - 1) / 2);
+  return Math.max(0, Math.min(ideal, rowCount - pageSize));
+}
+
+/**
+ * One card for a clubTeam at a chosen position.
+ * Returns null when the team has zero resolved players (any position).
  */
 export function buildMatchExperienceCard(
   focus: LivePlayer,
@@ -100,12 +136,14 @@ export function buildMatchExperienceCard(
   const pos = position.trim();
   if (!pos) return null;
 
-  const onRoster = players.filter(
-    (player) =>
-      player.squadTeamUid === team.teamUid && hasPrimaryPosition(player, pos),
+  const teamPlayers = players.filter(
+    (player) => player.squadTeamUid === team.teamUid,
   );
-  if (onRoster.length === 0) return null;
+  if (teamPlayers.length === 0) return null;
 
+  const onRoster = teamPlayers.filter((player) =>
+    hasPrimaryPosition(player, pos),
+  );
   const focusOnRoster = onRoster.some((player) => player.id === focus.id);
   const pool: LivePlayer[] = focusOnRoster ? onRoster : [...onRoster, focus];
 
@@ -116,7 +154,7 @@ export function buildMatchExperienceCard(
   });
 
   let focusRank: number | null = null;
-  const rows: MatchExperienceRow[] = sorted.map((player, index) => {
+  const allRows: MatchExperienceRow[] = sorted.map((player, index) => {
     const rank = index + 1;
     const isFocus = player.id === focus.id;
     if (isFocus) focusRank = rank;
@@ -130,19 +168,23 @@ export function buildMatchExperienceCard(
     };
   });
 
+  const start = matchExperienceWindowStart(allRows.length, focusRank);
+  const rows = allRows.slice(start, start + MATCH_EXPERIENCE_PAGE_SIZE);
+
   return {
     teamUid: team.teamUid,
     teamLabel: squadTeamDisplayName(team, managedClubName),
     position: pos,
     focusRank,
-    rosterPeerCount: onRoster.length,
+    teamPlayerCount: teamPlayers.length,
     rows,
+    totalRows: allRows.length,
   };
 }
 
 /**
- * Cards for all loaded clubTeams. `positionByTeamUid` overrides default per card.
- * Empty same-pos rosters are omitted.
+ * Cards for loaded clubTeams with ≥1 resolved player.
+ * `positionByTeamUid` overrides default per card.
  */
 export function buildMatchExperienceCards(
   focus: LivePlayer,
@@ -171,20 +213,4 @@ export function buildMatchExperienceCards(
     if (card) cards.push(card);
   }
   return cards;
-}
-
-/**
- * Slice start so `focusRank` (1-based) sits in a PAGE_SIZE window.
- * Prefer centering the focus player when the list is longer than the page.
- */
-export function matchExperienceWindowStart(
-  rowCount: number,
-  focusRank: number | null,
-  pageSize: number = MATCH_EXPERIENCE_PAGE_SIZE,
-): number {
-  if (rowCount <= pageSize) return 0;
-  if (focusRank == null || focusRank < 1) return 0;
-  const focusIndex = focusRank - 1;
-  const ideal = focusIndex - Math.floor((pageSize - 1) / 2);
-  return Math.max(0, Math.min(ideal, rowCount - pageSize));
 }

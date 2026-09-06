@@ -1451,17 +1451,19 @@ fn load_bteam_affiliate_rosters(
         }
 
         let normal_affiliate = affiliate.affiliation_type == Some(0x01);
+        // Same Club.Teams path for II (0x08) and Normal (0x01): prefer First (type 0),
+        // else largest roster. Normal also keeps Under-N / Youth sides when typed.
         if normal_affiliate {
-            // Match experience: First + Under-N / Youth; drop unknown / empty shells.
             linked_teams.retain(|team| {
                 team.roster_len > 0
-                    && team
-                        .team_type
-                        .and_then(crate::fm26::affiliate_links::squad_unit_from_team_type)
-                        .is_some()
+                    && matches!(
+                        team
+                            .team_type
+                            .and_then(crate::fm26::affiliate_links::squad_unit_from_team_type),
+                        Some("firstTeam") | Some("under19s")
+                    )
             });
         } else if linked_teams.iter().any(|team| team.team_type == Some(0)) {
-            // II / satellite reserve: First only when present.
             linked_teams.retain(|team| team.team_type == Some(0));
         } else if linked_teams.len() > 1 {
             let max_roster = linked_teams
@@ -1471,11 +1473,17 @@ fn load_bteam_affiliate_rosters(
                 .unwrap_or(0);
             linked_teams.retain(|team| team.roster_len == max_roster);
         }
+        // II / satellite: force reserves unit for Squad band (2nd side).
+        // Normal: use real TeamType → firstTeam / under19s.
         for team in linked_teams {
-            let squad_unit = team
-                .team_type
-                .and_then(crate::fm26::affiliate_links::squad_unit_from_team_type)
-                .unwrap_or("reserves");
+            let squad_unit = if normal_affiliate {
+                team
+                    .team_type
+                    .and_then(crate::fm26::affiliate_links::squad_unit_from_team_type)
+                    .unwrap_or("firstTeam")
+            } else {
+                "reserves"
+            };
             let short = team.short_name.trim();
             let full = team.name.trim();
             // Affiliate tab/log: full FM team name (shortName is U19-only in live evidence).

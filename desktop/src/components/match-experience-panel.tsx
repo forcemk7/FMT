@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import type { LiveFootballSnapshot, LivePlayer } from "@/domain/adapters";
 import {
   buildMatchExperienceCards,
   MATCH_EXPERIENCE_PAGE_SIZE,
   matchExperiencePosition,
+  matchExperiencePositionOptions,
   type MatchExperienceCard,
+  type MatchExperienceRow,
 } from "@/domain/match-experience";
 import { PlayerFace } from "@/components/player-face";
 
@@ -14,26 +16,79 @@ function abilityLabel(value: number | null): string {
   return typeof value === "number" && Number.isFinite(value) ? String(value) : "—";
 }
 
+function MatchExperienceRowView({
+  row,
+  onOpenPlayer,
+}: {
+  row: MatchExperienceRow | null;
+  onOpenPlayer: (playerId: string) => void;
+}) {
+  if (!row) {
+    return (
+      <li className="match-experience-row match-experience-row-pad" aria-hidden="true">
+        <div className="match-experience-row-btn" />
+      </li>
+    );
+  }
+
+  const openOther = !row.isFocus;
+  const className = [
+    "match-experience-row",
+    row.isFocus ? "match-experience-row-focus" : "",
+    !row.isOnRoster && row.isFocus ? "match-experience-row-projected" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const body = (
+    <>
+      <span className="match-experience-rank">{row.rank}</span>
+      <PlayerFace playerId={row.playerId} name={row.name} size="sm" />
+      <span className="match-experience-name">
+        <strong>{row.name}</strong>
+        {row.isFocus && !row.isOnRoster ? <small>projected</small> : null}
+        {row.isFocus && row.isOnRoster ? <small>current</small> : null}
+      </span>
+      <span className="match-experience-ca">{abilityLabel(row.currentAbility)}</span>
+    </>
+  );
+
+  return (
+    <li className={className}>
+      {openOther ? (
+        <button
+          type="button"
+          className="match-experience-row-btn"
+          onClick={() => onOpenPlayer(row.playerId)}
+        >
+          {body}
+        </button>
+      ) : (
+        <div className="match-experience-row-btn">{body}</div>
+      )}
+    </li>
+  );
+}
+
 function MatchExperienceCardView({
   card,
-  primaries,
+  positionOptions,
   onPositionChange,
   onOpenPlayer,
 }: {
   card: MatchExperienceCard;
-  primaries: string[];
+  positionOptions: string[];
   onPositionChange: (teamUid: string, position: string) => void;
   onOpenPlayer: (playerId: string) => void;
 }) {
-  const listRef = useRef<HTMLOListElement | null>(null);
-  const focusRef = useRef<HTMLLIElement | null>(null);
-
-  useEffect(() => {
-    focusRef.current?.scrollIntoView({ block: "nearest", inline: "nearest" });
-  }, [card.teamUid, card.position, card.focusRank, card.rows.length]);
-
   const rankLabel =
-    card.focusRank != null ? `${card.focusRank}/${card.rows.length}` : "—";
+    card.focusRank != null ? `${card.focusRank}/${card.totalRows}` : "—";
+
+  const slots: Array<MatchExperienceRow | null> = [...card.rows];
+  while (slots.length < MATCH_EXPERIENCE_PAGE_SIZE) slots.push(null);
+
+  const selectValue = positionOptions.includes(card.position)
+    ? card.position
+    : (positionOptions[0] ?? card.position);
 
   return (
     <article className="match-experience-card">
@@ -46,14 +101,14 @@ function MatchExperienceCardView({
             <span>{rankLabel}</span>
           </span>
         </div>
-        {primaries.length > 1 ? (
+        {positionOptions.length > 0 ? (
           <label className="match-experience-pos-select">
             <span className="sr-only">Position for {card.teamLabel}</span>
             <select
-              value={card.position}
+              value={selectValue}
               onChange={(event) => onPositionChange(card.teamUid, event.target.value)}
             >
-              {primaries.map((code) => (
+              {positionOptions.map((code) => (
                 <option key={code} value={code}>
                   {code}
                 </option>
@@ -63,51 +118,16 @@ function MatchExperienceCardView({
         ) : null}
       </header>
       <ol
-        ref={listRef}
         className="match-experience-list"
         style={{ ["--match-exp-rows" as string]: MATCH_EXPERIENCE_PAGE_SIZE }}
       >
-        {card.rows.map((row) => {
-          const openOther = !row.isFocus;
-          const className = [
-            "match-experience-row",
-            row.isFocus ? "match-experience-row-focus" : "",
-            !row.isOnRoster && row.isFocus ? "match-experience-row-projected" : "",
-          ]
-            .filter(Boolean)
-            .join(" ");
-          const body = (
-            <>
-              <span className="match-experience-rank">{row.rank}</span>
-              <PlayerFace playerId={row.playerId} name={row.name} size="sm" />
-              <span className="match-experience-name">
-                <strong>{row.name}</strong>
-                {row.isFocus && !row.isOnRoster ? <small>projected</small> : null}
-                {row.isFocus && row.isOnRoster ? <small>current</small> : null}
-              </span>
-              <span className="match-experience-ca">{abilityLabel(row.currentAbility)}</span>
-            </>
-          );
-          return (
-            <li
-              key={`${card.teamUid}-${row.playerId}`}
-              className={className}
-              ref={row.isFocus ? focusRef : undefined}
-            >
-              {openOther ? (
-                <button
-                  type="button"
-                  className="match-experience-row-btn"
-                  onClick={() => onOpenPlayer(row.playerId)}
-                >
-                  {body}
-                </button>
-              ) : (
-                <div className="match-experience-row-btn">{body}</div>
-              )}
-            </li>
-          );
-        })}
+        {slots.map((row, index) => (
+          <MatchExperienceRowView
+            key={row ? `${card.teamUid}-${row.playerId}` : `${card.teamUid}-pad-${index}`}
+            row={row}
+            onOpenPlayer={onOpenPlayer}
+          />
+        ))}
       </ol>
     </article>
   );
@@ -122,8 +142,8 @@ export function MatchExperiencePanel({
   snapshot: LiveFootballSnapshot;
   onOpenPlayer: (playerId: string) => void;
 }) {
-  const primaries = player.positions ?? [];
-  const defaultPosition = matchExperiencePosition(player);
+  const positionOptions = matchExperiencePositionOptions(player);
+  const defaultPosition = matchExperiencePosition(player) ?? positionOptions[0] ?? null;
   const [positionByTeam, setPositionByTeam] = useState<Record<string, string>>({});
 
   const managedClubName =
@@ -181,7 +201,7 @@ export function MatchExperiencePanel({
     return (
       <section className="match-experience-panel" aria-label="Match experience">
         <p className="match-experience-empty">
-          No same-position peers on loaded club teams for {defaultPosition}.
+          No loaded club teams with resolved players.
         </p>
       </section>
     );
@@ -194,7 +214,7 @@ export function MatchExperiencePanel({
           <MatchExperienceCardView
             key={card.teamUid}
             card={card}
-            primaries={primaries.length ? primaries : [card.position]}
+            positionOptions={positionOptions}
             onPositionChange={onPositionChange}
             onOpenPlayer={onOpenPlayer}
           />
