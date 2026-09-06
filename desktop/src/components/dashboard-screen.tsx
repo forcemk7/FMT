@@ -92,7 +92,7 @@ export function DashboardScreen({
       ) : (
         <div className="dash-widget-grid">
           <WidgetShell
-            title="Movers"
+            title={dashViewTitle("Movers")}
             viewId="Movers"
             onOpenView={onOpenView}
             empty={
@@ -117,7 +117,7 @@ export function DashboardScreen({
           </WidgetShell>
 
           <WidgetShell
-            title="Prospects"
+            title={dashViewTitle("Prospects")}
             viewId="Prospects"
             onOpenView={onOpenView}
             empty={
@@ -136,7 +136,7 @@ export function DashboardScreen({
           </WidgetShell>
 
           <WidgetShell
-            title="HAS Top"
+            title={dashViewTitle("HAS Top")}
             viewId="HAS Top"
             onOpenView={onOpenView}
             empty={has.top.length ? null : "No readable personality pack on squad players yet."}
@@ -157,7 +157,7 @@ export function DashboardScreen({
           </WidgetShell>
 
           <WidgetShell
-            title="HAS Bottom"
+            title={dashViewTitle("HAS Bottom")}
             viewId="HAS Bottom"
             onOpenView={onOpenView}
             empty={has.bottom.length ? null : "No readable personality pack on squad players yet."}

@@ -15,6 +15,7 @@ import {
   isOnClubTeamRosterPlayer,
   playerMatchesSquadRosterFilters,
   positionGroups,
+  seniorAtClubPlayers,
   sortClubTeamsForSquadDesk,
   squadMedianCA,
   squadRosterStatus,
@@ -511,10 +512,15 @@ export function MyTeamScreen({
       squadDeskMode,
     ],
   );
-  const medianCA = useMemo(
-    () => (moveOnMode || hoydMode ? squadMedianCA(teamRoster) : null),
-    [teamRoster, hoydMode, moveOnMode],
-  );
+  const medianCA = useMemo(() => {
+    if (!moveOnMode && !hoydMode) return null;
+    const senior = seniorAtClubPlayers(
+      snapshot.players,
+      snapshot.managedClubId,
+      clubTeams,
+    );
+    return squadMedianCA(senior);
+  }, [clubTeams, hoydMode, moveOnMode, snapshot.managedClubId, snapshot.players]);
   const gmByAdvice = useMemo(() => {
     const empty: Record<GmAdvice, LivePlayer[]> = { sell: [], loan: [] };
     if (!moveOnMode || medianCA == null) return empty;

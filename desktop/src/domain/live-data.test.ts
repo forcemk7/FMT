@@ -18,6 +18,8 @@ import {
   playerMatchesSquadRosterFilters,
   sortClubTeamsForSquadDesk,
   squadMedianCA,
+  seniorAtClubPlayers,
+  seniorSquadTeamUid,
   squadTeamDisplayName,
   squadTeamLoadedCount,
   squadTeamTabLabel,
@@ -341,6 +343,54 @@ describe("squadMedianCA", () => {
   it("returns null when no finite CA", () => {
     expect(squadMedianCA([{ currentAbility: null }])).toBeNull();
     expect(squadMedianCA([])).toBeNull();
+  });
+});
+
+describe("seniorAtClubPlayers / senior median", () => {
+  const teams = [
+    { name: "Senior", squadUnit: "firstTeam" as const, rosterLen: 25, teamUid: "1", isManagerTeam: true },
+    { name: "U19", squadUnit: "under19s" as const, rosterLen: 20, teamUid: "2", isManagerTeam: false },
+  ];
+
+  it("picks manager team uid", () => {
+    expect(seniorSquadTeamUid(teams)).toBe("1");
+  });
+
+  it("median ignores youth roster CA", () => {
+    const players = [
+      {
+        clubId: "920",
+        loanedOut: false,
+        loanedIn: false,
+        squadTeamUid: "1",
+        currentAbility: 140,
+      },
+      {
+        clubId: "920",
+        loanedOut: false,
+        loanedIn: false,
+        squadTeamUid: "1",
+        currentAbility: 120,
+      },
+      {
+        clubId: "920",
+        loanedOut: false,
+        loanedIn: false,
+        squadTeamUid: "2",
+        currentAbility: 40,
+      },
+      {
+        clubId: "920",
+        loanedOut: false,
+        loanedIn: false,
+        squadTeamUid: "2",
+        currentAbility: 50,
+      },
+    ];
+    const senior = seniorAtClubPlayers(players, "920", teams);
+    expect(senior).toHaveLength(2);
+    expect(squadMedianCA(senior)).toBe(130);
+    expect(squadMedianCA(players)).toBe(85);
   });
 });
 

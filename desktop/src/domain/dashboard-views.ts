@@ -13,13 +13,13 @@ export function isDashViewId(value: string): value is DashViewId {
 export function dashViewTitle(id: DashViewId): string {
   switch (id) {
     case "Movers":
-      return "Movers";
+      return "Development";
     case "Prospects":
-      return "Prospects";
+      return "Best talent";
     case "HAS Top":
-      return "HAS Top";
+      return "Top personalities";
     case "HAS Bottom":
-      return "HAS Bottom";
+      return "Worst personalities";
   }
 }
 

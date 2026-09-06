@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-06 (T227 done — desk chrome + live pulse)
+Last updated: 2026-09-06 (T228 done — dash labels + senior median)
 
 ## Now
 
@@ -8,7 +8,7 @@ Last updated: 2026-09-06 (T227 done — desk chrome + live pulse)
 
 **Deferred:** T215 Diagnostics source-of-truth skeleton + live fill. T210 Squad card/list density. T139 theme. T162 trophy cabinet. Empty Youth(0) tab. Loop D full-world load parked — catalog `research/ecosystem.md` + `research/recipes.md`. Placement ladder — not now.
 
-**Residuals (not tickets):** Main/Permanent/PMF affiliation bytes; further globals CSS carcass; club page polish.
+**Residuals (not tickets):** Main/Permanent/PMF affiliation bytes; further globals CSS carcass; club page polish; First XI median later.
 
 ## Board
 
@@ -26,32 +26,33 @@ Last updated: 2026-09-06 (T227 done — desk chrome + live pulse)
 
 ## Recently done
 
+- **T228** Dash widget labels + senior-team median for HoYD/GM
 - **T227** Role desks no filter; Dashboard chrome; live load pulse
 - **T226** Nav cleanup — drop Tactic/TD; desk chrome; order Squad·Loans·HoYD·GM
 - **T225** Facts strip align + FM-faithful Development plot
-- **T224** Player facts strip + Development plot (align, fixed Y, linear, gameDate X)
-- **T223** Rip empty player profile tabs (Attributes + Development only)
-- **T222** Commit wired FMT WIP (desk / cosmetics / terminal / HAS breakdown)
-- **T221** Strip GlassScout chrome leftovers (CSS + scratch dumps)
-- **T124** Quiet dev launch — BROWSER=none + Start FMT wait line
-- **T209** Squad roster Filter dropdown (multi-select status + counts)
-- **T208** Five-band SD tones + Super/High greens; deltas Super/Low; range-% rings
-- **T220** Move R&D knowledge to `research/` (`ecosystem.md` + `recipes.md`)
-- **T219** First-party recipes + strip probe fossils / dumps / fmt-probe
-- **T218** Dead code hygiene — ~376 orphan GS/root/vite files + unused UI
-- **T217** Forgiving squad search (diacritic fold) + Ctrl/Cmd+F / arrows / Enter / Esc
-- **T216** Live isRegen from person+0xD5 (DB=1 / regen=0); personality labels use real origin
-- **T214** Lock durable Squad-tab affiliate discovery (`club+0x118` + type `+0x30`; T212 bridge for NPL)
-- **T212** Load managed affiliate squads (Schalke II + Melbourne NPL; totals 79/55)
-- **T213** Diagnostics — rename, game date, load-order fields
-- **T211** Club.Teams — map TeamType 21 (Youth; Melbourne Youths 15)
-- **T206** Club.Teams — in-game team display names (TeamType when name equals club; keep real `… U19`)
-- **T207** Roster — load all First Team Players slots (UID floor; Liverpool 39=39)
-- **T205** Roster — FSS person-class/PLAO resolve
-- **T204** Squad — status filters + rosterLen in Settings
-- **T203** RE — affiliate squad-tab flag bytes (probe; unwired)
+- **T224** Player facts strip + Development plot
+- **T223** Rip empty player profile tabs
+- **T222** Commit wired FMT WIP
+- **T221** Strip GlassScout chrome leftovers
+- **T124** Quiet dev launch
+- **T209** Squad roster Filter dropdown
+- **T208** Five-band SD tones + rings
+- **T220** Move R&D knowledge to `research/`
+- **T219** First-party recipes + strip fossils
+- **T218** Dead code hygiene
+- **T217** Forgiving squad search
+- **T216** Live isRegen
+- **T214** Affiliate discovery lock
+- **T212** Load managed affiliate squads
+- **T213** Diagnostics game date
+- **T211** TeamType 21 Youth
+- **T206** Club.Teams display names
+- **T207** Roster First Team slots
+- **T205** FSS person-class resolve
+- **T204** Squad status filters
+- **T203** Affiliate flag probe
 - **T202** Squad face-cache freshness
-- **T201** Production load — Club.Teams only
+- **T201** Production load Club.Teams only
 - **T200** Lock Club.Teams + TeamType
 - **T198** Club affiliate graph RE
 - **T196** U19 squad live read
@@ -60,13 +61,7 @@ Last updated: 2026-09-06 (T227 done — desk chrome + live pulse)
 - **T192** GM desk move-on
 - **T191** Loans age + loan club
 - **T189** Loans desk
-- **T188** Attr deltas in load pipeline
-- **T187** Invalidate attr history poisoned by old rounding (v2 store)
-- **T186** Development plot color match, hover values, all-time Δ layout fix
-- **T185** Development content = plot + desk only (zero chrome)
-- **T182** Live Squad = at-club match squad only (`loanedOut` via person loan agreement)
-- **T184** Development desk compact single-page (all-time Δ desk + plot)
 
 ## Loop
 
-Loop A funded. Loop B = Dashboard. Loop C: Loans + HoYD + GM live; Tactic/TD out of nav until recipes. Loop D parked.
+Loop A funded. Loop B = Dashboard. Loop C: Loans + HoYD + GM live (senior-team median); Tactic/TD out of nav. Loop D parked.

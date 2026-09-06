@@ -171,8 +171,36 @@ export function squadMedianCA(
   return (values[mid - 1]! + values[mid]!) / 2;
 }
 
+/** Manager senior squad team uid (First Team), else first `firstTeam` unit. */
+export function seniorSquadTeamUid(
+  clubTeams: Array<Pick<LiveClubTeam, "teamUid" | "isManagerTeam" | "squadUnit">>,
+): string | null {
+  const manager = clubTeams.find((team) => team.isManagerTeam);
+  if (manager?.teamUid) return manager.teamUid;
+  const first = clubTeams.find((team) => team.squadUnit === "firstTeam");
+  return first?.teamUid ?? null;
+}
+
 /**
- * GM advice vs this club’s squad median CA.
+ * At-club players on the senior/manager team — reference pool for HoYD/GM median CA
+ * (pipeline toward First Team, not diluted by UTeams/reserves).
+ */
+export function seniorAtClubPlayers<
+  T extends Pick<LivePlayer, "clubId" | "loanedOut" | "loanedIn" | "squadTeamUid">,
+>(
+  players: T[],
+  managedClubId: string | null | undefined,
+  clubTeams: Array<Pick<LiveClubTeam, "teamUid" | "isManagerTeam" | "squadUnit">>,
+): T[] {
+  const teamUid = seniorSquadTeamUid(clubTeams);
+  if (!teamUid) return [];
+  return players.filter((player) =>
+    isAtClubTeamPlayer(player, managedClubId, teamUid),
+  );
+}
+
+/**
+ * GM advice vs senior-team median CA (pipeline toward First Team).
  * Sell: PA below ref and CA≈PA, or past dev age with CA far below PA (decline).
  * Loan: in dev range (≤24) with CA far below PA — high PA youth below ref, or CA still below ref.
  */
@@ -206,8 +234,8 @@ export function gmAdvice(
 }
 
 /**
- * HoYD groom prospect vs squad median CA.
- * High PA for this club with room left to develop; youth only (≤24).
+ * HoYD groom prospect vs senior-team median CA.
+ * High PA for this club’s First Team bar with room left to develop; youth only (≤24).
  */
 export function isHoydProspect(
   player: Pick<LivePlayer, "currentAbility" | "potentialAbility" | "age">,

@@ -20,8 +20,8 @@ Load → **Dashboard** = collective view of the same squad/profile signals (move
 Nav stubs stay **Later** until they have load → desk → decision. Empty chrome = GlassScout failure mode.
 
 - **Loans** — live: Squad twin filtered to outgoing `loanedOut` (honesty / tracking).
-- **GM** — live: Squad twin that **advises Sell vs Loan** from squad **median CA**. Sell = capped low PA, or past dev age (25+) with CA far below PA (decline). Loan = age ≤24 with CA far below PA — youth below median (loan then sell) or CA still below median. Not a transfer market, not a loan finder.
-- **HoYD** — live: Squad twin filtered to **high-PA groom prospects** (age ≤24, `PA ≥ squad median CA`, headroom > 8), sorted PA desc. Not mentoring, not world search.
+- **GM** — live: Squad twin that **advises Sell vs Loan** vs **senior-team median CA** (manager First Team). Candidates = club-wide at-club employees. Sell = capped low PA, or past dev age (25+) with CA far below PA (decline). Loan = age ≤24 with CA far below PA — youth below median (loan then sell) or CA still below median. Not a transfer market, not a loan finder.
+- **HoYD** — live: Squad twin filtered to **high-PA groom prospects** (age ≤24, `PA ≥ senior-team median CA`, headroom > 8), sorted PA desc; candidates club-wide. Not mentoring, not world search.
 - **Tactic · TD** — not in nav until a proven loop + recipes exist (no empty stubs).
 
 **Loop D — Shared scouting core / replace FMLE read speed (Step 2, not funded)**  
