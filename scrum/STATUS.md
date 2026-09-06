@@ -1,10 +1,8 @@
 ﻿# Status
 
-Last updated: 2026-09-06 (T223 done — player profile Attr+Dev only)
+Last updated: 2026-09-06 (T224 done — facts strip + Development plot)
 
 ## Now
-
-**Board clear of T223.** Club page improve still unticketed. Ask HQ for next.
 
 **T190 parked** — Save ID in RAM before save-copy CA path.
 
@@ -28,6 +26,7 @@ Last updated: 2026-09-06 (T223 done — player profile Attr+Dev only)
 
 ## Recently done
 
+- **T224** Player facts strip + Development plot (align, fixed Y, linear, gameDate X)
 - **T223** Rip empty player profile tabs (Attributes + Development only)
 - **T222** Commit wired FMT WIP (desk / cosmetics / terminal / HAS breakdown)
 - **T221** Strip GlassScout chrome leftovers (CSS + scratch dumps)

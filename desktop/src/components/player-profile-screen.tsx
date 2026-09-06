@@ -4,7 +4,7 @@ import { ArrowLeft, Star } from "lucide-react";
 import type { LiveFootballSnapshot, LivePlayer } from "@/domain/adapters";
 import { abilityToneFromScore, attributeTone } from "@/domain/attribute-tone";
 import { formatHasScore, hasBand, liveHasScore } from "@/domain/has-score";
-import { formatPlayerPositions } from "@/domain/live-data";
+import { playerPositionParts } from "@/domain/live-data";
 import { livePersonalityLabels } from "@/domain/personality-labels";
 import { AttributeDesk } from "@/components/attribute-desk";
 import { AttributeHistoryPanel } from "@/components/attribute-history-panel";
@@ -108,7 +108,8 @@ export function PlayerProfileScreen({
 
   const ageLabel = player.age != null ? `${player.age} years old` : "—";
   const dobLabel = player.dateOfBirth?.trim() || null;
-  const position = formatPlayerPositions(player);
+  const { primary: positionPrimary, secondary: positionSecondary } =
+    playerPositionParts(player);
   const height = formatHeight(player.heightCm ?? null);
   const leftFoot = player.leftFoot != null ? String(player.leftFoot) : "—";
   const rightFoot = player.rightFoot != null ? String(player.rightFoot) : "—";
@@ -154,17 +155,19 @@ export function PlayerProfileScreen({
         <div className="player-facts-row">
           <span className="player-nation-fact">
             <b>Nationality</b>
-            <span className="player-fact-identity">
-              {player.nationalityId ? (
-                <NationFlag
-                  nationId={player.nationalityId}
-                  name={player.nationality ?? "Nation"}
-                  size="md"
-                />
-              ) : (
-                <span className="nation-flag nation-flag-md nation-flag-empty" aria-hidden="true" />
-              )}
-              <strong title={nationLabel === "—" ? undefined : nationLabel}>{nationLabel}</strong>
+            <span className="player-fact-value">
+              <span className="player-fact-identity">
+                {player.nationalityId ? (
+                  <NationFlag
+                    nationId={player.nationalityId}
+                    name={player.nationality ?? "Nation"}
+                    size="md"
+                  />
+                ) : (
+                  <span className="nation-flag nation-flag-md nation-flag-empty" aria-hidden="true" />
+                )}
+                <strong title={nationLabel === "—" ? undefined : nationLabel}>{nationLabel}</strong>
+              </span>
             </span>
           </span>
           <span className="player-age-fact">
@@ -207,26 +210,31 @@ export function PlayerProfileScreen({
             onClick={() => club && onOpenClub?.(club.id)}
           >
             <b>{loanedOut && loanClubName ? "Loan club" : "Club"}</b>
-            <span className="player-fact-identity">
-              {activeClubId ? (
-                <ClubLogo
-                  clubId={activeClubId}
-                  name={clubName ?? club?.name ?? "Club"}
-                  size="md"
-                />
-              ) : (
-                <span className="club-logo club-logo-md club-logo-empty" aria-hidden="true" />
-              )}
-              <span className="player-fact-value">
+            <span className="player-fact-value">
+              <span className="player-fact-identity">
+                {activeClubId ? (
+                  <ClubLogo
+                    clubId={activeClubId}
+                    name={clubName ?? club?.name ?? "Club"}
+                    size="md"
+                  />
+                ) : (
+                  <span className="club-logo club-logo-md club-logo-empty" aria-hidden="true" />
+                )}
                 <strong title={clubName ?? undefined}>{clubName ?? "—"}</strong>
-                {clubSub ? <small className="player-fact-sub">{clubSub}</small> : null}
               </span>
+              {clubSub ? <small className="player-fact-sub">{clubSub}</small> : null}
             </span>
           </button>
           <span>
             <b>Position</b>
             <span className="player-fact-value">
-              <strong title={position === "—" ? undefined : position}>{position}</strong>
+              <strong title={positionPrimary === "—" ? undefined : positionPrimary}>
+                {positionPrimary}
+              </strong>
+              {positionSecondary ? (
+                <small className="player-fact-sub">({positionSecondary})</small>
+              ) : null}
             </span>
           </span>
           <span>

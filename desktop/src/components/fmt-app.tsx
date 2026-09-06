@@ -188,7 +188,7 @@ export function FMTApp() {
       if (nextSnapshot.status.state === "connected" && nextSnapshot.players.length) {
         const players = attachSnapshotDeltas(nextSnapshot.players);
         setSnapshot({ ...nextSnapshot, players });
-        deferRecordSnapshotPlayers(nextSnapshot.players, nextSnapshot.season);
+        deferRecordSnapshotPlayers(nextSnapshot.players, nextSnapshot.gameDate);
         window.requestAnimationFrame(() => {
           markFmtCosmeticsReady();
           warmSquadGraphics({ ...nextSnapshot, players });

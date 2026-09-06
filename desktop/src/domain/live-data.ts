@@ -32,7 +32,7 @@ export function isAtClubSquadPlayer(
 
 /** At-club player on a specific FM team object roster. */
 export function isAtClubTeamPlayer(
-  player: Pick<LivePlayer, "clubId" | "loanedOut" | "squadTeamUid">,
+  player: Pick<LivePlayer, "clubId" | "loanedOut" | "loanedIn" | "squadTeamUid">,
   managedClubId: string | null | undefined,
   teamUid: string | null | undefined,
 ): boolean {
@@ -241,12 +241,22 @@ export type PositionGroup = (typeof positionGroups)[number];
 export function formatPlayerPositions(
   player: Pick<LivePlayer, "positions" | "secondaryPositions">,
 ): string {
-  const primary = player.positions ?? [];
-  if (!primary.length) return "—";
-  const head = primary.join(" / ");
-  const secondary = player.secondaryPositions ?? [];
-  if (!secondary.length) return head;
-  return `${head} (${secondary.join(" / ")})`;
+  const { primary, secondary } = playerPositionParts(player);
+  if (primary === "—") return "—";
+  if (!secondary) return primary;
+  return `${primary} (${secondary})`;
+}
+
+/** Primary / secondary parts for stacked facts-strip display. */
+export function playerPositionParts(
+  player: Pick<LivePlayer, "positions" | "secondaryPositions">,
+): { primary: string; secondary: string | null } {
+  const primaryList = player.positions ?? [];
+  if (!primaryList.length) return { primary: "—", secondary: null };
+  const primary = primaryList.join(" / ");
+  const secondaryList = player.secondaryPositions ?? [];
+  if (!secondaryList.length) return { primary, secondary: null };
+  return { primary, secondary: secondaryList.join(" / ") };
 }
 
 const POSITION_CODE_GROUP: Record<string, PositionGroup> = {

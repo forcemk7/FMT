@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupPlayerPosition, formatPlayerPositions, resolveFavorites, toggleFavorite, updateFavoriteNote } from "./live-data";
+import { groupPlayerPosition, formatPlayerPositions, playerPositionParts, resolveFavorites, toggleFavorite, updateFavoriteNote } from "./live-data";
 import type { LivePlayer } from "./adapters";
 
 const livePlayer: LivePlayer = {
@@ -62,6 +62,23 @@ describe("player position labels", () => {
     );
     expect(formatPlayerPositions({ positions: ["GK"], secondaryPositions: [] })).toBe("GK");
     expect(formatPlayerPositions({ positions: [], secondaryPositions: ["MC"] })).toBe("—");
+  });
+
+  it("splits primary and secondary for stacked facts display", () => {
+    expect(
+      playerPositionParts({
+        positions: ["DR", "WBR"],
+        secondaryPositions: ["DC", "MC"],
+      }),
+    ).toEqual({ primary: "DR / WBR", secondary: "DC / MC" });
+    expect(playerPositionParts({ positions: ["GK"], secondaryPositions: [] })).toEqual({
+      primary: "GK",
+      secondary: null,
+    });
+    expect(playerPositionParts({ positions: [], secondaryPositions: ["MC"] })).toEqual({
+      primary: "—",
+      secondary: null,
+    });
   });
 });
 

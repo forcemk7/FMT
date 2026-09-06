@@ -11,24 +11,17 @@ import { AttributeDesk } from "@/components/attribute-desk";
 
 const DEFAULT_PLOT = ["CA", "PA"] as const;
 const MAX_PLOT_SERIES = 6;
+/** Fixed ability scale (CA/PA). */
+const ABILITY_Y = { min: 1, max: 200 } as const;
+/** Fixed attribute scale (1–20). */
+const ATTR_Y = { min: 1, max: 20 } as const;
 
-function smoothLinePath(pts: Array<{ x: number; y: number }>): string {
+function linePath(pts: Array<{ x: number; y: number }>): string {
   if (pts.length === 0) return "";
   if (pts.length === 1) return `M ${pts[0]!.x} ${pts[0]!.y}`;
-  if (pts.length === 2) return `M ${pts[0]!.x} ${pts[0]!.y} L ${pts[1]!.x} ${pts[1]!.y}`;
-  let d = `M ${pts[0]!.x} ${pts[0]!.y}`;
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = pts[i - 1] ?? pts[i]!;
-    const p1 = pts[i]!;
-    const p2 = pts[i + 1]!;
-    const p3 = pts[i + 2] ?? p2;
-    const c1x = p1.x + (p2.x - p0.x) / 6;
-    const c1y = p1.y + (p2.y - p0.y) / 6;
-    const c2x = p2.x - (p3.x - p1.x) / 6;
-    const c2y = p2.y - (p3.y - p1.y) / 6;
-    d += ` C ${c1x} ${c1y} ${c2x} ${c2y} ${p2.x} ${p2.y}`;
-  }
-  return d;
+  return pts
+    .map((pt, index) => `${index === 0 ? "M" : "L"} ${pt.x} ${pt.y}`)
+    .join(" ");
 }
 
 function shortFieldLabel(field: string): string {
@@ -37,8 +30,21 @@ function shortFieldLabel(field: string): string {
   return field;
 }
 
+function formatWallClockShort(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "Observation";
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
 function observationLabel(point: AttrHistoryPoint, index: number): string {
-  return point.gameDate?.trim() || `Observation ${index + 1}`;
+  const gameDate = point.gameDate?.trim();
+  if (gameDate) return gameDate;
+  if (point.at?.trim()) return formatWallClockShort(point.at);
+  return `Observation ${index + 1}`;
+}
+
+function isAbilityField(field: string): boolean {
+  return field === "CA" || field === "PA";
 }
 
 export function AttributeHistoryPanel({
@@ -66,76 +72,65 @@ export function AttributeHistoryPanel({
   );
 
   const chart = useMemo(() => {
-    if (points.length === 0 || plotFields.length === 0) return null;
     const width = 720;
     const height = 132;
     const pad = { left: 34, right: 10, top: 10, bottom: 22 };
     const innerW = width - pad.left - pad.right;
     const innerH = height - pad.top - pad.bottom;
 
-    const seriesRanges = plotFields.map((field) => {
-      let min = Infinity;
-      let max = -Infinity;
-      for (const point of points) {
-        const value = point.values[field];
-        if (typeof value !== "number") continue;
-        min = Math.min(min, value);
-        max = Math.max(max, value);
-      }
-      if (!Number.isFinite(min) || !Number.isFinite(max)) return null;
-      if (min === max) {
-        min -= 1;
-        max += 1;
-      }
-      return { field, min, max };
-    });
+    const xAt = (index: number) => {
+      if (points.length <= 1) return pad.left + innerW / 2;
+      return pad.left + (index / (points.length - 1)) * innerW;
+    };
 
-    const validRanges = seriesRanges.filter(
-      (row): row is { field: string; min: number; max: number } => row != null,
-    );
-    if (!validRanges.length) return null;
-
-    const abilityish = validRanges.some((row) => row.field === "CA" || row.field === "PA");
-    const attrish = validRanges.some((row) => row.field !== "CA" && row.field !== "PA");
+    const abilityish = plotFields.some(isAbilityField);
+    const attrish = plotFields.some((field) => !isAbilityField(field));
     const normalize = abilityish && attrish;
 
-    const sharedMin = Math.min(...validRanges.map((row) => row.min));
-    const sharedMax = Math.max(...validRanges.map((row) => row.max));
-
-    const xAt = (index: number) =>
-      pad.left + (points.length <= 1 ? innerW / 2 : (index / (points.length - 1)) * innerW);
+    const sharedScale = abilityish && !attrish ? ABILITY_Y : ATTR_Y;
     const yAtShared = (value: number) =>
-      pad.top + ((sharedMax - value) / (sharedMax - sharedMin)) * innerH;
+      pad.top +
+      ((sharedScale.max - value) / (sharedScale.max - sharedScale.min)) * innerH;
     const yAtNorm = (value: number, min: number, max: number) =>
       pad.top + ((max - value) / (max - min)) * innerH;
 
-    const series = validRanges.map((row, index) => {
-      const orderIndex = selected.indexOf(row.field);
+    const series = plotFields.flatMap((field, index) => {
+      const scale = isAbilityField(field) ? ABILITY_Y : ATTR_Y;
+      const orderIndex = selected.indexOf(field);
       const color = colorForSeries(orderIndex >= 0 ? orderIndex : index);
       const pts = points.flatMap((point, pointIndex) => {
-        const value = point.values[row.field];
+        const value = point.values[field];
         if (typeof value !== "number") return [];
-        const y = normalize ? yAtNorm(value, row.min, row.max) : yAtShared(value);
+        const y = normalize
+          ? yAtNorm(value, scale.min, scale.max)
+          : yAtShared(value);
         return [{ x: xAt(pointIndex), y, value, pointIndex }];
       });
-      return { field: row.field, color, path: smoothLinePath(pts), pts };
+      if (!pts.length) return [];
+      return [{ field, color, path: linePath(pts), pts }];
     });
 
-    const xLabels = points.map((point, index) => ({
-      x: xAt(index),
-      label: observationLabel(point, index),
-    }));
+    const xLabels =
+      points.length === 0
+        ? []
+        : points.map((point, index) => ({
+            x: xAt(index),
+            label: observationLabel(point, index),
+          }));
 
     return {
       width,
       height,
       pad,
       innerW,
-      yLabelTop: normalize ? "↑" : String(Math.round(sharedMax)),
-      yLabelBottom: normalize ? "↓" : String(Math.round(sharedMin)),
+      innerH,
+      yLabelTop: normalize ? "↑" : String(sharedScale.max),
+      yLabelBottom: normalize ? "↓" : String(sharedScale.min),
       series,
       xLabels,
       xAt,
+      empty: points.length === 0,
+      noSeries: plotFields.length === 0,
     };
   }, [player.id, points, plotFields.join("\0"), selected.join("\0")]);
 
@@ -143,7 +138,7 @@ export function AttributeHistoryPanel({
     hoverIndex != null && points[hoverIndex] ? points[hoverIndex]! : null;
 
   const onPlotMove = (event: MouseEvent<SVGSVGElement>) => {
-    if (!chart || points.length === 0) return;
+    if (points.length === 0) return;
     const rect = event.currentTarget.getBoundingClientRect();
     const x = ((event.clientX - rect.left) / rect.width) * chart.width;
     let best = 0;
@@ -161,78 +156,116 @@ export function AttributeHistoryPanel({
   return (
     <section className="dossier-panel tab-evidence-panel development-desk-panel">
       <div className="development-desk-body">
-        {chart ? (
-          <div className="development-desk-plot-block">
-            <div className="development-desk-chart">
-              <svg
-                viewBox={`0 0 ${chart.width} ${chart.height}`}
-                role="img"
-                aria-label="Attribute development plot"
-                onMouseMove={onPlotMove}
-                onMouseLeave={() => setHoverIndex(null)}
-              >
-                <text x={6} y={chart.pad.top + 4} className="attr-history-axis">
-                  {chart.yLabelTop}
-                </text>
-                <text x={6} y={chart.height - chart.pad.bottom} className="attr-history-axis">
-                  {chart.yLabelBottom}
-                </text>
-                {chart.series.map((series) => (
-                  <g key={series.field}>
-                    <path d={series.path} fill="none" stroke={series.color} strokeWidth={2} />
-                    {series.pts.map((pt) => (
-                      <circle
-                        key={`${series.field}-${pt.pointIndex}`}
-                        cx={pt.x}
-                        cy={pt.y}
-                        r={hoverIndex === pt.pointIndex ? 3.5 : 2.5}
-                        fill={series.color}
-                      />
-                    ))}
-                  </g>
-                ))}
-                {hoverIndex != null ? (
-                  <line
-                    x1={chart.xAt(hoverIndex)}
-                    x2={chart.xAt(hoverIndex)}
-                    y1={chart.pad.top}
-                    y2={chart.height - chart.pad.bottom}
-                    className="development-plot-guide"
+        <div className="development-desk-plot-block">
+          <div className="development-desk-chart">
+            <svg
+              viewBox={`0 0 ${chart.width} ${chart.height}`}
+              role="img"
+              aria-label="Attribute development plot"
+              onMouseMove={onPlotMove}
+              onMouseLeave={() => setHoverIndex(null)}
+            >
+              <line
+                x1={chart.pad.left}
+                x2={chart.width - chart.pad.right}
+                y1={chart.pad.top}
+                y2={chart.pad.top}
+                className="development-plot-rail"
+              />
+              <line
+                x1={chart.pad.left}
+                x2={chart.width - chart.pad.right}
+                y1={chart.height - chart.pad.bottom}
+                y2={chart.height - chart.pad.bottom}
+                className="development-plot-rail"
+              />
+              <text x={6} y={chart.pad.top + 4} className="attr-history-axis">
+                {chart.yLabelTop}
+              </text>
+              <text x={6} y={chart.height - chart.pad.bottom} className="attr-history-axis">
+                {chart.yLabelBottom}
+              </text>
+              {chart.series.map((series) => (
+                <g key={series.field}>
+                  <path
+                    d={series.path}
+                    fill="none"
+                    stroke={series.color}
+                    strokeWidth={1.75}
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
                   />
-                ) : null}
-                {chart.xLabels.map((item, index) => (
-                  <text
-                    key={`${item.label}-${index}`}
-                    x={item.x}
-                    y={chart.height - 4}
-                    textAnchor="middle"
-                    className="attr-history-axis"
-                  >
-                    {item.label.length > 12 ? item.label.slice(0, 10) + "…" : item.label}
-                  </text>
-                ))}
-              </svg>
-              {hoverPoint && hoverIndex != null ? (
-                <div className="development-plot-hover" role="status">
-                  <strong>{observationLabel(hoverPoint, hoverIndex)}</strong>
-                  <ul>
-                    {plotFields.map((field) => {
-                      const value = hoverPoint.values[field];
-                      const color = colorForSeries(selected.indexOf(field));
-                      return (
-                        <li key={field}>
-                          <i style={{ background: color }} />
-                          <span>{shortFieldLabel(field)}</span>
-                          <b>{typeof value === "number" ? value : "—"}</b>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </div>
+                  {series.pts.map((pt) => (
+                    <circle
+                      key={`${series.field}-${pt.pointIndex}`}
+                      cx={pt.x}
+                      cy={pt.y}
+                      r={hoverIndex === pt.pointIndex ? 3.25 : 2.25}
+                      fill={series.color}
+                    />
+                  ))}
+                </g>
+              ))}
+              {hoverIndex != null && points.length > 0 ? (
+                <line
+                  x1={chart.xAt(hoverIndex)}
+                  x2={chart.xAt(hoverIndex)}
+                  y1={chart.pad.top}
+                  y2={chart.height - chart.pad.bottom}
+                  className="development-plot-guide"
+                />
               ) : null}
-            </div>
+              {chart.xLabels.map((item, index) => (
+                <text
+                  key={`${item.label}-${index}`}
+                  x={item.x}
+                  y={chart.height - 4}
+                  textAnchor="middle"
+                  className="attr-history-axis"
+                >
+                  {item.label.length > 12 ? `${item.label.slice(0, 10)}…` : item.label}
+                </text>
+              ))}
+              {chart.empty ? (
+                <text
+                  x={chart.pad.left + chart.innerW / 2}
+                  y={chart.pad.top + chart.innerH / 2}
+                  textAnchor="middle"
+                  className="attr-history-axis"
+                >
+                  No Load observations yet
+                </text>
+              ) : chart.noSeries ? (
+                <text
+                  x={chart.pad.left + chart.innerW / 2}
+                  y={chart.pad.top + chart.innerH / 2}
+                  textAnchor="middle"
+                  className="attr-history-axis"
+                >
+                  Select attributes to plot
+                </text>
+              ) : null}
+            </svg>
+            {hoverPoint && hoverIndex != null && plotFields.length > 0 ? (
+              <div className="development-plot-hover" role="status">
+                <strong>{observationLabel(hoverPoint, hoverIndex)}</strong>
+                <ul>
+                  {plotFields.map((field) => {
+                    const value = hoverPoint.values[field];
+                    const color = colorForSeries(selected.indexOf(field));
+                    return (
+                      <li key={field}>
+                        <i style={{ background: color }} />
+                        <span>{shortFieldLabel(field)}</span>
+                        <b>{typeof value === "number" ? value : "—"}</b>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : null}
           </div>
-        ) : null}
+        </div>
 
         <div className="development-desk-attrs">
           <AttributeDesk
