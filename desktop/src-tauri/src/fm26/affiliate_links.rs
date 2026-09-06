@@ -237,8 +237,7 @@ fn resolve_linked_team(
         .read_u32(team + profile.constants.entity_uid_offset)
         .unwrap_or(0);
     let name = read_team_display_name(reader, team, profile);
-    let short_raw = read_team_short_name(reader, team, profile);
-    let short_name = resolve_populated_short_name(&short_raw, &name);
+    let short_name = read_team_short_name(reader, team, profile);
     let team_type = reader.read_u8(team + profile.constants.team_type_offset);
     Some(AffiliateTeamDiscovery {
         team,
@@ -301,37 +300,7 @@ pub(crate) const TEAM_NAME_OFFSET: u64 = 0x18;
 /// Short display name (e.g. "Schalke 04 U19") — optional fallback after full name @ +0x18.
 pub(crate) const TEAM_SHORT_NAME_OFFSET: u64 = 0x20;
 
-/// Common club legal-form prefixes — strip once so profile shows shortName style.
-const TEAM_NAME_LEGAL_PREFIXES: &[&str] = &[
-    "FC ", "AFC ", "CF ", "SC ", "SV ", "AC ", "AS ", "FK ", "SK ", "NK ", "BK ", "IF ", "FF ",
-    "AFK ", "SD ", "CD ", "UD ", "RC ", "RCD ", "SSC ", "US ", "SS ", "TSG ",
-];
-
-/// `FC Schalke 04 U19` → `Schalke 04 U19`. Leaves already-short names unchanged.
-pub(crate) fn strip_team_name_legal_prefix(name: &str) -> String {
-    let trimmed = name.trim();
-    for prefix in TEAM_NAME_LEGAL_PREFIXES {
-        if trimmed.len() > prefix.len() && trimmed[..prefix.len()].eq_ignore_ascii_case(prefix) {
-            return trimmed[prefix.len()..].trim().to_string();
-        }
-    }
-    trimmed.to_string()
-}
-
-/// Prefer memory shortName; if empty, derive from full team name by stripping legal form.
-pub(crate) fn resolve_populated_short_name(short: &str, full: &str) -> String {
-    let short = short.trim();
-    if !short.is_empty() {
-        return strip_team_name_legal_prefix(short);
-    }
-    let full = full.trim();
-    if full.is_empty() {
-        return String::new();
-    }
-    strip_team_name_legal_prefix(full)
-}
-
-/// Short display name only (team+0x20). Empty when missing — do not fall back to full/club here.
+/// Short display name only (team+0x20). Empty when missing — do not invent from full name.
 #[cfg(target_os = "windows")]
 pub(crate) fn read_team_short_name(
     reader: &mut ProcessReader,
@@ -1956,10 +1925,10 @@ pub(crate) fn probe_lock_affiliate_link_layout(
 #[cfg(test)]
 mod tests {
     use super::{
-        bteam_satellite_team_matches, diff_affiliate_struct_hex, resolve_populated_short_name,
-        resolve_team_tab_label, squad_unit_from_team_type, strip_team_name_legal_prefix,
-        team_type_display_label, AFFILIATE_LINK_STRUCT_CLUB_POINTER_OFFSET,
-        BTEAM_LINK_POINTER_SLOTS, BTEAM_SATELLITE_ROSTER_MAX, BTEAM_SATELLITE_ROSTER_MIN,
+        bteam_satellite_team_matches, diff_affiliate_struct_hex, resolve_team_tab_label,
+        squad_unit_from_team_type, team_type_display_label,
+        AFFILIATE_LINK_STRUCT_CLUB_POINTER_OFFSET, BTEAM_LINK_POINTER_SLOTS,
+        BTEAM_SATELLITE_ROSTER_MAX, BTEAM_SATELLITE_ROSTER_MIN,
         MANAGED_CLUB_BTEAM_LINK_VECTOR_OFFSET, TEAM_NAME_OFFSET, TEAM_SHORT_NAME_OFFSET,
     };
 
@@ -2012,37 +1981,6 @@ mod tests {
     fn team_name_offsets_match_entity_map() {
         assert_eq!(TEAM_NAME_OFFSET, 0x18);
         assert_eq!(TEAM_SHORT_NAME_OFFSET, 0x20);
-    }
-
-    #[test]
-    fn strip_team_name_legal_prefix_schalke_forms() {
-        assert_eq!(
-            strip_team_name_legal_prefix("FC Schalke 04 U19"),
-            "Schalke 04 U19"
-        );
-        assert_eq!(
-            strip_team_name_legal_prefix("FC Schalke 04 II"),
-            "Schalke 04 II"
-        );
-        assert_eq!(strip_team_name_legal_prefix("Schalke 04"), "Schalke 04");
-        assert_eq!(strip_team_name_legal_prefix("Liverpool"), "Liverpool");
-    }
-
-    #[test]
-    fn resolve_populated_short_name_prefers_short_then_full() {
-        assert_eq!(
-            resolve_populated_short_name("Schalke 04 U19", "FC Schalke 04 U19"),
-            "Schalke 04 U19"
-        );
-        assert_eq!(
-            resolve_populated_short_name("", "FC Schalke 04 U19"),
-            "Schalke 04 U19"
-        );
-        assert_eq!(
-            resolve_populated_short_name("FC Schalke 04 U19", "FC Schalke 04 U19"),
-            "Schalke 04 U19"
-        );
-        assert_eq!(resolve_populated_short_name("", ""), "");
     }
 
     #[test]

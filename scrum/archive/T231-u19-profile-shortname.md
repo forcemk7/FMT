@@ -36,4 +36,4 @@ After T229/T230, U19 player profiles still do not show expected team shortName (
 
 Shipped: load fills `shortName` via `team+0x20` or derive from full name by stripping one legal-form prefix (`FC …` → short). Profile normalizes the same way so U19 shows `Schalke 04 U19` even when memory short is empty/full-form. Load labels log `short=`. Vitest 45 + Rust strip/resolve ok.
 
-Commit SHA after commit.
+Commit SHA: `bfc421a`.
