@@ -89,9 +89,15 @@ function MatchExperienceCardView({
     : (positionOptions[0] ?? card.position);
 
   const identityTitle = `${card.clubName} · ${card.teamLabel}`;
+  const cardClass = [
+    "match-experience-card",
+    card.isFocusCurrentTeam ? "match-experience-card-current" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
-    <article className="match-experience-card">
+    <article className={cardClass}>
       <header className="match-experience-card-header">
         <div className="match-experience-card-identity" title={identityTitle}>
           {card.clubId ? (

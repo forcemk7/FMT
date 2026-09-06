@@ -1,10 +1,10 @@
 ﻿# Status
 
-Last updated: 2026-09-06 (T252 done — ME clubTeam logos UniqueID)
+Last updated: 2026-09-06 (T250 done — ME strength + chrome)
 
 ## Now
 
-**T250 ready** — ME strength order + status chrome.
+**Board empty of ready product tickets** (T190 parked). Ask HQ before inventing work.
 
 **T190 parked** — Save ID in RAM before save-copy CA path.
 
@@ -16,7 +16,6 @@ Last updated: 2026-09-06 (T252 done — ME clubTeam logos UniqueID)
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
-| T250 | ME card order by team strength + status chrome | ready | 3 | next |
 | T190 | Development all-time from Progress Report CA strip | blocked | 2 | **parked** |
 | T210 | Squad — card / list density toggle | deferred | — | not now |
 | T215 | Diagnostics — source-of-truth skeleton + live fill | deferred | — | after product loops |
@@ -29,12 +28,12 @@ Last updated: 2026-09-06 (T252 done — ME clubTeam logos UniqueID)
 
 ## Recently done
 
+- **T250** ME card order by max same-pos CA + current-team chrome
 - **T252** ME clubTeam logos via same UniqueID path (no parent fallback)
 - **T251** Load feeder II Club (affiliate-of-affiliate) for ME
 - **T249** Load feeder Reserve clubTeams for ME
 - **T245** Lock Players-Go-On-Loan affiliation byte (nested+0x65)
 - **T248** ME header TeamType first; sort by TeamType
-- **T247** clubTeam owner clubId/name for ME headers
 
 ## Loop
 

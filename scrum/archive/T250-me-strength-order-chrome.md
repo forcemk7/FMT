@@ -1,12 +1,12 @@
 ---
 id: T250
 title: ME card order by team strength + status chrome
-status: ready
+status: done
 priority: 3
-owner: null
-claimed_at: null
-started_at: null
-completed_at: null
+owner: auto
+claimed_at: "2026-09-06T23:33:00+02:00"
+started_at: "2026-09-06T23:33:00+02:00"
+completed_at: "2026-09-06T23:36:00+02:00"
 depends_on: [T249]
 ---
 
@@ -24,10 +24,12 @@ After loan filter + reserves load, cards still need a “best → worst opportun
 
 ## Acceptance criteria
 
-- [ ] Stronger same-pos depth sorts left within band (or documented override)
-- [ ] Current team card visually distinct from projected ladder cards
-- [ ] Commit `T250: …`
+- [x] Stronger same-pos depth sorts left within band (or documented override)
+- [x] Current team card visually distinct from projected ladder cards
+- [x] Commit `T250: …`
 
 ## Progress
 
-Ready after T249. Prefer max-CA first; reputation only if needed.
+- Shipped: `sortMatchExperienceCards` — band then max same-pos CA; `isFocusCurrentTeam` + `.match-experience-card-current` chrome
+- Verified: `npx vitest run src/domain/match-experience.test.ts` (12 passed)
+- Commit: (this ticket)

@@ -32,6 +32,12 @@ export type MatchExperienceCard = {
   teamPlayerCount: number;
   rows: MatchExperienceRow[];
   totalRows: number;
+  /** Ladder band from TeamType / squadUnit (First → Reserves → Under N). */
+  band: number;
+  /** Max CA among same-position competitors on this card (strength sort). */
+  maxSamePosCa: number;
+  /** Focus player competes here now (not projected onto another ladder step). */
+  isFocusCurrentTeam: boolean;
 };
 
 /** Best single position code for competition compare. */
@@ -132,6 +138,8 @@ export function matchExperienceTeamLabel(
  * 0 First Team (any club, including II First)
  * 1 Reserves / other non-youth
  * 2+ Under N / Youth (high age band first)
+ *
+ * Within a band, cards re-sort by max same-pos CA (see `sortMatchExperienceCards`).
  */
 export function matchExperienceTeamBand(
   team: Pick<LiveClubTeam, "squadUnit" | "teamType">,
@@ -160,6 +168,19 @@ export function sortClubTeamsForMatchExperience(
     if (byClub !== 0) return byClub;
 
     if (right.rosterLen !== left.rosterLen) return right.rosterLen - left.rosterLen;
+    return left.teamUid.localeCompare(right.teamUid);
+  });
+}
+
+/** Within TeamType band: stronger same-pos depth (max CA) first. */
+export function sortMatchExperienceCards(
+  cards: MatchExperienceCard[],
+): MatchExperienceCard[] {
+  return [...cards].sort((left, right) => {
+    const band = left.band - right.band;
+    if (band !== 0) return band;
+    const strength = right.maxSamePosCa - left.maxSamePosCa;
+    if (strength !== 0) return strength;
     return left.teamUid.localeCompare(right.teamUid);
   });
 }
@@ -292,6 +313,11 @@ export function buildMatchExperienceCard(
     team.name.trim() ||
     `Map club (?): uid-${team.teamUid}`;
 
+  let maxSamePosCa = -Infinity;
+  for (const row of allRows) {
+    maxSamePosCa = Math.max(maxSamePosCa, caSortKey(row.currentAbility));
+  }
+
   return {
     teamUid: team.teamUid,
     teamLabel: matchExperienceTeamLabel(team),
@@ -302,6 +328,9 @@ export function buildMatchExperienceCard(
     teamPlayerCount: teamPlayers.length,
     rows,
     totalRows: allRows.length,
+    band: matchExperienceTeamBand(team),
+    maxSamePosCa,
+    isFocusCurrentTeam: focusCompetes,
   };
 }
 
@@ -333,5 +362,5 @@ export function buildMatchExperienceCards(
     );
     if (card) cards.push(card);
   }
-  return cards;
+  return sortMatchExperienceCards(cards);
 }

@@ -1321,6 +1321,8 @@ button:active,
 .match-experience-panel{margin:16px 0;display:flex;flex-direction:column;gap:12px}
 .match-experience-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;align-items:stretch}
 .match-experience-card{border:1px solid var(--border);border-radius:8px;background:#fff;overflow:hidden;min-width:0;display:flex;flex-direction:column}
+.match-experience-card-current{border-color:#0b496f;box-shadow:inset 3px 0 0 #0b496f}
+.match-experience-card-current .match-experience-card-header{background:color-mix(in srgb,#0b496f 6%,#fff)}
 .match-experience-card-header{display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:34px;padding:5px 8px;border-bottom:1px solid var(--border)}
 .match-experience-card-identity{display:flex;align-items:center;gap:6px;min-width:0;flex:1}
 .match-experience-card-identity .club-logo,
