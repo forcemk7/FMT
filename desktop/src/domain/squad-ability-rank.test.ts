@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { LivePlayer } from "./adapters";
 import {
-  dashClubTeamSpellout,
+  dashClubTeamChrome,
   isOwnedManagedPlayer,
   rankBestPlayers,
   rankBestTalent,
@@ -109,7 +109,7 @@ describe("rankBestTalent", () => {
   });
 });
 
-describe("dashClubTeamSpellout", () => {
+describe("dashClubTeamChrome", () => {
   const teams: LiveClubTeam[] = [
     {
       teamUid: "t-u19",
@@ -134,19 +134,21 @@ describe("dashClubTeamSpellout", () => {
     },
   ];
 
-  it("spells managed clubTeam as clubName + teamType", () => {
+  it("returns clubId + teamType for managed clubTeam", () => {
     const kid = player({
       id: "1",
       name: "Kid",
       squadTeamUid: "t-u19",
       clubId: "920",
     });
-    expect(dashClubTeamSpellout(kid, teams, [{ id: "920", name: "Schalke" }])).toBe(
-      "Schalke Under 19s",
-    );
+    expect(dashClubTeamChrome(kid, teams, [{ id: "920", name: "Schalke" }])).toEqual({
+      clubId: "920",
+      clubName: "Schalke",
+      teamType: "Under 19s",
+    });
   });
 
-  it("spells loaned-out as destination First Team", () => {
+  it("returns loan destination First Team chrome", () => {
     const loan = player({
       id: "2",
       name: "Loan",
@@ -156,6 +158,10 @@ describe("dashClubTeamSpellout", () => {
       loanClubId: "9001",
       loanClubName: "Legia",
     });
-    expect(dashClubTeamSpellout(loan, teams)).toBe("Legia First Team");
+    expect(dashClubTeamChrome(loan, teams)).toEqual({
+      clubId: "9001",
+      clubName: "Legia",
+      teamType: "First Team",
+    });
   });
 });

@@ -93,19 +93,29 @@ function MatchExperienceCardView({
 
   const identityTitle = `${card.clubName} · ${card.teamLabel}`;
   // Green wins when current is also best; otherwise blue current + green best.
+  const isCurrent = card.isFocusCurrentTeam;
   const cardClass = [
     "match-experience-card",
     isBestOption
       ? "match-experience-card-best"
-      : card.isFocusCurrentTeam
+      : isCurrent
         ? "match-experience-card-current"
         : "",
   ]
     .filter(Boolean)
     .join(" ");
+  const ribbon = isBestOption
+    ? { className: "match-experience-card-ribbon match-experience-card-ribbon-best", label: "Best" }
+    : isCurrent
+      ? {
+          className: "match-experience-card-ribbon match-experience-card-ribbon-current",
+          label: "Current",
+        }
+      : null;
 
   return (
     <article className={cardClass}>
+      {ribbon ? <span className={ribbon.className}>{ribbon.label}</span> : null}
       <header className="match-experience-card-header">
         <div className="match-experience-card-identity" title={identityTitle}>
           {card.clubId ? (
@@ -116,15 +126,6 @@ function MatchExperienceCardView({
           <div className="match-experience-card-text">
             <strong className="match-experience-team-type">{card.teamLabel}</strong>
             <span className="match-experience-club-name">{card.clubName}</span>
-            {isBestOption ? (
-              <span className="match-experience-card-badge match-experience-card-badge-best">
-                Best option
-              </span>
-            ) : card.isFocusCurrentTeam ? (
-              <span className="match-experience-card-badge match-experience-card-badge-current">
-                Current
-              </span>
-            ) : null}
           </div>
         </div>
         {positionOptions.length > 0 ? (

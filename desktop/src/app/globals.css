@@ -1240,8 +1240,22 @@ button:active,
 .global-search-results header{display:flex;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--border)}.global-search-results header button{border:0;background:transparent;color:var(--primary)}
 .global-search-results>button{display:grid;grid-template-columns:52px 1fr auto;width:100%;padding:11px 14px;border:0;border-bottom:1px solid var(--border);background:#fff;text-align:left}.global-search-results>button:hover{background:#f5faf9}.global-search-results>button span{color:var(--primary);font-size:8px;text-transform:uppercase}.global-search-results>button strong{font-size:10px}.global-search-results>button small{color:var(--slate);font-size:8px}.global-search-results>p{padding:20px;color:var(--slate);font-size:10px}
 .player-club-fact{border:0;background:transparent;text-align:left;cursor:pointer}.player-club-fact:disabled{cursor:default}.player-club-fact:not(:disabled):hover{background:color-mix(in srgb, var(--primary) 6%, transparent)}
-/* Equal square slots for PNG cutouts ? fixed media box + contain (no absolute auto sizing). */
-.club-logo,.nation-flag{
+/* Equal square slots for PNG cutouts — fixed media box + contain (no absolute auto sizing).
+ * Club logos: bare by default (no border / fill frame). Nation flags keep a light frame. */
+.club-logo{
+  display:block;
+  flex-shrink:0;
+  width:36px;
+  height:36px;
+  box-sizing:border-box;
+  border:0;
+  border-radius:0;
+  padding:0;
+  background:transparent;
+  color:var(--primary);
+  overflow:hidden;
+}
+.nation-flag{
   display:block;
   flex-shrink:0;
   width:36px;
@@ -1260,7 +1274,7 @@ button:active,
   width:100%;
   height:100%;
   overflow:hidden;
-  border-radius:2px;
+  border-radius:0;
 }
 .club-logo img,.nation-flag img{
   display:block;
@@ -1271,9 +1285,12 @@ button:active,
   image-rendering:auto;
 }
 .club-logo svg{display:block;width:55%;height:55%;margin:auto}
-.club-logo-sm,.nation-flag-sm{width:28px;height:28px;padding:3px}
-.club-logo-md,.nation-flag-md{width:36px;height:36px;padding:4px}
-.club-logo-lg{width:72px;height:72px;padding:6px}
+.club-logo-sm,.nation-flag-sm{width:28px;height:28px}
+.nation-flag-sm{padding:3px}
+.club-logo-md,.nation-flag-md{width:36px;height:36px}
+.nation-flag-md{padding:4px}
+.club-logo-lg{width:72px;height:72px}
+.nation-flag-lg{padding:6px}
 .club-logo-empty,.nation-flag-empty{opacity:.55}
 .player-fact-identity .club-logo,
 .player-fact-identity .nation-flag{
@@ -1319,41 +1336,67 @@ button:active,
   flex:0 0 auto; /* natural row height — do not stretch gaps between attrs */
 }
 .match-experience-panel{margin:16px 0;display:flex;flex-direction:column;gap:12px}
-.match-experience-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;align-items:stretch}
-.match-experience-card{border:1px solid var(--border);border-radius:8px;background:#fff;overflow:hidden;min-width:0;display:flex;flex-direction:column}
-.match-experience-card-current{border-color:#1d4ed8;box-shadow:inset 4px 0 0 #2563eb}
-.match-experience-card-current .match-experience-card-header{background:color-mix(in srgb,#2563eb 14%,#fff)}
-.match-experience-card-best{border-color:#22c55e;box-shadow:inset 4px 0 0 #39ff14,0 0 0 1px color-mix(in srgb,#39ff14 35%,transparent)}
-.match-experience-card-best .match-experience-card-header{background:color-mix(in srgb,#39ff14 18%,#fff)}
-.match-experience-card-badge{display:inline-block;margin-top:2px;padding:1px 5px;border-radius:4px;font-size:7px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;width:fit-content;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.match-experience-card-badge-current{background:#dbeafe;color:#1e40af}
-.match-experience-card-badge-best{background:#dcfce7;color:#15803d}
-.match-experience-card-header{display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:34px;padding:5px 8px;border-bottom:1px solid var(--border)}
+.match-experience-cards{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(220px,1fr));
+  gap:12px;
+  align-items:stretch;
+  padding-top:10px;
+}
+.match-experience-card{
+  position:relative;
+  border:1px solid var(--border);
+  border-radius:8px;
+  background:#fff;
+  overflow:visible;
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  box-shadow:none;
+}
+.match-experience-card-current{
+  border-color:color-mix(in srgb,#2563eb 45%, var(--border));
+  box-shadow:none;
+}
+.match-experience-card-best{
+  border-color:color-mix(in srgb,#22c55e 40%, var(--border));
+  box-shadow:none;
+}
+.match-experience-card-ribbon{
+  position:absolute;
+  top:0;
+  left:50%;
+  transform:translate(-50%,-50%);
+  z-index:1;
+  margin:0;
+  padding:1px 7px;
+  border:1px solid inherit;
+  border-radius:4px;
+  background:#fff;
+  font-size:8px;
+  font-weight:700;
+  letter-spacing:.03em;
+  text-transform:uppercase;
+  line-height:1.2;
+  white-space:nowrap;
+  max-width:calc(100% - 16px);
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.match-experience-card-ribbon-current{
+  color:#1e40af;
+  border-color:color-mix(in srgb,#2563eb 45%, var(--border));
+}
+.match-experience-card-ribbon-best{
+  color:#15803d;
+  border-color:color-mix(in srgb,#22c55e 40%, var(--border));
+}
+.match-experience-card-header{display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:34px;padding:5px 8px;border-bottom:1px solid var(--border);border-radius:8px 8px 0 0;overflow:hidden}
 .match-experience-card-identity{display:flex;align-items:center;gap:6px;min-width:0;flex:1}
 .match-experience-card-identity .club-logo,
 .match-experience-card-identity .club-logo-sm{
-  width:22px!important;
-  height:22px!important;
-  padding:0!important;
-  border:0!important;
-  border-radius:0!important;
-  background:transparent!important;
-  box-sizing:border-box!important;
-  overflow:hidden!important;
-}
-.match-experience-card-identity .club-logo .badge-media{
-  display:block;
-  width:100%;
-  height:100%;
-  overflow:hidden;
-  border-radius:0;
-}
-.match-experience-card-identity .club-logo img{
-  display:block;
-  width:100%;
-  height:100%;
-  object-fit:contain;
-  object-position:center;
+  width:22px;
+  height:22px;
 }
 .match-experience-card-text{display:flex;flex-direction:column;gap:1px;min-width:0;flex:1}
 .match-experience-team-type{margin:0;font-size:10px;font-weight:600;line-height:1.15;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -2616,7 +2659,13 @@ body.fmt-shell {
   font-size:10px;font-weight:700;text-align:center;
 }
 .dash-ability-extra{gap:10px}
-.dash-ability-team{font-size:9px;font-weight:600;color:var(--slate,#64748b);white-space:nowrap}
+.dash-ability-team{
+  display:inline-flex;align-items:center;gap:5px;min-width:0;
+  font-size:9px;font-weight:600;color:var(--slate,#64748b);white-space:nowrap;
+}
+.dash-ability-team .club-logo,
+.dash-ability-team .club-logo-sm{width:18px;height:18px}
+.dash-ability-team-type{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .dash-ability-secondary{
   display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:650;
   font-variant-numeric:tabular-nums;color:var(--slate,#64748b);white-space:nowrap;
@@ -2636,6 +2685,8 @@ body.fmt-shell {
   display:flex;align-items:center;justify-content:flex-end;gap:6px;min-width:0;max-width:100%;
 }
 .dash-me-move-side{display:inline-flex;align-items:center;gap:4px;min-width:0}
+.dash-me-move-side .club-logo,
+.dash-me-move-side .club-logo-sm{width:16px;height:16px}
 .dash-me-move-type{font-size:9px;font-weight:700;color:#334155;white-space:nowrap}
 .dash-me-move-arrow{flex:none;font-size:11px;font-weight:700;color:var(--slate,#64748b)}
 .dash-me-opportunity-rank{flex:none;min-width:48px;padding:3px 7px;border-radius:5px;background:#eef6f3;color:#0b496f;font-size:9px;font-weight:700;font-variant-numeric:tabular-nums;text-align:center;white-space:nowrap}

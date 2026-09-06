@@ -47,14 +47,20 @@ function resolveClubName(
 }
 
 /**
- * Actual clubTeam for ability peeks: `{clubName} {teamType}`.
+ * Actual clubTeam chrome for ability peeks: logo + teamType.
  * Loaned-out → destination First Team when loaded.
  */
-export function dashClubTeamSpellout(
+export type DashClubTeamChrome = {
+  clubId: string | null;
+  clubName: string;
+  teamType: string;
+};
+
+export function dashClubTeamChrome(
   player: LivePlayer,
   clubTeams: LiveClubTeam[],
   clubs: Array<{ id: string; name: string }> = [],
-): string | null {
+): DashClubTeamChrome | null {
   if (player.loanedOut === true) {
     const loanId = player.loanClubId?.trim() || null;
     const first =
@@ -62,9 +68,12 @@ export function dashClubTeamSpellout(
         (team) => team.clubId === loanId && matchExperienceTeamBand(team) === 0,
       ) ?? clubTeams.find((team) => team.clubId === loanId);
     const clubName = resolveClubName(loanId, clubTeams, clubs, player.loanClubName);
-    if (clubName && first) return `${clubName} ${matchExperienceTeamLabel(first)}`;
-    if (clubName) return `${clubName} First Team`;
-    return null;
+    if (!clubName && !first) return null;
+    return {
+      clubId: loanId,
+      clubName: clubName ?? first?.clubName?.trim() ?? "Club",
+      teamType: first ? matchExperienceTeamLabel(first) : "First Team",
+    };
   }
 
   const teamUid = player.squadTeamUid?.trim();
@@ -72,14 +81,25 @@ export function dashClubTeamSpellout(
     ? clubTeams.find((item) => item.teamUid === teamUid)
     : undefined;
   if (!team) return null;
-  const clubName = resolveClubName(
-    team.clubId,
-    clubTeams,
-    clubs,
-    team.clubName ?? player.clubName,
-  );
-  const type = matchExperienceTeamLabel(team);
-  return clubName ? `${clubName} ${type}` : type;
+  const clubId = team.clubId?.trim() || player.clubId?.trim() || null;
+  const clubName =
+    resolveClubName(clubId, clubTeams, clubs, team.clubName ?? player.clubName) ??
+    "Club";
+  return {
+    clubId,
+    clubName,
+    teamType: matchExperienceTeamLabel(team),
+  };
+}
+
+/** @deprecated Prefer {@link dashClubTeamChrome} for UI. */
+export function dashClubTeamSpellout(
+  player: LivePlayer,
+  clubTeams: LiveClubTeam[],
+  clubs: Array<{ id: string; name: string }> = [],
+): string | null {
+  const chrome = dashClubTeamChrome(player, clubTeams, clubs);
+  return chrome ? `${chrome.clubName} ${chrome.teamType}` : null;
 }
 
 function byName(a: LivePlayer, b: LivePlayer): number {

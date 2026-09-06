@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-07 (T260 done — ME loans + clubTeam spellout)
+Last updated: 2026-09-07 (T261 done — borderless logos + ME ribbons)
 
 ## Now
 
@@ -29,6 +29,7 @@ Last updated: 2026-09-07 (T260 done — ME loans + clubTeam spellout)
 
 ## Recently done
 
+- **T261** Borderless club logos default; ability logo+type; ME Current/Best ribbons
 - **T260** Dash `{clubName} {teamType}` + ME counts loans on destination First
 - **T259** Dashboard Best players (CA) / Best talent (PA ≤20, loans+FT) + horizontal rows
 - **T258** Dashboard polish — Attribute changes / First-team path rows, tabs, `goBack`
@@ -36,7 +37,6 @@ Last updated: 2026-09-07 (T260 done — ME loans + clubTeam spellout)
 - **T256** Loan honesty — feeder destinations count as outgoing (not II suppress)
 - **T255** ME widget club→club labels, deeplink to ME tab, blue/green cards
 - **T254** Dashboard Match experience opportunities (Under N/Res → First #1–2)
-- **T250** ME card order by max same-pos CA + current-team chrome
 
 ## Loop
 

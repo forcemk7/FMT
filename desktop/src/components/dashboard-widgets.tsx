@@ -14,7 +14,7 @@ import {
   type HasTone,
 } from "@/domain/has-score";
 import {
-  dashClubTeamSpellout,
+  dashClubTeamChrome,
   type SquadAbilityRank,
 } from "@/domain/squad-ability-rank";
 import type { MatchExperienceOpportunity } from "@/domain/match-experience-opportunities";
@@ -159,7 +159,7 @@ export function DashAbilityRow({
   clubs?: Array<{ id: string; name: string }>;
 }) {
   const { player, ca, pa } = row;
-  const teamLabel = dashClubTeamSpellout(player, clubTeams ?? [], clubs ?? []);
+  const chrome = dashClubTeamChrome(player, clubTeams ?? [], clubs ?? []);
   const secondary =
     mode === "players" ? (
       <>
@@ -193,7 +193,16 @@ export function DashAbilityRow({
         {!compact && player.age != null ? <small>Age {player.age}</small> : null}
       </span>
       <span className="dash-row-extra dash-ability-extra">
-        {teamLabel ? <span className="dash-ability-team">{teamLabel}</span> : null}
+        {chrome ? (
+          <span className="dash-ability-team" title={`${chrome.clubName} ${chrome.teamType}`}>
+            {chrome.clubId ? (
+              <ClubLogo clubId={chrome.clubId} name={chrome.clubName} size="sm" />
+            ) : (
+              <span className="club-logo club-logo-sm club-logo-empty" aria-hidden="true" />
+            )}
+            <span className="dash-ability-team-type">{chrome.teamType}</span>
+          </span>
+        ) : null}
         <span className="dash-ability-secondary">{secondary}</span>
       </span>
       <span className="dash-row-main dash-ability-main">{main}</span>
