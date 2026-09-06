@@ -1,16 +1,16 @@
 ﻿# Status
 
-Last updated: 2026-09-06 (T222 done — wired FMT WIP committed; board clear of ready cleanup)
+Last updated: 2026-09-06 (T223 done — player profile Attr+Dev only)
 
 ## Now
 
-**Board clear of T222.** No other `ready` cleanup tickets — ask HQ. Parked/deferred remain.
+**Board clear of T223.** Club page improve still unticketed. Ask HQ for next.
 
 **T190 parked** — Save ID in RAM before save-copy CA path.
 
 **Deferred:** T215 Diagnostics source-of-truth skeleton + live fill. T210 Squad card/list density. T139 theme. T162 trophy cabinet. Empty Youth(0) tab. Loop D full-world load parked — catalog `research/ecosystem.md` + `research/recipes.md`. Placement ladder — not now.
 
-**Residuals (not tickets):** Main/Permanent/PMF affiliation bytes still open (see `research/recipes.md`). Dirty tree may still hold unrelated WIP (attribute-history, dashboard filter rename, etc.).
+**Residuals (not tickets):** Main/Permanent/PMF affiliation bytes; further globals CSS carcass; club page polish.
 
 ## Board
 
@@ -28,6 +28,7 @@ Last updated: 2026-09-06 (T222 done — wired FMT WIP committed; board clear of 
 
 ## Recently done
 
+- **T223** Rip empty player profile tabs (Attributes + Development only)
 - **T222** Commit wired FMT WIP (desk / cosmetics / terminal / HAS breakdown)
 - **T221** Strip GlassScout chrome leftovers (CSS + scratch dumps)
 - **T124** Quiet dev launch — BROWSER=none + Start FMT wait line

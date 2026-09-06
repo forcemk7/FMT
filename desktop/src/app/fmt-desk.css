@@ -271,8 +271,7 @@ body.fmt-shell .dossier-panel > header {
   border-color: var(--hairline);
 }
 
-body.fmt-shell .squad-player-row,
-body.fmt-shell .compact-dossier-panel > button {
+body.fmt-shell .squad-player-row{
   border-color: var(--hairline) !important;
   background: transparent !important;
 }
