@@ -38,4 +38,4 @@ Fullscreen still scrolls peeks; ability rows need best position; ME needs age/CA
 - Ability: logo · teamType · position · age · secondary → main
 - ME: age · CA · PA · move rail → rank
 - Personality chips: no mid-pill clip (`overflow:visible`, intact flex basis)
-- Commit: (pending)
+- Commit: `437e7f6`
