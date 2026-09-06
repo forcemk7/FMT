@@ -161,11 +161,11 @@ export function PlayerProfileScreen({
                   <NationFlag
                     nationId={player.nationalityId}
                     name={player.nationality ?? "Nation"}
-                    size="md"
-                  />
-                ) : (
-                  <span className="nation-flag nation-flag-md nation-flag-empty" aria-hidden="true" />
-                )}
+                  size="sm"
+                />
+              ) : (
+                <span className="nation-flag nation-flag-sm nation-flag-empty" aria-hidden="true" />
+              )}
                 <strong title={nationLabel === "—" ? undefined : nationLabel}>{nationLabel}</strong>
               </span>
             </span>
@@ -216,10 +216,10 @@ export function PlayerProfileScreen({
                   <ClubLogo
                     clubId={activeClubId}
                     name={clubName ?? club?.name ?? "Club"}
-                    size="md"
+                    size="sm"
                   />
                 ) : (
-                  <span className="club-logo club-logo-md club-logo-empty" aria-hidden="true" />
+                  <span className="club-logo club-logo-sm club-logo-empty" aria-hidden="true" />
                 )}
                 <strong title={clubName ?? undefined}>{clubName ?? "—"}</strong>
               </span>

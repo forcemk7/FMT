@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-06 (T224 done — facts strip + Development plot)
+Last updated: 2026-09-06 (T225 done — facts align + FM plot)
 
 ## Now
 
@@ -26,6 +26,7 @@ Last updated: 2026-09-06 (T224 done — facts strip + Development plot)
 
 ## Recently done
 
+- **T225** Facts strip align + FM-faithful Development plot
 - **T224** Player facts strip + Development plot (align, fixed Y, linear, gameDate X)
 - **T223** Rip empty player profile tabs (Attributes + Development only)
 - **T222** Commit wired FMT WIP (desk / cosmetics / terminal / HAS breakdown)

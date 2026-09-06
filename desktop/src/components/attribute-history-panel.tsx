@@ -11,17 +11,32 @@ import { AttributeDesk } from "@/components/attribute-desk";
 
 const DEFAULT_PLOT = ["CA", "PA"] as const;
 const MAX_PLOT_SERIES = 6;
-/** Fixed ability scale (CA/PA). */
-const ABILITY_Y = { min: 1, max: 200 } as const;
-/** Fixed attribute scale (1–20). */
-const ATTR_Y = { min: 1, max: 20 } as const;
+/** FM development plot always uses a fixed 0–20 axis. */
+const PLOT_Y = { min: 0, max: 20 } as const;
+const Y_TICKS = [0, 5, 10, 15, 20] as const;
+const ENDPOINT_GOLD = "#f0c14a";
 
-function linePath(pts: Array<{ x: number; y: number }>): string {
+/**
+ * FM-style path: horizontal tangents so plateaus stay flat and level changes
+ * ease with a smooth S-curve between observations.
+ */
+function fmSmoothPath(pts: Array<{ x: number; y: number }>): string {
   if (pts.length === 0) return "";
   if (pts.length === 1) return `M ${pts[0]!.x} ${pts[0]!.y}`;
-  return pts
-    .map((pt, index) => `${index === 0 ? "M" : "L"} ${pt.x} ${pt.y}`)
-    .join(" ");
+  if (pts.length === 2) {
+    const a = pts[0]!;
+    const b = pts[1]!;
+    const dx = (b.x - a.x) / 3;
+    return `M ${a.x} ${a.y} C ${a.x + dx} ${a.y} ${b.x - dx} ${b.y} ${b.x} ${b.y}`;
+  }
+  let d = `M ${pts[0]!.x} ${pts[0]!.y}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = pts[i]!;
+    const b = pts[i + 1]!;
+    const dx = (b.x - a.x) / 3;
+    d += ` C ${a.x + dx} ${a.y} ${b.x - dx} ${b.y} ${b.x} ${b.y}`;
+  }
+  return d;
 }
 
 function shortFieldLabel(field: string): string {
@@ -33,18 +48,87 @@ function shortFieldLabel(field: string): string {
 function formatWallClockShort(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "Observation";
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return formatFmDateParts(date.getUTCDate(), date.getUTCMonth(), date.getUTCFullYear() % 100, true);
 }
 
-function observationLabel(point: AttrHistoryPoint, index: number): string {
+const MONTH_SHORT = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+] as const;
+
+function formatFmDateParts(
+  day: number,
+  monthIndex: number,
+  yearTwo: number,
+  withYear: boolean,
+): string {
+  const month = MONTH_SHORT[monthIndex] ?? "Jan";
+  if (!withYear) return `${day} ${month}`;
+  return `${day} ${month} ${String(yearTwo).padStart(2, "0")}`;
+}
+
+/** Parse ISO / FM-ish game dates into plot tick labels (FM: "21 Jun 42", then "22 Aug"). */
+function observationLabel(
+  point: AttrHistoryPoint,
+  index: number,
+  prior: AttrHistoryPoint | null,
+): string {
+  const parsed = parseObservationDate(point);
+  if (parsed) {
+    const priorParsed = prior ? parseObservationDate(prior) : null;
+    const withYear =
+      index === 0 || !priorParsed || priorParsed.year !== parsed.year;
+    return formatFmDateParts(parsed.day, parsed.monthIndex, parsed.year % 100, withYear);
+  }
   const gameDate = point.gameDate?.trim();
   if (gameDate) return gameDate;
   if (point.at?.trim()) return formatWallClockShort(point.at);
-  return `Observation ${index + 1}`;
+  return `Obs ${index + 1}`;
+}
+
+function parseObservationDate(
+  point: AttrHistoryPoint,
+): { day: number; monthIndex: number; year: number } | null {
+  const raw = point.gameDate?.trim() || point.at?.trim() || "";
+  if (!raw) return null;
+  // YYYY-MM-DD or ISO datetime
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) {
+    return {
+      year: Number(iso[1]),
+      monthIndex: Number(iso[2]) - 1,
+      day: Number(iso[3]),
+    };
+  }
+  const wall = new Date(raw);
+  if (!Number.isNaN(wall.getTime()) && raw.includes("T")) {
+    return {
+      year: wall.getUTCFullYear(),
+      monthIndex: wall.getUTCMonth(),
+      day: wall.getUTCDate(),
+    };
+  }
+  return null;
 }
 
 function isAbilityField(field: string): boolean {
   return field === "CA" || field === "PA";
+}
+
+/** Map CA/PA (≈1–200) onto FM's 0–20 ability axis; attrs already 1–20. */
+function plotValue(field: string, value: number): number {
+  if (isAbilityField(field)) return value / 10;
+  return value;
 }
 
 export function AttributeHistoryPanel({
@@ -73,8 +157,8 @@ export function AttributeHistoryPanel({
 
   const chart = useMemo(() => {
     const width = 720;
-    const height = 132;
-    const pad = { left: 34, right: 10, top: 10, bottom: 22 };
+    const height = 168;
+    const pad = { left: 40, right: 12, top: 12, bottom: 28 };
     const innerW = width - pad.left - pad.right;
     const innerH = height - pad.top - pad.bottom;
 
@@ -83,31 +167,32 @@ export function AttributeHistoryPanel({
       return pad.left + (index / (points.length - 1)) * innerW;
     };
 
-    const abilityish = plotFields.some(isAbilityField);
-    const attrish = plotFields.some((field) => !isAbilityField(field));
-    const normalize = abilityish && attrish;
+    const yAt = (value: number) => {
+      const clamped = Math.min(PLOT_Y.max, Math.max(PLOT_Y.min, value));
+      return pad.top + ((PLOT_Y.max - clamped) / (PLOT_Y.max - PLOT_Y.min)) * innerH;
+    };
 
-    const sharedScale = abilityish && !attrish ? ABILITY_Y : ATTR_Y;
-    const yAtShared = (value: number) =>
-      pad.top +
-      ((sharedScale.max - value) / (sharedScale.max - sharedScale.min)) * innerH;
-    const yAtNorm = (value: number, min: number, max: number) =>
-      pad.top + ((max - value) / (max - min)) * innerH;
+    const abilityOnly =
+      plotFields.length > 0 && plotFields.every(isAbilityField);
+    const axisTitle = abilityOnly ? "Ability" : "Attributes";
 
     const series = plotFields.flatMap((field, index) => {
-      const scale = isAbilityField(field) ? ABILITY_Y : ATTR_Y;
       const orderIndex = selected.indexOf(field);
       const color = colorForSeries(orderIndex >= 0 ? orderIndex : index);
       const pts = points.flatMap((point, pointIndex) => {
         const value = point.values[field];
         if (typeof value !== "number") return [];
-        const y = normalize
-          ? yAtNorm(value, scale.min, scale.max)
-          : yAtShared(value);
-        return [{ x: xAt(pointIndex), y, value, pointIndex }];
+        return [
+          {
+            x: xAt(pointIndex),
+            y: yAt(plotValue(field, value)),
+            value,
+            pointIndex,
+          },
+        ];
       });
       if (!pts.length) return [];
-      return [{ field, color, path: linePath(pts), pts }];
+      return [{ field, color, path: fmSmoothPath(pts), pts }];
     });
 
     const xLabels =
@@ -115,8 +200,13 @@ export function AttributeHistoryPanel({
         ? []
         : points.map((point, index) => ({
             x: xAt(index),
-            label: observationLabel(point, index),
+            label: observationLabel(point, index, points[index - 1] ?? null),
           }));
+
+    const yTicks = Y_TICKS.map((tick) => ({
+      tick,
+      y: yAt(tick),
+    }));
 
     return {
       width,
@@ -124,10 +214,11 @@ export function AttributeHistoryPanel({
       pad,
       innerW,
       innerH,
-      yLabelTop: normalize ? "↑" : String(sharedScale.max),
-      yLabelBottom: normalize ? "↓" : String(sharedScale.min),
+      axisTitle,
+      abilityOnly,
       series,
       xLabels,
+      yTicks,
       xAt,
       empty: points.length === 0,
       noSeries: plotFields.length === 0,
@@ -153,6 +244,11 @@ export function AttributeHistoryPanel({
     setHoverIndex(best);
   };
 
+  const hoverLabel =
+    hoverPoint && hoverIndex != null
+      ? observationLabel(hoverPoint, hoverIndex, points[hoverIndex - 1] ?? null)
+      : null;
+
   return (
     <section className="dossier-panel tab-evidence-panel development-desk-panel">
       <div className="development-desk-body">
@@ -165,47 +261,82 @@ export function AttributeHistoryPanel({
               onMouseMove={onPlotMove}
               onMouseLeave={() => setHoverIndex(null)}
             >
-              <line
-                x1={chart.pad.left}
-                x2={chart.width - chart.pad.right}
-                y1={chart.pad.top}
-                y2={chart.pad.top}
-                className="development-plot-rail"
-              />
-              <line
-                x1={chart.pad.left}
-                x2={chart.width - chart.pad.right}
-                y1={chart.height - chart.pad.bottom}
-                y2={chart.height - chart.pad.bottom}
-                className="development-plot-rail"
-              />
-              <text x={6} y={chart.pad.top + 4} className="attr-history-axis">
-                {chart.yLabelTop}
+              <text
+                className="development-plot-axis-title"
+                transform={`translate(11 ${chart.pad.top + chart.innerH / 2}) rotate(-90)`}
+                textAnchor="middle"
+              >
+                {chart.axisTitle}
               </text>
-              <text x={6} y={chart.height - chart.pad.bottom} className="attr-history-axis">
-                {chart.yLabelBottom}
-              </text>
-              {chart.series.map((series) => (
-                <g key={series.field}>
-                  <path
-                    d={series.path}
-                    fill="none"
-                    stroke={series.color}
-                    strokeWidth={1.75}
-                    strokeLinejoin="round"
-                    strokeLinecap="round"
+              {chart.yTicks.map((item) => (
+                <g key={item.tick}>
+                  <line
+                    x1={chart.pad.left}
+                    x2={chart.width - chart.pad.right}
+                    y1={item.y}
+                    y2={item.y}
+                    className={
+                      item.tick === 0
+                        ? "development-plot-baseline"
+                        : "development-plot-grid"
+                    }
                   />
-                  {series.pts.map((pt) => (
-                    <circle
-                      key={`${series.field}-${pt.pointIndex}`}
-                      cx={pt.x}
-                      cy={pt.y}
-                      r={hoverIndex === pt.pointIndex ? 3.25 : 2.25}
-                      fill={series.color}
-                    />
-                  ))}
+                  <text
+                    x={chart.pad.left - 6}
+                    y={item.y + 3}
+                    textAnchor="end"
+                    className="attr-history-axis"
+                  >
+                    {item.tick}
+                  </text>
                 </g>
               ))}
+              <line
+                x1={chart.pad.left}
+                x2={chart.pad.left}
+                y1={chart.pad.top}
+                y2={chart.height - chart.pad.bottom}
+                className="development-plot-baseline"
+              />
+              {chart.series.map((series) => {
+                const last = series.pts[series.pts.length - 1];
+                const showEndpoint = chart.abilityOnly && last;
+                return (
+                  <g key={series.field}>
+                    <path
+                      d={series.path}
+                      fill="none"
+                      stroke={series.color}
+                      strokeWidth={1.5}
+                      strokeLinejoin="round"
+                      strokeLinecap="round"
+                      className="development-plot-line"
+                    />
+                    {showEndpoint ? (
+                      <circle
+                        cx={last.x}
+                        cy={last.y}
+                        r={3}
+                        fill={ENDPOINT_GOLD}
+                        className="development-plot-endpoint"
+                      />
+                    ) : null}
+                    {hoverIndex != null
+                      ? series.pts
+                          .filter((pt) => pt.pointIndex === hoverIndex)
+                          .map((pt) => (
+                            <circle
+                              key={`${series.field}-hover-${pt.pointIndex}`}
+                              cx={pt.x}
+                              cy={pt.y}
+                              r={3}
+                              fill={series.color}
+                            />
+                          ))
+                      : null}
+                  </g>
+                );
+              })}
               {hoverIndex != null && points.length > 0 ? (
                 <line
                   x1={chart.xAt(hoverIndex)}
@@ -216,15 +347,23 @@ export function AttributeHistoryPanel({
                 />
               ) : null}
               {chart.xLabels.map((item, index) => (
-                <text
-                  key={`${item.label}-${index}`}
-                  x={item.x}
-                  y={chart.height - 4}
-                  textAnchor="middle"
-                  className="attr-history-axis"
-                >
-                  {item.label.length > 12 ? `${item.label.slice(0, 10)}…` : item.label}
-                </text>
+                <g key={`${item.label}-${index}`}>
+                  <line
+                    x1={item.x}
+                    x2={item.x}
+                    y1={chart.height - chart.pad.bottom}
+                    y2={chart.height - chart.pad.bottom + 4}
+                    className="development-plot-xtick"
+                  />
+                  <text
+                    x={item.x}
+                    y={chart.height - 6}
+                    textAnchor="middle"
+                    className="attr-history-axis"
+                  >
+                    {item.label.length > 11 ? `${item.label.slice(0, 9)}…` : item.label}
+                  </text>
+                </g>
               ))}
               {chart.empty ? (
                 <text
@@ -246,9 +385,9 @@ export function AttributeHistoryPanel({
                 </text>
               ) : null}
             </svg>
-            {hoverPoint && hoverIndex != null && plotFields.length > 0 ? (
+            {hoverPoint && hoverIndex != null && plotFields.length > 0 && hoverLabel ? (
               <div className="development-plot-hover" role="status">
-                <strong>{observationLabel(hoverPoint, hoverIndex)}</strong>
+                <strong>{hoverLabel}</strong>
                 <ul>
                   {plotFields.map((field) => {
                     const value = hoverPoint.values[field];
