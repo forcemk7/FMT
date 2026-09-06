@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-07 (T263 done — denser peeks + ME stats)
+Last updated: 2026-09-07 (T264 done — dash flex + mid chip fix)
 
 ## Now
 
@@ -29,6 +29,7 @@ Last updated: 2026-09-07 (T263 done — denser peeks + ME stats)
 
 ## Recently done
 
+- **T264** Dash true flex fill; mid-tone chip padding fix; ability/ME detail order
 - **T263** Dash denser peeks (4), best position, ME age/CA/PA, personality chip clip fix
 - **T262** Dashboard viewport-fit widgets; ability age; spelled personality chips
 - **T261** Borderless club logos default; ability logo+type; ME Current/Best ribbons
@@ -36,7 +37,6 @@ Last updated: 2026-09-07 (T263 done — denser peeks + ME stats)
 - **T259** Dashboard Best players (CA) / Best talent (PA ≤20, loans+FT) + horizontal rows
 - **T258** Dashboard polish — Attribute changes / First-team path rows, tabs, `goBack`
 - **T257** Squad desk — hide empty / ME-only clubTeams (`isSquadDeskClubTeam`)
-- **T256** Loan honesty — feeder destinations count as outgoing (not II suppress)
 
 ## Loop
 

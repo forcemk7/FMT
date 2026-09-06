@@ -208,6 +208,8 @@ export function DashAbilityRow({
         {!compact && ageLabel ? <small>{ageLabel}</small> : null}
       </span>
       <span className="dash-row-extra dash-ability-extra">
+        {ageLabel ? <span className="dash-ability-age">{ageLabel}</span> : null}
+        {position ? <span className="dash-ability-pos">{position}</span> : null}
         {chrome ? (
           <span className="dash-ability-team" title={`${chrome.clubName} ${chrome.teamType}`}>
             {chrome.clubId ? (
@@ -218,8 +220,6 @@ export function DashAbilityRow({
             <span className="dash-ability-team-type">{chrome.teamType}</span>
           </span>
         ) : null}
-        {position ? <span className="dash-ability-pos">{position}</span> : null}
-        {ageLabel ? <span className="dash-ability-age">{ageLabel}</span> : null}
         <span className="dash-ability-secondary">{secondary}</span>
       </span>
       <span className="dash-row-main dash-ability-main">{main}</span>
@@ -268,12 +268,6 @@ export function DashMatchExperienceRow({
       </span>
       <span className="dash-row-extra dash-me-extra">
         {ageLabel ? <span className="dash-ability-age">{ageLabel}</span> : null}
-        <span className="dash-ability-secondary">
-          <abbr title="Current ability">CA</abbr> {abilityLabel(ca)}
-        </span>
-        <span className="dash-ability-secondary">
-          <abbr title="Potential ability">PA</abbr> {abilityLabel(pa)}
-        </span>
         <span className="dash-me-move-rail" aria-label={moveTitle}>
           <span className="dash-me-move-side">
             {fromClubId ? <ClubLogo clubId={fromClubId} name={fromClubName} size="sm" /> : null}
@@ -286,6 +280,12 @@ export function DashMatchExperienceRow({
             {toClubId ? <ClubLogo clubId={toClubId} name={toClubName} size="sm" /> : null}
             <span className="dash-me-move-type">{toTeamLabel}</span>
           </span>
+        </span>
+        <span className="dash-ability-secondary">
+          <abbr title="Current ability">CA</abbr> {abilityLabel(ca)}
+        </span>
+        <span className="dash-ability-secondary">
+          <abbr title="Potential ability">PA</abbr> {abilityLabel(pa)}
         </span>
       </span>
       <span className="dash-row-main dash-me-opportunity-rank">
