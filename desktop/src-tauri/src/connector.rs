@@ -12,6 +12,9 @@ use std::{
 use tauri::Emitter;
 
 use crate::fm26::{
+    affiliation_types::{
+        is_match_experience_feeder_type, is_squad_tab_affiliation_type,
+    },
     affiliate_links::{
         discover_bteam_affiliate_clubs, discover_teams_for_affiliate_club, discover_teams_for_club,
         AffiliateClubDiscovery,
@@ -1134,18 +1137,41 @@ fn is_loaned_out_from_loan_club(loan_club_uid: Option<u32>, managed_club_uid: u3
     is_outgoing_external_loan(loan_club_uid, managed_club_uid, &HashSet::new())
 }
 
-/// Outgoing loan to an external club — not parent→B-team affiliate (pointer-graph club UIDs).
+/// Outgoing loan to an external club — not parent→II / satellite (internal Squad structure).
+/// Feeders (0x01/0x03) and ME-only hops are **not** in this set — those are real loan destinations.
 fn is_outgoing_external_loan(
     loan_club_uid: Option<u32>,
     managed_club_uid: u32,
-    bteam_affiliate_club_uids: &HashSet<u32>,
+    internal_reserve_club_uids: &HashSet<u32>,
 ) -> bool {
     match loan_club_uid {
         None => false,
         Some(uid) if uid == managed_club_uid => false,
-        Some(uid) if bteam_affiliate_club_uids.contains(&uid) => false,
+        Some(uid) if internal_reserve_club_uids.contains(&uid) => false,
         Some(_) => true,
     }
+}
+
+/// Club UIDs that still count as “at club” for loan honesty (Squad-tab II / NPL satellite).
+/// Excludes Normal/feeder affiliates and ME-only feeder→II hops.
+fn loan_honesty_internal_reserve_uids(
+    affiliates: &[AffiliateClubDiscovery],
+) -> HashSet<u32> {
+    affiliates
+        .iter()
+        .filter(|entry| {
+            if entry.match_experience_only {
+                return false;
+            }
+            match entry.affiliation_type {
+                Some(type_byte) if is_match_experience_feeder_type(type_byte) => false,
+                Some(type_byte) => is_squad_tab_affiliation_type(type_byte),
+                // Satellite / unmapped Squad-tab discovery (e.g. NPL) — keep T212 honesty.
+                None => true,
+            }
+        })
+        .map(|entry| entry.club_uid)
+        .collect()
 }
 
 /// Contract object ???????? employing team pointer.
@@ -2164,8 +2190,7 @@ fn extract_live_data(
     let bteam_discovery =
         discover_bteam_affiliate_clubs(reader, module, profile, club, club_uid, team);
     let bteam_affiliates = &bteam_discovery.affiliates;
-    let affiliate_reserve_club_uids: HashSet<u32> =
-        bteam_affiliates.iter().map(|entry| entry.club_uid).collect();
+    let affiliate_reserve_club_uids = loan_honesty_internal_reserve_uids(bteam_affiliates);
 
     if let Some(progress) = progress {
         progress("loading_club_teams");
@@ -3141,6 +3166,75 @@ mod tests {
         let bteam = HashSet::from([3_609_393_u32]);
         assert!(!super::is_outgoing_external_loan(Some(3_609_393), 920, &bteam));
         assert!(super::is_outgoing_external_loan(Some(1150), 920, &bteam));
+    }
+
+    #[test]
+    fn loan_honesty_uids_keep_ii_exclude_feeders_and_me_only() {
+        use crate::fm26::affiliate_links::{AffiliateClubDiscovery, AffiliateLinkKind};
+
+        let ii = AffiliateClubDiscovery {
+            club: 1,
+            club_uid: 921,
+            club_name: "II".into(),
+            link_kind: AffiliateLinkKind::BTeam,
+            link_struct_pointer: None,
+            affiliation_type: Some(0x08),
+            affiliation_type_label: Some("II Club".into()),
+            match_experience_only: false,
+        };
+        let feeder = AffiliateClubDiscovery {
+            club: 2,
+            club_uid: 9001,
+            club_name: "Feeder".into(),
+            link_kind: AffiliateLinkKind::BTeam,
+            link_struct_pointer: None,
+            affiliation_type: Some(0x03),
+            affiliation_type_label: None,
+            match_experience_only: false,
+        };
+        let normal = AffiliateClubDiscovery {
+            club: 3,
+            club_uid: 9002,
+            club_name: "Normal Aff".into(),
+            link_kind: AffiliateLinkKind::BTeam,
+            link_struct_pointer: None,
+            affiliation_type: Some(0x01),
+            affiliation_type_label: None,
+            match_experience_only: false,
+        };
+        let me_only_ii = AffiliateClubDiscovery {
+            club: 4,
+            club_uid: 9003,
+            club_name: "Feeder II".into(),
+            link_kind: AffiliateLinkKind::BTeam,
+            link_struct_pointer: None,
+            affiliation_type: Some(0x08),
+            affiliation_type_label: Some("II Club".into()),
+            match_experience_only: true,
+        };
+        let satellite = AffiliateClubDiscovery {
+            club: 5,
+            club_uid: 3609393,
+            club_name: "NPL".into(),
+            link_kind: AffiliateLinkKind::BTeam,
+            link_struct_pointer: None,
+            affiliation_type: None,
+            affiliation_type_label: None,
+            match_experience_only: false,
+        };
+
+        let uids = super::loan_honesty_internal_reserve_uids(&[
+            ii, feeder, normal, me_only_ii, satellite,
+        ]);
+        assert!(uids.contains(&921));
+        assert!(uids.contains(&3_609_393));
+        assert!(!uids.contains(&9001));
+        assert!(!uids.contains(&9002));
+        assert!(!uids.contains(&9003));
+
+        // Feeder destination = outgoing; II destination still internal.
+        assert!(super::is_outgoing_external_loan(Some(9001), 920, &uids));
+        assert!(!super::is_outgoing_external_loan(Some(921), 920, &uids));
     }
     #[test]
     fn fm_dates_and_age_match_the_current_save_calendar() {

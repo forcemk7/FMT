@@ -6,7 +6,7 @@
 
 Update this file when a ticket locks or discards a recipe. Prefer recipes here over resurrecting deleted probe modules.
 
-**Last updated:** 2026-09-06 (T251 — feeder→II one-hop for ME)
+**Last updated:** 2026-09-07 (T256 — loan honesty UIDs = Squad-tab II only)
 
 ---
 
@@ -39,6 +39,8 @@ Update this file when a ticket locks or discards a recipe. Prefer recipes here o
 **Players Go On Loan (locked T245):** nested agreement byte `@+0x65` — `1` = on, `0` = off. Evidence: Schalke Legia / Sparta Praha / Kaiserslautern vs Daegu / Melbourne (FMLE nested term). Production: `nested_players_go_on_loan`; no name needles.
 
 **Production:** type walk first — roster allow-list `0x08` \| (`0x01`/`0x03` + loan-on); then **one hop** from each loan-on feeder `+0x118` for type `0x08` II (ME-only, e.g. Kaiserslautern II). Squad desk filters out `0x01` / `0x03` / `matchExperienceOnly`. T212-style satellite merge only for NPL / unmapped types; other unmapped `+0x30` → Diagnostics `Map AffiliationType 0xNN`. Feeders: Club.Teams **First + Reserves + Under-N/Youth**; direct managed II: First as Squad 2nd side; feeder→II: First only, ME-only.
+
+**Loan honesty (T256):** `loanedOut` suppresses only loans whose destination UID is an **internal reserve** affiliate — Squad-tab `0x08` II (and type-less satellite / NPL). **Do not** put `0x01`/`0x03` feeders or ME-only feeder→II UIDs in that set — U19→Legia/Kaiser etc. must stay outgoing.
 
 **Schalke evidence (2026-09-06):** `7/12` links mapped labels; `Map AffiliationType 0x03`; only `0x08` II was resolving before `0x03` allow-list. FMLE-only friendlies (Duisburg, Twente, …) stay out (`0x10` / `0x11`).
 
