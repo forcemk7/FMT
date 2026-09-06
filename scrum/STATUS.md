@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-06 (T230 done — profile shortName only)
+Last updated: 2026-09-06 (T231 done — U19 profile shortName)
 
 ## Now
 
@@ -26,6 +26,7 @@ Last updated: 2026-09-06 (T230 done — profile shortName only)
 
 ## Recently done
 
+- **T231** U19 profile Club shows team shortName
 - **T230** Profile Club fact must use team shortName only
 - **T229** TeamType Under Ns; affiliate shortName; profile team shortName
 - **T228** Dash widget labels + senior-team median for HoYD/GM

@@ -2142,9 +2142,14 @@ fn extract_live_data(
     let mut discovered_team_labels: Vec<String> = Vec::new();
     for entry in &discovered_teams {
         discovered_team_labels.push(format!(
-            "{} uid {} ({}, {} roster, type={:?})",
+            "{} uid {} (short={}, {}, {} roster, type={:?})",
             entry.name.trim(),
             entry.team_uid,
+            if entry.short_name.trim().is_empty() {
+                "—"
+            } else {
+                entry.short_name.trim()
+            },
             entry.squad_unit,
             entry.roster_len,
             entry.team_type

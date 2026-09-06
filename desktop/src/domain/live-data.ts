@@ -516,10 +516,29 @@ export function isSquadTabTypeLabel(value: string): boolean {
   return known.has(trimmed);
 }
 
+/** Strip one leading club legal-form token (`FC Schalke 04 U19` → `Schalke 04 U19`). */
+export function stripTeamNameLegalPrefix(value: string): string {
+  const trimmed = value.trim();
+  const match =
+    /^(?:FC|AFC|CF|SC|SV|AC|AS|FK|SK|NK|BK|IF|FF|AFK|SD|CD|UD|RC|RCD|SSC|US|SS|TSG)\s+/i.exec(
+      trimmed,
+    );
+  if (!match) return trimmed;
+  return trimmed.slice(match[0].length).trim();
+}
+
+/** Profile short display: reject TeamType labels; strip legal-form prefix. */
+export function normalizeTeamShortDisplay(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed || isSquadTabTypeLabel(trimmed)) return null;
+  const short = stripTeamNameLegalPrefix(trimmed);
+  return short || null;
+}
+
 /**
  * Player profile Club fact — team shortName only (e.g. Schalke 04 / Schalke 04 U19).
  * Never TeamType tab labels. Full team/club names only as last-resort fallbacks
- * when they are not type labels.
+ * when they are not type labels (then stripped to short form).
  */
 export function playerTeamDisplayName(
   player: Pick<LivePlayer, "squadTeamUid" | "clubName" | "clubId">,
@@ -529,18 +548,18 @@ export function playerTeamDisplayName(
   const teamUid = player.squadTeamUid?.trim();
   if (teamUid) {
     const team = clubTeams.find((item) => item.teamUid === teamUid);
-    const short = team?.shortName?.trim();
-    if (short && !isSquadTabTypeLabel(short)) return short;
-    const teamName = team?.name?.trim();
-    if (teamName && !isSquadTabTypeLabel(teamName)) return teamName;
+    const fromShort = normalizeTeamShortDisplay(team?.shortName);
+    if (fromShort) return fromShort;
+    const fromName = normalizeTeamShortDisplay(team?.name);
+    if (fromName) return fromName;
   }
-  const clubName = player.clubName?.trim();
-  if (clubName && !isSquadTabTypeLabel(clubName)) return clubName;
+  const fromClubName = normalizeTeamShortDisplay(player.clubName);
+  if (fromClubName) return fromClubName;
   const clubId = player.clubId?.trim();
   if (clubId) {
     const club = clubs.find((item) => item.id === clubId);
-    const name = club?.name?.trim();
-    if (name && !isSquadTabTypeLabel(name)) return name;
+    const fromClub = normalizeTeamShortDisplay(club?.name);
+    if (fromClub) return fromClub;
   }
   return null;
 }
