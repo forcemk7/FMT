@@ -36,4 +36,4 @@ Club logos keep getting framed every place we add them — default must be bare.
 - Ability peeks: `dashClubTeamChrome` → logo + teamType
 - ME: thin even border; Current/Best ribbon on top edge; grid padding for alignment
 - Verified: squad-ability-rank tests
-- Commit: (pending)
+- Commit: `d6ae15e`
