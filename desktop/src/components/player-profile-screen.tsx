@@ -4,7 +4,7 @@ import { ArrowLeft, Star } from "lucide-react";
 import type { LiveFootballSnapshot, LivePlayer } from "@/domain/adapters";
 import { abilityToneFromScore, attributeTone } from "@/domain/attribute-tone";
 import { formatHasScore, hasBand, liveHasScore } from "@/domain/has-score";
-import { formatPlayerPositions, playerPositionParts, playerTeamDisplayName } from "@/domain/live-data";
+import { playerPositionParts, playerTeamDisplayName } from "@/domain/live-data";
 import { livePersonalityLabels } from "@/domain/personality-labels";
 import { AttributeDesk } from "@/components/attribute-desk";
 import { AttributeHistoryPanel } from "@/components/attribute-history-panel";
