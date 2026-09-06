@@ -146,29 +146,19 @@ describe("sortClubTeamsForMatchExperience", () => {
 });
 
 describe("matchExperienceTeamLabel", () => {
-  it("uses club name + TeamType for affiliates", () => {
+  it("uses TeamType only (crest carries club identity)", () => {
     expect(
       matchExperienceTeamLabel({
-        teamUid: "1",
-        name: "Legia Warszawa",
         squadUnit: "firstTeam",
-        affiliationType: 0x03,
         teamType: 0,
-        rosterLen: 20,
-        isManagerTeam: false,
       }),
-    ).toBe("Legia Warszawa First Team");
+    ).toBe("First Team");
     expect(
       matchExperienceTeamLabel({
-        teamUid: "2",
-        name: "Legia Warszawa",
         squadUnit: "under19s",
-        affiliationType: 0x03,
         teamType: 11,
-        rosterLen: 18,
-        isManagerTeam: false,
       }),
-    ).toBe("Legia Warszawa Under 19s");
+    ).toBe("Under 19s");
   });
 });
 
@@ -260,8 +250,14 @@ describe("buildMatchExperienceCards", () => {
       youth,
       [youth, seniorSt, otherSt, loanedSt, feederSt],
       [u19, first, feeder],
+      "920",
     );
     expect(cards.map((card) => card.teamUid)).toEqual(["t-first", "t-u19", "t-feed"]);
+    expect(cards[0]!.teamLabel).toBe("First Team");
+    expect(cards[0]!.clubId).toBe("920");
+    expect(cards[2]!.teamLabel).toBe("First Team");
+    expect(cards[2]!.clubId).toBe("9001");
+    expect(cards[2]!.clubName).toBe("Feeder");
     expect(cards[1]!.rows.map((row) => row.playerId)).toEqual(["youth", "other"]);
     expect(cards[1]!.rows.some((row) => row.playerId === "loan")).toBe(false);
   });

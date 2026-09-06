@@ -20,7 +20,12 @@ export type MatchExperienceRow = {
 
 export type MatchExperienceCard = {
   teamUid: string;
+  /** TeamType only — club identity is `clubId` logo in the UI. */
   teamLabel: string;
+  /** Club UniqueID for badge; null when unread. */
+  clubId: string | null;
+  /** Full club/team name for tooltip / aria (not the visible title). */
+  clubName: string;
   position: string;
   focusRank: number | null;
   /** Resolved players on this team (any status / position) — Squad-tab style presence. */
@@ -106,26 +111,20 @@ function isIiClubAffiliate(
   return team.affiliationType === 0x08;
 }
 
-/** Match experience card title — affiliates: `{clubName} {TeamType}`. */
+/**
+ * Visible TeamType on ME cards. Club identity is the crest, not the string.
+ * (Squad desk still uses `squadTeamDisplayName`.)
+ */
 export function matchExperienceTeamLabel(
-  team: Pick<
-    LiveClubTeam,
-    "name" | "teamUid" | "teamType" | "affiliationType" | "squadUnit" | "shortName" | "affiliationTypeLabel"
-  >,
-  managedClubName?: string | null,
+  team: Pick<LiveClubTeam, "teamType" | "squadUnit">,
 ): string {
-  const affiliate =
-    isFeederAffiliate(team) || isIiClubAffiliate(team) || typeof team.affiliationType === "number";
-  if (affiliate) {
-    const club = team.name.trim() || `Map club (?): uid-${team.teamUid}`;
-    const typeLabel =
-      teamTypeDisplayLabel(team.teamType) ??
-      (typeof team.teamType === "number"
-        ? `Map TeamType ${team.teamType}`
-        : "Map TeamType (?)");
-    return `${club} ${typeLabel}`;
-  }
-  return squadTeamDisplayName(team, managedClubName);
+  const fromType = teamTypeDisplayLabel(team.teamType);
+  if (fromType) return fromType;
+  if (team.squadUnit === "firstTeam") return "First Team";
+  if (team.squadUnit === "under19s") return "Under 19s";
+  if (team.squadUnit === "reserves") return "Reserves";
+  if (typeof team.teamType === "number") return `Map TeamType ${team.teamType}`;
+  return "Map TeamType (?)";
 }
 
 /**
@@ -226,7 +225,7 @@ export function buildMatchExperienceCard(
   players: LivePlayer[],
   team: LiveClubTeam,
   position: string,
-  managedClubName?: string | null,
+  managedClubId?: string | null,
 ): MatchExperienceCard | null {
   const pos = position.trim();
   if (!pos) return null;
@@ -234,7 +233,12 @@ export function buildMatchExperienceCard(
   const teamPlayers = matchExperienceResolvedPlayers(players, team.teamUid);
   if (teamPlayers.length === 0) return null;
 
-  const teamClubId = matchExperienceTeamClubId(teamPlayers);
+  const fromRoster = matchExperienceTeamClubId(teamPlayers);
+  const teamClubId =
+    fromRoster ??
+    (isFeederAffiliate(team) || isIiClubAffiliate(team)
+      ? null
+      : managedClubId?.trim() || null);
   const competing = teamPlayers.filter((player) =>
     matchExperiencePlayerCompetesOnTeam(player, team.teamUid, teamClubId),
   );
@@ -285,7 +289,9 @@ export function buildMatchExperienceCard(
 
   return {
     teamUid: team.teamUid,
-    teamLabel: matchExperienceTeamLabel(team, managedClubName),
+    teamLabel: matchExperienceTeamLabel(team),
+    clubId: teamClubId,
+    clubName: team.name.trim() || `Map club (?): uid-${team.teamUid}`,
     position: pos,
     focusRank,
     teamPlayerCount: teamPlayers.length,
@@ -298,7 +304,7 @@ export function buildMatchExperienceCards(
   focus: LivePlayer,
   players: LivePlayer[],
   clubTeams: LiveClubTeam[],
-  managedClubName?: string | null,
+  managedClubId?: string | null,
   positionByTeamUid?: Record<string, string | null | undefined>,
   defaultPosition?: string | null,
 ): MatchExperienceCard[] {
@@ -316,7 +322,7 @@ export function buildMatchExperienceCards(
       players,
       team,
       position,
-      managedClubName,
+      managedClubId,
     );
     if (card) cards.push(card);
   }

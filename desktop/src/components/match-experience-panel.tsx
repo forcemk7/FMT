@@ -11,6 +11,7 @@ import {
   type MatchExperienceRow,
 } from "@/domain/match-experience";
 import { PlayerFace } from "@/components/player-face";
+import { ClubLogo } from "@/components/club-logo";
 
 function abilityLabel(value: number | null): string {
   return typeof value === "number" && Number.isFinite(value) ? String(value) : "—";
@@ -93,8 +94,15 @@ function MatchExperienceCardView({
   return (
     <article className="match-experience-card">
       <header className="match-experience-card-header">
-        <div className="match-experience-card-title">
-          <h3 title={card.teamLabel}>{card.teamLabel}</h3>
+        <div className="match-experience-card-title" title={card.clubName}>
+          <h3>
+            {card.clubId ? (
+              <ClubLogo clubId={card.clubId} name={card.clubName} size="sm" />
+            ) : (
+              <span className="club-logo club-logo-sm club-logo-empty" aria-hidden="true" />
+            )}
+            <span className="match-experience-team-type">{card.teamLabel}</span>
+          </h3>
           <span className="match-experience-card-meta">
             <span>{card.position}</span>
             <span aria-hidden="true">·</span>
@@ -103,7 +111,9 @@ function MatchExperienceCardView({
         </div>
         {positionOptions.length > 0 ? (
           <label className="match-experience-pos-select">
-            <span className="sr-only">Position for {card.teamLabel}</span>
+            <span className="sr-only">
+              Position for {card.clubName} {card.teamLabel}
+            </span>
             <select
               value={selectValue}
               onChange={(event) => onPositionChange(card.teamUid, event.target.value)}
@@ -146,8 +156,7 @@ export function MatchExperiencePanel({
   const defaultPosition = matchExperiencePosition(player) ?? positionOptions[0] ?? null;
   const [positionByTeam, setPositionByTeam] = useState<Record<string, string>>({});
 
-  const managedClubName =
-    snapshot.clubs.find((club) => club.id === snapshot.managedClubId)?.name ?? null;
+  const managedClubId = snapshot.managedClubId;
 
   const cards = useMemo(
     () =>
@@ -155,7 +164,7 @@ export function MatchExperiencePanel({
         player,
         snapshot.players,
         snapshot.clubTeams ?? [],
-        managedClubName,
+        managedClubId,
         positionByTeam,
         defaultPosition,
       ),
@@ -163,7 +172,7 @@ export function MatchExperiencePanel({
       player,
       snapshot.players,
       snapshot.clubTeams,
-      managedClubName,
+      managedClubId,
       positionByTeam,
       defaultPosition,
     ],
