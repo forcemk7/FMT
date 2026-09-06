@@ -31,4 +31,4 @@ Player profile still shipped GlassScout Overview / Tactical / Performance / Care
 
 ## Progress
 
-Ripped empty tabs + polygram/role-fit helpers. Stripped matching orphan CSS. Club page untouched. Commit pending.
+Ripped empty tabs + polygram/role-fit helpers. Stripped matching orphan CSS. Club page untouched. Commit `4bcd11d`.
