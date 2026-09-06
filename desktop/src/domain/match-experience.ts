@@ -185,6 +185,31 @@ export function sortMatchExperienceCards(
   });
 }
 
+/**
+ * Best First-team ladder step for this player (lowest same-pos rank).
+ * Used for profile chrome — includes current First if that is already best.
+ */
+export function pickBestMatchExperienceCard(
+  cards: MatchExperienceCard[],
+  managedClubId?: string | null,
+): MatchExperienceCard | null {
+  const firsts = cards.filter(
+    (card) => card.band === 0 && card.focusRank != null && card.focusRank >= 1,
+  );
+  if (!firsts.length) return null;
+  const managed = managedClubId?.trim() || null;
+  return [...firsts].sort((left, right) => {
+    const rank = (left.focusRank ?? 99) - (right.focusRank ?? 99);
+    if (rank !== 0) return rank;
+    const leftHome = managed && left.clubId === managed ? 0 : 1;
+    const rightHome = managed && right.clubId === managed ? 0 : 1;
+    if (leftHome !== rightHome) return leftHome - rightHome;
+    const strength = right.maxSamePosCa - left.maxSamePosCa;
+    if (strength !== 0) return strength;
+    return left.teamUid.localeCompare(right.teamUid);
+  })[0]!;
+}
+
 export function matchExperienceWindowStart(
   rowCount: number,
   focusRank: number | null,

@@ -54,7 +54,13 @@ function formatGeneralText(value: string | null | undefined) {
 
 const PROFILE_TABS = ["attributes", "development", "match-experience"] as const;
 
-function profileTabLabel(value: (typeof PROFILE_TABS)[number]) {
+export type PlayerProfileTab = (typeof PROFILE_TABS)[number];
+
+export function isPlayerProfileTab(value: string): value is PlayerProfileTab {
+  return (PROFILE_TABS as readonly string[]).includes(value);
+}
+
+function profileTabLabel(value: PlayerProfileTab) {
   if (value === "development") return "Development";
   if (value === "match-experience") return "Match experience";
   return "Attributes";
@@ -68,6 +74,7 @@ export function PlayerProfileScreen({
   onBack,
   onOpenClub,
   onOpenPlayer,
+  initialTab = "attributes",
 }: {
   player: LivePlayer | null;
   snapshot: LiveFootballSnapshot;
@@ -78,6 +85,7 @@ export function PlayerProfileScreen({
   onBack: () => void;
   onOpenClub?: (clubId: string) => void;
   onOpenPlayer: (playerId: string) => void;
+  initialTab?: PlayerProfileTab;
 }) {
   if (!player) {
     return (
@@ -273,7 +281,11 @@ export function PlayerProfileScreen({
         </div>
       </section>
 
-      <Tabs defaultValue="attributes" className="dossier-tabs">
+      <Tabs
+        key={`${player.id}-${initialTab}`}
+        defaultValue={initialTab}
+        className="dossier-tabs"
+      >
         <TabsList variant="line">
           {PROFILE_TABS.map((value) => (
             <TabsTrigger key={value} value={value}>

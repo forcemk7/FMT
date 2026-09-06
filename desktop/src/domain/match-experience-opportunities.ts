@@ -24,6 +24,16 @@ export type MatchExperienceOpportunity = {
   toTeamUid: string;
 };
 
+/** Club · TeamType → Club · TeamType */
+export function formatMatchExperienceMove(
+  row: Pick<
+    MatchExperienceOpportunity,
+    "fromClubName" | "fromTeamLabel" | "toClubName" | "toTeamLabel"
+  >,
+): string {
+  return `${row.fromClubName} · ${row.fromTeamLabel} → ${row.toClubName} · ${row.toTeamLabel}`;
+}
+
 function teamByUid(
   clubTeams: LiveClubTeam[],
   teamUid: string | null | undefined,

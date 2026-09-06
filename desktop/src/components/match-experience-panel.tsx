@@ -7,6 +7,7 @@ import {
   MATCH_EXPERIENCE_PAGE_SIZE,
   matchExperiencePosition,
   matchExperiencePositionOptions,
+  pickBestMatchExperienceCard,
   type MatchExperienceCard,
   type MatchExperienceRow,
 } from "@/domain/match-experience";
@@ -75,11 +76,13 @@ function MatchExperienceCardView({
   positionOptions,
   onPositionChange,
   onOpenPlayer,
+  isBestOption,
 }: {
   card: MatchExperienceCard;
   positionOptions: string[];
   onPositionChange: (teamUid: string, position: string) => void;
   onOpenPlayer: (playerId: string) => void;
+  isBestOption: boolean;
 }) {
   const slots: Array<MatchExperienceRow | null> = [...card.rows];
   while (slots.length < MATCH_EXPERIENCE_PAGE_SIZE) slots.push(null);
@@ -89,9 +92,14 @@ function MatchExperienceCardView({
     : (positionOptions[0] ?? card.position);
 
   const identityTitle = `${card.clubName} · ${card.teamLabel}`;
+  // Green wins when current is also best; otherwise blue current + green best.
   const cardClass = [
     "match-experience-card",
-    card.isFocusCurrentTeam ? "match-experience-card-current" : "",
+    isBestOption
+      ? "match-experience-card-best"
+      : card.isFocusCurrentTeam
+        ? "match-experience-card-current"
+        : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -108,6 +116,15 @@ function MatchExperienceCardView({
           <div className="match-experience-card-text">
             <strong className="match-experience-team-type">{card.teamLabel}</strong>
             <span className="match-experience-club-name">{card.clubName}</span>
+            {isBestOption ? (
+              <span className="match-experience-card-badge match-experience-card-badge-best">
+                Best option
+              </span>
+            ) : card.isFocusCurrentTeam ? (
+              <span className="match-experience-card-badge match-experience-card-badge-current">
+                Current
+              </span>
+            ) : null}
           </div>
         </div>
         {positionOptions.length > 0 ? (
@@ -179,6 +196,11 @@ export function MatchExperiencePanel({
     ],
   );
 
+  const bestTeamUid = useMemo(
+    () => pickBestMatchExperienceCard(cards, managedClubId)?.teamUid ?? null,
+    [cards, managedClubId],
+  );
+
   const onPositionChange = (teamUid: string, position: string) => {
     setPositionByTeam((prev) => ({ ...prev, [teamUid]: position }));
   };
@@ -227,6 +249,7 @@ export function MatchExperiencePanel({
             positionOptions={positionOptions}
             onPositionChange={onPositionChange}
             onOpenPlayer={onOpenPlayer}
+            isBestOption={card.teamUid === bestTeamUid}
           />
         ))}
       </div>

@@ -28,6 +28,7 @@ export type Screen =
   | "Settings"
   | "Movers"
   | "Prospects"
+  | "Match experience"
   | "HAS Top"
   | "HAS Bottom";
 

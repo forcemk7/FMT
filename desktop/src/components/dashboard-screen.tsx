@@ -23,6 +23,9 @@ import { LiveDataState } from "@/components/live-data-state";
 import { Button } from "@/components/ui/button";
 import { isAtClubEmployee } from "@/domain/live-data";
 import { rankMatchExperienceOpportunities } from "@/domain/match-experience-opportunities";
+import type { PlayerProfileTab } from "@/components/player-profile-screen";
+
+type OpenPlayer = (playerId: string, options?: { tab?: PlayerProfileTab }) => void;
 
 function WidgetShell({
   title,
@@ -63,7 +66,7 @@ export function DashboardScreen({
   snapshot: LiveFootballSnapshot;
   checking: boolean;
   onRefresh: () => Promise<unknown>;
-  onOpenPlayer: (playerId: string) => void;
+  onOpenPlayer: OpenPlayer;
   onOpenView: (view: DashViewId) => void;
 }) {
   const squad = useMemo(
@@ -157,7 +160,7 @@ export function DashboardScreen({
                   <DashMatchExperienceRow
                     key={row.player.id}
                     row={row}
-                    onOpen={onOpenPlayer}
+                    onOpen={(id) => onOpenPlayer(id, { tab: "match-experience" })}
                     compact
                   />
                 ))}
@@ -224,7 +227,7 @@ export function DashboardViewScreen({
   snapshot: LiveFootballSnapshot;
   checking: boolean;
   onRefresh: () => Promise<unknown>;
-  onOpenPlayer: (playerId: string) => void;
+  onOpenPlayer: OpenPlayer;
   onBack: () => void;
 }) {
   const squad = useMemo(
@@ -284,7 +287,11 @@ export function DashboardViewScreen({
     body = matchExperience.length ? (
       <div className="dash-has-list dash-view-list">
         {matchExperience.map((row) => (
-          <DashMatchExperienceRow key={row.player.id} row={row} onOpen={onOpenPlayer} />
+          <DashMatchExperienceRow
+            key={row.player.id}
+            row={row}
+            onOpen={(id) => onOpenPlayer(id, { tab: "match-experience" })}
+          />
         ))}
       </div>
     ) : (

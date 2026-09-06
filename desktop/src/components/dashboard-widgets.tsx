@@ -10,6 +10,7 @@ import { formatPlayerPositions } from "@/domain/live-data";
 import { formatHasScore, hasBand, type HasTone } from "@/domain/has-score";
 import type { SquadProspect } from "@/domain/squad-prospects";
 import type { MatchExperienceOpportunity } from "@/domain/match-experience-opportunities";
+import { formatMatchExperienceMove } from "@/domain/match-experience-opportunities";
 import { HasBreakdownGridFromPlayer } from "@/components/has-breakdown-grid";
 import { PlayerFace } from "@/components/player-face";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -151,8 +152,8 @@ export function DashMatchExperienceRow({
   onOpen: (id: string) => void;
   compact?: boolean;
 }) {
-  const { player, position, focusRank, fromTeamLabel, toTeamLabel, toClubName } = row;
-  const move = `${fromTeamLabel} → ${toTeamLabel}`;
+  const { player, position, focusRank } = row;
+  const move = formatMatchExperienceMove(row);
   const rank = `#${focusRank} ${position}`;
   return (
     <button
@@ -161,19 +162,13 @@ export function DashMatchExperienceRow({
         compact ? "dash-peek-row dash-me-opportunity-card" : "dash-has-card dash-me-opportunity-card"
       }
       onClick={() => onOpen(player.id)}
+      title={move}
     >
       <PlayerFace playerId={player.id} name={player.name} size="sm" />
       <span className="dash-has-card-copy">
         <strong>{player.name}</strong>
-        <small>
-          {move}
-          {compact ? ` · ${rank}` : null}
-        </small>
-        {!compact ? (
-          <small className="dash-me-opportunity-target">
-            {rank} · {toClubName}
-          </small>
-        ) : null}
+        <small className="dash-me-opportunity-move">{move}</small>
+        {!compact ? <small className="dash-me-opportunity-target">{rank}</small> : null}
       </span>
       {compact ? <span className="dash-me-opportunity-rank">{rank}</span> : null}
     </button>

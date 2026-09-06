@@ -1321,8 +1321,13 @@ button:active,
 .match-experience-panel{margin:16px 0;display:flex;flex-direction:column;gap:12px}
 .match-experience-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;align-items:stretch}
 .match-experience-card{border:1px solid var(--border);border-radius:8px;background:#fff;overflow:hidden;min-width:0;display:flex;flex-direction:column}
-.match-experience-card-current{border-color:#0b496f;box-shadow:inset 3px 0 0 #0b496f}
-.match-experience-card-current .match-experience-card-header{background:color-mix(in srgb,#0b496f 6%,#fff)}
+.match-experience-card-current{border-color:#1d4ed8;box-shadow:inset 4px 0 0 #2563eb}
+.match-experience-card-current .match-experience-card-header{background:color-mix(in srgb,#2563eb 14%,#fff)}
+.match-experience-card-best{border-color:#22c55e;box-shadow:inset 4px 0 0 #39ff14,0 0 0 1px color-mix(in srgb,#39ff14 35%,transparent)}
+.match-experience-card-best .match-experience-card-header{background:color-mix(in srgb,#39ff14 18%,#fff)}
+.match-experience-card-badge{display:inline-block;margin-top:2px;padding:1px 5px;border-radius:4px;font-size:7px;font-weight:700;letter-spacing:.02em;text-transform:uppercase;width:fit-content;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.match-experience-card-badge-current{background:#dbeafe;color:#1e40af}
+.match-experience-card-badge-best{background:#dcfce7;color:#15803d}
 .match-experience-card-header{display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:34px;padding:5px 8px;border-bottom:1px solid var(--border)}
 .match-experience-card-identity{display:flex;align-items:center;gap:6px;min-width:0;flex:1}
 .match-experience-card-identity .club-logo,
@@ -2545,10 +2550,10 @@ body.fmt-shell {
   display:grid !important;
   grid-template-columns:auto minmax(0,1fr) auto;
   align-items:center;
-  gap:8px;
+  gap:10px;
   width:100%;
   box-sizing:border-box;
-  padding:6px 8px;
+  padding:7px 10px;
   border:1px solid transparent;
   border-radius:8px;
   background:transparent;
@@ -2563,14 +2568,21 @@ body.fmt-shell {
   flex-direction:column;
   gap:2px;
   min-width:0;
+  flex:1 1 auto;
 }
-.dash-peek-row .dash-has-card-copy strong{font-size:11px}
+.dash-peek-row .dash-has-card-copy strong{font-size:12px}
+.dash-peek-row .dash-has-card-copy small{
+  font-size:9px;
+  line-height:1.3;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
 .dash-peek-row .dash-has-score{min-width:34px;padding:2px 6px;font-size:9px}
 .dash-peek-row .dash-mover-chips{
   display:flex;
   flex-wrap:wrap;
   justify-content:flex-end;
-  max-width:9.5rem;
+  max-width:min(100%,14rem);
 }
 .dash-view-heading-row{display:flex;align-items:flex-start;gap:8px}
 .dash-view-list{gap:8px}
@@ -2584,8 +2596,10 @@ body.fmt-shell {
 .dash-mover-chip small{font-size:8px;font-weight:600;opacity:.75;text-transform:uppercase}
 .dash-mover-chip.is-more{font-weight:600;color:var(--slate,#64748b);background:transparent;padding-inline:2px}
 .dash-prospect-card .dash-prospect-mentor{color:var(--slate,#64748b);white-space:normal}
-.dash-me-opportunity-rank{flex:none;min-width:42px;padding:2px 6px;border-radius:5px;background:#eef6f3;color:#0b496f;font-size:9px;font-weight:700;font-variant-numeric:tabular-nums;text-align:center}
+.dash-me-opportunity-rank{flex:none;min-width:48px;padding:3px 7px;border-radius:5px;background:#eef6f3;color:#0b496f;font-size:9px;font-weight:700;font-variant-numeric:tabular-nums;text-align:center;white-space:nowrap}
+.dash-me-opportunity-move{color:var(--slate,#64748b)}
 .dash-me-opportunity-target{color:var(--slate,#64748b);white-space:normal}
+.dash-me-opportunity-card .dash-has-card-copy{min-width:0}
 .dash-has-card{
   display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;
   width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fafbfc;

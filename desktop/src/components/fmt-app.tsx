@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { ShellHeader, type Screen } from "@/components/shell-header";
 import { MyTeamScreen } from "@/components/my-team-screen";
-import { PlayerProfileScreen } from "@/components/player-profile-screen";
+import { PlayerProfileScreen, type PlayerProfileTab } from "@/components/player-profile-screen";
 import { SettingsScreen } from "@/components/settings-screen";
 import { ClubProfileScreen } from "@/components/club-profile-screen";
 import { DashboardScreen, DashboardViewScreen } from "@/components/dashboard-screen";
@@ -96,6 +96,7 @@ export function FMTApp() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [snapshot, setSnapshot] = useState<LiveFootballSnapshot>(initialSnapshot);
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+  const [profileTab, setProfileTab] = useState<PlayerProfileTab>("attributes");
   const [selectedClubId, setSelectedClubId] = useState<string | null>(null);
   const [returnScreen, setReturnScreen] = useState<Screen>("Dashboard");
   const [favorites, setFavorites] = useState<FavoriteRecord[]>(() => {
@@ -201,11 +202,12 @@ export function FMTApp() {
     setFavorites((current) => toggleFavorite(current, playerId));
 
   const openPlayer = useCallback(
-    (playerId: string) => {
+    (playerId: string, options?: { tab?: PlayerProfileTab }) => {
       setReturnScreen((current) =>
         screen === "Player Profile" || screen === "Club Profile" ? current : screen,
       );
       setSelectedPlayerId(playerId);
+      setProfileTab(options?.tab ?? "attributes");
       navigate("Player Profile");
     },
     [navigate, screen],
@@ -381,6 +383,7 @@ export function FMTApp() {
         onBack={goBackOrReturn}
         onOpenClub={openClub}
         onOpenPlayer={openPlayer}
+        initialTab={profileTab}
       />
     ) : screen === "Club Profile" ? (
       <ClubProfileScreen

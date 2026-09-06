@@ -54,8 +54,8 @@ function snapshot(
     clubTeams,
     managedClubId: "920",
     clubs: [
-      { id: "920", name: "Schalke" },
-      { id: "9001", name: "Feeder FC" },
+      { id: "920", name: "Schalke", nation: null, league: null },
+      { id: "9001", name: "Feeder FC", nation: null, league: null },
     ],
   };
 }
@@ -129,6 +129,7 @@ describe("rankMatchExperienceOpportunities", () => {
     expect(rows[0]!.toTeamLabel).toBe("First Team");
     expect(rows[0]!.toClubName).toBe("Schalke");
     expect(rows[0]!.fromTeamLabel).toBe("Under 19s");
+    expect(rows[0]!.fromClubName).toBe("Schalke");
   });
 
   it("skips First-team players and loaned-out players", () => {

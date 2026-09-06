@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-06 (T254 done — ME opportunities dash)
+Last updated: 2026-09-07 (T255 done — ME widget clarity)
 
 ## Now
 
@@ -29,12 +29,12 @@ Last updated: 2026-09-06 (T254 done — ME opportunities dash)
 
 ## Recently done
 
+- **T255** ME widget club→club labels, deeplink to ME tab, blue/green cards
 - **T254** Dashboard Match experience opportunities (Under N/Res → First #1–2)
 - **T250** ME card order by max same-pos CA + current-team chrome
 - **T252** ME clubTeam logos via same UniqueID path (no parent fallback)
 - **T251** Load feeder II Club (affiliate-of-affiliate) for ME
 - **T249** Load feeder Reserve clubTeams for ME
-- **T245** Lock Players-Go-On-Loan affiliation byte (nested+0x65)
 
 ## Loop
 
