@@ -251,20 +251,7 @@ describe("squadTeamDisplayName", () => {
     ).toBe("Under 18s");
   });
 
-  it("uses shortName for affiliated teams", () => {
-    expect(
-      squadTeamDisplayName({
-        name: "FC Schalke 04 II",
-        shortName: "Schalke 04 II",
-        teamUid: "9",
-        teamType: 0,
-        affiliationType: 0x08,
-        affiliationTypeLabel: "II Club",
-      }),
-    ).toBe("Schalke 04 II");
-  });
-
-  it("never substitutes full name for missing shortName on affiliates", () => {
+  it("uses full team name for affiliated teams (not shortName)", () => {
     expect(
       squadTeamDisplayName({
         name: "FC Schalke 04 II",
@@ -272,8 +259,9 @@ describe("squadTeamDisplayName", () => {
         teamUid: "9",
         teamType: 0,
         affiliationType: 0x08,
+        affiliationTypeLabel: "II Club",
       }),
-    ).toBe("Map shortName (?): uid-9");
+    ).toBe("FC Schalke 04 II");
   });
 
   it("reminds to map unmapped or missing TeamType", () => {
@@ -290,52 +278,41 @@ describe("squadTeamDisplayName", () => {
 });
 
 describe("playerTeamDisplayName", () => {
-  it("uses team shortName only", () => {
+  it("uses full team name for U19 / II / FT", () => {
     expect(
       playerTeamDisplayName(
         { squadTeamUid: "2", clubName: "FC Schalke 04", clubId: "920" },
         [
-          {
-            teamUid: "1",
-            shortName: "Schalke 04",
-            name: "FC Schalke 04",
-          },
-          {
-            teamUid: "2",
-            shortName: "Schalke 04 U19",
-            name: "FC Schalke 04 U19",
-          },
+          { teamUid: "1", shortName: "", name: "FC Schalke 04" },
+          { teamUid: "2", shortName: "Schalke 04 U19", name: "FC Schalke 04 U19" },
         ],
         [{ id: "920", name: "FC Schalke 04" }],
       ),
-    ).toBe("Schalke 04 U19");
-  });
-
-  it("returns null when shortName empty — no full-name or clubName substitute", () => {
+    ).toBe("FC Schalke 04 U19");
     expect(
       playerTeamDisplayName(
-        { squadTeamUid: "2", clubName: "FC Schalke 04", clubId: "920" },
-        [{ teamUid: "2", shortName: "", name: "FC Schalke 04 U19" }],
+        { squadTeamUid: "9", clubName: "FC Schalke 04", clubId: "920" },
+        [{ teamUid: "9", shortName: "", name: "FC Schalke 04 II" }],
         [{ id: "920", name: "FC Schalke 04" }],
       ),
-    ).toBeNull();
+    ).toBe("FC Schalke 04 II");
     expect(
       playerTeamDisplayName(
         { squadTeamUid: "1", clubName: "FC Schalke 04", clubId: "920" },
-        [{ teamUid: "1", shortName: null, name: "First Team" }],
+        [{ teamUid: "1", shortName: "", name: "FC Schalke 04" }],
         [{ id: "920", name: "FC Schalke 04" }],
       ),
-    ).toBeNull();
+    ).toBe("FC Schalke 04");
   });
 
-  it("uses first-team shortName Schalke 04 style", () => {
+  it("falls back to club name when team row missing", () => {
     expect(
       playerTeamDisplayName(
-        { squadTeamUid: "1", clubName: "FC Schalke 04", clubId: "920" },
-        [{ teamUid: "1", shortName: "Schalke 04", name: "FC Schalke 04" }],
+        { squadTeamUid: "99", clubName: "FC Schalke 04", clubId: "920" },
+        [],
         [{ id: "920", name: "FC Schalke 04" }],
       ),
-    ).toBe("Schalke 04");
+    ).toBe("FC Schalke 04");
   });
 });
 

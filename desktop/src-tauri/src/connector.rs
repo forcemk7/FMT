@@ -1464,11 +1464,13 @@ fn load_bteam_affiliate_rosters(
             let squad_unit = "reserves";
             let short = team.short_name.trim();
             let full = team.name.trim();
-            // Display / log label: shortName only (never full FC… name).
-            let team_label = if !short.is_empty() {
+            // Affiliate tab/log: full FM team name (shortName is U19-only in live evidence).
+            let team_label = if !full.is_empty() {
+                full.to_string()
+            } else if !short.is_empty() {
                 short.to_string()
             } else {
-                format!("Map shortName (?): uid-{}", team.team_uid)
+                format!("Map team name (?): uid-{}", team.team_uid)
             };
             crate::fmt_log::load_detail(format!(
                 "affiliate roster: {} uid {} ({} players)",

@@ -437,9 +437,9 @@ export function affiliationTypeDisplayLabel(
 }
 
 /**
- * Squad tab / Settings display name — pure rule:
- * managed club teams → TeamType; affiliated teams → memory shortName.
- * No full-name / clubName substitutes.
+ * Squad tab / Settings display name:
+ * managed club teams → TeamType; affiliated teams → full FM team name.
+ * `shortName` (team+0x20) is U19-only in live evidence — not used for UI.
  */
 export function squadTeamDisplayName(
   team: Pick<
@@ -455,9 +455,9 @@ export function squadTeamDisplayName(
 ): string {
   const isAffiliate = typeof team.affiliationType === "number";
   if (isAffiliate) {
-    const short = team.shortName?.trim();
-    if (short) return short;
-    return `Map shortName (?): uid-${team.teamUid}`;
+    const full = team.name.trim();
+    if (full) return full;
+    return `Map team name (?): uid-${team.teamUid}`;
   }
 
   const fromType = teamTypeDisplayLabel(team.teamType);
@@ -467,19 +467,29 @@ export function squadTeamDisplayName(
 }
 
 /**
- * Player profile Club fact — memory team shortName only.
- * No TeamType, no full name, no clubName fallback.
+ * Player profile Club fact — full FM team name via squadTeamUid
+ * (load already fills `name` from team+0x18, else linked club name).
  */
 export function playerTeamDisplayName(
   player: Pick<LivePlayer, "squadTeamUid" | "clubName" | "clubId">,
   clubTeams: Array<Pick<LiveClubTeam, "teamUid" | "shortName" | "name">>,
-  _clubs: Array<{ id: string; name: string }>,
+  clubs: Array<{ id: string; name: string }>,
 ): string | null {
   const teamUid = player.squadTeamUid?.trim();
-  if (!teamUid) return null;
-  const team = clubTeams.find((item) => item.teamUid === teamUid);
-  const short = team?.shortName?.trim();
-  return short || null;
+  if (teamUid) {
+    const team = clubTeams.find((item) => item.teamUid === teamUid);
+    const full = team?.name?.trim();
+    if (full) return full;
+  }
+  const clubName = player.clubName?.trim();
+  if (clubName) return clubName;
+  const clubId = player.clubId?.trim();
+  if (clubId) {
+    const club = clubs.find((item) => item.id === clubId);
+    const name = club?.name?.trim();
+    if (name) return name;
+  }
+  return null;
 }
 
 /**

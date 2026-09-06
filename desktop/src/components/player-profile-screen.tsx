@@ -97,7 +97,7 @@ export function PlayerProfileScreen({
   const loanClubName = player.loanClubName?.trim() || null;
   const loanClubId = player.loanClubId?.trim() || null;
   const activeClubId = loanedOut && loanClubId ? loanClubId : player.clubId ?? null;
-  // Club fact = team shortName only (T233/T234). Never substitute club full name.
+  // Club fact = full FM team name via squadTeamUid (T235). shortName is not the display contract.
   const teamDisplayName = playerTeamDisplayName(
     player,
     snapshot.clubTeams ?? [],
