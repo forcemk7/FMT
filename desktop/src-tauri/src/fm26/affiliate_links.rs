@@ -1049,18 +1049,19 @@ fn discover_bteam_from_heap_satellite_teams(
     found
 }
 
-/// B-team affiliate discovery (German reserves / separate club entity).
+/// B-team / affiliate discovery for roster load (T214 + T237).
 ///
-/// **Production ladder** (T214):
-/// 0. **`club+0x118` type walk** — Squad-tab types only (`0x08` II Club for now).
+/// **Production ladder**:
+/// 0. **`club+0x118` type walk** — roster-load types: `0x08` II Club (Squad tab) and
+///    `0x01` Normal Affiliated Club (Match experience; Squad desk filters out).
 /// 1. Link vector @ +0x8E8 — graph walk; skips feeder catalogs (>1 club pointer / struct).
 /// 2. **Satellite team heap scan** — T212 bridge for NPL / unmapped reserve types.
 /// 3. Indirect managed-club pointers → link struct with managed UID/pointer + single club.
 /// 4. Heap backrefs to managed club pointer inside link structs.
 /// 5. Managed club blob direct club pointers with parent edge.
 ///
-/// Known non-squad types (`0x01` Normal, `0x10` Good Relations, `0x11` Likely Friendly) never
-/// become Squad tabs. Unmapped `+0x30` values are reported for Diagnostics map reminders.
+/// Non-load types (`0x10` Good Relations, `0x11` Likely Friendly) stay out.
+/// Unmapped `+0x30` values are reported for Diagnostics map reminders.
 #[cfg(target_os = "windows")]
 pub(crate) fn discover_bteam_affiliate_clubs(
     reader: &mut ProcessReader,
@@ -1071,8 +1072,8 @@ pub(crate) fn discover_bteam_affiliate_clubs(
     first_team: u64,
 ) -> BteamAffiliateDiscovery {
     use super::affiliation_types::{
-        affiliation_type_map_reminder, affiliation_walk_to_json, resolve_club_ptr_by_uid,
-        walk_club_affiliation_links,
+        affiliation_type_map_reminder, affiliation_walk_to_json, is_roster_load_affiliation_type,
+        resolve_club_ptr_by_uid, walk_club_affiliation_links,
     };
 
     let walk = walk_club_affiliation_links(reader, managed_club);
@@ -1082,7 +1083,7 @@ pub(crate) fn discover_bteam_affiliate_clubs(
     let mut found = Vec::new();
 
     for link in &walk.links {
-        if !link.squad_tab {
+        if !is_roster_load_affiliation_type(link.type_byte) {
             continue;
         }
         if link.partner_uid == managed_club_uid || !seen_uids.insert(link.partner_uid) {

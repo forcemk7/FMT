@@ -352,9 +352,11 @@ export function MyTeamScreen({
   const clubTeams = useMemo(
     () =>
       sortClubTeamsForSquadDesk(
-        (snapshot.clubTeams ?? []).filter(
-          (team) => team.rosterLen > 0 || team.isManagerTeam,
-        ),
+        (snapshot.clubTeams ?? []).filter((team) => {
+          // Normal Affiliated Club (0x01) is Match experience only — not Squad tabs.
+          if (team.affiliationType === 0x01) return false;
+          return team.rosterLen > 0 || team.isManagerTeam;
+        }),
       ),
     [snapshot.clubTeams],
   );

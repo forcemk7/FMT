@@ -307,21 +307,16 @@ body.fmt-shell .match-experience-card {
   background: var(--panel) !important;
   border-color: var(--hairline) !important;
 }
-body.fmt-shell .match-experience-card > header {
+body.fmt-shell .match-experience-card-header {
   background: rgba(0, 0, 0, 0.22);
   border-color: var(--hairline);
 }
-body.fmt-shell .match-experience-card > header h3 {
+body.fmt-shell .match-experience-card-title h3 {
   color: var(--text);
 }
-body.fmt-shell .match-experience-pos {
-  background: transparent;
+body.fmt-shell .match-experience-pos-select select {
+  background: rgba(0, 0, 0, 0.25);
   border-color: var(--hairline);
-  color: var(--text-muted);
-}
-body.fmt-shell .match-experience-pos-active {
-  border-color: var(--mint);
-  background: rgba(143, 215, 200, 0.12);
   color: var(--text);
 }
 body.fmt-shell .match-experience-row-focus .match-experience-row-btn {

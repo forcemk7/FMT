@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-06 (T236 done — Match experience profile tab)
+Last updated: 2026-09-06 (T237 done — Match experience UX + Normal affiliates)
 
 ## Now
 
@@ -8,7 +8,7 @@ Last updated: 2026-09-06 (T236 done — Match experience profile tab)
 
 **Deferred:** T215 Diagnostics source-of-truth skeleton + live fill. T210 Squad card/list density. T139 theme. T162 trophy cabinet. Empty Youth(0) tab. Loop D full-world load parked.
 
-**Residuals (not tickets):** Main/Permanent/PMF affiliation bytes; further globals CSS carcass; club page polish; First XI median later. Club/general shortName RE parked — UI uses TeamType + full team name (T235). Feeder (Normal affiliate) First rosters for Match experience — not loaded yet.
+**Residuals (not tickets):** Main/Permanent/PMF affiliation bytes; further globals CSS carcass; club page polish; First XI median later. Club/general shortName RE parked — UI uses TeamType + full team name (T235).
 
 ## Board
 
@@ -26,6 +26,7 @@ Last updated: 2026-09-06 (T236 done — Match experience profile tab)
 
 ## Recently done
 
+- **T237** Match experience UX + Normal affiliate rosters
 - **T236** Match experience profile tab (same-pos CA by loaded clubTeam)
 - **T235** Drop shortName display; TeamType + full team name
 - **T234** Profile stop clubName substitute; shortName map honesty

@@ -45,6 +45,12 @@ pub(crate) fn is_squad_tab_affiliation_type(type_byte: u8) -> bool {
     matches!(type_byte, 0x08) // II Club — Sub/B/C/2/3 when discovered
 }
 
+/// Types whose club teams are loaded for Match experience (and Squad when also squad-tab).
+/// Normal Affiliated Club (0x01) is Match experience only — Squad desk filters it out.
+pub(crate) fn is_roster_load_affiliation_type(type_byte: u8) -> bool {
+    matches!(type_byte, 0x01 | 0x08) // Normal Affiliated Club | II Club
+}
+
 /// Reminder string for UI / Diagnostics (mirrors TeamType “Map …” pattern).
 pub(crate) fn affiliation_type_map_reminder(type_byte: u8) -> String {
     if let Some(label) = affiliation_type_label(type_byte) {
@@ -259,5 +265,26 @@ pub(crate) fn walk_club_affiliation_links(
     AffiliationTypeWalk {
         links: Vec::new(),
         unmapped_type_bytes: Vec::new(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        affiliation_type_label, is_roster_load_affiliation_type, is_squad_tab_affiliation_type,
+    };
+
+    #[test]
+    fn roster_load_types_include_normal_and_ii_not_friendly() {
+        assert!(is_roster_load_affiliation_type(0x01));
+        assert!(is_roster_load_affiliation_type(0x08));
+        assert!(!is_roster_load_affiliation_type(0x10));
+        assert!(!is_roster_load_affiliation_type(0x11));
+        assert!(!is_squad_tab_affiliation_type(0x01));
+        assert!(is_squad_tab_affiliation_type(0x08));
+        assert_eq!(
+            affiliation_type_label(0x01),
+            Some("Normal Affiliated Club")
+        );
     }
 }

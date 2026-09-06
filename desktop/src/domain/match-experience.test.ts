@@ -3,6 +3,9 @@ import type { LiveClubTeam, LivePlayer } from "./adapters";
 import {
   buildMatchExperienceCards,
   matchExperiencePosition,
+  matchExperienceTeamBand,
+  matchExperienceWindowStart,
+  sortClubTeamsForMatchExperience,
 } from "./match-experience";
 
 function player(
@@ -71,6 +74,59 @@ describe("matchExperiencePosition", () => {
   });
 });
 
+describe("sortClubTeamsForMatchExperience", () => {
+  it("orders Senior → Under N → 2nd/II → Aff Senior → Aff Under N", () => {
+    const sorted = sortClubTeamsForMatchExperience([
+      team({
+        teamUid: "aff-u",
+        name: "Feeder U19",
+        squadUnit: "under19s",
+        affiliationType: 0x01,
+        rosterLen: 10,
+      }),
+      team({
+        teamUid: "aff-1",
+        name: "Feeder",
+        squadUnit: "firstTeam",
+        affiliationType: 0x01,
+        teamType: 0,
+        rosterLen: 20,
+      }),
+      team({
+        teamUid: "ii",
+        name: "II",
+        squadUnit: "reserves",
+        affiliationType: 0x08,
+        rosterLen: 21,
+      }),
+      team({
+        teamUid: "u19",
+        name: "U19",
+        squadUnit: "under19s",
+        teamType: 11,
+        rosterLen: 22,
+      }),
+      team({
+        teamUid: "ft",
+        name: "First",
+        squadUnit: "firstTeam",
+        teamType: 0,
+        rosterLen: 28,
+        isManagerTeam: true,
+      }),
+    ]);
+    expect(sorted.map((item) => item.teamUid)).toEqual([
+      "ft",
+      "u19",
+      "ii",
+      "aff-1",
+      "aff-u",
+    ]);
+    expect(matchExperienceTeamBand(sorted[2]!)).toBe(2);
+    expect(matchExperienceTeamBand(sorted[3]!)).toBe(3);
+  });
+});
+
 describe("buildMatchExperienceCards", () => {
   const first = team({
     teamUid: "t-first",
@@ -91,7 +147,7 @@ describe("buildMatchExperienceCards", () => {
   const youth = player({
     id: "youth",
     name: "Youth",
-    positions: ["ST"],
+    positions: ["ST", "MC"],
     bestCalculatedPosition: "ST",
     currentAbility: 110,
     squadTeamUid: "t-u19",
@@ -138,10 +194,37 @@ describe("buildMatchExperienceCards", () => {
     const u19Card = cards[1]!;
     expect(u19Card.rows.map((row) => row.playerId)).toEqual(["youth", "other"]);
     expect(u19Card.focusRank).toBe(1);
-    expect(u19Card.rows[0]).toMatchObject({
-      isFocus: true,
-      isOnRoster: true,
+  });
+
+  it("hides teams with no same-pos roster peers", () => {
+    const emptySide = team({
+      teamUid: "t-empty",
+      name: "Empty",
+      squadUnit: "reserves",
+      rosterLen: 5,
     });
+    const cards = buildMatchExperienceCards(
+      youth,
+      [youth, seniorSt, otherSt],
+      [first, u19, emptySide],
+    );
+    expect(cards.map((card) => card.teamUid)).toEqual(["t-first", "t-u19"]);
+  });
+
+  it("allows per-team position overrides", () => {
+    const cards = buildMatchExperienceCards(
+      youth,
+      [youth, seniorSt, otherSt, mid],
+      [first, u19],
+      null,
+      { "t-first": "MC", "t-u19": "ST" },
+    );
+    expect(cards.find((card) => card.teamUid === "t-first")?.position).toBe("MC");
+    expect(cards.find((card) => card.teamUid === "t-first")?.rows.map((r) => r.playerId)).toEqual([
+      "mid",
+      "youth",
+    ]);
+    expect(cards.find((card) => card.teamUid === "t-u19")?.position).toBe("ST");
   });
 
   it("returns empty when focus has no position", () => {
@@ -152,5 +235,15 @@ describe("buildMatchExperienceCards", () => {
         [first],
       ),
     ).toEqual([]);
+  });
+});
+
+describe("matchExperienceWindowStart", () => {
+  it("keeps start at 0 when list fits the page", () => {
+    expect(matchExperienceWindowStart(4, 3, 5)).toBe(0);
+  });
+
+  it("centers focus when possible", () => {
+    expect(matchExperienceWindowStart(10, 8, 5)).toBe(5);
   });
 });

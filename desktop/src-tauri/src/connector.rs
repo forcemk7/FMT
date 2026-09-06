@@ -1377,10 +1377,10 @@ fn merge_satellite_club_teams_json(mut base: Vec<Value>, extra: Vec<Value>) -> V
     base
 }
 
-/// Squad-tab separate-club reserves (German II / Melbourne NPL / …).
+/// Squad-tab separate-club reserves (II) plus Normal Affiliated Club sides for Match experience.
 ///
-/// Discovery = parent-edge affiliates that are not inline feeders (FMLE class Main+Permanent+
-/// Players Move Freely). Then Club.Teams on that club → existing roster pipeline.
+/// II Club (0x08): keep First / largest roster only (Squad-tab reserve).
+/// Normal Affiliated Club (0x01): load First + Under-N / Youth sides (Match experience).
 #[cfg(target_os = "windows")]
 #[allow(clippy::too_many_arguments)]
 fn load_bteam_affiliate_rosters(
@@ -1406,7 +1406,7 @@ fn load_bteam_affiliate_rosters(
     let mut labels = Vec::new();
     let mut discovered_teams = Vec::new();
     crate::fmt_log::load_detail(format!(
-        "squad-tab affiliate clubs via pointer graph: {} resolved",
+        "affiliate clubs for roster load: {} resolved",
         affiliates.len()
     ));
     let heap_anchors = [managed_club, first_team];
@@ -1449,7 +1449,19 @@ fn load_bteam_affiliate_rosters(
         if linked_teams.is_empty() {
             continue;
         }
-        if linked_teams.iter().any(|team| team.team_type == Some(0)) {
+
+        let normal_affiliate = affiliate.affiliation_type == Some(0x01);
+        if normal_affiliate {
+            // Match experience: First + Under-N / Youth; drop unknown / empty shells.
+            linked_teams.retain(|team| {
+                team.roster_len > 0
+                    && team
+                        .team_type
+                        .and_then(crate::fm26::affiliate_links::squad_unit_from_team_type)
+                        .is_some()
+            });
+        } else if linked_teams.iter().any(|team| team.team_type == Some(0)) {
+            // II / satellite reserve: First only when present.
             linked_teams.retain(|team| team.team_type == Some(0));
         } else if linked_teams.len() > 1 {
             let max_roster = linked_teams
@@ -1460,8 +1472,10 @@ fn load_bteam_affiliate_rosters(
             linked_teams.retain(|team| team.roster_len == max_roster);
         }
         for team in linked_teams {
-            // Separate-club reserves are never the managed First Team tab.
-            let squad_unit = "reserves";
+            let squad_unit = team
+                .team_type
+                .and_then(crate::fm26::affiliate_links::squad_unit_from_team_type)
+                .unwrap_or("reserves");
             let short = team.short_name.trim();
             let full = team.name.trim();
             // Affiliate tab/log: full FM team name (shortName is U19-only in live evidence).
@@ -1473,9 +1487,10 @@ fn load_bteam_affiliate_rosters(
                 format!("Map team name (?): uid-{}", team.team_uid)
             };
             crate::fmt_log::load_detail(format!(
-                "affiliate roster: {} uid {} ({} players)",
+                "affiliate roster: {} uid {} ({}, {} players)",
                 team_label.trim(),
                 team.team_uid,
+                squad_unit,
                 team.roster_len
             ));
             discovered_teams.push(DiscoveredClubTeam {
@@ -1496,6 +1511,13 @@ fn load_bteam_affiliate_rosters(
                 squad_unit,
                 team.roster_len
             ));
+            // II / satellite stay under managed club_id (Squad structure).
+            // Normal feeders use their own club uid so HoYD/GM/Squad don't treat them as employees.
+            let (roster_club_id, roster_club_uid) = if normal_affiliate {
+                (affiliate.club_uid.to_string(), affiliate.club_uid)
+            } else {
+                (club_id.to_string(), managed_club_uid)
+            };
             promoted += load_team_roster(
                 reader,
                 module,
@@ -1504,8 +1526,8 @@ fn load_bteam_affiliate_rosters(
                 &team_label,
                 squad_unit,
                 team.team_uid,
-                club_id,
-                managed_club_uid,
+                &roster_club_id,
+                roster_club_uid,
                 squad_game_date,
                 bteam_affiliate_club_uids,
                 managed_player_ids,
@@ -2399,7 +2421,7 @@ fn extract_live_data(
         let links = report.get("linkCount").and_then(Value::as_u64).unwrap_or(0);
         if links > 0 {
             warnings.push(format!(
-                "Affiliation types on club+0x118: {mapped}/{links} links mapped (Squad tabs use II Club 0x08; Normal/Good Relations/Likely Friendly excluded)."
+                "Affiliation types on club+0x118: {mapped}/{links} links mapped (roster load: II Club 0x08 + Normal Affiliated 0x01; Good Relations/Likely Friendly excluded)."
             ));
         }
     }
