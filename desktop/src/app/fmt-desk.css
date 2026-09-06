@@ -481,7 +481,8 @@ body.fmt-shell .dash-prospect-team {
 body.fmt-shell .dash-prospect-ability {
   color: var(--text);
 }
-body.fmt-shell .dash-ability-age {
+body.fmt-shell .dash-ability-age,
+body.fmt-shell .dash-ability-pos {
   color: var(--text-muted);
 }
 body.fmt-shell .dash-ability-secondary {

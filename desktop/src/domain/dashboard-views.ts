@@ -11,7 +11,7 @@ export const DASH_VIEW_IDS = [
 
 export type DashViewId = (typeof DASH_VIEW_IDS)[number];
 
-export const DASH_PEEK_SIZE = 5;
+export const DASH_PEEK_SIZE = 4;
 
 export function isDashViewId(value: string): value is DashViewId {
   return (DASH_VIEW_IDS as readonly string[]).includes(value);

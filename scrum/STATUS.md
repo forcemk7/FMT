@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-07 (T262 done — dash viewport + row details)
+Last updated: 2026-09-07 (T263 done — denser peeks + ME stats)
 
 ## Now
 
@@ -29,6 +29,7 @@ Last updated: 2026-09-07 (T262 done — dash viewport + row details)
 
 ## Recently done
 
+- **T263** Dash denser peeks (4), best position, ME age/CA/PA, personality chip clip fix
 - **T262** Dashboard viewport-fit widgets; ability age; spelled personality chips
 - **T261** Borderless club logos default; ability logo+type; ME Current/Best ribbons
 - **T260** Dash `{clubName} {teamType}` + ME counts loans on destination First
@@ -36,7 +37,6 @@ Last updated: 2026-09-07 (T262 done — dash viewport + row details)
 - **T258** Dashboard polish — Attribute changes / First-team path rows, tabs, `goBack`
 - **T257** Squad desk — hide empty / ME-only clubTeams (`isSquadDeskClubTeam`)
 - **T256** Loan honesty — feeder destinations count as outgoing (not II suppress)
-- **T255** ME widget club→club labels, deeplink to ME tab, blue/green cards
 
 ## Loop
 

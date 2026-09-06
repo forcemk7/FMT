@@ -27,6 +27,19 @@ function abilityLabel(value: number | null | undefined): string {
   return typeof value === "number" && Number.isFinite(value) ? String(Math.round(value)) : "—";
 }
 
+function bestPositionLabel(player: LivePlayer): string | null {
+  const best = player.bestCalculatedPosition?.trim();
+  if (best) return best;
+  const primary = player.positions?.[0]?.trim();
+  return primary || null;
+}
+
+function ageYearsLabel(player: LivePlayer): string | null {
+  return typeof player.age === "number" && Number.isFinite(player.age)
+    ? `${Math.round(player.age)} years old`
+    : null;
+}
+
 export function DashHasRow({
   player,
   score,
@@ -160,10 +173,8 @@ export function DashAbilityRow({
 }) {
   const { player, ca, pa } = row;
   const chrome = dashClubTeamChrome(player, clubTeams ?? [], clubs ?? []);
-  const ageLabel =
-    typeof player.age === "number" && Number.isFinite(player.age)
-      ? `${Math.round(player.age)} years old`
-      : null;
+  const ageLabel = ageYearsLabel(player);
+  const position = bestPositionLabel(player);
   const secondary =
     mode === "players" ? (
       <>
@@ -207,6 +218,7 @@ export function DashAbilityRow({
             <span className="dash-ability-team-type">{chrome.teamType}</span>
           </span>
         ) : null}
+        {position ? <span className="dash-ability-pos">{position}</span> : null}
         {ageLabel ? <span className="dash-ability-age">{ageLabel}</span> : null}
         <span className="dash-ability-secondary">{secondary}</span>
       </span>
@@ -236,6 +248,9 @@ export function DashMatchExperienceRow({
     toClubId,
   } = row;
   const moveTitle = `${fromClubName} · ${fromTeamLabel} → ${toClubName} · ${toTeamLabel}`;
+  const ageLabel = ageYearsLabel(player);
+  const ca = player.currentAbility;
+  const pa = player.potentialAbility;
 
   return (
     <button
@@ -251,17 +266,26 @@ export function DashMatchExperienceRow({
         <strong>{player.name}</strong>
         {!compact ? <small>{formatPlayerPositions(player)}</small> : null}
       </span>
-      <span className="dash-row-extra dash-me-move-rail" aria-label={moveTitle}>
-        <span className="dash-me-move-side">
-          {fromClubId ? <ClubLogo clubId={fromClubId} name={fromClubName} size="sm" /> : null}
-          <span className="dash-me-move-type">{fromTeamLabel}</span>
+      <span className="dash-row-extra dash-me-extra">
+        {ageLabel ? <span className="dash-ability-age">{ageLabel}</span> : null}
+        <span className="dash-ability-secondary">
+          <abbr title="Current ability">CA</abbr> {abilityLabel(ca)}
         </span>
-        <span className="dash-me-move-arrow" aria-hidden="true">
-          →
+        <span className="dash-ability-secondary">
+          <abbr title="Potential ability">PA</abbr> {abilityLabel(pa)}
         </span>
-        <span className="dash-me-move-side">
-          {toClubId ? <ClubLogo clubId={toClubId} name={toClubName} size="sm" /> : null}
-          <span className="dash-me-move-type">{toTeamLabel}</span>
+        <span className="dash-me-move-rail" aria-label={moveTitle}>
+          <span className="dash-me-move-side">
+            {fromClubId ? <ClubLogo clubId={fromClubId} name={fromClubName} size="sm" /> : null}
+            <span className="dash-me-move-type">{fromTeamLabel}</span>
+          </span>
+          <span className="dash-me-move-arrow" aria-hidden="true">
+            →
+          </span>
+          <span className="dash-me-move-side">
+            {toClubId ? <ClubLogo clubId={toClubId} name={toClubName} size="sm" /> : null}
+            <span className="dash-me-move-type">{toTeamLabel}</span>
+          </span>
         </span>
       </span>
       <span className="dash-row-main dash-me-opportunity-rank">
