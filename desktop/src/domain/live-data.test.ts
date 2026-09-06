@@ -312,6 +312,33 @@ describe("playerTeamDisplayName", () => {
       ),
     ).toBe("Schalke 04 U19");
   });
+
+  it("never falls back to TeamType tab labels polluted into name", () => {
+    expect(
+      playerTeamDisplayName(
+        { squadTeamUid: "1", clubName: null, clubId: "920" },
+        [{ teamUid: "1", shortName: "", name: "First Team" }],
+        [{ id: "920", name: "FC Schalke 04" }],
+      ),
+    ).toBe("FC Schalke 04");
+    expect(
+      playerTeamDisplayName(
+        { squadTeamUid: "2", clubName: null, clubId: "920" },
+        [{ teamUid: "2", shortName: null, name: "U19" }],
+        [{ id: "920", name: "FC Schalke 04" }],
+      ),
+    ).toBe("FC Schalke 04");
+  });
+
+  it("uses first-team shortName Schalke 04 style", () => {
+    expect(
+      playerTeamDisplayName(
+        { squadTeamUid: "1", clubName: "FC Schalke 04", clubId: "920" },
+        [{ teamUid: "1", shortName: "Schalke 04", name: "FC Schalke 04" }],
+        [{ id: "920", name: "FC Schalke 04" }],
+      ),
+    ).toBe("Schalke 04");
+  });
 });
 
 describe("countAtClubSquadUnit", () => {

@@ -479,7 +479,48 @@ export function squadTeamDisplayName(
   return `Map TeamType (?): uid-${team.teamUid}`;
 }
 
-/** Player profile Club fact — prefer the player's team shortName. */
+/**
+ * True when a string is a TeamType / map-reminder tab label — never use these
+ * as a player profile Club fact (legacy `clubTeams.name` pollution).
+ */
+export function isSquadTabTypeLabel(value: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (trimmed.startsWith("Map TeamType") || trimmed.startsWith("Map AffiliationType")) {
+    return true;
+  }
+  // Current + pre-T229 TeamType vocabulary.
+  const known = new Set([
+    "First Team",
+    "Reserves",
+    "A",
+    "B",
+    "C",
+    "Amateur",
+    "II",
+    "Team 2",
+    "Team 3",
+    "Youth",
+    "Dutch Reserves",
+    "Under 23s",
+    "Under 21s",
+    "Under 20s",
+    "Under 19s",
+    "Under 18s",
+    "U23",
+    "U21",
+    "U20",
+    "U19",
+    "U18",
+  ]);
+  return known.has(trimmed);
+}
+
+/**
+ * Player profile Club fact — team shortName only (e.g. Schalke 04 / Schalke 04 U19).
+ * Never TeamType tab labels. Full team/club names only as last-resort fallbacks
+ * when they are not type labels.
+ */
 export function playerTeamDisplayName(
   player: Pick<LivePlayer, "squadTeamUid" | "clubName" | "clubId">,
   clubTeams: Array<Pick<LiveClubTeam, "teamUid" | "shortName" | "name">>,
@@ -489,17 +530,17 @@ export function playerTeamDisplayName(
   if (teamUid) {
     const team = clubTeams.find((item) => item.teamUid === teamUid);
     const short = team?.shortName?.trim();
-    if (short) return short;
+    if (short && !isSquadTabTypeLabel(short)) return short;
     const teamName = team?.name?.trim();
-    if (teamName) return teamName;
+    if (teamName && !isSquadTabTypeLabel(teamName)) return teamName;
   }
   const clubName = player.clubName?.trim();
-  if (clubName) return clubName;
+  if (clubName && !isSquadTabTypeLabel(clubName)) return clubName;
   const clubId = player.clubId?.trim();
   if (clubId) {
     const club = clubs.find((item) => item.id === clubId);
     const name = club?.name?.trim();
-    if (name) return name;
+    if (name && !isSquadTabTypeLabel(name)) return name;
   }
   return null;
 }
