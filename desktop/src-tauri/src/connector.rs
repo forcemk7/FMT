@@ -1401,7 +1401,7 @@ fn merge_satellite_club_teams_json(mut base: Vec<Value>, extra: Vec<Value>) -> V
 /// Squad-tab separate-club reserves (II) plus Match-experience feeders (0x01 / 0x03).
 ///
 /// II Club (0x08): keep First / largest roster only (Squad-tab reserve).
-/// Feeders (0x01 Normal, 0x03 Schalke feeder byte): First + Under-N / Youth (Match experience).
+/// Feeders (0x01 Normal, 0x03 Schalke feeder byte): First + Reserves + Under-N / Youth (Match experience).
 #[cfg(target_os = "windows")]
 #[allow(clippy::too_many_arguments)]
 fn load_bteam_affiliate_rosters(
@@ -1473,7 +1473,7 @@ fn load_bteam_affiliate_rosters(
 
         let feeder_affiliate = matches!(affiliate.affiliation_type, Some(0x01) | Some(0x03));
         // Same Club.Teams path for II (0x08) vs feeders (0x01 / 0x03):
-        // II → First only; feeders → First + Under-N / Youth.
+        // II → First only; feeders → First + Reserves + Under-N / Youth.
         if feeder_affiliate {
             linked_teams.retain(|team| {
                 team.roster_len > 0
@@ -1481,7 +1481,7 @@ fn load_bteam_affiliate_rosters(
                         team
                             .team_type
                             .and_then(crate::fm26::affiliate_links::squad_unit_from_team_type),
-                        Some("firstTeam") | Some("under19s")
+                        Some("firstTeam") | Some("reserves") | Some("under19s")
                     )
             });
         } else if linked_teams.iter().any(|team| team.team_type == Some(0)) {
@@ -1495,7 +1495,7 @@ fn load_bteam_affiliate_rosters(
             linked_teams.retain(|team| team.roster_len == max_roster);
         }
         // II / satellite: force reserves unit for Squad band (2nd side).
-        // Feeders: use real TeamType → firstTeam / under19s.
+        // Feeders: use real TeamType → firstTeam / reserves / under19s.
         for team in linked_teams {
             let squad_unit = if feeder_affiliate {
                 team
