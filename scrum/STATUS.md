@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-06 (T242 done — ME affiliate labels + loan-flag diff)
+Last updated: 2026-09-06 (T243 done — unclip attr Δ glyphs)
 
 ## Now
 
@@ -26,11 +26,11 @@ Last updated: 2026-09-06 (T242 done — ME affiliate labels + loan-flag diff)
 
 ## Recently done
 
+- **T243** Unclip attr Δ glyphs without row-height shift
 - **T242** ME affiliate labels + loan-flag wrapper diff
 - **T241** Roster-load AffiliationType 0x03 feeders (Match experience)
 - **T240** Match experience layout, sort, loans, hide
 - **T239** Lock attr desk row metrics (no Δ layout shift)
-- **T238** Fix Match experience cards + Normal 0x01 path
 
 ## Loop
 

@@ -1512,7 +1512,7 @@ button.match-experience-row-btn:hover{background:#f7fbfa}
 .attribute-desk .attr-row{
   display:grid;
   grid-template-columns:minmax(0,1fr) var(--attr-value-col);
-  align-items:baseline;
+  align-items:center;
   column-gap:var(--attr-row-gap);
   padding:var(--attr-row-pad-y) 0;
   min-width:0;
@@ -1523,7 +1523,7 @@ button.match-experience-row-btn:hover{background:#f7fbfa}
 }
 .attribute-desk .attr-row-values{
   display:flex;
-  align-items:baseline;
+  align-items:center;
   justify-content:flex-end;
   width:100%;
   min-width:0;
@@ -1534,20 +1534,19 @@ button.match-experience-row-btn:hover{background:#f7fbfa}
   display:grid;
   grid-template-columns:var(--attr-delta-col) var(--attr-value-col);
   column-gap:var(--attr-delta-gap);
-  align-items:baseline;
+  align-items:center;
   justify-content:end;
 }
-/* Fixed line box = value metrics. Empty or filled Δ cannot change row height. */
+/* Width reserved always; height comes from the value cell (always present). */
 .attribute-desk .attr-delta-slot{
   display:flex;
-  align-items:baseline;
+  align-items:center;
   justify-content:flex-end;
   box-sizing:border-box;
   width:var(--attr-delta-col);
   max-width:var(--attr-delta-col);
   min-width:0;
-  height:calc(var(--attr-value-size) * var(--attr-line-height));
-  overflow:hidden;
+  overflow:hidden; /* horizontal only — long Δs must not widen the track */
 }
 .attribute-desk .attr-row-label{
   min-width:0;
@@ -1570,7 +1569,7 @@ button.match-experience-row-btn:hover{background:#f7fbfa}
   white-space:nowrap;
   overflow:hidden;
 }
-/* Same type metrics as values — sits inside the fixed-height slot */
+/* Identical type box to values — no separate clipped height */
 .attribute-desk .attr-delta{
   display:block;
   max-width:100%;
@@ -1619,11 +1618,11 @@ button.match-experience-row-btn:hover{background:#f7fbfa}
   display:grid;
   grid-template-columns:var(--attr-delta-col) var(--attr-value-col);
   column-gap:var(--attr-delta-gap);
-  align-items:baseline;
+  align-items:center;
 }
 .attribute-desk .attr-delta-slot{
   display:flex;
-  align-items:baseline;
+  align-items:center;
   justify-content:flex-end;
   padding:0;
   gap:0;
