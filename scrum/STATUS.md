@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-06 (T251 done — feeder→II for ME)
+Last updated: 2026-09-06 (T252 done — ME clubTeam logos UniqueID)
 
 ## Now
 
@@ -29,6 +29,7 @@ Last updated: 2026-09-06 (T251 done — feeder→II for ME)
 
 ## Recently done
 
+- **T252** ME clubTeam logos via same UniqueID path (no parent fallback)
 - **T251** Load feeder II Club (affiliate-of-affiliate) for ME
 - **T249** Load feeder Reserve clubTeams for ME
 - **T245** Lock Players-Go-On-Loan affiliation byte (nested+0x65)

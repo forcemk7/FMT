@@ -26,6 +26,8 @@ export function warmSquadGraphics(snapshot: LiveFootballSnapshot) {
     snapshot.managedClubId,
     ...snapshot.players.map((player) => player.clubId),
     ...snapshot.clubs.map((club) => club.id),
+    // ME / affiliate teams (II, feeder→II) — UniqueID may not appear on players[] / clubs[].
+    ...(snapshot.clubTeams ?? []).map((team) => team.clubId),
   ]);
   const nationIds = uniqueNumericIds(snapshot.players.map((player) => player.nationalityId));
 
@@ -43,8 +45,12 @@ export function warmSquadGraphics(snapshot: LiveFootballSnapshot) {
   if (clubIds.length) {
     void invoke("logos_update_cache", { clubIds })
       .then(() => {
+        // Logo pack index is one-shot and can outlast ClubLogo short retries.
         window.setTimeout(() => clearClubLogoMemoryCache(), 800);
         window.setTimeout(() => clearClubLogoMemoryCache(), 2500);
+        window.setTimeout(() => clearClubLogoMemoryCache(), 8000);
+        window.setTimeout(() => clearClubLogoMemoryCache(), 15000);
+        window.setTimeout(() => clearClubLogoMemoryCache(), 30000);
       })
       .catch(() => undefined);
   }

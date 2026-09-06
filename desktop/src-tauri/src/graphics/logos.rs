@@ -47,6 +47,13 @@ pub fn logo_cache_dir() -> PathBuf {
     app_data_dir().join(LOGO_CACHE_DIR)
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LogoLookup {
+    Found,
+    Pending,
+    Missing,
+}
+
 /// Queue club IDs and start a one-shot background index. Do not call from Load Active Save.
 pub fn warm_logos_for_clubs(club_ids: &[String]) -> FaceWarmResult {
     let cache = logo_cache_dir();
@@ -70,33 +77,49 @@ pub fn warm_logos_for_clubs(club_ids: &[String]) -> FaceWarmResult {
 }
 
 pub(crate) fn resolve_logo_path(club_id: &str) -> Option<PathBuf> {
+    match resolve_logo_lookup(club_id) {
+        (LogoLookup::Found, Some(path)) => Some(path),
+        _ => None,
+    }
+}
+
+/// UniqueID → logo-cache / pack index. `Pending` while the one-shot index still builds
+/// or a post-index fill is queued — UI must not permanent-cache a miss.
+pub(crate) fn resolve_logo_lookup(club_id: &str) -> (LogoLookup, Option<PathBuf>) {
     let id = club_id.trim();
     if id.is_empty() || !id.bytes().all(|b| b.is_ascii_digit()) {
-        return None;
+        return (LogoLookup::Missing, None);
     }
     // Hot path: local cache only. Never start pack walks from club_logo_data.
     if let Some(cached) = resolve_cached_asset(&logo_cache_dir(), id) {
-        return Some(cached);
+        return (LogoLookup::Found, Some(cached));
     }
-    let mut state = state().lock().ok()?;
-    if state.missing.contains(id) {
-        return None;
+    let Ok(mut guard) = state().lock() else {
+        return (LogoLookup::Pending, None);
+    };
+    if guard.missing.contains(id) {
+        return (LogoLookup::Missing, None);
     }
-    if let Some(index) = state.index.as_ref() {
+    if let Some(index) = guard.index.as_ref() {
         let source = index.get(id).cloned();
-        drop(state);
+        drop(guard);
         let Some(source) = source else {
-            return None;
+            if let Ok(mut missing_guard) = state().lock() {
+                missing_guard.missing.insert(id.to_string());
+            }
+            return (LogoLookup::Missing, None);
         };
-        return copy_into_asset_cache(&logo_cache_dir(), id, &source, MAX_IMAGE_BYTES).or(Some(source));
+        let path =
+            copy_into_asset_cache(&logo_cache_dir(), id, &source, MAX_IMAGE_BYTES).or(Some(source));
+        return (LogoLookup::Found, path);
     }
-    if !state.pending.iter().any(|pending| pending == id) {
-        state.pending.push_back(id.to_string());
+    if !guard.pending.iter().any(|pending| pending == id) {
+        guard.pending.push_back(id.to_string());
     }
-    drop(state);
+    drop(guard);
     // Background only — never walk packs on the invoke thread.
     ensure_index_building();
-    None
+    (LogoLookup::Pending, None)
 }
 
 fn queue_needs(ids: &[String]) {
@@ -117,6 +140,8 @@ fn queue_needs(ids: &[String]) {
 
 fn ensure_index_building() {
     if INDEX_STARTED.swap(true, Ordering::SeqCst) {
+        // Index thread already ran (or is running). Drain any IDs queued after first build.
+        drain_pending_if_index_ready();
         return;
     }
     if let Ok(mut guard) = state().lock() {
@@ -130,6 +155,30 @@ fn ensure_index_building() {
             guard.building = false;
             std::mem::take(&mut guard.pending)
         };
+        let cache = logo_cache_dir();
+        let _ = fs::create_dir_all(&cache);
+        for id in pending {
+            fill_cache_for_id(&cache, &id);
+        }
+        // Warm may enqueue more IDs while we filled the first batch.
+        drain_pending_if_index_ready();
+    });
+}
+
+fn drain_pending_if_index_ready() {
+    let pending = {
+        let Ok(mut guard) = state().lock() else {
+            return;
+        };
+        if guard.index.is_none() || guard.building {
+            return;
+        }
+        if guard.pending.is_empty() {
+            return;
+        }
+        std::mem::take(&mut guard.pending)
+    };
+    thread::spawn(move || {
         let cache = logo_cache_dir();
         let _ = fs::create_dir_all(&cache);
         for id in pending {

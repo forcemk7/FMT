@@ -3,9 +3,14 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
-type ClubLogoResult = { found: boolean; clubId: string; dataUrl: string | null };
+type ClubLogoResult = {
+  found: boolean;
+  pending?: boolean;
+  clubId: string;
+  dataUrl: string | null;
+};
 const cache = new Map<string, string | null>();
-const RETRY_MS = [400, 1200, 2800, 5000];
+const RETRY_MS = [400, 1200, 2800, 5000, 8000, 12000, 20000];
 
 export function clearClubLogoMemoryCache() {
   cache.clear();
@@ -56,6 +61,23 @@ export function ClubLogo({
           const next = result.found && result.dataUrl ? result.dataUrl : null;
           if (next) {
             apply(next);
+            return;
+          }
+          // Pack index / cache fill still running — soft-retry; never permanent-cache
+          // a miss while pending (ME second-hop II UniqueIDs hit this race).
+          if (result.pending) {
+            if (attempt >= 24) {
+              apply(null);
+              return;
+            }
+            if (active) setSource(null);
+            const delay = RETRY_MS[Math.min(attempt, RETRY_MS.length - 1)];
+            timers.push(
+              window.setTimeout(() => {
+                cache.delete(clubId);
+                load(attempt + 1);
+              }, delay),
+            );
             return;
           }
           if (attempt < RETRY_MS.length) {

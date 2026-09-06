@@ -9,7 +9,7 @@ use crate::graphics::{
         GraphicsStatus, MAX_IMAGE_BYTES,
     },
     flags::{resolve_flag_path, warm_flags_for_nations},
-    logos::{resolve_logo_path, warm_logos_for_clubs},
+    logos::{resolve_logo_lookup, warm_logos_for_clubs, LogoLookup},
 };
 
 #[derive(Serialize)]
@@ -25,6 +25,8 @@ pub struct PlayerFaceResult {
 #[serde(rename_all = "camelCase")]
 pub struct ClubLogoResult {
     found: bool,
+    /// True while logo pack index / cache fill may still resolve this UniqueID.
+    pending: bool,
     club_id: String,
     data_url: Option<String>,
 }
@@ -74,23 +76,40 @@ pub fn club_logo_data(club_id: String) -> ClubLogoResult {
     if club_id.is_empty() || !club_id.bytes().all(|byte| byte.is_ascii_digit()) {
         return ClubLogoResult {
             found: false,
+            pending: false,
             club_id,
             data_url: None,
         };
     }
-    if let Some(path) = resolve_logo_path(&club_id) {
-        if let (Some(mime), Ok(bytes)) = (image_mime(&path), fs::read(path)) {
-            return ClubLogoResult {
-                found: true,
+    match resolve_logo_lookup(&club_id) {
+        (LogoLookup::Found, Some(path)) => {
+            if let (Some(mime), Ok(bytes)) = (image_mime(&path), fs::read(&path)) {
+                return ClubLogoResult {
+                    found: true,
+                    pending: false,
+                    club_id,
+                    data_url: Some(format!("data:{mime};base64,{}", STANDARD.encode(bytes))),
+                };
+            }
+            ClubLogoResult {
+                found: false,
+                pending: true,
                 club_id,
-                data_url: Some(format!("data:{mime};base64,{}", STANDARD.encode(bytes))),
-            };
+                data_url: None,
+            }
         }
-    }
-    ClubLogoResult {
-        found: false,
-        club_id,
-        data_url: None,
+        (LogoLookup::Pending, _) => ClubLogoResult {
+            found: false,
+            pending: true,
+            club_id,
+            data_url: None,
+        },
+        (LogoLookup::Missing, _) | (LogoLookup::Found, None) => ClubLogoResult {
+            found: false,
+            pending: false,
+            club_id,
+            data_url: None,
+        },
     }
 }
 
