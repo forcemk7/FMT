@@ -97,19 +97,18 @@ export function PlayerProfileScreen({
   const loanClubName = player.loanClubName?.trim() || null;
   const loanClubId = player.loanClubId?.trim() || null;
   const activeClubId = loanedOut && loanClubId ? loanClubId : player.clubId ?? null;
+  // Club fact = team shortName only (T233/T234). Never substitute club full name.
   const teamDisplayName = playerTeamDisplayName(
     player,
     snapshot.clubTeams ?? [],
     snapshot.clubs,
   );
   const activeClubName =
-    loanedOut && loanClubName
-      ? loanClubName
-      : teamDisplayName ?? parentClubName ?? null;
+    loanedOut && loanClubName ? loanClubName : teamDisplayName;
   const club = activeClubId
     ? snapshot.clubs.find((item) => item.id === activeClubId) ?? null
     : null;
-  const clubName = activeClubName ?? club?.name ?? null;
+  const clubName = activeClubName;
   const clubSub =
     loanedOut && loanClubName ? `Parent: ${parentClubName ?? "—"}` : null;
 

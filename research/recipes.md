@@ -61,13 +61,15 @@ Update this file when a ticket locks or discards a recipe. Prefer recipes here o
 
 - **Club.Teams** MSVC vector: `club+0x18` begin / `club+0x20` end (entity-map 24/32).
 - **TeamType:** `team+0x28` (entity-map 40) — First / under19s / reserves; do not classify same-club youth by `" ii"` / name hacks when TeamType works.
-- **Team name:** `team+0x18` full; **`team+0x20` shortName** (validated Schalke `Schalke 04 U19`).
-- **Tab labels (T233):** managed → TeamType only; affiliate → shortName only. No full-name substitutes.
-- **Profile Club fact:** shortName only via `squadTeamUid`. Empty short → null (not club/full invent).
+- **Team name:** `team+0x18` full; **`team+0x20` shortName**.
+  - **Validated:** U19 `team+0x20` → `Schalke 04 U19` (live profiles confirm).
+  - **Not locked:** first-team objects often have empty team name fields (full falls back to club name in map); club-level shortName (`Schalke 04`) **unmapped**. II first-team shortName not validated — empty → map reminder, not invent.
+- **Tab labels (T233):** managed → TeamType only; affiliate → shortName only.
+- **Profile Club fact:** shortName only (T234: no `clubName` UI substitute).
 - **Team→club:** `+0x30` (48). **Team.Players:** begin/end 56/64.
 - Separate-club German II: resolve **affiliate club** first (above), then Club.Teams on that club.
 
-Tickets: T200, T201, T206, T211, T212, T229, T230, T232, T233.
+Tickets: T200, T201, T206, T211, T212, T229, T230, T232, T233, T234.
 
 ---
 

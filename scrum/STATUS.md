@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-06 (T233 done — pure TeamType/shortName)
+Last updated: 2026-09-06 (T234 done — profile no clubName substitute)
 
 ## Now
 
@@ -8,7 +8,7 @@ Last updated: 2026-09-06 (T233 done — pure TeamType/shortName)
 
 **Deferred:** T215 Diagnostics source-of-truth skeleton + live fill. T210 Squad card/list density. T139 theme. T162 trophy cabinet. Empty Youth(0) tab. Loop D full-world load parked.
 
-**Residuals (not tickets):** Main/Permanent/PMF affiliation bytes; further globals CSS carcass; club page polish; First XI median later. If team+0x20 shortName empty on load, profile/affiliate show gap (map reminder / null) — fix with RE evidence, not string invent.
+**Residuals (not tickets):** Main/Permanent/PMF affiliation bytes; further globals CSS carcass; club page polish; First XI median later. **Club shortName / II team+0x20** unmapped — U19 shortName works; FT/II empty until RE.
 
 ## Board
 
@@ -26,12 +26,12 @@ Last updated: 2026-09-06 (T233 done — pure TeamType/shortName)
 
 ## Recently done
 
+- **T234** Profile stop clubName substitute; shortName map honesty
 - **T233** Pure TeamType / shortName display rule
 - **T232** Drop FC prefix string hacks for shortName
-- **T231** U19 profile Club shows team shortName (superseded)
-- **T230** Profile Club fact must use team shortName only
-- **T229** TeamType Under Ns; affiliate shortName; profile team shortName
-- **T228** Dash widget labels + senior-team median for HoYD/GM
+- **T231** U19 profile (superseded)
+- **T230** Profile shortName only
+- **T229** TeamType Under Ns; affiliate/profile shortName
 
 ## Loop
 
