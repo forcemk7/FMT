@@ -70,4 +70,4 @@ Slightly more vertical spacing between peek rows / widgets.
 - `squad-ability-rank.ts`: owned pool + `rankBestPlayers` / `rankBestTalent`
 - Dashboard order + horizontal row chrome; First-team path removed from peeks
 - Verified: vitest `squad-ability-rank.test.ts`
-- Commit: (pending)
+- Commit: `380b3db`
