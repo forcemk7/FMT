@@ -425,6 +425,8 @@ export function affiliationTypeDisplayLabel(
   switch (affiliationType) {
     case 0x01:
       return "Normal Affiliated Club";
+    case 0x03:
+      return "Map AffiliationType 0x03";
     case 0x08:
       return "II Club";
     case 0x10:

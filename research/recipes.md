@@ -6,7 +6,7 @@
 
 Update this file when a ticket locks or discards a recipe. Prefer recipes here over resurrecting deleted probe modules.
 
-**Last updated:** 2026-09-06 (T238 — Normal `0x01` roster load for Match experience)
+**Last updated:** 2026-09-06 (T241 — feeder `0x03` roster load)
 
 ---
 
@@ -23,28 +23,30 @@ Update this file when a ticket locks or discards a recipe. Prefer recipes here o
 
 **Durable edge (T214):**
 
-- Vector at managed `club+0x118` / `+0x120` → wrapper → nested partner UID `@+0x0C` (also seen `@+0x10`).
+- Vector at managed `club+0x118` / `+0x120` → wrapper → nested record UID `@+0x0C` (also seen `@+0x10`).
 - Wrapper: `+0x00` = managed club ptr, `+0x08` = nested record, **type at `+0x30`**.
 
-**Type map (locked):**
+**Type map (locked / in use):**
 
 | Byte | Meaning | Squad tab? | Roster load? |
 |------|---------|------------|--------------|
 | `0x01` | Normal Affiliated Club | no | **yes** (Match experience) |
+| `0x03` | Feeder partners (Schalke: Legia / Kaiserslautern / …) — **PGE label TBD** | no | **yes** (Match experience) |
 | `0x08` | II Club | **yes** | **yes** |
 | `0x10` | Good Relations | no | no |
 | `0x11` | Likely Friendly | no | no |
 
-**Production:** type walk first — roster allow-list `0x08` \| `0x01` (`is_roster_load_affiliation_type`); Squad desk filters out `0x01`. T212-style satellite merge only for NPL / unmapped types; unmapped `+0x30` → Diagnostics `Map AffiliationType 0xNN`. Normal affiliates: Club.Teams First + Under-N/Youth; II: First (or largest) as Squad 2nd side.
+**Production:** type walk first — roster allow-list `0x08` \| `0x01` \| `0x03` (`is_roster_load_affiliation_type`); Squad desk filters out `0x01` / `0x03`. T212-style satellite merge only for NPL / unmapped types; other unmapped `+0x30` → Diagnostics `Map AffiliationType 0xNN`. Feeders: Club.Teams First + Under-N/Youth; II: First (or largest) as Squad 2nd side.
+
+**Schalke evidence (2026-09-06):** `7/12` links mapped labels; `Map AffiliationType 0x03`; only `0x08` II was resolving before `0x03` allow-list. FMLE-only friendlies (Duisburg, Twente, …) stay out (`0x10` / `0x11`).
 
 **Cancel A/B:** cancelling inbox affiliation shrinks `+0x118` by cancelled count (edge confirmed).
 
-**Schalke FM Affiliates (Squad-class ground truth):** II, Daegu, Kaiserslautern, Legia, Melbourne Victory, Sparta Praha. FMLE-only friendlies (Duisburg, Twente, …) are **not** Squad tabs. Normal (`0x01`) feeders load for Match experience only.
-
 ### Open
 
+- PGE display name for `0x03` (still `Map AffiliationType 0x03` in UI).
 - Main / Permanent / Players Move Freely **bytes** still unlocked.
-- Sub / B / C / 2 / 3 / Feeder / etc. type values unmapped; NPL still needs satellite or a locked type.
+- Sub / B / C / 2 / 3 / Feeder / etc. other type values; NPL still needs satellite or a locked type.
 
 ### Do not revive
 

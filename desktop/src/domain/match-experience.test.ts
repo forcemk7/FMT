@@ -88,20 +88,20 @@ describe("sortClubTeamsForMatchExperience", () => {
   it("orders First → Res/II → Under N → Normal First → Normal Under N", () => {
     const sorted = sortClubTeamsForMatchExperience([
       team({
-        teamUid: "aff-u",
-        name: "Feeder U19",
-        squadUnit: "under19s",
-        affiliationType: 0x01,
-        teamType: 11,
-        rosterLen: 10,
-      }),
-      team({
         teamUid: "aff-1",
         name: "Feeder",
         squadUnit: "firstTeam",
-        affiliationType: 0x01,
+        affiliationType: 0x03,
         teamType: 0,
         rosterLen: 20,
+      }),
+      team({
+        teamUid: "aff-u",
+        name: "Feeder U19",
+        squadUnit: "under19s",
+        affiliationType: 0x03,
+        teamType: 11,
+        rosterLen: 10,
       }),
       team({
         teamUid: "u18",
@@ -181,7 +181,7 @@ describe("buildMatchExperienceCards", () => {
     teamUid: "t-feed",
     name: "Feeder",
     squadUnit: "firstTeam",
-    affiliationType: 0x01,
+    affiliationType: 0x03,
     teamType: 0,
     rosterLen: 12,
   });

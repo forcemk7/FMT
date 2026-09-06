@@ -353,8 +353,8 @@ export function MyTeamScreen({
     () =>
       sortClubTeamsForSquadDesk(
         (snapshot.clubTeams ?? []).filter((team) => {
-          // Normal Affiliated Club (0x01) is Match experience only — not Squad tabs.
-          if (team.affiliationType === 0x01) return false;
+          // Match-experience feeders (0x01 Normal, 0x03) — not Squad tabs.
+          if (team.affiliationType === 0x01 || team.affiliationType === 0x03) return false;
           return team.rosterLen > 0 || team.isManagerTeam;
         }),
       ),

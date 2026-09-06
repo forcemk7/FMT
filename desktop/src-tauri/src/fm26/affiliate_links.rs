@@ -1049,11 +1049,11 @@ fn discover_bteam_from_heap_satellite_teams(
     found
 }
 
-/// B-team / affiliate discovery for roster load (T214 + T237).
+/// B-team / affiliate discovery for roster load (T214 + T241).
 ///
 /// **Production ladder**:
-/// 0. **`club+0x118` type walk** — roster-load types: `0x08` II Club (Squad tab) and
-///    `0x01` Normal Affiliated Club (Match experience; Squad desk filters out).
+/// 0. **`club+0x118` type walk** — roster-load types: `0x08` II Club (Squad tab),
+///    `0x01` Normal + `0x03` feeder (Match experience; Squad desk filters out).
 /// 1. Link vector @ +0x8E8 — graph walk; skips feeder catalogs (>1 club pointer / struct).
 /// 2. **Satellite team heap scan** — T212 bridge for NPL / unmapped reserve types.
 /// 3. Indirect managed-club pointers → link struct with managed UID/pointer + single club.
@@ -1061,7 +1061,7 @@ fn discover_bteam_from_heap_satellite_teams(
 /// 5. Managed club blob direct club pointers with parent edge.
 ///
 /// Non-load types (`0x10` Good Relations, `0x11` Likely Friendly) stay out.
-/// Unmapped `+0x30` values are reported for Diagnostics map reminders.
+/// Other unmapped `+0x30` values are reported for Diagnostics map reminders.
 #[cfg(target_os = "windows")]
 pub(crate) fn discover_bteam_affiliate_clubs(
     reader: &mut ProcessReader,

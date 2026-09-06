@@ -93,17 +93,17 @@ export function underNTeamTypeSortKey(teamType: number | null | undefined): numb
   }
 }
 
-function isNormalAffiliate(
+function isFeederAffiliate(
   team: Pick<LiveClubTeam, "affiliationType">,
 ): boolean {
-  return team.affiliationType === 0x01;
+  // 0x01 Normal Affiliated Club; 0x03 Schalke feeder byte (PGE label unlocked).
+  return team.affiliationType === 0x01 || team.affiliationType === 0x03;
 }
 
-function isIiOrReserveAffiliate(
+function isIiClubAffiliate(
   team: Pick<LiveClubTeam, "affiliationType">,
 ): boolean {
-  const aff = team.affiliationType;
-  return aff === 0x08 || (typeof aff === "number" && aff !== 0x01);
+  return team.affiliationType === 0x08;
 }
 
 /**
@@ -111,18 +111,18 @@ function isIiOrReserveAffiliate(
  * 0 managed First
  * 1 managed Res/II/2 + II Club affiliates
  * 2 managed Under Ns
- * 3+ Normal Affiliated Club (First / Res / Under N)
+ * 3+ feeder affiliates 0x01/0x03 (First / Res / Under N)
  */
 export function matchExperienceTeamBand(
   team: Pick<LiveClubTeam, "squadUnit" | "affiliationType" | "teamType">,
 ): number {
-  if (isNormalAffiliate(team)) {
+  if (isFeederAffiliate(team)) {
     if (team.squadUnit === "firstTeam" || team.teamType === 0) return 3;
     if (team.squadUnit === "under19s") return 5;
-    return 4; // reserves / II / 2 Club under Normal
+    return 4; // reserves / II / 2 Club under feeder club
   }
 
-  if (isIiOrReserveAffiliate(team) || team.squadUnit === "reserves") {
+  if (isIiClubAffiliate(team) || team.squadUnit === "reserves") {
     return 1;
   }
   if (team.squadUnit === "firstTeam") return 0;
@@ -137,8 +137,8 @@ export function sortClubTeamsForMatchExperience(
     const band = matchExperienceTeamBand(left) - matchExperienceTeamBand(right);
     if (band !== 0) return band;
 
-    const leftUnder = left.squadUnit === "under19s" || (isNormalAffiliate(left) && left.squadUnit === "under19s");
-    const rightUnder = right.squadUnit === "under19s" || (isNormalAffiliate(right) && right.squadUnit === "under19s");
+    const leftUnder = left.squadUnit === "under19s";
+    const rightUnder = right.squadUnit === "under19s";
     if (leftUnder && rightUnder) {
       const n = underNTeamTypeSortKey(left.teamType) - underNTeamTypeSortKey(right.teamType);
       if (n !== 0) return n;

@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-06 (T240 done — Match experience layout/sort/loans)
+Last updated: 2026-09-06 (T241 done — roster-load AffiliationType 0x03)
 
 ## Now
 
@@ -8,7 +8,7 @@ Last updated: 2026-09-06 (T240 done — Match experience layout/sort/loans)
 
 **Deferred:** T215 Diagnostics source-of-truth skeleton + live fill. T210 Squad card/list density. T139 theme. T162 trophy cabinet. Empty Youth(0) tab. Loop D full-world load parked.
 
-**Residuals (not tickets):** Main/Permanent/PMF affiliation bytes; further globals CSS carcass; club page polish; First XI median later. Club/general shortName RE parked — UI uses TeamType + full team name (T235). **Normal Affiliated Club (`0x01`) Match experience cards — awaiting user verify / load evidence.**
+**Residuals (not tickets):** Main/Permanent/PMF affiliation bytes; PGE label for AffiliationType `0x03`; further globals CSS carcass; club page polish; First XI median later. Club/general shortName RE parked — UI uses TeamType + full team name (T235).
 
 ## Board
 
@@ -26,11 +26,10 @@ Last updated: 2026-09-06 (T240 done — Match experience layout/sort/loans)
 
 ## Recently done
 
+- **T241** Roster-load AffiliationType 0x03 feeders (Match experience)
 - **T240** Match experience layout, sort, loans, hide
 - **T239** Lock attr desk row metrics (no Δ layout shift)
 - **T238** Fix Match experience cards + Normal 0x01 path
-- **T237** Match experience UX + Normal affiliate rosters
-- **T236** Match experience profile tab (same-pos CA by loaded clubTeam)
 
 ## Loop
 

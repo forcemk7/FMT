@@ -33,6 +33,7 @@ const OFFSET_TABLE_RVA: u64 = 0x4E4_9490;
 pub(crate) fn affiliation_type_label(type_byte: u8) -> Option<&'static str> {
     match type_byte {
         0x01 => Some("Normal Affiliated Club"),
+        // 0x03: Schalke feeders (Legia / Kaiserslautern / …) — PGE label not locked yet.
         0x08 => Some("II Club"),
         0x10 => Some("Good Relations"),
         0x11 => Some("Likely Friendly"),
@@ -45,10 +46,14 @@ pub(crate) fn is_squad_tab_affiliation_type(type_byte: u8) -> bool {
     matches!(type_byte, 0x08) // II Club — Sub/B/C/2/3 when discovered
 }
 
+/// Match-experience feeders (not Squad tabs): Normal `0x01` + Schalke feeder byte `0x03`.
+pub(crate) fn is_match_experience_feeder_type(type_byte: u8) -> bool {
+    matches!(type_byte, 0x01 | 0x03)
+}
+
 /// Types whose club teams are loaded for Match experience (and Squad when also squad-tab).
-/// Normal Affiliated Club (0x01) is Match experience only — Squad desk filters it out.
 pub(crate) fn is_roster_load_affiliation_type(type_byte: u8) -> bool {
-    matches!(type_byte, 0x01 | 0x08) // Normal Affiliated Club | II Club
+    matches!(type_byte, 0x01 | 0x03 | 0x08) // Normal | feeder 0x03 | II Club
 }
 
 /// Reminder string for UI / Diagnostics (mirrors TeamType “Map …” pattern).
@@ -271,17 +276,21 @@ pub(crate) fn walk_club_affiliation_links(
 #[cfg(test)]
 mod tests {
     use super::{
-        affiliation_type_label, is_roster_load_affiliation_type, is_squad_tab_affiliation_type,
+        affiliation_type_label, is_match_experience_feeder_type, is_roster_load_affiliation_type,
+        is_squad_tab_affiliation_type,
     };
 
     #[test]
     fn roster_load_types_include_normal_and_ii_not_friendly() {
         assert!(is_roster_load_affiliation_type(0x01));
+        assert!(is_roster_load_affiliation_type(0x03));
         assert!(is_roster_load_affiliation_type(0x08));
         assert!(!is_roster_load_affiliation_type(0x10));
         assert!(!is_roster_load_affiliation_type(0x11));
         assert!(!is_squad_tab_affiliation_type(0x01));
+        assert!(!is_squad_tab_affiliation_type(0x03));
         assert!(is_squad_tab_affiliation_type(0x08));
+        assert!(is_match_experience_feeder_type(0x03));
         assert_eq!(
             affiliation_type_label(0x01),
             Some("Normal Affiliated Club")

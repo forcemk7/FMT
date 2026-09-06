@@ -1377,10 +1377,10 @@ fn merge_satellite_club_teams_json(mut base: Vec<Value>, extra: Vec<Value>) -> V
     base
 }
 
-/// Squad-tab separate-club reserves (II) plus Normal Affiliated Club sides for Match experience.
+/// Squad-tab separate-club reserves (II) plus Match-experience feeders (0x01 / 0x03).
 ///
 /// II Club (0x08): keep First / largest roster only (Squad-tab reserve).
-/// Normal Affiliated Club (0x01): load First + Under-N / Youth sides (Match experience).
+/// Feeders (0x01 Normal, 0x03 Schalke feeder byte): First + Under-N / Youth (Match experience).
 #[cfg(target_os = "windows")]
 #[allow(clippy::too_many_arguments)]
 fn load_bteam_affiliate_rosters(
@@ -1450,10 +1450,10 @@ fn load_bteam_affiliate_rosters(
             continue;
         }
 
-        let normal_affiliate = affiliate.affiliation_type == Some(0x01);
-        // Same Club.Teams path for II (0x08) and Normal (0x01): prefer First (type 0),
-        // else largest roster. Normal also keeps Under-N / Youth sides when typed.
-        if normal_affiliate {
+        let feeder_affiliate = matches!(affiliate.affiliation_type, Some(0x01) | Some(0x03));
+        // Same Club.Teams path for II (0x08) vs feeders (0x01 / 0x03):
+        // II → First only; feeders → First + Under-N / Youth.
+        if feeder_affiliate {
             linked_teams.retain(|team| {
                 team.roster_len > 0
                     && matches!(
@@ -1474,9 +1474,9 @@ fn load_bteam_affiliate_rosters(
             linked_teams.retain(|team| team.roster_len == max_roster);
         }
         // II / satellite: force reserves unit for Squad band (2nd side).
-        // Normal: use real TeamType → firstTeam / under19s.
+        // Feeders: use real TeamType → firstTeam / under19s.
         for team in linked_teams {
-            let squad_unit = if normal_affiliate {
+            let squad_unit = if feeder_affiliate {
                 team
                     .team_type
                     .and_then(crate::fm26::affiliate_links::squad_unit_from_team_type)
@@ -1520,8 +1520,8 @@ fn load_bteam_affiliate_rosters(
                 team.roster_len
             ));
             // II / satellite stay under managed club_id (Squad structure).
-            // Normal feeders use their own club uid so HoYD/GM/Squad don't treat them as employees.
-            let (roster_club_id, roster_club_uid) = if normal_affiliate {
+            // Feeders (0x01 / 0x03) use their own club uid so HoYD/GM/Squad don't treat them as employees.
+            let (roster_club_id, roster_club_uid) = if feeder_affiliate {
                 (affiliate.club_uid.to_string(), affiliate.club_uid)
             } else {
                 (club_id.to_string(), managed_club_uid)
@@ -2429,7 +2429,7 @@ fn extract_live_data(
         let links = report.get("linkCount").and_then(Value::as_u64).unwrap_or(0);
         if links > 0 {
             warnings.push(format!(
-                "Affiliation types on club+0x118: {mapped}/{links} links mapped (roster load: II Club 0x08 + Normal Affiliated 0x01; Good Relations/Likely Friendly excluded)."
+                "Affiliation types on club+0x118: {mapped}/{links} links mapped (roster load: II 0x08 + Normal 0x01 + feeder 0x03; Good Relations/Likely Friendly excluded)."
             ));
         }
     }
