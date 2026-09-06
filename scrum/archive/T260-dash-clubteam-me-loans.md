@@ -34,4 +34,4 @@ Best players/talent must show the real clubTeam (`{clubName} {teamType}`), inclu
 - ME competing pool scans all players; loans only on destination band-0 First
 - recipes.md T260 note
 - Verified: match-experience + opportunities + squad-ability-rank tests
-- Commit: (pending)
+- Commit: `dffba05`
