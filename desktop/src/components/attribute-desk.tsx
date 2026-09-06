@@ -72,6 +72,7 @@ function AttrRow({
   const interactive = typeof onToggle === "function";
   const className = [
     "attr-row",
+    showDeltaColumn ? "has-delta-col" : "",
     interactive ? "is-interactive" : "",
     selected ? "is-selected" : "",
   ]
@@ -90,7 +91,7 @@ function AttrRow({
       <span className="attr-row-label">{label}</span>
       <span className={`attr-row-values${showDeltaColumn ? " has-delta-col" : ""}`}>
         {showDeltaColumn ? (
-          <span className="attr-delta-slot" aria-hidden={delta == null || delta === 0}>
+          <span className="attr-delta-slot">
             <AttrDeltaBadge attribute={deltaAttribute ?? label} delta={delta} />
           </span>
         ) : null}

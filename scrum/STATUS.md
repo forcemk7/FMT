@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-06 (T238 done — fix Match experience cards)
+Last updated: 2026-09-06 (T239 done — lock attr desk Δ layout)
 
 ## Now
 
@@ -26,6 +26,7 @@ Last updated: 2026-09-06 (T238 done — fix Match experience cards)
 
 ## Recently done
 
+- **T239** Lock attr desk row metrics (no Δ layout shift)
 - **T238** Fix Match experience cards + Normal 0x01 path
 - **T237** Match experience UX + Normal affiliate rosters
 - **T236** Match experience profile tab (same-pos CA by loaded clubTeam)
