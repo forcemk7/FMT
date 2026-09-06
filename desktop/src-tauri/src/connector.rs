@@ -729,6 +729,40 @@ fn collect_snapshot(progress: Option<&dyn Fn(&'static str)>) -> ConnectorSnapsho
                     candidate: 0,
                     unmapped,
                 });
+                if let Some(lock) = report.get("loanFlagLock") {
+                    if let (Some(region), Some(off), Some(on), Some(offv)) = (
+                        lock.get("region").and_then(Value::as_str),
+                        lock.get("offsetHex").and_then(Value::as_str),
+                        lock.get("loanOnValue").and_then(Value::as_u64),
+                        lock.get("loanOffValue").and_then(Value::as_u64),
+                    ) {
+                        status.warnings.push(format!(
+                            "Affiliation loan-flag lock: {region}{off} loanOn={on} loanOff={offv} (Schalke Legia/Sparta/KL vs Daegu/Melbourne)."
+                        ));
+                    }
+                } else if report
+                    .get("loanFlagWrapperCandidates")
+                    .and_then(Value::as_array)
+                    .is_some_and(|a| !a.is_empty())
+                    || report
+                        .get("loanFlagNestedCandidates")
+                        .and_then(Value::as_array)
+                        .is_some_and(|a| !a.is_empty())
+                {
+                    let w = report
+                        .get("loanFlagWrapperCandidates")
+                        .and_then(Value::as_array)
+                        .map(|a| a.len())
+                        .unwrap_or(0);
+                    let n = report
+                        .get("loanFlagNestedCandidates")
+                        .and_then(Value::as_array)
+                        .map(|a| a.len())
+                        .unwrap_or(0);
+                    status.warnings.push(format!(
+                        "Affiliation loan-flag candidates: {w} wrapper + {n} nested offsets (no single lock yet)."
+                    ));
+                }
             }
             let data_warnings = status.warnings.clone();
             status.read_pipeline = Vec::new();

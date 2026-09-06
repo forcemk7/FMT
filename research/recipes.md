@@ -6,7 +6,7 @@
 
 Update this file when a ticket locks or discards a recipe. Prefer recipes here over resurrecting deleted probe modules.
 
-**Last updated:** 2026-09-06 (T241 — feeder `0x03` roster load)
+**Last updated:** 2026-09-06 (T242 — ME labels + loan-flag wrapper diff)
 
 ---
 
@@ -46,6 +46,7 @@ Update this file when a ticket locks or discards a recipe. Prefer recipes here o
 
 - PGE display name for `0x03` (still `Map AffiliationType 0x03` in UI).
 - Main / Permanent / Players Move Freely **bytes** still unlocked.
+- **Players Go On Loan** flag: static-diff on `club+0x118` wrapper/nested via Schalke needles (Legia/Sparta/KL = on, Daegu/Melbourne = off). Report fields `loanFlagLock` / `loanFlag*Candidates`; when locked, feeder load requires loan-on value.
 - Sub / B / C / 2 / 3 / Feeder / etc. other type values; NPL still needs satellite or a locked type.
 
 ### Do not revive

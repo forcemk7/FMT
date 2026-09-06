@@ -1072,15 +1072,103 @@ pub(crate) fn discover_bteam_affiliate_clubs(
     first_team: u64,
 ) -> BteamAffiliateDiscovery {
     use super::affiliation_types::{
-        affiliation_type_map_reminder, affiliation_walk_to_json, is_roster_load_affiliation_type,
-        resolve_club_ptr_by_uid, walk_club_affiliation_links,
+        affiliation_type_map_reminder, affiliation_walk_to_json, find_stable_u8_separators,
+        is_match_experience_feeder_type, is_roster_load_affiliation_type, resolve_club_ptr_by_uid,
+        schalke_loan_off_name, schalke_loan_on_name, walk_club_affiliation_links,
     };
 
     let walk = walk_club_affiliation_links(reader, managed_club);
-    let affiliation_type_report = Some(affiliation_walk_to_json(&walk));
+    let mut affiliation_type_report = affiliation_walk_to_json(&walk);
 
     let mut seen_uids = std::collections::HashSet::new();
     let mut found = Vec::new();
+
+    // Resolve feeder partner names + wrapper/nested bytes for loan-flag static diff.
+    let mut loan_on_wrapper = Vec::new();
+    let mut loan_off_wrapper = Vec::new();
+    let mut loan_on_nested = Vec::new();
+    let mut loan_off_nested = Vec::new();
+    let mut named_links = Vec::new();
+
+    for link in &walk.links {
+        let partner_name = resolve_club_ptr_by_uid(reader, module, profile, link.partner_uid)
+            .map(|(_, name)| name)
+            .unwrap_or_default();
+        named_links.push(json!({
+            "partnerUid": link.partner_uid,
+            "partnerName": partner_name,
+            "typeHex": format!("0x{:02X}", link.type_byte),
+            "reminder": affiliation_type_map_reminder(link.type_byte),
+        }));
+        if !is_match_experience_feeder_type(link.type_byte) {
+            continue;
+        }
+        if schalke_loan_on_name(&partner_name) {
+            loan_on_wrapper.push(link.wrapper_bytes.clone());
+            if !link.nested_bytes.is_empty() {
+                loan_on_nested.push(link.nested_bytes.clone());
+            }
+        } else if schalke_loan_off_name(&partner_name) {
+            loan_off_wrapper.push(link.wrapper_bytes.clone());
+            if !link.nested_bytes.is_empty() {
+                loan_off_nested.push(link.nested_bytes.clone());
+            }
+        }
+    }
+
+    let wrapper_seps = find_stable_u8_separators(&loan_on_wrapper, &loan_off_wrapper);
+    let nested_seps = find_stable_u8_separators(&loan_on_nested, &loan_off_nested);
+    let loan_lock = pick_loan_flag_lock(&wrapper_seps, &nested_seps);
+    if let Some(obj) = affiliation_type_report.as_object_mut() {
+        obj.insert("namedLinks".into(), Value::Array(named_links));
+        obj.insert(
+            "loanFlagWrapperCandidates".into(),
+            json!(wrapper_seps
+                .iter()
+                .map(|(off, on, offv)| json!({
+                    "region": "wrapper",
+                    "offset": off,
+                    "offsetHex": format!("0x{off:X}"),
+                    "loanOn": on,
+                    "loanOff": offv,
+                }))
+                .collect::<Vec<_>>()),
+        );
+        obj.insert(
+            "loanFlagNestedCandidates".into(),
+            json!(nested_seps
+                .iter()
+                .map(|(off, on, offv)| json!({
+                    "region": "nested",
+                    "offset": off,
+                    "offsetHex": format!("0x{off:X}"),
+                    "loanOn": on,
+                    "loanOff": offv,
+                }))
+                .collect::<Vec<_>>()),
+        );
+        if let Some((region, offset, on_val, off_val)) = loan_lock {
+            obj.insert(
+                "loanFlagLock".into(),
+                json!({
+                    "region": region,
+                    "offset": offset,
+                    "offsetHex": format!("0x{offset:X}"),
+                    "loanOnValue": on_val,
+                    "loanOffValue": off_val,
+                    "evidence": "Schalke name needles: Legia/Sparta/Kaiserslautern vs Daegu/Melbourne",
+                }),
+            );
+            crate::fmt_log::load_detail(format!(
+                "affiliation loan-flag lock: {region}+0x{offset:X} on={on_val} off={off_val}"
+            ));
+        } else if !loan_on_wrapper.is_empty() && !loan_off_wrapper.is_empty() {
+            crate::fmt_log::load_detail(
+                "affiliation loan-flag: no single stable separator yet (check loanFlag*Candidates)"
+                    .to_string(),
+            );
+        }
+    }
 
     for link in &walk.links {
         if !is_roster_load_affiliation_type(link.type_byte) {
@@ -1088,6 +1176,26 @@ pub(crate) fn discover_bteam_affiliate_clubs(
         }
         if link.partner_uid == managed_club_uid || !seen_uids.insert(link.partner_uid) {
             continue;
+        }
+        // Feeders without Players-Go-On-Loan (when lock known) stay out of Match experience.
+        if is_match_experience_feeder_type(link.type_byte) {
+            if let Some((region, offset, on_val, _)) = loan_lock {
+                let bytes = if region == "nested" {
+                    &link.nested_bytes
+                } else {
+                    &link.wrapper_bytes
+                };
+                let Some(got) = bytes.get(offset).copied() else {
+                    continue;
+                };
+                if got != on_val {
+                    crate::fmt_log::load_detail(format!(
+                        "skip feeder uid {}: {region}+0x{offset:X}={got} (want loan-on {on_val})",
+                        link.partner_uid
+                    ));
+                    continue;
+                }
+            }
         }
         let Some((club, club_name)) =
             resolve_club_ptr_by_uid(reader, module, profile, link.partner_uid)
@@ -1103,8 +1211,10 @@ pub(crate) fn discover_bteam_affiliate_clubs(
             .map(|s| s.to_string())
             .unwrap_or_else(|| affiliation_type_map_reminder(link.type_byte));
         crate::fmt_log::load_detail(format!(
-            "affiliation +0x118 type 0x{:02X} ({label}) → club uid {}",
-            link.type_byte, link.partner_uid
+            "affiliation +0x118 type 0x{:02X} ({label}) → club uid {} ({})",
+            link.type_byte,
+            link.partner_uid,
+            club_name.trim()
         ));
         found.push(AffiliateClubDiscovery {
             club,
@@ -1171,8 +1281,25 @@ pub(crate) fn discover_bteam_affiliate_clubs(
 
     BteamAffiliateDiscovery {
         affiliates: found,
-        affiliation_type_report,
+        affiliation_type_report: Some(affiliation_type_report),
     }
+}
+
+/// Lock only on a boolean-looking separator (0/1 vs 0/1). Nested preferred over wrapper.
+/// Non-boolean candidates stay in the report for Diagnostics — do not auto-filter on them.
+fn pick_loan_flag_lock(
+    wrapper: &[(usize, u8, u8)],
+    nested: &[(usize, u8, u8)],
+) -> Option<(&'static str, usize, u8, u8)> {
+    let boolean_sep = |cands: &[(usize, u8, u8)], region: &'static str| {
+        cands
+            .iter()
+            .find(|(_, on, off)| {
+                (*on == 0 || *on == 1) && (*off == 0 || *off == 1) && on != off
+            })
+            .map(|(off, on, offv)| (region, *off, *on, *offv))
+    };
+    boolean_sep(nested, "nested").or_else(|| boolean_sep(wrapper, "wrapper"))
 }
 
 /// RE-only: dump managed-club `@0x8E8` slots **and** heap link structs whose club@0x160 is a

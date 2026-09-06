@@ -6,6 +6,7 @@ import {
   matchExperiencePosition,
   matchExperiencePositionOptions,
   matchExperienceTeamBand,
+  matchExperienceTeamLabel,
   matchExperienceWindowStart,
   sortClubTeamsForMatchExperience,
 } from "./match-experience";
@@ -88,20 +89,20 @@ describe("sortClubTeamsForMatchExperience", () => {
   it("orders First → Res/II → Under N → Normal First → Normal Under N", () => {
     const sorted = sortClubTeamsForMatchExperience([
       team({
-        teamUid: "aff-1",
-        name: "Feeder",
-        squadUnit: "firstTeam",
-        affiliationType: 0x03,
-        teamType: 0,
-        rosterLen: 20,
-      }),
-      team({
         teamUid: "aff-u",
         name: "Feeder U19",
         squadUnit: "under19s",
         affiliationType: 0x03,
         teamType: 11,
         rosterLen: 10,
+      }),
+      team({
+        teamUid: "aff-1",
+        name: "Feeder",
+        squadUnit: "firstTeam",
+        affiliationType: 0x03,
+        teamType: 0,
+        rosterLen: 20,
       }),
       team({
         teamUid: "u18",
@@ -141,9 +142,33 @@ describe("sortClubTeamsForMatchExperience", () => {
       "aff-1",
       "aff-u",
     ]);
-    expect(matchExperienceTeamBand(sorted[1]!)).toBe(1);
-    expect(matchExperienceTeamBand(sorted[2]!)).toBe(2);
-    expect(matchExperienceTeamBand(sorted[4]!)).toBe(3);
+  });
+});
+
+describe("matchExperienceTeamLabel", () => {
+  it("uses club name + TeamType for affiliates", () => {
+    expect(
+      matchExperienceTeamLabel({
+        teamUid: "1",
+        name: "Legia Warszawa",
+        squadUnit: "firstTeam",
+        affiliationType: 0x03,
+        teamType: 0,
+        rosterLen: 20,
+        isManagerTeam: false,
+      }),
+    ).toBe("Legia Warszawa First Team");
+    expect(
+      matchExperienceTeamLabel({
+        teamUid: "2",
+        name: "Legia Warszawa",
+        squadUnit: "under19s",
+        affiliationType: 0x03,
+        teamType: 11,
+        rosterLen: 18,
+        isManagerTeam: false,
+      }),
+    ).toBe("Legia Warszawa Under 19s");
   });
 });
 

@@ -3,7 +3,7 @@
  */
 
 import type { LiveClubTeam, LivePlayer } from "./adapters";
-import { squadTeamDisplayName } from "./live-data";
+import { squadTeamDisplayName, teamTypeDisplayLabel } from "./live-data";
 
 /** Visible rows per card — fixed height, no scrollbar (window around focus). */
 export const MATCH_EXPERIENCE_PAGE_SIZE = 5;
@@ -104,6 +104,28 @@ function isIiClubAffiliate(
   team: Pick<LiveClubTeam, "affiliationType">,
 ): boolean {
   return team.affiliationType === 0x08;
+}
+
+/** Match experience card title — affiliates: `{clubName} {TeamType}`. */
+export function matchExperienceTeamLabel(
+  team: Pick<
+    LiveClubTeam,
+    "name" | "teamUid" | "teamType" | "affiliationType" | "squadUnit" | "shortName" | "affiliationTypeLabel"
+  >,
+  managedClubName?: string | null,
+): string {
+  const affiliate =
+    isFeederAffiliate(team) || isIiClubAffiliate(team) || typeof team.affiliationType === "number";
+  if (affiliate) {
+    const club = team.name.trim() || `Map club (?): uid-${team.teamUid}`;
+    const typeLabel =
+      teamTypeDisplayLabel(team.teamType) ??
+      (typeof team.teamType === "number"
+        ? `Map TeamType ${team.teamType}`
+        : "Map TeamType (?)");
+    return `${club} ${typeLabel}`;
+  }
+  return squadTeamDisplayName(team, managedClubName);
 }
 
 /**
@@ -263,7 +285,7 @@ export function buildMatchExperienceCard(
 
   return {
     teamUid: team.teamUid,
-    teamLabel: squadTeamDisplayName(team, managedClubName),
+    teamLabel: matchExperienceTeamLabel(team, managedClubName),
     position: pos,
     focusRank,
     teamPlayerCount: teamPlayers.length,

@@ -73,12 +73,71 @@ pub(crate) struct AffiliationLinkSighting {
     pub nested: u64,
     pub squad_tab: bool,
     pub mapped_label: Option<&'static str>,
+    /// Wrapper object bytes (for flag diffs: loan / Main / Permanent / …).
+    pub wrapper_bytes: Vec<u8>,
+    /// Nested agreement record bytes when readable.
+    pub nested_bytes: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct AffiliationTypeWalk {
     pub links: Vec<AffiliationLinkSighting>,
     pub unmapped_type_bytes: Vec<u8>,
+}
+
+/// Bytes read from each affiliation wrapper for flag hunting.
+pub(crate) const AFFILIATION_WRAPPER_PROBE_BYTES: usize = 0x80;
+/// Bytes read from nested partner/agreement record.
+pub(crate) const AFFILIATION_NESTED_PROBE_BYTES: usize = 0x40;
+
+/// Offsets where every `loan_on` blob shares one u8 value and every `loan_off`
+/// blob shares a different u8 — candidates for “Players Go On Loan”.
+pub(crate) fn find_stable_u8_separators(
+    loan_on: &[Vec<u8>],
+    loan_off: &[Vec<u8>],
+) -> Vec<(usize, u8, u8)> {
+    if loan_on.is_empty() || loan_off.is_empty() {
+        return Vec::new();
+    }
+    let min_len = loan_on
+        .iter()
+        .chain(loan_off.iter())
+        .map(|b| b.len())
+        .min()
+        .unwrap_or(0);
+    let mut out = Vec::new();
+    for offset in 0..min_len {
+        let Some(on_val) = shared_u8_at(loan_on, offset) else {
+            continue;
+        };
+        let Some(off_val) = shared_u8_at(loan_off, offset) else {
+            continue;
+        };
+        if on_val != off_val {
+            out.push((offset, on_val, off_val));
+        }
+    }
+    out
+}
+
+fn shared_u8_at(blobs: &[Vec<u8>], offset: usize) -> Option<u8> {
+    let first = *blobs.first()?.get(offset)?;
+    if blobs.iter().all(|b| b.get(offset).copied() == Some(first)) {
+        Some(first)
+    } else {
+        None
+    }
+}
+
+/// Schalke ground-truth needles for loan-agreement static diff (case-insensitive contains).
+pub(crate) fn schalke_loan_on_name(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    lower.contains("legia") || lower.contains("kaiserslautern") || lower.contains("sparta")
+}
+
+pub(crate) fn schalke_loan_off_name(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    lower.contains("daegu") || lower.contains("melbourne")
 }
 
 #[cfg(target_os = "windows")]
@@ -192,19 +251,21 @@ pub(crate) fn walk_club_affiliation_links(
         if !looks_heap(wrapper) {
             continue;
         }
-        let Some(wrap) = reader.read_bytes(wrapper, 0x40) else {
+        let Some(wrap) = reader.read_bytes(wrapper, AFFILIATION_WRAPPER_PROBE_BYTES) else {
             continue;
         };
         let type_byte = wrap[AFFILIATION_TYPE_OFFSET];
         let nested = u64::from_le_bytes(wrap[8..16].try_into().unwrap());
         let mut partner_uid = 0u32;
+        let mut nested_bytes = Vec::new();
         if looks_heap(nested) {
-            if let Some(nobj) = reader.read_bytes(nested, 0x20) {
+            if let Some(nobj) = reader.read_bytes(nested, AFFILIATION_NESTED_PROBE_BYTES) {
                 partner_uid = u32::from_le_bytes(
                     nobj[NESTED_PARTNER_UID_OFFSET..NESTED_PARTNER_UID_OFFSET + 4]
                         .try_into()
                         .unwrap(),
                 );
+                nested_bytes = nobj;
             }
         }
         // Skip self / empty partner noise on Likely Friendly filler slots.
@@ -222,6 +283,8 @@ pub(crate) fn walk_club_affiliation_links(
             nested,
             squad_tab: is_squad_tab_affiliation_type(type_byte),
             mapped_label,
+            wrapper_bytes: wrap,
+            nested_bytes,
         });
     }
 
@@ -258,6 +321,8 @@ pub(crate) fn affiliation_walk_to_json(walk: &AffiliationTypeWalk) -> Value {
             "reminder": affiliation_type_map_reminder(l.type_byte),
             "squadTab": l.squad_tab,
             "wrapper": format!("0x{:X}", l.wrapper),
+            "wrapperBytesHex": l.wrapper_bytes.iter().map(|b| format!("{b:02x}")).collect::<String>(),
+            "nestedBytesHex": l.nested_bytes.iter().map(|b| format!("{b:02x}")).collect::<String>(),
         })).collect::<Vec<_>>(),
     })
 }
@@ -276,12 +341,13 @@ pub(crate) fn walk_club_affiliation_links(
 #[cfg(test)]
 mod tests {
     use super::{
-        affiliation_type_label, is_match_experience_feeder_type, is_roster_load_affiliation_type,
-        is_squad_tab_affiliation_type,
+        affiliation_type_label, find_stable_u8_separators, is_match_experience_feeder_type,
+        is_roster_load_affiliation_type, is_squad_tab_affiliation_type, schalke_loan_off_name,
+        schalke_loan_on_name,
     };
 
     #[test]
-    fn roster_load_types_include_normal_and_ii_not_friendly() {
+    fn roster_load_types_include_normal_feeder_and_ii_not_friendly() {
         assert!(is_roster_load_affiliation_type(0x01));
         assert!(is_roster_load_affiliation_type(0x03));
         assert!(is_roster_load_affiliation_type(0x08));
@@ -295,5 +361,24 @@ mod tests {
             affiliation_type_label(0x01),
             Some("Normal Affiliated Club")
         );
+    }
+
+    #[test]
+    fn schalke_loan_needles() {
+        assert!(schalke_loan_on_name("Legia Warszawa"));
+        assert!(schalke_loan_on_name("1. FC Kaiserslautern"));
+        assert!(schalke_loan_on_name("AC Sparta Praha"));
+        assert!(schalke_loan_off_name("Daegu FC"));
+        assert!(schalke_loan_off_name("Melbourne Victory"));
+        assert!(!schalke_loan_on_name("Daegu FC"));
+    }
+
+    #[test]
+    fn stable_u8_separator_finds_loan_flag() {
+        let on = vec![vec![0u8, 1, 9], vec![0u8, 1, 7]];
+        let off = vec![vec![0u8, 0, 3], vec![0u8, 0, 4]];
+        let seps = find_stable_u8_separators(&on, &off);
+        assert!(seps.contains(&(1, 1, 0)));
+        assert!(!seps.iter().any(|(o, _, _)| *o == 0));
     }
 }

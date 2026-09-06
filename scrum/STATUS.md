@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-06 (T241 done — roster-load AffiliationType 0x03)
+Last updated: 2026-09-06 (T242 done — ME affiliate labels + loan-flag diff)
 
 ## Now
 
@@ -8,7 +8,7 @@ Last updated: 2026-09-06 (T241 done — roster-load AffiliationType 0x03)
 
 **Deferred:** T215 Diagnostics source-of-truth skeleton + live fill. T210 Squad card/list density. T139 theme. T162 trophy cabinet. Empty Youth(0) tab. Loop D full-world load parked.
 
-**Residuals (not tickets):** Main/Permanent/PMF affiliation bytes; PGE label for AffiliationType `0x03`; further globals CSS carcass; club page polish; First XI median later. Club/general shortName RE parked — UI uses TeamType + full team name (T235).
+**Residuals (not tickets):** Main/Permanent/PMF affiliation bytes; PGE label for AffiliationType `0x03`; Players Go On Loan byte (auto-lock when boolean separator found); further globals CSS carcass; club page polish; First XI median later. Club/general shortName RE parked — UI uses TeamType + full team name (T235).
 
 ## Board
 
@@ -26,6 +26,7 @@ Last updated: 2026-09-06 (T241 done — roster-load AffiliationType 0x03)
 
 ## Recently done
 
+- **T242** ME affiliate labels + loan-flag wrapper diff
 - **T241** Roster-load AffiliationType 0x03 feeders (Match experience)
 - **T240** Match experience layout, sort, loans, hide
 - **T239** Lock attr desk row metrics (no Δ layout shift)
