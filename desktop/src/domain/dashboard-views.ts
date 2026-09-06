@@ -2,7 +2,8 @@
 
 export const DASH_VIEW_IDS = [
   "Movers",
-  "Prospects",
+  "Best players",
+  "Best talent",
   "Match experience",
   "HAS Top",
   "HAS Bottom",
@@ -20,8 +21,10 @@ export function dashViewTitle(id: DashViewId): string {
   switch (id) {
     case "Movers":
       return "Attribute changes";
-    case "Prospects":
-      return "First-team path";
+    case "Best players":
+      return "Best players";
+    case "Best talent":
+      return "Best talent";
     case "Match experience":
       return "Match experience";
     case "HAS Top":
@@ -35,8 +38,10 @@ export function dashViewBlurb(id: DashViewId): string {
   switch (id) {
     case "Movers":
       return "Attribute changes since the last recorded change-point";
-    case "Prospects":
-      return "Non–First Team players with First Team upside (PA + mentor room)";
+    case "Best players":
+      return "Highest current ability on the owned club (including loans)";
+    case "Best talent":
+      return "Highest potential among owned players age 20 and under (including First Team and loans)";
     case "Match experience":
       return "Under N / Reserves players who would be #1 or #2 same-pos on a First Team";
     case "HAS Top":

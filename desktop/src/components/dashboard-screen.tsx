@@ -13,12 +13,12 @@ import {
   type DashViewId,
 } from "@/domain/dashboard-views";
 import { squadHasRankings } from "@/domain/has-score";
-import { rankSquadProspects } from "@/domain/squad-prospects";
+import { rankBestPlayers, rankBestTalent } from "@/domain/squad-ability-rank";
 import {
+  DashAbilityRow,
   DashHasRow,
   DashMatchExperienceRow,
   DashMoverRow,
-  DashProspectRow,
 } from "@/components/dashboard-widgets";
 import { LiveDataState } from "@/components/live-data-state";
 import { Button } from "@/components/ui/button";
@@ -82,13 +82,22 @@ export function DashboardScreen({
     () => rankSquadMovers(squad, undefined, DASH_PEEK_SIZE),
     [squad, snapshot.status.lastSync, snapshot.status.lastSuccessfulRead],
   );
-  const prospects = useMemo(() => rankSquadProspects(squad, DASH_PEEK_SIZE), [squad]);
+  const bestPlayers = useMemo(
+    () => rankBestPlayers(snapshot.players, snapshot.managedClubId, DASH_PEEK_SIZE),
+    [snapshot.managedClubId, snapshot.players],
+  );
+  const bestTalent = useMemo(
+    () => rankBestTalent(snapshot.players, snapshot.managedClubId, DASH_PEEK_SIZE),
+    [snapshot.managedClubId, snapshot.players],
+  );
   const matchExperience = useMemo(
     () => rankMatchExperienceOpportunities(snapshot, DASH_PEEK_SIZE),
     [snapshot],
   );
   const ready =
-    snapshot.status.state === "connected" && Boolean(snapshot.managedClubId) && squad.length > 0;
+    snapshot.status.state === "connected" &&
+    Boolean(snapshot.managedClubId) &&
+    (squad.length > 0 || bestPlayers.length > 0 || bestTalent.length > 0);
 
   const managedClubName =
     snapshot.clubs.find((club) => club.id === snapshot.managedClubId)?.name ?? null;
@@ -133,22 +142,46 @@ export function DashboardScreen({
           </WidgetShell>
 
           <WidgetShell
-            title={dashViewTitle("Prospects")}
-            viewId="Prospects"
+            title={dashViewTitle("Best players")}
+            viewId="Best players"
             onOpenView={onOpenView}
-            empty={
-              prospects.length
-                ? null
-                : "No non–First Team young high-PA players with a clear Pro mentor."
-            }
+            empty={bestPlayers.length ? null : "No readable CA on owned club players yet."}
           >
-            {prospects.length ? (
+            {bestPlayers.length ? (
               <div className="dash-peek-list">
-                {prospects.map((row) => (
-                  <DashProspectRow
+                {bestPlayers.map((row) => (
+                  <DashAbilityRow
                     key={row.player.id}
                     row={row}
-                    onOpen={openFromView("Prospects")}
+                    mode="players"
+                    onOpen={openFromView("Best players")}
+                    compact
+                    clubTeams={snapshot.clubTeams}
+                    managedClubName={managedClubName}
+                  />
+                ))}
+              </div>
+            ) : null}
+          </WidgetShell>
+
+          <WidgetShell
+            title={dashViewTitle("Best talent")}
+            viewId="Best talent"
+            onOpenView={onOpenView}
+            empty={
+              bestTalent.length
+                ? null
+                : "No owned players age 20 or under with readable PA yet."
+            }
+          >
+            {bestTalent.length ? (
+              <div className="dash-peek-list">
+                {bestTalent.map((row) => (
+                  <DashAbilityRow
+                    key={row.player.id}
+                    row={row}
+                    mode="talent"
+                    onOpen={openFromView("Best talent")}
                     compact
                     clubTeams={snapshot.clubTeams}
                     managedClubName={managedClubName}
@@ -253,14 +286,23 @@ export function DashboardViewScreen({
       ),
     [snapshot.managedClubId, snapshot.players],
   );
+  const bestPlayers = useMemo(
+    () => rankBestPlayers(snapshot.players, snapshot.managedClubId, 64),
+    [snapshot.managedClubId, snapshot.players],
+  );
+  const bestTalent = useMemo(
+    () => rankBestTalent(snapshot.players, snapshot.managedClubId, 64),
+    [snapshot.managedClubId, snapshot.players],
+  );
   const ready =
-    snapshot.status.state === "connected" && Boolean(snapshot.managedClubId) && squad.length > 0;
+    snapshot.status.state === "connected" &&
+    Boolean(snapshot.managedClubId) &&
+    (squad.length > 0 || bestPlayers.length > 0 || bestTalent.length > 0);
 
   const movers = useMemo(
     () => rankSquadMovers(squad, undefined, 64),
     [squad, snapshot.status.lastSync, snapshot.status.lastSuccessfulRead],
   );
-  const prospects = useMemo(() => rankSquadProspects(squad, 64), [squad]);
   const matchExperience = useMemo(
     () => rankMatchExperienceOpportunities(snapshot, 64),
     [snapshot],
@@ -291,13 +333,14 @@ export function DashboardViewScreen({
     ) : (
       <p className="evidence-caption">No attribute moves since the last recorded change-point.</p>
     );
-  } else if (view === "Prospects") {
-    body = prospects.length ? (
+  } else if (view === "Best players") {
+    body = bestPlayers.length ? (
       <div className="dash-has-list dash-view-list">
-        {prospects.map((row) => (
-          <DashProspectRow
+        {bestPlayers.map((row) => (
+          <DashAbilityRow
             key={row.player.id}
             row={row}
+            mode="players"
             onOpen={openPlayer}
             clubTeams={snapshot.clubTeams}
             managedClubName={managedClubName}
@@ -305,9 +348,24 @@ export function DashboardViewScreen({
         ))}
       </div>
     ) : (
-      <p className="evidence-caption">
-        No non–First Team young high-PA players with a clear Professionalism mentor on squad.
-      </p>
+      <p className="evidence-caption">No readable CA on owned club players yet.</p>
+    );
+  } else if (view === "Best talent") {
+    body = bestTalent.length ? (
+      <div className="dash-has-list dash-view-list">
+        {bestTalent.map((row) => (
+          <DashAbilityRow
+            key={row.player.id}
+            row={row}
+            mode="talent"
+            onOpen={openPlayer}
+            clubTeams={snapshot.clubTeams}
+            managedClubName={managedClubName}
+          />
+        ))}
+      </div>
+    ) : (
+      <p className="evidence-caption">No owned players age 20 or under with readable PA yet.</p>
     );
   } else if (view === "Match experience") {
     body = matchExperience.length ? (

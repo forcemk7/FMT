@@ -27,7 +27,8 @@ export type Screen =
   | "Club Profile"
   | "Settings"
   | "Movers"
-  | "Prospects"
+  | "Best players"
+  | "Best talent"
   | "Match experience"
   | "HAS Top"
   | "HAS Bottom";

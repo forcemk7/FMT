@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-07 (T258 done — Dashboard polish labels/rows/tabs)
+Last updated: 2026-09-07 (T259 done — Best players / Best talent)
 
 ## Now
 
@@ -29,6 +29,7 @@ Last updated: 2026-09-07 (T258 done — Dashboard polish labels/rows/tabs)
 
 ## Recently done
 
+- **T259** Dashboard Best players (CA) / Best talent (PA ≤20, loans+FT) + horizontal rows
 - **T258** Dashboard polish — Attribute changes / First-team path rows, tabs, `goBack`
 - **T257** Squad desk — hide empty / ME-only clubTeams (`isSquadDeskClubTeam`)
 - **T256** Loan honesty — feeder destinations count as outgoing (not II suppress)

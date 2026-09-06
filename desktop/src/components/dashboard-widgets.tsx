@@ -13,7 +13,7 @@ import {
   hasBand,
   type HasTone,
 } from "@/domain/has-score";
-import type { SquadProspect } from "@/domain/squad-prospects";
+import type { SquadAbilityRank } from "@/domain/squad-ability-rank";
 import type { MatchExperienceOpportunity } from "@/domain/match-experience-opportunities";
 import { HasBreakdownGridFromPlayer } from "@/components/has-breakdown-grid";
 import { ClubLogo } from "@/components/club-logo";
@@ -22,6 +22,20 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 
 function abilityLabel(value: number | null | undefined): string {
   return typeof value === "number" && Number.isFinite(value) ? String(Math.round(value)) : "—";
+}
+
+function teamLabelForPlayer(
+  player: LivePlayer,
+  clubTeams?: LiveClubTeam[],
+  managedClubName?: string | null,
+): string | null {
+  const team = clubTeams?.find((item) => item.teamUid === player.squadTeamUid);
+  if (team) return squadTeamDisplayName(team, managedClubName);
+  if (player.squadUnit === "under19s") return "Under 19s";
+  if (player.squadUnit === "reserves") return "Reserves";
+  if (player.squadUnit === "firstTeam") return "First Team";
+  if (player.loanedOut) return "On loan";
+  return null;
 }
 
 export function DashHasRow({
@@ -50,7 +64,7 @@ export function DashHasRow({
         <strong>{player.name}</strong>
         {!compact ? <small>{formatPlayerPositions(player)}</small> : null}
       </span>
-      <span className="dash-has-right">
+      <span className="dash-row-extra">
         <span className="dash-personality-chips">
           {chips.map((chip) => (
             <span
@@ -62,8 +76,8 @@ export function DashHasRow({
             </span>
           ))}
         </span>
-        <span className={`dash-has-score tone-${tone}`}>{formatHasScore(score)}</span>
       </span>
+      <span className={`dash-row-main dash-has-score tone-${tone}`}>{formatHasScore(score)}</span>
     </button>
   );
 
@@ -130,62 +144,70 @@ export function DashMoverRow({
         <strong>{player.name}</strong>
         {!compact ? <small>{formatPlayerPositions(player)}</small> : null}
       </span>
-      <MoverChangeChips changes={changes} peek={compact} />
+      <span className="dash-row-extra">
+        <MoverChangeChips changes={changes} peek={compact} />
+      </span>
+      <span className="dash-row-main dash-mover-count" title={`${changes.length} attribute changes`}>
+        {changes.length}
+      </span>
     </button>
   );
 }
 
-export function DashProspectRow({
+export function DashAbilityRow({
   row,
+  mode,
   onOpen,
   compact,
   clubTeams,
   managedClubName,
 }: {
-  row: SquadProspect;
+  row: SquadAbilityRank;
+  mode: "players" | "talent";
   onOpen: (id: string) => void;
   compact?: boolean;
   clubTeams?: LiveClubTeam[];
   managedClubName?: string | null;
 }) {
-  const { player, pa, professionalism, mentor, mentorPro, proGap } = row;
-  const ca = player.currentAbility;
-  const team = clubTeams?.find((item) => item.teamUid === player.squadTeamUid);
-  const teamLabel = team
-    ? squadTeamDisplayName(team, managedClubName)
-    : player.squadUnit === "under19s"
-      ? "Under 19s"
-      : player.squadUnit === "reserves"
-        ? "Reserves"
-        : null;
+  const { player, ca, pa } = row;
+  const teamLabel = teamLabelForPlayer(player, clubTeams, managedClubName);
+  const secondary =
+    mode === "players" ? (
+      <>
+        <abbr title="Potential ability">PA</abbr> {abilityLabel(pa)}
+      </>
+    ) : (
+      <>
+        <abbr title="Current ability">CA</abbr> {abilityLabel(ca)}
+      </>
+    );
+  const main =
+    mode === "players" ? (
+      <>
+        <abbr title="Current ability">CA</abbr> {abilityLabel(ca)}
+      </>
+    ) : (
+      <>
+        <abbr title="Potential ability">PA</abbr> {abilityLabel(pa)}
+      </>
+    );
 
   return (
     <button
       type="button"
-      className={compact ? "dash-peek-row dash-prospect-card" : "dash-has-card dash-prospect-card"}
+      className={compact ? "dash-peek-row dash-ability-card" : "dash-has-card dash-ability-card"}
       onClick={() => onOpen(player.id)}
     >
       <PlayerFace playerId={player.id} name={player.name} size="sm" />
       <span className="dash-has-card-copy">
         <strong>{player.name}</strong>
-        <small>
-          {player.age != null ? `Age ${player.age}` : null}
-          {!compact ? (
-            <>
-              {player.age != null ? " · " : null}
-              Pro {professionalism} → {mentor.name} (+{proGap}, {mentorPro})
-            </>
-          ) : null}
-        </small>
+        {!compact && player.age != null ? <small>Age {player.age}</small> : null}
       </span>
-      <span className="dash-prospect-right">
-        {teamLabel ? <span className="dash-prospect-team">{teamLabel}</span> : null}
-        <span className="dash-prospect-ability">
-          <abbr title="Current ability">CA</abbr> {abilityLabel(ca)}
-          <span aria-hidden="true">·</span>
-          <abbr title="Potential ability">PA</abbr> {abilityLabel(pa)}
-        </span>
+      <span className="dash-row-extra dash-ability-extra">
+        {teamLabel ? <span className="dash-ability-team">{teamLabel}</span> : null}
+        <span className="dash-ability-secondary">{secondary}</span>
       </span>
+      <span className="dash-row-main dash-ability-main">{main}</span>
     </button>
   );
 }
@@ -226,7 +248,7 @@ export function DashMatchExperienceRow({
         <strong>{player.name}</strong>
         {!compact ? <small>{formatPlayerPositions(player)}</small> : null}
       </span>
-      <span className="dash-me-move-rail" aria-label={moveTitle}>
+      <span className="dash-row-extra dash-me-move-rail" aria-label={moveTitle}>
         <span className="dash-me-move-side">
           {fromClubId ? <ClubLogo clubId={fromClubId} name={fromClubName} size="sm" /> : null}
           <span className="dash-me-move-type">{fromTeamLabel}</span>
@@ -237,10 +259,10 @@ export function DashMatchExperienceRow({
         <span className="dash-me-move-side">
           {toClubId ? <ClubLogo clubId={toClubId} name={toClubName} size="sm" /> : null}
           <span className="dash-me-move-type">{toTeamLabel}</span>
-          <span className="dash-me-opportunity-rank">
-            #{focusRank} {position}
-          </span>
         </span>
+      </span>
+      <span className="dash-row-main dash-me-opportunity-rank">
+        #{focusRank} {position}
       </span>
     </button>
   );
