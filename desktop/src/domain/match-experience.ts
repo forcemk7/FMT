@@ -235,7 +235,9 @@ export function buildMatchExperienceCard(
   if (teamPlayers.length === 0) return null;
 
   const fromRoster = matchExperienceTeamClubId(teamPlayers);
+  const fromTeam = team.clubId?.trim() || null;
   const teamClubId =
+    fromTeam ??
     fromRoster ??
     (isFeederAffiliate(team) || isIiClubAffiliate(team)
       ? null
@@ -289,6 +291,7 @@ export function buildMatchExperienceCard(
   const rows = allRows.slice(start, start + MATCH_EXPERIENCE_PAGE_SIZE);
 
   const clubName =
+    team.clubName?.trim() ||
     (teamClubId
       ? clubs?.find((club) => club.id === teamClubId)?.name?.trim()
       : null) ||

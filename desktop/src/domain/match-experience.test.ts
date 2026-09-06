@@ -269,6 +269,39 @@ describe("buildMatchExperienceCards", () => {
     expect(cards[1]!.rows.some((row) => row.playerId === "loan")).toBe(false);
   });
 
+  it("prefers clubTeam owner club over player clubId for II", () => {
+    const ii = team({
+      teamUid: "t-ii",
+      name: "First Team",
+      squadUnit: "reserves",
+      affiliationType: 0x08,
+      teamType: 0,
+      rosterLen: 20,
+      clubId: "921",
+      clubName: "FC Schalke 04 II",
+    });
+    const iiPlayer = player({
+      id: "ii1",
+      name: "II DC",
+      positions: ["ST"],
+      currentAbility: 100,
+      squadTeamUid: "t-ii",
+      clubId: "920", // managed stamp — Squad structure
+    });
+    const cards = buildMatchExperienceCards(
+      youth,
+      [youth, iiPlayer],
+      [ii],
+      "920",
+      undefined,
+      undefined,
+      [{ id: "920", name: "FC Schalke 04" }],
+    );
+    expect(cards).toHaveLength(1);
+    expect(cards[0]!.clubId).toBe("921");
+    expect(cards[0]!.clubName).toBe("FC Schalke 04 II");
+  });
+
   it("places loaned focus on affiliate card as current", () => {
     const loanedYouth = player({
       id: "youth",

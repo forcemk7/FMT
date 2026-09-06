@@ -1326,6 +1326,10 @@ struct DiscoveredClubTeam {
     team_type: Option<u8>,
     affiliation_type: Option<u8>,
     affiliation_type_label: Option<String>,
+    /// Owning club UniqueID (II/feeder may differ from player clubId stamp).
+    club_id: String,
+    /// Owning club display name for ME / desk chrome.
+    club_name: String,
 }
 
 /// Club → Teams: validated team objects linked to the managed club (FMLE tree parity).
@@ -1343,6 +1347,7 @@ fn discover_managed_club_teams(
     let seeds: Vec<u64> = index_team_seeds.iter().copied().collect();
     let heap_anchors = [managed_club, first_team];
     let mut discovered = Vec::new();
+    let managed_club_id = managed_club_uid.to_string();
     for team in discover_teams_for_club(
         reader,
         module,
@@ -1373,6 +1378,8 @@ fn discover_managed_club_teams(
             team_type: team.team_type,
             affiliation_type: None,
             affiliation_type_label: None,
+            club_id: managed_club_id.clone(),
+            club_name: managed_club_name.to_string(),
         });
     }
     discovered
@@ -1391,6 +1398,8 @@ fn club_teams_json(discovered: &[DiscoveredClubTeam], manager_team: u64) -> Vec<
                 "teamType": entry.team_type,
                 "affiliationType": entry.affiliation_type,
                 "affiliationTypeLabel": entry.affiliation_type_label,
+                "clubId": entry.club_id,
+                "clubName": entry.club_name,
                 "isManagerTeam": entry.team == manager_team,
             })
         })
@@ -1545,6 +1554,8 @@ fn load_bteam_affiliate_rosters(
                 team_type: team.team_type,
                 affiliation_type: affiliate.affiliation_type,
                 affiliation_type_label: affiliate.affiliation_type_label.clone(),
+                club_id: affiliate.club_uid.to_string(),
+                club_name: affiliate.club_name.trim().to_string(),
             });
             labels.push(format!(
                 "{} (affiliate) uid {} ({}, {} roster)",

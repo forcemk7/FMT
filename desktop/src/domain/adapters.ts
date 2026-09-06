@@ -262,6 +262,10 @@ export type LiveClubTeam = {
   affiliationType?: number | null;
   /** PGE label or `Map AffiliationType 0xNN` reminder. */
   affiliationTypeLabel?: string | null;
+  /** Owning club UniqueID (II/feeder — may differ from player.clubId). */
+  clubId?: string | null;
+  /** Owning club display name (e.g. FC Schalke 04 II). */
+  clubName?: string | null;
   isManagerTeam: boolean;
 };
 
