@@ -8,6 +8,7 @@ import { playerPositionParts, playerTeamDisplayName } from "@/domain/live-data";
 import { livePersonalityLabels } from "@/domain/personality-labels";
 import { AttributeDesk } from "@/components/attribute-desk";
 import { AttributeHistoryPanel } from "@/components/attribute-history-panel";
+import { MatchExperiencePanel } from "@/components/match-experience-panel";
 import { Button } from "@/components/ui/button";
 import { PlayerFace } from "@/components/player-face";
 import { ClubLogo } from "@/components/club-logo";
@@ -51,10 +52,11 @@ function formatGeneralText(value: string | null | undefined) {
   return trimmed;
 }
 
-const PROFILE_TABS = ["attributes", "development"] as const;
+const PROFILE_TABS = ["attributes", "development", "match-experience"] as const;
 
 function profileTabLabel(value: (typeof PROFILE_TABS)[number]) {
   if (value === "development") return "Development";
+  if (value === "match-experience") return "Match experience";
   return "Attributes";
 }
 
@@ -65,6 +67,7 @@ export function PlayerProfileScreen({
   onToggleFavorite,
   onBack,
   onOpenClub,
+  onOpenPlayer,
 }: {
   player: LivePlayer | null;
   snapshot: LiveFootballSnapshot;
@@ -293,6 +296,14 @@ export function PlayerProfileScreen({
             key={player.id}
             player={player}
             historySyncKey={snapshot.status.lastSync}
+          />
+        </TabsContent>
+        <TabsContent value="match-experience">
+          <MatchExperiencePanel
+            key={player.id}
+            player={player}
+            snapshot={snapshot}
+            onOpenPlayer={onOpenPlayer}
           />
         </TabsContent>
       </Tabs>

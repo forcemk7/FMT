@@ -303,6 +303,36 @@ body.fmt-shell .attribute-column h3,
 body.fmt-shell .dossier-panel > header h2 {
   color: var(--text-muted) !important;
 }
+body.fmt-shell .match-experience-card {
+  background: var(--panel) !important;
+  border-color: var(--hairline) !important;
+}
+body.fmt-shell .match-experience-card > header {
+  background: rgba(0, 0, 0, 0.22);
+  border-color: var(--hairline);
+}
+body.fmt-shell .match-experience-card > header h3 {
+  color: var(--text);
+}
+body.fmt-shell .match-experience-pos {
+  background: transparent;
+  border-color: var(--hairline);
+  color: var(--text-muted);
+}
+body.fmt-shell .match-experience-pos-active {
+  border-color: var(--mint);
+  background: rgba(143, 215, 200, 0.12);
+  color: var(--text);
+}
+body.fmt-shell .match-experience-row-focus .match-experience-row-btn {
+  background: rgba(143, 215, 200, 0.1);
+}
+body.fmt-shell .match-experience-row-projected .match-experience-row-btn {
+  background: rgba(255, 255, 255, 0.04);
+}
+body.fmt-shell button.match-experience-row-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
 body.fmt-shell .attribute-column strong {
   color: inherit;
 }

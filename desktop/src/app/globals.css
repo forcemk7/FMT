@@ -1287,6 +1287,29 @@ button:active,
 .club-profile-header{display:flex;align-items:center;gap:16px;padding:18px;border:1px solid var(--border);border-radius:12px;background:#fff}.club-profile-header h1{margin:0;font-size:26px}.club-profile-header p{margin:4px 0 0;color:var(--slate);font-size:10px}.club-profile-header>span:last-child{display:flex;align-items:center;gap:7px;margin-left:auto;color:var(--slate);font-size:10px}.club-profile-header>span svg{width:17px}
 .club-squad-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}.club-squad-grid>button{display:flex;align-items:center;gap:11px;padding:12px;border:1px solid var(--border);border-radius:9px;background:#fff;text-align:left}.club-squad-grid>button:hover{border-color:#8fd7c8;background:#f7fbfa}.club-squad-grid>button>span{display:flex;flex-direction:column;gap:4px}.club-squad-grid strong{font-size:10px}.club-squad-grid small,.club-squad-grid b{color:var(--slate);font-size:8px}
 .attribute-grid-four{grid-template-columns:repeat(4,1fr)}.tab-evidence-panel{margin:16px 0}
+.match-experience-panel{margin:16px 0;display:flex;flex-direction:column;gap:12px}
+.match-experience-position-label{margin:0;color:var(--slate);font-size:10px}
+.match-experience-positions{display:flex;flex-wrap:wrap;gap:6px}
+.match-experience-pos{height:28px;padding:0 10px;border:1px solid var(--border);border-radius:6px;background:#fff;font-size:10px;color:var(--slate)}
+.match-experience-pos-active{border-color:#8fd7c8;background:#f7fbfa;color:#0f172a;font-weight:600}
+.match-experience-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.match-experience-card{border:1px solid var(--border);border-radius:8px;background:#fff;overflow:hidden;min-width:0}
+.match-experience-card>header{display:flex;align-items:center;justify-content:space-between;gap:8px;height:40px;padding:0 12px;border-bottom:1px solid var(--border)}
+.match-experience-card>header h3{margin:0;font-size:11px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.match-experience-card>header span{flex:none;color:var(--slate);font-size:9px}
+.match-experience-empty{margin:0;padding:14px 12px;color:var(--slate);font-size:10px}
+.match-experience-list{list-style:none;margin:0;padding:4px 0}
+.match-experience-row{border-top:1px solid transparent}
+.match-experience-row+.match-experience-row{border-top-color:var(--border)}
+.match-experience-row-btn{display:grid;grid-template-columns:28px 28px minmax(0,1fr) 36px;align-items:center;gap:8px;width:100%;padding:7px 12px;border:0;background:transparent;text-align:left;cursor:pointer}
+.match-experience-row-focus .match-experience-row-btn{background:#f0faf7}
+.match-experience-row-projected .match-experience-row-btn{background:#f7f8fa}
+.match-experience-rank{color:var(--slate);font-size:10px;font-variant-numeric:tabular-nums}
+.match-experience-name{display:flex;flex-direction:column;gap:1px;min-width:0}
+.match-experience-name strong{font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.match-experience-name small{color:var(--slate);font-size:8px;text-transform:uppercase;letter-spacing:.04em}
+.match-experience-ca{justify-self:end;font-size:10px;font-variant-numeric:tabular-nums;font-weight:600}
+button.match-experience-row-btn:hover{background:#f7fbfa}
 .attribute-grid-five{grid-template-columns:repeat(5,minmax(0,1fr))}
 .attribute-grid-two{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:2px}
 /* FM-style fixed 3-column attribute desk ? one row grid for every section */
