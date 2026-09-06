@@ -37,4 +37,4 @@ Widget names/display/navigation should match purpose; dash→player must open th
 - Row chrome: mover chips (3 +N), prospect CA/PA + team right, ME logo rail, HAS personality abbr chips
 - Peeks + full views open profile via `dashViewProfileTab`; DashboardViewScreen `onBack={goBack}`
 - Verified: `vitest` squad-prospects + match-experience-opportunities
-- Commit: (see git)
+- Commit: `ccf62c5`

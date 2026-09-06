@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-07 (T257 done — Squad hide empty/ME tabs)
+Last updated: 2026-09-07 (T258 done — Dashboard polish labels/rows/tabs)
 
 ## Now
 
@@ -29,6 +29,7 @@ Last updated: 2026-09-07 (T257 done — Squad hide empty/ME tabs)
 
 ## Recently done
 
+- **T258** Dashboard polish — Attribute changes / First-team path rows, tabs, `goBack`
 - **T257** Squad desk — hide empty / ME-only clubTeams (`isSquadDeskClubTeam`)
 - **T256** Loan honesty — feeder destinations count as outgoing (not II suppress)
 - **T255** ME widget club→club labels, deeplink to ME tab, blue/green cards
