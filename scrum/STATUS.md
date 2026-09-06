@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-06 (T247 done — clubTeam owner club for ME)
+Last updated: 2026-09-06 (T248 done — ME TeamType header + sort)
 
 ## Now
 
@@ -29,11 +29,11 @@ Last updated: 2026-09-06 (T247 done — clubTeam owner club for ME)
 
 ## Recently done
 
+- **T248** ME header TeamType first; sort by TeamType
 - **T247** clubTeam owner clubId/name for ME headers
 - **T246** ME card header — logo + club + TeamType subtitle
 - **T244** ME cards — club logo + TeamType header
 - **T243** Unclip attr Δ glyphs without row-height shift
-- **T242** ME affiliate labels + loan-flag wrapper diff
 
 ## Loop
 

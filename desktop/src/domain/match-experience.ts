@@ -3,7 +3,7 @@
  */
 
 import type { LiveClubTeam, LivePlayer } from "./adapters";
-import { squadTeamDisplayName, teamTypeDisplayLabel } from "./live-data";
+import { teamTypeDisplayLabel } from "./live-data";
 
 /** Visible rows per card — fixed height, no scrollbar (window around focus). */
 export const MATCH_EXPERIENCE_PAGE_SIZE = 5;
@@ -129,25 +129,21 @@ export function matchExperienceTeamLabel(
 
 /**
  * Ladder (Match experience only — does not change Squad desk):
- * 0 managed First
- * 1 managed Res/II/2 + II Club affiliates
- * 2 managed Under Ns
- * 3+ feeder affiliates 0x01/0x03 (First / Res / Under N)
+ * 0 First Team (any club, including II First)
+ * 1 Reserves / other non-youth
+ * 2+ Under N / Youth (high age band first)
  */
 export function matchExperienceTeamBand(
-  team: Pick<LiveClubTeam, "squadUnit" | "affiliationType" | "teamType">,
+  team: Pick<LiveClubTeam, "squadUnit" | "teamType">,
 ): number {
-  if (isFeederAffiliate(team)) {
-    if (team.squadUnit === "firstTeam" || team.teamType === 0) return 3;
-    if (team.squadUnit === "under19s") return 5;
-    return 4; // reserves / II / 2 Club under feeder club
+  const teamType = team.teamType ?? -1;
+  if (
+    team.squadUnit === "under19s" ||
+    [9, 10, 11, 12, 18, 21, 22].includes(teamType)
+  ) {
+    return 2 + underNTeamTypeSortKey(team.teamType);
   }
-
-  if (isIiClubAffiliate(team) || team.squadUnit === "reserves") {
-    return 1;
-  }
-  if (team.squadUnit === "firstTeam") return 0;
-  if (team.squadUnit === "under19s") return 2;
+  if (teamType === 0 || team.squadUnit === "firstTeam") return 0;
   return 1;
 }
 
@@ -158,15 +154,13 @@ export function sortClubTeamsForMatchExperience(
     const band = matchExperienceTeamBand(left) - matchExperienceTeamBand(right);
     if (band !== 0) return band;
 
-    const leftUnder = left.squadUnit === "under19s";
-    const rightUnder = right.squadUnit === "under19s";
-    if (leftUnder && rightUnder) {
-      const n = underNTeamTypeSortKey(left.teamType) - underNTeamTypeSortKey(right.teamType);
-      if (n !== 0) return n;
-    }
+    const leftClub = (left.clubName ?? left.name).trim();
+    const rightClub = (right.clubName ?? right.name).trim();
+    const byClub = leftClub.localeCompare(rightClub);
+    if (byClub !== 0) return byClub;
 
     if (right.rosterLen !== left.rosterLen) return right.rosterLen - left.rosterLen;
-    return squadTeamDisplayName(left).localeCompare(squadTeamDisplayName(right));
+    return left.teamUid.localeCompare(right.teamUid);
   });
 }
 

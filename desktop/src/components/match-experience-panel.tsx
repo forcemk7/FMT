@@ -100,8 +100,8 @@ function MatchExperienceCardView({
             <span className="club-logo club-logo-sm club-logo-empty" aria-hidden="true" />
           )}
           <div className="match-experience-card-text">
-            <strong className="match-experience-club-name">{card.clubName}</strong>
-            <span className="match-experience-team-type">{card.teamLabel}</span>
+            <strong className="match-experience-team-type">{card.teamLabel}</strong>
+            <span className="match-experience-club-name">{card.clubName}</span>
           </div>
         </div>
         {positionOptions.length > 0 ? (

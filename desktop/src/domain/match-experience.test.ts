@@ -86,11 +86,12 @@ describe("matchExperiencePositionOptions", () => {
 });
 
 describe("sortClubTeamsForMatchExperience", () => {
-  it("orders First → Res/II → Under N → Normal First → Normal Under N", () => {
+  it("orders all First Teams before Under Ns, then by club name", () => {
     const sorted = sortClubTeamsForMatchExperience([
       team({
         teamUid: "aff-u",
         name: "Feeder U19",
+        clubName: "Feeder",
         squadUnit: "under19s",
         affiliationType: 0x03,
         teamType: 11,
@@ -99,6 +100,7 @@ describe("sortClubTeamsForMatchExperience", () => {
       team({
         teamUid: "aff-1",
         name: "Feeder",
+        clubName: "Feeder",
         squadUnit: "firstTeam",
         affiliationType: 0x03,
         teamType: 0,
@@ -107,6 +109,7 @@ describe("sortClubTeamsForMatchExperience", () => {
       team({
         teamUid: "u18",
         name: "U18",
+        clubName: "Schalke",
         squadUnit: "under19s",
         teamType: 12,
         rosterLen: 18,
@@ -114,20 +117,24 @@ describe("sortClubTeamsForMatchExperience", () => {
       team({
         teamUid: "u19",
         name: "U19",
+        clubName: "Schalke",
         squadUnit: "under19s",
         teamType: 11,
         rosterLen: 22,
       }),
       team({
         teamUid: "ii",
-        name: "II",
+        name: "First Team",
+        clubName: "FC Schalke 04 II",
         squadUnit: "reserves",
         affiliationType: 0x08,
+        teamType: 0,
         rosterLen: 21,
       }),
       team({
         teamUid: "ft",
-        name: "First",
+        name: "First Team",
+        clubName: "FC Schalke 04",
         squadUnit: "firstTeam",
         teamType: 0,
         rosterLen: 28,
@@ -137,10 +144,10 @@ describe("sortClubTeamsForMatchExperience", () => {
     expect(sorted.map((item) => item.teamUid)).toEqual([
       "ft",
       "ii",
-      "u19",
-      "u18",
       "aff-1",
       "aff-u",
+      "u19",
+      "u18",
     ]);
   });
 });
@@ -258,15 +265,18 @@ describe("buildMatchExperienceCards", () => {
         { id: "9001", name: "Feeder FC" },
       ],
     );
-    expect(cards.map((card) => card.teamUid)).toEqual(["t-first", "t-u19", "t-feed"]);
-    expect(cards[0]!.teamLabel).toBe("First Team");
-    expect(cards[0]!.clubId).toBe("920");
-    expect(cards[0]!.clubName).toBe("Schalke");
-    expect(cards[2]!.teamLabel).toBe("First Team");
-    expect(cards[2]!.clubId).toBe("9001");
-    expect(cards[2]!.clubName).toBe("Feeder FC");
-    expect(cards[1]!.rows.map((row) => row.playerId)).toEqual(["youth", "other"]);
-    expect(cards[1]!.rows.some((row) => row.playerId === "loan")).toBe(false);
+    expect(cards.map((card) => card.teamUid)).toEqual(["t-feed", "t-first", "t-u19"]);
+    const firstCard = cards.find((card) => card.teamUid === "t-first")!;
+    const feedCard = cards.find((card) => card.teamUid === "t-feed")!;
+    const u19Card = cards.find((card) => card.teamUid === "t-u19")!;
+    expect(firstCard.teamLabel).toBe("First Team");
+    expect(firstCard.clubId).toBe("920");
+    expect(firstCard.clubName).toBe("Schalke");
+    expect(feedCard.teamLabel).toBe("First Team");
+    expect(feedCard.clubId).toBe("9001");
+    expect(feedCard.clubName).toBe("Feeder FC");
+    expect(u19Card.rows.map((row) => row.playerId)).toEqual(["youth", "other"]);
+    expect(u19Card.rows.some((row) => row.playerId === "loan")).toBe(false);
   });
 
   it("prefers clubTeam owner club over player clubId for II", () => {
