@@ -1564,7 +1564,8 @@ fn load_bteam_affiliate_rosters(
                 affiliation_type_label: affiliate.affiliation_type_label.clone(),
                 club_id: affiliate.club_uid.to_string(),
                 club_name: affiliate.club_name.trim().to_string(),
-                match_experience_only: affiliate.match_experience_only,
+                // Feeders + second-hop II are Match experience only — never Squad tabs.
+                match_experience_only: affiliate.match_experience_only || feeder_affiliate,
             });
             labels.push(format!(
                 "{} (affiliate) uid {} ({}, {} roster)",

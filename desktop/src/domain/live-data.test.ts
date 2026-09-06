@@ -13,6 +13,7 @@ import {
   isAtClubTeamPlayer,
   isHoydProspect,
   isLoanedOutSquadPlayer,
+  isSquadDeskClubTeam,
   MOVE_ON_HEADROOM_MAX,
   playerMatchesSquadRosterFilters,
   playerTeamDisplayName,
@@ -226,6 +227,54 @@ describe("sortClubTeamsForSquadDesk", () => {
       { name: "Senior", squadUnit: "firstTeam", rosterLen: 28, teamUid: "1", isManagerTeam: true },
     ]);
     expect(sorted.map((team) => team.squadUnit)).toEqual(["firstTeam", "under19s", "reserves"]);
+  });
+});
+
+describe("isSquadDeskClubTeam", () => {
+  it("hides empty shells, feeders, and ME-only; keeps loaded + manager", () => {
+    const players = [
+      {
+        clubId: "920",
+        loanedOut: false,
+        loanedIn: false,
+        squadTeamUid: "1",
+      },
+    ];
+    expect(
+      isSquadDeskClubTeam(
+        { teamUid: "1", isManagerTeam: true, affiliationType: null },
+        [],
+        "920",
+      ),
+    ).toBe(true);
+    expect(
+      isSquadDeskClubTeam(
+        { teamUid: "youth", isManagerTeam: false, affiliationType: null },
+        players,
+        "920",
+      ),
+    ).toBe(false);
+    expect(
+      isSquadDeskClubTeam(
+        { teamUid: "1", isManagerTeam: false, affiliationType: null },
+        players,
+        "920",
+      ),
+    ).toBe(true);
+    expect(
+      isSquadDeskClubTeam(
+        { teamUid: "f", isManagerTeam: false, affiliationType: 0x03 },
+        players,
+        "920",
+      ),
+    ).toBe(false);
+    expect(
+      isSquadDeskClubTeam(
+        { teamUid: "ii", isManagerTeam: false, matchExperienceOnly: true },
+        players,
+        "920",
+      ),
+    ).toBe(false);
   });
 });
 

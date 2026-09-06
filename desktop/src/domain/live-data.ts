@@ -75,6 +75,31 @@ export function squadTeamLoadedCount(counts: SquadTeamRosterCounts): number {
   return counts.atClub + counts.loanedIn + counts.loanedOut;
 }
 
+/**
+ * Squad desk clubTeam law (do not weaken casually):
+ * - No ME feeders (0x01 / 0x03) or matchExperienceOnly hops
+ * - No empty shells (Youth(0) etc.) — use loaded players, not raw rosterLen
+ * - Manager First always kept
+ */
+export function isSquadDeskClubTeam(
+  team: Pick<
+    LiveClubTeam,
+    "teamUid" | "affiliationType" | "matchExperienceOnly" | "isManagerTeam"
+  >,
+  players: Array<
+    Pick<LivePlayer, "clubId" | "loanedOut" | "loanedIn" | "squadTeamUid">
+  >,
+  managedClubId: string | null | undefined,
+): boolean {
+  if (team.matchExperienceOnly) return false;
+  if (team.affiliationType === 0x01 || team.affiliationType === 0x03) return false;
+  if (team.isManagerTeam) return true;
+  const loaded = squadTeamLoadedCount(
+    countSquadTeamRoster(players, managedClubId, team.teamUid),
+  );
+  return loaded > 0;
+}
+
 export function countSquadTeamRoster(
   players: Array<
     Pick<LivePlayer, "clubId" | "loanedOut" | "loanedIn" | "squadTeamUid">

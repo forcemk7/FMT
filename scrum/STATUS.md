@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-07 (T256 done — feeder loan honesty)
+Last updated: 2026-09-07 (T257 done — Squad hide empty/ME tabs)
 
 ## Now
 
@@ -8,7 +8,7 @@ Last updated: 2026-09-07 (T256 done — feeder loan honesty)
 
 **T190 parked** — Save ID in RAM before save-copy CA path.
 
-**Deferred:** T253 ME card order by division difficulty (claim when competition signal locked). T215 Diagnostics. T210 Squad density. T139 theme. T162 trophy cabinet. Empty Youth(0) tab. Loop D full-world load parked.
+**Deferred:** T253 ME card order by division difficulty (claim when competition signal locked). T215 Diagnostics. T210 Squad density. T139 theme. T162 trophy cabinet. Loop D full-world load parked.
 
 **Residuals (not tickets):** Main/Permanent/PMF affiliation bytes; PGE label for AffiliationType `0x03`; further globals CSS carcass; club page polish; First XI median later. Club shortName RE parked (T235).
 
@@ -29,12 +29,12 @@ Last updated: 2026-09-07 (T256 done — feeder loan honesty)
 
 ## Recently done
 
+- **T257** Squad desk — hide empty / ME-only clubTeams (`isSquadDeskClubTeam`)
 - **T256** Loan honesty — feeder destinations count as outgoing (not II suppress)
 - **T255** ME widget club→club labels, deeplink to ME tab, blue/green cards
 - **T254** Dashboard Match experience opportunities (Under N/Res → First #1–2)
 - **T250** ME card order by max same-pos CA + current-team chrome
 - **T252** ME clubTeam logos via same UniqueID path (no parent fallback)
-- **T251** Load feeder II Club (affiliate-of-affiliate) for ME
 
 ## Loop
 

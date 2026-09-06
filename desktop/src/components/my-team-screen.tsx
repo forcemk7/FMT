@@ -13,6 +13,7 @@ import {
   isHoydProspect,
   isLoanedOutSquadPlayer,
   isOnClubTeamRosterPlayer,
+  isSquadDeskClubTeam,
   playerMatchesSquadRosterFilters,
   positionGroups,
   seniorAtClubPlayers,
@@ -352,15 +353,11 @@ export function MyTeamScreen({
   const clubTeams = useMemo(
     () =>
       sortClubTeamsForSquadDesk(
-        (snapshot.clubTeams ?? []).filter((team) => {
-          // Match-experience feeders (0x01 Normal, 0x03) — not Squad tabs.
-          if (team.affiliationType === 0x01 || team.affiliationType === 0x03) return false;
-          // Feeder→II second hop (e.g. Kaiserslautern II) — ME only.
-          if (team.matchExperienceOnly) return false;
-          return team.rosterLen > 0 || team.isManagerTeam;
-        }),
+        (snapshot.clubTeams ?? []).filter((team) =>
+          isSquadDeskClubTeam(team, snapshot.players, snapshot.managedClubId),
+        ),
       ),
-    [snapshot.clubTeams],
+    [snapshot.clubTeams, snapshot.managedClubId, snapshot.players],
   );
   const managedClubName = useMemo(() => {
     const clubId = snapshot.managedClubId;
