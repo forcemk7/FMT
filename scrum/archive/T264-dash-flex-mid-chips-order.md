@@ -35,4 +35,4 @@ Hardcoded peek density still scrolls on small viewports and wastes space on larg
 - Root cause: `body.fmt-shell .attr-tone-mid { padding:0 }` — values 8–12 (Loyalty/Temperament) are mid-band
 - Peek rows `flex:1 1 0`; faces `clamp(20px,4.2vh,36px)`; grid fills viewport; no widget scroll
 - Detail order updated
-- Commit: (pending)
+- Commit: `7e63f45`
