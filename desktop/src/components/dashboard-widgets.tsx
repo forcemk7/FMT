@@ -61,7 +61,7 @@ export function DashHasRow({
               className={`dash-personality-chip attr-tone attr-tone-${chip.tone}`}
               title={`${chip.label} ${chip.value}`}
             >
-              {chip.abbr.toUpperCase()} {chip.value}
+              {chip.label} {chip.value}
             </span>
           ))}
         </span>
@@ -160,6 +160,10 @@ export function DashAbilityRow({
 }) {
   const { player, ca, pa } = row;
   const chrome = dashClubTeamChrome(player, clubTeams ?? [], clubs ?? []);
+  const ageLabel =
+    typeof player.age === "number" && Number.isFinite(player.age)
+      ? `${Math.round(player.age)} years old`
+      : null;
   const secondary =
     mode === "players" ? (
       <>
@@ -190,7 +194,7 @@ export function DashAbilityRow({
       <PlayerFace playerId={player.id} name={player.name} size="sm" />
       <span className="dash-has-card-copy">
         <strong>{player.name}</strong>
-        {!compact && player.age != null ? <small>Age {player.age}</small> : null}
+        {!compact && ageLabel ? <small>{ageLabel}</small> : null}
       </span>
       <span className="dash-row-extra dash-ability-extra">
         {chrome ? (
@@ -203,6 +207,7 @@ export function DashAbilityRow({
             <span className="dash-ability-team-type">{chrome.teamType}</span>
           </span>
         ) : null}
+        {ageLabel ? <span className="dash-ability-age">{ageLabel}</span> : null}
         <span className="dash-ability-secondary">{secondary}</span>
       </span>
       <span className="dash-row-main dash-ability-main">{main}</span>

@@ -312,7 +312,7 @@ export function liveHasBreakdown(player: LivePlayer): HasBreakdownRow[] {
   }));
 }
 
-/** Top or bottom personality/HAS inputs for dashboard chips (abbr + value). */
+/** Top or bottom personality/HAS inputs for dashboard chips (full label + value). */
 export function dashPersonalityHighlights(
   player: LivePlayer,
   mode: "top" | "bottom",
