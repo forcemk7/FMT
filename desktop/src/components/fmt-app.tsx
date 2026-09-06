@@ -339,7 +339,7 @@ export function FMTApp() {
         checking={checking}
         onRefresh={checkConnection}
         onOpenPlayer={openPlayer}
-        onBack={() => navigate("Dashboard")}
+        onBack={goBack}
       />
     ) : screen === "Squad" ? (
       <MyTeamScreen

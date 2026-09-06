@@ -312,6 +312,20 @@ export function liveHasBreakdown(player: LivePlayer): HasBreakdownRow[] {
   }));
 }
 
+/** Top or bottom personality/HAS inputs for dashboard chips (abbr + value). */
+export function dashPersonalityHighlights(
+  player: LivePlayer,
+  mode: "top" | "bottom",
+  limit = 3,
+): HasBreakdownRow[] {
+  const rows = liveHasBreakdown(player);
+  if (!rows.length) return [];
+  const sorted = [...rows].sort((left, right) =>
+    mode === "top" ? right.value - left.value : left.value - right.value,
+  );
+  return sorted.slice(0, Math.max(0, limit));
+}
+
 /** Weighted HAS from live personality (+ Det/Lea when mapped). */
 export function liveHasScore(player: LivePlayer): number | null {
   const contributions = hasContributions(player);

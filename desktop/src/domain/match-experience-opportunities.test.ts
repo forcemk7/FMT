@@ -130,6 +130,8 @@ describe("rankMatchExperienceOpportunities", () => {
     expect(rows[0]!.toClubName).toBe("Schalke");
     expect(rows[0]!.fromTeamLabel).toBe("Under 19s");
     expect(rows[0]!.fromClubName).toBe("Schalke");
+    expect(rows[0]!.fromClubId).toBe("920");
+    expect(rows[0]!.toClubId).toBe("920");
   });
 
   it("skips First-team players and loaned-out players", () => {

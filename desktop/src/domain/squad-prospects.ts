@@ -89,8 +89,8 @@ function bestProMentor(
 }
 
 /**
- * Young high-PA squad players who still have a clear Professionalism mentor on squad.
- * PA ≥ squad median CA; mentor Pro ≥ subject Pro + 2.
+ * Young high-PA squad players still off First Team with a clear Pro mentor on squad.
+ * PA ≥ squad median CA; mentor Pro ≥ subject Pro + 2; squadUnit ≠ firstTeam.
  */
 export function rankSquadProspects(
   squad: LivePlayer[],
@@ -103,6 +103,7 @@ export function rankSquadProspects(
   const rows: SquadProspect[] = [];
 
   for (const player of young) {
+    if ((player.squadUnit ?? "firstTeam") === "firstTeam") continue;
     const pa = player.potentialAbility;
     if (!isFiniteNumber(pa) || pa < caMedian) continue;
     const professionalism = readPro(player);

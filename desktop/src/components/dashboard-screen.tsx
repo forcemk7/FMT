@@ -8,6 +8,7 @@ import { rankSquadMovers } from "@/domain/attribute-history";
 import {
   DASH_PEEK_SIZE,
   dashViewBlurb,
+  dashViewProfileTab,
   dashViewTitle,
   type DashViewId,
 } from "@/domain/dashboard-views";
@@ -89,6 +90,12 @@ export function DashboardScreen({
   const ready =
     snapshot.status.state === "connected" && Boolean(snapshot.managedClubId) && squad.length > 0;
 
+  const managedClubName =
+    snapshot.clubs.find((club) => club.id === snapshot.managedClubId)?.name ?? null;
+
+  const openFromView = (viewId: DashViewId) => (playerId: string) =>
+    onOpenPlayer(playerId, { tab: dashViewProfileTab(viewId) });
+
   return (
     <main className={`screen dash-screen${ready ? " is-dash-compact" : ""}`}>
       {!ready ? (
@@ -117,7 +124,7 @@ export function DashboardScreen({
                     key={player.id}
                     player={player}
                     changes={changes}
-                    onOpen={onOpenPlayer}
+                    onOpen={openFromView("Movers")}
                     compact
                   />
                 ))}
@@ -132,13 +139,20 @@ export function DashboardScreen({
             empty={
               prospects.length
                 ? null
-                : "No young high-PA players with a clear Pro mentor on squad."
+                : "No non–First Team young high-PA players with a clear Pro mentor."
             }
           >
             {prospects.length ? (
               <div className="dash-peek-list">
                 {prospects.map((row) => (
-                  <DashProspectRow key={row.player.id} row={row} onOpen={onOpenPlayer} compact />
+                  <DashProspectRow
+                    key={row.player.id}
+                    row={row}
+                    onOpen={openFromView("Prospects")}
+                    compact
+                    clubTeams={snapshot.clubTeams}
+                    managedClubName={managedClubName}
+                  />
                 ))}
               </div>
             ) : null}
@@ -160,7 +174,7 @@ export function DashboardScreen({
                   <DashMatchExperienceRow
                     key={row.player.id}
                     row={row}
-                    onOpen={(id) => onOpenPlayer(id, { tab: "match-experience" })}
+                    onOpen={openFromView("Match experience")}
                     compact
                   />
                 ))}
@@ -181,8 +195,9 @@ export function DashboardScreen({
                     key={player.id}
                     player={player}
                     score={score}
-                    onOpen={onOpenPlayer}
+                    onOpen={openFromView("HAS Top")}
                     compact
+                    highlight="top"
                   />
                 ))}
               </div>
@@ -202,8 +217,9 @@ export function DashboardScreen({
                     key={player.id}
                     player={player}
                     score={score}
-                    onOpen={onOpenPlayer}
+                    onOpen={openFromView("HAS Bottom")}
                     compact
+                    highlight="bottom"
                   />
                 ))}
               </div>
@@ -250,6 +266,10 @@ export function DashboardViewScreen({
     [snapshot],
   );
   const has = useMemo(() => squadHasRankings(squad, Math.max(squad.length, 1)), [squad]);
+  const managedClubName =
+    snapshot.clubs.find((club) => club.id === snapshot.managedClubId)?.name ?? null;
+  const openPlayer = (playerId: string) =>
+    onOpenPlayer(playerId, { tab: dashViewProfileTab(view) });
 
   let body: ReactNode = null;
   if (!ready) {
@@ -265,7 +285,7 @@ export function DashboardViewScreen({
     body = movers.length ? (
       <div className="dash-has-list dash-view-list">
         {movers.map(({ player, changes }) => (
-          <DashMoverRow key={player.id} player={player} changes={changes} onOpen={onOpenPlayer} />
+          <DashMoverRow key={player.id} player={player} changes={changes} onOpen={openPlayer} />
         ))}
       </div>
     ) : (
@@ -275,23 +295,25 @@ export function DashboardViewScreen({
     body = prospects.length ? (
       <div className="dash-has-list dash-view-list">
         {prospects.map((row) => (
-          <DashProspectRow key={row.player.id} row={row} onOpen={onOpenPlayer} />
+          <DashProspectRow
+            key={row.player.id}
+            row={row}
+            onOpen={openPlayer}
+            clubTeams={snapshot.clubTeams}
+            managedClubName={managedClubName}
+          />
         ))}
       </div>
     ) : (
       <p className="evidence-caption">
-        No young high-PA players with a clear Professionalism mentor on squad.
+        No non–First Team young high-PA players with a clear Professionalism mentor on squad.
       </p>
     );
   } else if (view === "Match experience") {
     body = matchExperience.length ? (
       <div className="dash-has-list dash-view-list">
         {matchExperience.map((row) => (
-          <DashMatchExperienceRow
-            key={row.player.id}
-            row={row}
-            onOpen={(id) => onOpenPlayer(id, { tab: "match-experience" })}
-          />
+          <DashMatchExperienceRow key={row.player.id} row={row} onOpen={openPlayer} />
         ))}
       </div>
     ) : (
@@ -303,7 +325,13 @@ export function DashboardViewScreen({
     body = has.top.length ? (
       <div className="dash-has-list dash-view-list">
         {has.top.map(({ player, score }) => (
-          <DashHasRow key={player.id} player={player} score={score} onOpen={onOpenPlayer} />
+          <DashHasRow
+            key={player.id}
+            player={player}
+            score={score}
+            onOpen={openPlayer}
+            highlight="top"
+          />
         ))}
       </div>
     ) : (
@@ -313,7 +341,13 @@ export function DashboardViewScreen({
     body = has.bottom.length ? (
       <div className="dash-has-list dash-view-list">
         {has.bottom.map(({ player, score }) => (
-          <DashHasRow key={player.id} player={player} score={score} onOpen={onOpenPlayer} />
+          <DashHasRow
+            key={player.id}
+            player={player}
+            score={score}
+            onOpen={openPlayer}
+            highlight="bottom"
+          />
         ))}
       </div>
     ) : (
@@ -325,7 +359,7 @@ export function DashboardViewScreen({
     <main className="screen dash-view-screen">
       <header className="planner-heading dash-view-heading">
         <div className="dash-view-heading-row">
-          <Button variant="ghost" size="icon" onClick={onBack} aria-label="Back to Dashboard">
+          <Button variant="ghost" size="icon" onClick={onBack} aria-label="Back">
             <ArrowLeft />
           </Button>
           <div>

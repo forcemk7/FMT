@@ -19,9 +19,9 @@ export function isDashViewId(value: string): value is DashViewId {
 export function dashViewTitle(id: DashViewId): string {
   switch (id) {
     case "Movers":
-      return "Development";
+      return "Attribute changes";
     case "Prospects":
-      return "Best talent";
+      return "First-team path";
     case "Match experience":
       return "Match experience";
     case "HAS Top":
@@ -36,7 +36,7 @@ export function dashViewBlurb(id: DashViewId): string {
     case "Movers":
       return "Attribute changes since the last recorded change-point";
     case "Prospects":
-      return "Young high-PA players with Professionalism mentor room";
+      return "Non–First Team players with First Team upside (PA + mentor room)";
     case "Match experience":
       return "Under N / Reserves players who would be #1 or #2 same-pos on a First Team";
     case "HAS Top":
@@ -44,4 +44,11 @@ export function dashViewBlurb(id: DashViewId): string {
     case "HAS Bottom":
       return "Lowest hidden-attribute scores on the managed squad";
   }
+}
+
+/** Profile tab when opening a player from a dashboard peek / full view. */
+export function dashViewProfileTab(
+  id: DashViewId,
+): "attributes" | "match-experience" {
+  return id === "Match experience" ? "match-experience" : "attributes";
 }

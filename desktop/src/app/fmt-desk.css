@@ -457,6 +457,26 @@ body.fmt-shell .dash-mover-chip.is-more {
 body.fmt-shell .dash-prospect-mentor {
   color: var(--text-muted);
 }
+body.fmt-shell .dash-prospect-team {
+  color: var(--text-muted);
+}
+body.fmt-shell .dash-prospect-ability {
+  color: var(--text);
+}
+body.fmt-shell .dash-personality-chip {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+body.fmt-shell .dash-me-move-type {
+  color: var(--text);
+}
+body.fmt-shell .dash-me-move-arrow {
+  color: var(--text-muted);
+}
+body.fmt-shell .dash-me-opportunity-rank {
+  background: rgba(101, 229, 58, 0.12);
+  color: var(--attr-tone-high, #65e53a);
+}
 body.fmt-shell .dash-has-card {
   background: var(--panel-2);
   border: 1px solid var(--hairline);

@@ -82,6 +82,7 @@ describe("rankSquadProspects", () => {
         age: 18,
         currentAbility: 90,
         potentialAbility: 150,
+        squadUnit: "under19s",
         personalityAttributes: { Professionalism: 10 },
       }),
       player({
@@ -90,6 +91,7 @@ describe("rankSquadProspects", () => {
         age: 30,
         currentAbility: 140,
         potentialAbility: 145,
+        squadUnit: "firstTeam",
         personalityAttributes: { Professionalism: 15 },
       }),
       player({
@@ -98,15 +100,49 @@ describe("rankSquadProspects", () => {
         age: 27,
         currentAbility: 130,
         potentialAbility: 135,
+        squadUnit: "firstTeam",
         personalityAttributes: { Professionalism: 11 },
       }),
+      player({
+        id: "ft-kid",
+        name: "First Team Kid",
+        age: 19,
+        currentAbility: 95,
+        potentialAbility: 155,
+        squadUnit: "firstTeam",
+        personalityAttributes: { Professionalism: 9 },
+      }),
     ];
-    expect(squadMedianCa(squad)).toBe(130);
+    expect(squadMedianCa(squad)).toBe(112.5);
     const ranked = rankSquadProspects(squad);
     expect(ranked).toHaveLength(1);
     expect(ranked[0]!.player.id).toBe("kid");
     expect(ranked[0]!.mentor.id).toBe("mentor");
     expect(ranked[0]!.proGap).toBe(5);
+  });
+
+  it("excludes First Team squadUnit even with mentor room", () => {
+    const squad = [
+      player({
+        id: "ft",
+        name: "FT Prospect",
+        age: 18,
+        currentAbility: 90,
+        potentialAbility: 160,
+        squadUnit: "firstTeam",
+        personalityAttributes: { Professionalism: 10 },
+      }),
+      player({
+        id: "mentor",
+        name: "Mentor",
+        age: 30,
+        currentAbility: 140,
+        potentialAbility: 145,
+        squadUnit: "firstTeam",
+        personalityAttributes: { Professionalism: 18 },
+      }),
+    ];
+    expect(rankSquadProspects(squad)).toEqual([]);
   });
 
   it("drops players without Pro room or below median CA PA", () => {

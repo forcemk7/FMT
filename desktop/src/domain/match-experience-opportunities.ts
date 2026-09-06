@@ -19,12 +19,13 @@ export type MatchExperienceOpportunity = {
   focusRank: number;
   fromTeamLabel: string;
   fromClubName: string;
+  fromClubId: string | null;
   toTeamLabel: string;
   toClubName: string;
+  toClubId: string | null;
   toTeamUid: string;
 };
 
-/** Club · TeamType → Club · TeamType */
 export function formatMatchExperienceMove(
   row: Pick<
     MatchExperienceOpportunity,
@@ -121,8 +122,10 @@ export function rankMatchExperienceOpportunities(
       focusRank: upgrade.focusRank,
       fromTeamLabel: current?.teamLabel ?? "—",
       fromClubName: current?.clubName ?? "—",
+      fromClubId: current?.clubId ?? null,
       toTeamLabel: upgrade.teamLabel,
       toClubName: upgrade.clubName,
+      toClubId: upgrade.clubId,
       toTeamUid: upgrade.teamUid,
     });
   }
