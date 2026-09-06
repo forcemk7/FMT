@@ -2328,6 +2328,9 @@ body.fmt-shell {
   gap:16px;
   align-items:stretch;
 }
+.dash-screen.is-dash-compact{
+  padding-top:16px;
+}
 @media (max-width:900px){
   .dash-widget-grid{grid-template-columns:1fr}
 }

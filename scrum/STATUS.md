@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-06 (T226 done — nav cleanup)
+Last updated: 2026-09-06 (T227 done — desk chrome + live pulse)
 
 ## Now
 
@@ -26,6 +26,7 @@ Last updated: 2026-09-06 (T226 done — nav cleanup)
 
 ## Recently done
 
+- **T227** Role desks no filter; Dashboard chrome; live load pulse
 - **T226** Nav cleanup — drop Tactic/TD; desk chrome; order Squad·Loans·HoYD·GM
 - **T225** Facts strip align + FM-faithful Development plot
 - **T224** Player facts strip + Development plot (align, fixed Y, linear, gameDate X)

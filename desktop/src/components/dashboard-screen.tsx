@@ -20,7 +20,7 @@ import {
 } from "@/components/dashboard-widgets";
 import { LiveDataState } from "@/components/live-data-state";
 import { Button } from "@/components/ui/button";
-import { isAtClubSquadPlayer } from "@/domain/live-data";
+import { isAtClubEmployee } from "@/domain/live-data";
 
 function WidgetShell({
   title,
@@ -67,11 +67,10 @@ export function DashboardScreen({
   const squad = useMemo(
     () =>
       snapshot.players.filter((player) =>
-        isAtClubSquadPlayer(player, snapshot.managedClubId),
+        isAtClubEmployee(player, snapshot.managedClubId),
       ),
     [snapshot.managedClubId, snapshot.players],
   );
-  const club = snapshot.clubs.find((item) => item.id === snapshot.managedClubId);
   const has = useMemo(() => squadHasRankings(squad, DASH_PEEK_SIZE), [squad]);
   const movers = useMemo(
     () => rankSquadMovers(squad, undefined, DASH_PEEK_SIZE),
@@ -82,18 +81,7 @@ export function DashboardScreen({
     snapshot.status.state === "connected" && Boolean(snapshot.managedClubId) && squad.length > 0;
 
   return (
-    <main className="screen dash-screen">
-      <div className="planner-heading">
-        <div>
-          <h1>Dashboard</h1>
-          <p>
-            {ready
-              ? `${club?.name ?? "Squad"} · filtered peeks — open a widget for the full view`
-              : "Collective squad signals — load when FM26 has a save open"}
-          </p>
-        </div>
-      </div>
-
+    <main className={`screen dash-screen${ready ? " is-dash-compact" : ""}`}>
       {!ready ? (
         <LiveDataState
           snapshot={snapshot}
@@ -212,7 +200,7 @@ export function DashboardViewScreen({
   const squad = useMemo(
     () =>
       snapshot.players.filter((player) =>
-        isAtClubSquadPlayer(player, snapshot.managedClubId),
+        isAtClubEmployee(player, snapshot.managedClubId),
       ),
     [snapshot.managedClubId, snapshot.players],
   );

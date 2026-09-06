@@ -195,8 +195,24 @@ body.fmt-shell .shell-load.is-needs-load .shell-load-icon {
   color: var(--action-text);
 }
 body.fmt-shell .shell-load .live-dot {
-  background: var(--gold);
-  box-shadow: 0 0 0 3px var(--gold-soft);
+  background: var(--mint);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--mint) 55%, transparent);
+  animation: fmt-live-dot-pulse 1.8s ease-out infinite;
+}
+body.fmt-shell .shell-load.is-loading .live-dot {
+  background: var(--mint);
+  animation: fmt-live-dot-pulse 0.9s ease-out infinite;
+}
+@keyframes fmt-live-dot-pulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--mint) 50%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 7px color-mix(in srgb, var(--mint) 0%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--mint) 0%, transparent);
+  }
 }
 body.fmt-shell .shell-tools > button:not(.shell-load) {
   color: var(--chrome-fg);
