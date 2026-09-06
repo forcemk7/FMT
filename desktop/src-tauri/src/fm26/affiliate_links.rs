@@ -96,6 +96,8 @@ pub(crate) struct AffiliateClubDiscovery {
     /// Wrapper `+0x30` when discovered via `club+0x118` type walk.
     pub affiliation_type: Option<u8>,
     pub affiliation_type_label: Option<String>,
+    /// Second-hop feeder→II: load for Match experience only (not Squad tabs).
+    pub match_experience_only: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -598,6 +600,7 @@ fn try_push_bteam_affiliate(
         link_struct_pointer,
         affiliation_type: None,
         affiliation_type_label: None,
+        match_experience_only: false,
     });
 }
 
@@ -883,6 +886,7 @@ fn discover_bteam_from_managed_club_blob(
             link_struct_pointer: None,
             affiliation_type: None,
             affiliation_type_label: None,
+            match_experience_only: false,
         });
     }
     found
@@ -1073,9 +1077,9 @@ pub(crate) fn discover_bteam_affiliate_clubs(
 ) -> BteamAffiliateDiscovery {
     use super::affiliation_types::{
         affiliation_type_map_reminder, affiliation_walk_to_json, is_match_experience_feeder_type,
-        is_roster_load_affiliation_type, nested_players_go_on_loan, resolve_club_ptr_by_uid,
-        walk_club_affiliation_links, PLAYERS_GO_ON_LOAN_NESTED_OFFSET, PLAYERS_GO_ON_LOAN_OFF,
-        PLAYERS_GO_ON_LOAN_ON,
+        is_roster_load_affiliation_type, is_squad_tab_affiliation_type, nested_players_go_on_loan,
+        resolve_club_ptr_by_uid, walk_club_affiliation_links, PLAYERS_GO_ON_LOAN_NESTED_OFFSET,
+        PLAYERS_GO_ON_LOAN_OFF, PLAYERS_GO_ON_LOAN_ON,
     };
 
     let walk = walk_club_affiliation_links(reader, managed_club);
@@ -1165,8 +1169,59 @@ pub(crate) fn discover_bteam_affiliate_clubs(
             link_struct_pointer: Some(link.wrapper),
             affiliation_type: Some(link.type_byte),
             affiliation_type_label: Some(label),
+            match_experience_only: false,
         });
     }
+
+    // One hop: loan-on feeder → their II Club (e.g. Kaiserslautern II). ME only.
+    let feeder_snapshot: Vec<(u64, u32, String)> = found
+        .iter()
+        .filter(|a| matches!(a.affiliation_type, Some(0x01) | Some(0x03)))
+        .map(|a| (a.club, a.club_uid, a.club_name.clone()))
+        .collect();
+    let mut second_hop = Vec::new();
+    for (feeder_club, feeder_uid, feeder_name) in feeder_snapshot {
+        let hop = walk_club_affiliation_links(reader, feeder_club);
+        for link in hop.links {
+            if !is_squad_tab_affiliation_type(link.type_byte) {
+                continue;
+            }
+            if link.partner_uid == managed_club_uid
+                || link.partner_uid == feeder_uid
+                || !seen_uids.insert(link.partner_uid)
+            {
+                continue;
+            }
+            let Some((club, club_name)) =
+                resolve_club_ptr_by_uid(reader, module, profile, link.partner_uid)
+            else {
+                continue;
+            };
+            let label = link
+                .mapped_label
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| affiliation_type_map_reminder(link.type_byte));
+            crate::fmt_log::load_detail(format!(
+                "feeder→II: {} (uid {}) +0x118 type 0x{:02X} → {} (uid {}) [ME-only]",
+                feeder_name.trim(),
+                feeder_uid,
+                link.type_byte,
+                club_name.trim(),
+                link.partner_uid
+            ));
+            second_hop.push(AffiliateClubDiscovery {
+                club,
+                club_uid: link.partner_uid,
+                club_name,
+                link_kind: AffiliateLinkKind::BTeam,
+                link_struct_pointer: Some(link.wrapper),
+                affiliation_type: Some(link.type_byte),
+                affiliation_type_label: Some(label),
+                match_experience_only: true,
+            });
+        }
+    }
+    found.extend(second_hop);
 
     // T212 bridge: always merge satellite reserves (e.g. Melbourne NPL) not yet typed.
     found.extend(discover_bteam_from_heap_satellite_teams(

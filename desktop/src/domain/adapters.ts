@@ -266,6 +266,8 @@ export type LiveClubTeam = {
   clubId?: string | null;
   /** Owning club display name (e.g. FC Schalke 04 II). */
   clubName?: string | null;
+  /** Second-hop feeder→II: Match experience only (hidden on Squad desk). */
+  matchExperienceOnly?: boolean | null;
   isManagerTeam: boolean;
 };
 

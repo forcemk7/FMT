@@ -355,6 +355,8 @@ export function MyTeamScreen({
         (snapshot.clubTeams ?? []).filter((team) => {
           // Match-experience feeders (0x01 Normal, 0x03) — not Squad tabs.
           if (team.affiliationType === 0x01 || team.affiliationType === 0x03) return false;
+          // Feeder→II second hop (e.g. Kaiserslautern II) — ME only.
+          if (team.matchExperienceOnly) return false;
           return team.rosterLen > 0 || team.isManagerTeam;
         }),
       ),

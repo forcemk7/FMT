@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-06 (T249 done — feeder Reserves on ME)
+Last updated: 2026-09-06 (T251 done — feeder→II for ME)
 
 ## Now
 
@@ -29,11 +29,11 @@ Last updated: 2026-09-06 (T249 done — feeder Reserves on ME)
 
 ## Recently done
 
+- **T251** Load feeder II Club (affiliate-of-affiliate) for ME
 - **T249** Load feeder Reserve clubTeams for ME
 - **T245** Lock Players-Go-On-Loan affiliation byte (nested+0x65)
 - **T248** ME header TeamType first; sort by TeamType
 - **T247** clubTeam owner clubId/name for ME headers
-- **T246** ME card header — logo + club + TeamType subtitle
 
 ## Loop
 

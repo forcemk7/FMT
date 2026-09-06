@@ -1308,6 +1308,8 @@ struct DiscoveredClubTeam {
     club_id: String,
     /// Owning club display name for ME / desk chrome.
     club_name: String,
+    /// Second-hop feeder→II: Match experience only.
+    match_experience_only: bool,
 }
 
 /// Club → Teams: validated team objects linked to the managed club (FMLE tree parity).
@@ -1358,6 +1360,7 @@ fn discover_managed_club_teams(
             affiliation_type_label: None,
             club_id: managed_club_id.clone(),
             club_name: managed_club_name.to_string(),
+            match_experience_only: false,
         });
     }
     discovered
@@ -1378,6 +1381,7 @@ fn club_teams_json(discovered: &[DiscoveredClubTeam], manager_team: u64) -> Vec<
                 "affiliationTypeLabel": entry.affiliation_type_label,
                 "clubId": entry.club_id,
                 "clubName": entry.club_name,
+                "matchExperienceOnly": entry.match_experience_only,
                 "isManagerTeam": entry.team == manager_team,
             })
         })
@@ -1534,6 +1538,7 @@ fn load_bteam_affiliate_rosters(
                 affiliation_type_label: affiliate.affiliation_type_label.clone(),
                 club_id: affiliate.club_uid.to_string(),
                 club_name: affiliate.club_name.trim().to_string(),
+                match_experience_only: affiliate.match_experience_only,
             });
             labels.push(format!(
                 "{} (affiliate) uid {} ({}, {} roster)",
@@ -1542,13 +1547,14 @@ fn load_bteam_affiliate_rosters(
                 squad_unit,
                 team.roster_len
             ));
-            // II / satellite stay under managed club_id (Squad structure).
-            // Feeders (0x01 / 0x03) use their own club uid so HoYD/GM/Squad don't treat them as employees.
-            let (roster_club_id, roster_club_uid) = if feeder_affiliate {
-                (affiliate.club_uid.to_string(), affiliate.club_uid)
-            } else {
-                (club_id.to_string(), managed_club_uid)
-            };
+            // Direct II / satellite stay under managed club_id (Squad structure).
+            // Feeders + ME-only feeder→II use their own club uid (not managed employees).
+            let (roster_club_id, roster_club_uid) =
+                if feeder_affiliate || affiliate.match_experience_only {
+                    (affiliate.club_uid.to_string(), affiliate.club_uid)
+                } else {
+                    (club_id.to_string(), managed_club_uid)
+                };
             promoted += load_team_roster(
                 reader,
                 module,
