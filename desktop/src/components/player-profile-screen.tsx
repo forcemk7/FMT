@@ -4,7 +4,7 @@ import { ArrowLeft, Star } from "lucide-react";
 import type { LiveFootballSnapshot, LivePlayer } from "@/domain/adapters";
 import { abilityToneFromScore, attributeTone } from "@/domain/attribute-tone";
 import { formatHasScore, hasBand, liveHasScore } from "@/domain/has-score";
-import { playerPositionParts } from "@/domain/live-data";
+import { formatPlayerPositions, playerPositionParts, playerTeamDisplayName } from "@/domain/live-data";
 import { livePersonalityLabels } from "@/domain/personality-labels";
 import { AttributeDesk } from "@/components/attribute-desk";
 import { AttributeHistoryPanel } from "@/components/attribute-history-panel";
@@ -97,8 +97,15 @@ export function PlayerProfileScreen({
   const loanClubName = player.loanClubName?.trim() || null;
   const loanClubId = player.loanClubId?.trim() || null;
   const activeClubId = loanedOut && loanClubId ? loanClubId : player.clubId ?? null;
+  const teamDisplayName = playerTeamDisplayName(
+    player,
+    snapshot.clubTeams ?? [],
+    snapshot.clubs,
+  );
   const activeClubName =
-    loanedOut && loanClubName ? loanClubName : parentClubName ?? null;
+    loanedOut && loanClubName
+      ? loanClubName
+      : teamDisplayName ?? parentClubName ?? null;
   const club = activeClubId
     ? snapshot.clubs.find((item) => item.id === activeClubId) ?? null
     : null;

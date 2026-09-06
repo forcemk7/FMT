@@ -16,6 +16,7 @@ import {
   isLoanedOutSquadPlayer,
   MOVE_ON_HEADROOM_MAX,
   playerMatchesSquadRosterFilters,
+  playerTeamDisplayName,
   sortClubTeamsForSquadDesk,
   squadMedianCA,
   seniorAtClubPlayers,
@@ -141,14 +142,14 @@ describe("squadTeamTabLabel", () => {
         null,
         { atClub: 19, loanedIn: 0, loanedOut: 3 },
       ),
-    ).toBe("U19 (22)");
+    ).toBe("Under 19s (22)");
     expect(
       squadTeamTabLabel(
         { name: "AFC Bournemouth", teamUid: "3", teamType: 12 },
         "AFC Bournemouth",
         { atClub: 19, loanedIn: 0, loanedOut: 0 },
       ),
-    ).toBe("U18 (19)");
+    ).toBe("Under 18s (19)");
   });
 
   it("omits count when roster counts are unavailable", () => {
@@ -230,13 +231,13 @@ describe("sortClubTeamsForSquadDesk", () => {
 });
 
 describe("squadTeamDisplayName", () => {
-  it("uses TeamType even when FM has a distinct string", () => {
+  it("uses TeamType Under Ns for managed club teams", () => {
     expect(
       squadTeamDisplayName(
         { name: "FC Schalke 04 U19", teamUid: "2", teamType: 11 },
         "FC Schalke 04",
       ),
-    ).toBe("U19");
+    ).toBe("Under 19s");
   });
 
   it("maps English TeamType bytes to labels", () => {
@@ -245,10 +246,23 @@ describe("squadTeamDisplayName", () => {
     ).toBe("First Team");
     expect(
       squadTeamDisplayName({ name: "Liverpool", teamUid: "2", teamType: 10 }, "Liverpool"),
-    ).toBe("U21");
+    ).toBe("Under 21s");
     expect(
       squadTeamDisplayName({ name: "liverpool", teamUid: "3", teamType: 12 }, "Liverpool"),
-    ).toBe("U18");
+    ).toBe("Under 18s");
+  });
+
+  it("uses shortName for affiliated teams", () => {
+    expect(
+      squadTeamDisplayName({
+        name: "FC Schalke 04 II",
+        shortName: "Schalke 04 II",
+        teamUid: "9",
+        teamType: 0,
+        affiliationType: 0x08,
+        affiliationTypeLabel: "II Club",
+      }),
+    ).toBe("Schalke 04 II");
   });
 
   it("reminds to map unmapped or missing TeamType", () => {
@@ -272,10 +286,31 @@ describe("squadTeamDisplayName", () => {
         affiliationType: 0x2a,
         affiliationTypeLabel: "Map AffiliationType 0x2A",
       }),
-    ).toBe("Map AffiliationType 0x2A");
+    ).toBe("Mystery Reserve");
+    expect(affiliationTypeDisplayLabel(0x08, null)).toBe("II Club");
+  });
+});
+
+describe("playerTeamDisplayName", () => {
+  it("prefers team shortName over club full name", () => {
     expect(
-      affiliationTypeDisplayLabel(0x08, null),
-    ).toBe("II Club");
+      playerTeamDisplayName(
+        { squadTeamUid: "2", clubName: "FC Schalke 04", clubId: "920" },
+        [
+          {
+            teamUid: "1",
+            shortName: "Schalke 04",
+            name: "FC Schalke 04",
+          },
+          {
+            teamUid: "2",
+            shortName: "Schalke 04 U19",
+            name: "FC Schalke 04 U19",
+          },
+        ],
+        [{ id: "920", name: "FC Schalke 04" }],
+      ),
+    ).toBe("Schalke 04 U19");
   });
 });
 

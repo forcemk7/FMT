@@ -1286,6 +1286,7 @@ struct DiscoveredClubTeam {
     team: u64,
     team_uid: u32,
     name: String,
+    short_name: String,
     squad_unit: &'static str,
     roster_len: usize,
     team_type: Option<u8>,
@@ -1331,12 +1332,8 @@ fn discover_managed_club_teams(
         discovered.push(DiscoveredClubTeam {
             team: team.team,
             team_uid: team.team_uid,
-            name: club_team_label(
-                &team.name,
-                managed_club_name,
-                team.team_type,
-                team.team_uid,
-            ),
+            name: team.name.clone(),
+            short_name: team.short_name.clone(),
             squad_unit,
             roster_len: team.roster_len,
             team_type: team.team_type,
@@ -1354,6 +1351,7 @@ fn club_teams_json(discovered: &[DiscoveredClubTeam], manager_team: u64) -> Vec<
             json!({
                 "teamUid": entry.team_uid.to_string(),
                 "name": entry.name,
+                "shortName": entry.short_name,
                 "rosterLen": entry.roster_len,
                 "squadUnit": entry.squad_unit,
                 "teamType": entry.team_type,
@@ -1464,9 +1462,15 @@ fn load_bteam_affiliate_rosters(
         for team in linked_teams {
             // Separate-club reserves are never the managed First Team tab.
             let squad_unit = "reserves";
-            let affiliate_name = affiliate.club_name.trim();
-            let team_label = if !affiliate_name.is_empty() {
-                affiliate_name.to_string()
+            let short = team.short_name.trim();
+            let full = team.name.trim();
+            let affiliate_club = affiliate.club_name.trim();
+            let team_label = if !short.is_empty() {
+                short.to_string()
+            } else if !full.is_empty() {
+                full.to_string()
+            } else if !affiliate_club.is_empty() {
+                affiliate_club.to_string()
             } else {
                 club_team_label(
                     &team.name,
@@ -1484,7 +1488,12 @@ fn load_bteam_affiliate_rosters(
             discovered_teams.push(DiscoveredClubTeam {
                 team: team.team,
                 team_uid: team.team_uid,
-                name: team_label.clone(),
+                name: if !full.is_empty() {
+                    full.to_string()
+                } else {
+                    team_label.clone()
+                },
+                short_name: short.to_string(),
                 squad_unit,
                 roster_len: team.roster_len,
                 team_type: team.team_type,

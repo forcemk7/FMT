@@ -110,6 +110,8 @@ pub(crate) struct AffiliateTeamDiscovery {
     pub team: u64,
     pub team_uid: u32,
     pub name: String,
+    /// Team short display (team+0x20), e.g. "Schalke 04 U19" / "Schalke 04 II".
+    pub short_name: String,
     pub roster_len: usize,
     /// Raw TeamType byte when read from the team object (`None` on heap-fallback path).
     pub team_type: Option<u8>,
@@ -163,23 +165,23 @@ pub(crate) fn squad_unit_from_team_type(team_type: u8) -> Option<&'static str> {
     }
 }
 
-/// Fine-grained FMScout TeamType → UI label (default squad tab name).
+/// Fine-grained FMScout TeamType → UI label (managed-club squad tabs).
 pub(crate) fn team_type_display_label(team_type: u8) -> Option<&'static str> {
     match team_type {
         0 => Some("First Team"),
         1 => Some("Reserves"),
         2 => Some("A"),
         3 => Some("B"),
-        9 => Some("U23"),
-        10 => Some("U21"),
-        11 => Some("U19"),
-        12 => Some("U18"),
+        9 => Some("Under 23s"),
+        10 => Some("Under 21s"),
+        11 => Some("Under 19s"),
+        12 => Some("Under 18s"),
         13 => Some("C"),
         14 => Some("Amateur"),
         15 => Some("II"),
         16 => Some("Team 2"),
         17 => Some("Team 3"),
-        18 => Some("U20"),
+        18 => Some("Under 20s"),
         21 | 22 => Some("Youth"),
         30 => Some("Dutch Reserves"),
         _ => None,
@@ -235,11 +237,13 @@ fn resolve_linked_team(
         .read_u32(team + profile.constants.entity_uid_offset)
         .unwrap_or(0);
     let name = read_team_display_name(reader, team, profile);
+    let short_name = read_team_short_name(reader, team, profile);
     let team_type = reader.read_u8(team + profile.constants.team_type_offset);
     Some(AffiliateTeamDiscovery {
         team,
         team_uid,
         name,
+        short_name,
         roster_len,
         team_type,
     })
@@ -296,6 +300,34 @@ pub(crate) const TEAM_NAME_OFFSET: u64 = 0x18;
 /// Short display name (e.g. "Schalke 04 U19") — optional fallback after full name @ +0x18.
 pub(crate) const TEAM_SHORT_NAME_OFFSET: u64 = 0x20;
 
+/// Short display name only (team+0x20). Empty when missing — do not fall back to full/club.
+#[cfg(target_os = "windows")]
+pub(crate) fn read_team_short_name(
+    reader: &mut ProcessReader,
+    team: u64,
+    profile: &EntityMapProfile,
+) -> String {
+    let offset = profile.constants.team_short_name_offset;
+    if let Some(name) = reader
+        .read_fm_string_pointer(team + offset)
+        .filter(|value| !value.trim().is_empty())
+    {
+        return name;
+    }
+    if let Some(pointer) = reader
+        .read_pointer(team + offset)
+        .filter(|value| *value != 0)
+    {
+        if let Some(name) = reader
+            .read_fm_string_at(pointer)
+            .filter(|value| !value.trim().is_empty())
+        {
+            return name;
+        }
+    }
+    String::new()
+}
+
 #[cfg(target_os = "windows")]
 pub(crate) fn read_team_display_name(
     reader: &mut ProcessReader,
@@ -335,6 +367,15 @@ pub(crate) fn read_team_display_name(
             return name;
         }
     }
+    String::new()
+}
+
+#[cfg(not(target_os = "windows"))]
+pub(crate) fn read_team_short_name(
+    _reader: &mut super::memory::ProcessReader,
+    _team: u64,
+    _profile: &EntityMapProfile,
+) -> String {
     String::new()
 }
 
@@ -516,8 +557,8 @@ fn link_struct_is_feeder_catalog(
 #[cfg(target_os = "windows")]
 fn try_push_bteam_affiliate(
     reader: &mut ProcessReader,
-    module: ModuleInfo,
-    profile: &EntityMapProfile,
+    _module: ModuleInfo,
+    _profile: &EntityMapProfile,
     managed_club: u64,
     managed_club_uid: u32,
     affiliate_club: u64,
@@ -1967,9 +2008,9 @@ mod tests {
     #[test]
     fn team_type_display_labels_match_fmscout_enum() {
         assert_eq!(team_type_display_label(0), Some("First Team"));
-        assert_eq!(team_type_display_label(10), Some("U21"));
-        assert_eq!(team_type_display_label(11), Some("U19"));
-        assert_eq!(team_type_display_label(12), Some("U18"));
+        assert_eq!(team_type_display_label(10), Some("Under 21s"));
+        assert_eq!(team_type_display_label(11), Some("Under 19s"));
+        assert_eq!(team_type_display_label(12), Some("Under 18s"));
         assert_eq!(team_type_display_label(15), Some("II"));
         assert_eq!(team_type_display_label(21), Some("Youth"));
         assert_eq!(team_type_display_label(22), Some("Youth"));
@@ -1980,7 +2021,7 @@ mod tests {
     fn resolve_team_tab_label_prefers_team_type() {
         assert_eq!(
             resolve_team_tab_label("FC Schalke 04 U19", "FC Schalke 04", Some(11), 1),
-            "U19"
+            "Under 19s"
         );
         assert_eq!(
             resolve_team_tab_label("Liverpool", "Liverpool", Some(0), 676),
@@ -1988,15 +2029,15 @@ mod tests {
         );
         assert_eq!(
             resolve_team_tab_label("Liverpool", "Liverpool", Some(10), 2),
-            "U21"
+            "Under 21s"
         );
         assert_eq!(
             resolve_team_tab_label("liverpool", "Liverpool", Some(12), 3),
-            "U18"
+            "Under 18s"
         );
         assert_eq!(
             resolve_team_tab_label("", "Leicester City", Some(11), 99),
-            "U19"
+            "Under 19s"
         );
         assert_eq!(
             resolve_team_tab_label("Some Side", "Club", Some(55), 7),

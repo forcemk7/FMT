@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-06 (T228 done — dash labels + senior median)
+Last updated: 2026-09-06 (T229 done — team labels + shortName)
 
 ## Now
 
@@ -26,9 +26,10 @@ Last updated: 2026-09-06 (T228 done — dash labels + senior median)
 
 ## Recently done
 
+- **T229** TeamType Under Ns; affiliate shortName; profile team shortName
 - **T228** Dash widget labels + senior-team median for HoYD/GM
 - **T227** Role desks no filter; Dashboard chrome; live load pulse
-- **T226** Nav cleanup — drop Tactic/TD; desk chrome; order Squad·Loans·HoYD·GM
+- **T226** Nav cleanup — drop Tactic/TD; desk chrome
 - **T225** Facts strip align + FM-faithful Development plot
 - **T224** Player facts strip + Development plot
 - **T223** Rip empty player profile tabs

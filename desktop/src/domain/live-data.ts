@@ -385,13 +385,13 @@ export function teamTypeDisplayLabel(teamType: number | null | undefined): strin
     case 3:
       return "B";
     case 9:
-      return "U23";
+      return "Under 23s";
     case 10:
-      return "U21";
+      return "Under 21s";
     case 11:
-      return "U19";
+      return "Under 19s";
     case 12:
-      return "U18";
+      return "Under 18s";
     case 13:
       return "C";
     case 14:
@@ -403,7 +403,7 @@ export function teamTypeDisplayLabel(teamType: number | null | undefined): strin
     case 17:
       return "Team 3";
     case 18:
-      return "U20";
+      return "Under 20s";
     case 21:
     case 22:
       return "Youth";
@@ -437,17 +437,35 @@ export function affiliationTypeDisplayLabel(
 }
 
 /**
- * Squad tab / Settings display name: TeamType label by default.
- * Missing/unmapped type → reminder so the team still shows.
- * Affiliate clubs may carry AffiliationType map reminders instead.
+ * Squad tab / Settings display name.
+ * Managed club teams → TeamType labels; affiliated teams → team shortName.
  */
 export function squadTeamDisplayName(
   team: Pick<
     LiveClubTeam,
-    "name" | "teamUid" | "teamType" | "affiliationType" | "affiliationTypeLabel"
+    | "name"
+    | "shortName"
+    | "teamUid"
+    | "teamType"
+    | "affiliationType"
+    | "affiliationTypeLabel"
   >,
   _managedClubName?: string | null,
 ): string {
+  const isAffiliate = typeof team.affiliationType === "number";
+  if (isAffiliate) {
+    const short = team.shortName?.trim();
+    if (short) return short;
+    const trimmed = team.name.trim();
+    if (trimmed) return trimmed;
+    const fromAffiliation = affiliationTypeDisplayLabel(
+      team.affiliationType,
+      team.affiliationTypeLabel,
+    );
+    if (fromAffiliation) return fromAffiliation;
+    return `Map TeamType (?): uid-${team.teamUid}`;
+  }
+
   const fromAffiliation = affiliationTypeDisplayLabel(
     team.affiliationType,
     team.affiliationTypeLabel,
@@ -461,6 +479,31 @@ export function squadTeamDisplayName(
   return `Map TeamType (?): uid-${team.teamUid}`;
 }
 
+/** Player profile Club fact — prefer the player's team shortName. */
+export function playerTeamDisplayName(
+  player: Pick<LivePlayer, "squadTeamUid" | "clubName" | "clubId">,
+  clubTeams: Array<Pick<LiveClubTeam, "teamUid" | "shortName" | "name">>,
+  clubs: Array<{ id: string; name: string }>,
+): string | null {
+  const teamUid = player.squadTeamUid?.trim();
+  if (teamUid) {
+    const team = clubTeams.find((item) => item.teamUid === teamUid);
+    const short = team?.shortName?.trim();
+    if (short) return short;
+    const teamName = team?.name?.trim();
+    if (teamName) return teamName;
+  }
+  const clubName = player.clubName?.trim();
+  if (clubName) return clubName;
+  const clubId = player.clubId?.trim();
+  if (clubId) {
+    const club = clubs.find((item) => item.id === clubId);
+    const name = club?.name?.trim();
+    if (name) return name;
+  }
+  return null;
+}
+
 /**
  * Squad desk tab label — display name + loaded roster size
  * (at club + on loan + loaned out). Raw Team.Players `rosterLen` stays in Settings.
@@ -468,7 +511,12 @@ export function squadTeamDisplayName(
 export function squadTeamTabLabel(
   team: Pick<
     LiveClubTeam,
-    "name" | "teamUid" | "teamType" | "affiliationType" | "affiliationTypeLabel"
+    | "name"
+    | "shortName"
+    | "teamUid"
+    | "teamType"
+    | "affiliationType"
+    | "affiliationTypeLabel"
   >,
   managedClubName?: string | null,
   rosterCounts?: SquadTeamRosterCounts | null,

@@ -252,6 +252,8 @@ export type TacticSource = "none" | "live-memory";
 export type LiveClubTeam = {
   teamUid: string;
   name: string;
+  /** Team short display (team+0x20), e.g. "Schalke 04 U19". */
+  shortName?: string | null;
   rosterLen: number;
   squadUnit: "firstTeam" | "under19s" | "reserves";
   /** Raw FM TeamType byte when known (FMScout enum). */
