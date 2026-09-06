@@ -437,8 +437,9 @@ export function affiliationTypeDisplayLabel(
 }
 
 /**
- * Squad tab / Settings display name.
- * Managed club teams → TeamType labels; affiliated teams → team shortName.
+ * Squad tab / Settings display name — pure rule:
+ * managed club teams → TeamType; affiliated teams → memory shortName.
+ * No full-name / clubName substitutes.
  */
 export function squadTeamDisplayName(
   team: Pick<
@@ -456,93 +457,29 @@ export function squadTeamDisplayName(
   if (isAffiliate) {
     const short = team.shortName?.trim();
     if (short) return short;
-    const trimmed = team.name.trim();
-    if (trimmed) return trimmed;
-    const fromAffiliation = affiliationTypeDisplayLabel(
-      team.affiliationType,
-      team.affiliationTypeLabel,
-    );
-    if (fromAffiliation) return fromAffiliation;
-    return `Map TeamType (?): uid-${team.teamUid}`;
+    return `Map shortName (?): uid-${team.teamUid}`;
   }
 
-  const fromAffiliation = affiliationTypeDisplayLabel(
-    team.affiliationType,
-    team.affiliationTypeLabel,
-  );
-  if (fromAffiliation?.startsWith("Map AffiliationType")) return fromAffiliation;
   const fromType = teamTypeDisplayLabel(team.teamType);
   if (fromType) return fromType;
-  if (fromAffiliation) return fromAffiliation;
-  const trimmed = team.name.trim();
-  if (trimmed) return `Map TeamType (?): ${trimmed}`;
+  if (typeof team.teamType === "number") return `Map TeamType ${team.teamType}`;
   return `Map TeamType (?): uid-${team.teamUid}`;
 }
 
 /**
- * True when a string is a TeamType / map-reminder tab label — never use these
- * as a player profile Club fact (legacy `clubTeams.name` pollution).
- */
-export function isSquadTabTypeLabel(value: string): boolean {
-  const trimmed = value.trim();
-  if (!trimmed) return false;
-  if (trimmed.startsWith("Map TeamType") || trimmed.startsWith("Map AffiliationType")) {
-    return true;
-  }
-  // Current + pre-T229 TeamType vocabulary.
-  const known = new Set([
-    "First Team",
-    "Reserves",
-    "A",
-    "B",
-    "C",
-    "Amateur",
-    "II",
-    "Team 2",
-    "Team 3",
-    "Youth",
-    "Dutch Reserves",
-    "Under 23s",
-    "Under 21s",
-    "Under 20s",
-    "Under 19s",
-    "Under 18s",
-    "U23",
-    "U21",
-    "U20",
-    "U19",
-    "U18",
-  ]);
-  return known.has(trimmed);
-}
-
-/**
- * Player profile Club fact — memory team shortName only (e.g. Schalke 04 / Schalke 04 U19).
- * Never TeamType tab labels. Never invent by stripping club legal forms.
- * Unmodified FM full team/club name only as last-resort fallback when not a type label.
+ * Player profile Club fact — memory team shortName only.
+ * No TeamType, no full name, no clubName fallback.
  */
 export function playerTeamDisplayName(
   player: Pick<LivePlayer, "squadTeamUid" | "clubName" | "clubId">,
   clubTeams: Array<Pick<LiveClubTeam, "teamUid" | "shortName" | "name">>,
-  clubs: Array<{ id: string; name: string }>,
+  _clubs: Array<{ id: string; name: string }>,
 ): string | null {
   const teamUid = player.squadTeamUid?.trim();
-  if (teamUid) {
-    const team = clubTeams.find((item) => item.teamUid === teamUid);
-    const short = team?.shortName?.trim();
-    if (short && !isSquadTabTypeLabel(short)) return short;
-    const teamName = team?.name?.trim();
-    if (teamName && !isSquadTabTypeLabel(teamName)) return teamName;
-  }
-  const clubName = player.clubName?.trim();
-  if (clubName && !isSquadTabTypeLabel(clubName)) return clubName;
-  const clubId = player.clubId?.trim();
-  if (clubId) {
-    const club = clubs.find((item) => item.id === clubId);
-    const name = club?.name?.trim();
-    if (name && !isSquadTabTypeLabel(name)) return name;
-  }
-  return null;
+  if (!teamUid) return null;
+  const team = clubTeams.find((item) => item.teamUid === teamUid);
+  const short = team?.shortName?.trim();
+  return short || null;
 }
 
 /**

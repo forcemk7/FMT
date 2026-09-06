@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  affiliationTypeDisplayLabel,
   countAtClubSquadUnit,
   countClubEmployees,
   countClubEmployeesAtClub,
@@ -265,34 +264,33 @@ describe("squadTeamDisplayName", () => {
     ).toBe("Schalke 04 II");
   });
 
+  it("never substitutes full name for missing shortName on affiliates", () => {
+    expect(
+      squadTeamDisplayName({
+        name: "FC Schalke 04 II",
+        shortName: "",
+        teamUid: "9",
+        teamType: 0,
+        affiliationType: 0x08,
+      }),
+    ).toBe("Map shortName (?): uid-9");
+  });
+
   it("reminds to map unmapped or missing TeamType", () => {
     expect(
       squadTeamDisplayName({ name: "FC Schalke 04 U19", teamUid: "2", teamType: 55 }),
     ).toBe("Map TeamType 55");
     expect(
       squadTeamDisplayName({ name: "FC Schalke 04 U19", teamUid: "2" }, "FC Schalke 04"),
-    ).toBe("Map TeamType (?): FC Schalke 04 U19");
+    ).toBe("Map TeamType (?): uid-2");
     expect(squadTeamDisplayName({ name: "", teamUid: "42" })).toBe(
       "Map TeamType (?): uid-42",
     );
   });
-
-  it("surfaces Map AffiliationType when affiliate type is unmapped", () => {
-    expect(
-      squadTeamDisplayName({
-        name: "Mystery Reserve",
-        teamUid: "9",
-        teamType: 15,
-        affiliationType: 0x2a,
-        affiliationTypeLabel: "Map AffiliationType 0x2A",
-      }),
-    ).toBe("Mystery Reserve");
-    expect(affiliationTypeDisplayLabel(0x08, null)).toBe("II Club");
-  });
 });
 
 describe("playerTeamDisplayName", () => {
-  it("prefers team shortName over club full name", () => {
+  it("uses team shortName only", () => {
     expect(
       playerTeamDisplayName(
         { squadTeamUid: "2", clubName: "FC Schalke 04", clubId: "920" },
@@ -313,31 +311,21 @@ describe("playerTeamDisplayName", () => {
     ).toBe("Schalke 04 U19");
   });
 
-  it("uses unmodified full team name when shortName empty (no invent)", () => {
+  it("returns null when shortName empty — no full-name or clubName substitute", () => {
     expect(
       playerTeamDisplayName(
         { squadTeamUid: "2", clubName: "FC Schalke 04", clubId: "920" },
         [{ teamUid: "2", shortName: "", name: "FC Schalke 04 U19" }],
         [{ id: "920", name: "FC Schalke 04" }],
       ),
-    ).toBe("FC Schalke 04 U19");
-  });
-
-  it("never falls back to TeamType tab labels polluted into name", () => {
+    ).toBeNull();
     expect(
       playerTeamDisplayName(
-        { squadTeamUid: "1", clubName: null, clubId: "920" },
-        [{ teamUid: "1", shortName: "", name: "First Team" }],
+        { squadTeamUid: "1", clubName: "FC Schalke 04", clubId: "920" },
+        [{ teamUid: "1", shortName: null, name: "First Team" }],
         [{ id: "920", name: "FC Schalke 04" }],
       ),
-    ).toBe("FC Schalke 04");
-    expect(
-      playerTeamDisplayName(
-        { squadTeamUid: "2", clubName: null, clubId: "920" },
-        [{ teamUid: "2", shortName: null, name: "U19" }],
-        [{ id: "920", name: "FC Schalke 04" }],
-      ),
-    ).toBe("FC Schalke 04");
+    ).toBeNull();
   });
 
   it("uses first-team shortName Schalke 04 style", () => {

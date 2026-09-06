@@ -1389,7 +1389,7 @@ fn load_bteam_affiliate_rosters(
     profile: &EntityMapProfile,
     managed_club: u64,
     managed_club_uid: u32,
-    managed_club_name: &str,
+    _managed_club_name: &str,
     first_team: u64,
     club_id: &str,
     squad_game_date: Option<FmDate>,
@@ -1464,20 +1464,11 @@ fn load_bteam_affiliate_rosters(
             let squad_unit = "reserves";
             let short = team.short_name.trim();
             let full = team.name.trim();
-            let affiliate_club = affiliate.club_name.trim();
+            // Display / log label: shortName only (never full FC… name).
             let team_label = if !short.is_empty() {
                 short.to_string()
-            } else if !full.is_empty() {
-                full.to_string()
-            } else if !affiliate_club.is_empty() {
-                affiliate_club.to_string()
             } else {
-                club_team_label(
-                    &team.name,
-                    managed_club_name,
-                    team.team_type,
-                    team.team_uid,
-                )
+                format!("Map shortName (?): uid-{}", team.team_uid)
             };
             crate::fmt_log::load_detail(format!(
                 "affiliate roster: {} uid {} ({} players)",
@@ -1488,11 +1479,7 @@ fn load_bteam_affiliate_rosters(
             discovered_teams.push(DiscoveredClubTeam {
                 team: team.team,
                 team_uid: team.team_uid,
-                name: if !full.is_empty() {
-                    full.to_string()
-                } else {
-                    team_label.clone()
-                },
+                name: full.to_string(),
                 short_name: short.to_string(),
                 squad_unit,
                 roster_len: team.roster_len,
