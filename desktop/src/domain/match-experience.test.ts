@@ -659,6 +659,61 @@ describe("buildMatchExperienceCards", () => {
     expect(best?.teamUid).toBe("t-u19");
   });
 
+  it("pickBest does not hop equal-rung First (II vs Europa First)", () => {
+    const legiaFirst = team({
+      teamUid: "t-legia",
+      name: "First Team",
+      clubName: "Legia Warszawa",
+      squadUnit: "firstTeam",
+      teamType: 0,
+      rosterLen: 20,
+      clubId: "legia",
+    });
+    const schalkeIi = team({
+      teamUid: "t-s04ii",
+      name: "First Team",
+      clubName: "FC Schalke 04 II",
+      squadUnit: "firstTeam",
+      teamType: 0,
+      rosterLen: 20,
+      clubId: "s04ii",
+    });
+    const focus = player({
+      id: "eze",
+      name: "Eze",
+      positions: ["ST"],
+      currentAbility: 120,
+      squadTeamUid: "t-legia",
+      clubId: "legia",
+    });
+    const legiaMate = player({
+      id: "lm",
+      name: "Legia Mate",
+      positions: ["ST"],
+      currentAbility: 115,
+      squadTeamUid: "t-legia",
+      clubId: "legia",
+    });
+    const iiMate = player({
+      id: "im",
+      name: "II Mate",
+      positions: ["ST"],
+      currentAbility: 80,
+      squadTeamUid: "t-s04ii",
+      clubId: "s04ii",
+    });
+    const cards = buildMatchExperienceCards(
+      focus,
+      [focus, legiaMate, iiMate],
+      [legiaFirst, schalkeIi],
+      "legia",
+    );
+    expect(cards.find((c) => c.teamUid === "t-legia")?.focusRank).toBe(1);
+    expect(cards.find((c) => c.teamUid === "t-s04ii")?.focusRank).toBe(1);
+    const best = pickBestMatchExperienceCard(cards, "legia");
+    expect(best?.teamUid).toBe("t-legia");
+  });
+
   it("hides teams with zero resolved players", () => {
     const empty = team({
       teamUid: "t-empty",

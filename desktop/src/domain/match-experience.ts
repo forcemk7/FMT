@@ -194,9 +194,9 @@ function isCompetitiveRank(rank: number | null | undefined): boolean {
 
 /**
  * True when `to` is a better place to play than `from`:
- * - higher ladder rung (lower band) while still top-N, or
- * - another First with a strictly better competitive rank, or
- * - current First is not competitive and `to` First is top-N.
+ * strictly higher ladder rung (lower band) while still top-N.
+ * Same-band First→First is never a better move (II vs Europa First, etc.) —
+ * division reputation ranking is T253, not equal-rung CA rank.
  */
 export function isMatchExperienceBetterMove(
   from: Pick<MatchExperienceCard, "teamUid" | "band" | "focusRank">,
@@ -204,10 +204,7 @@ export function isMatchExperienceBetterMove(
 ): boolean {
   if (to.teamUid === from.teamUid) return false;
   if (!isCompetitiveRank(to.focusRank)) return false;
-  if (to.band < from.band) return true;
-  if (to.band !== 0 || from.band !== 0) return false;
-  if (!isCompetitiveRank(from.focusRank)) return true;
-  return (to.focusRank as number) < (from.focusRank as number);
+  return to.band < from.band;
 }
 
 function sortBestMatchExperienceCandidates(
@@ -230,8 +227,9 @@ function sortBestMatchExperienceCandidates(
 
 /**
  * Best ladder step for this player.
- * Stay on Current when no better move (higher rung / better First still top-N).
+ * Stay on Current when no higher-rung top-N move exists.
  * Youth top-2 at Under N still move up when a First projects top-N.
+ * Same-band First hops wait for division reputation (T253).
  */
 export function pickBestMatchExperienceCard(
   cards: MatchExperienceCard[],

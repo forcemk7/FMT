@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-07 (T270 done — ME better-move Best)
+Last updated: 2026-09-07 (T271 done — no equal-rung Best)
 
 ## Now
 
@@ -8,7 +8,7 @@ Last updated: 2026-09-07 (T270 done — ME better-move Best)
 
 **T190 parked** — Save ID in RAM before save-copy CA path.
 
-**Deferred:** T253 ME card order by division difficulty (claim when competition signal locked). T215 Diagnostics. T210 Squad density. T139 theme. T162 trophy cabinet. Loop D full-world load parked.
+**Deferred:** T253 ME card order / Best by division reputation (team→division→reputation when funded). T215 Diagnostics. T210 Squad density. T139 theme. T162 trophy cabinet. Loop D full-world load parked.
 
 **Residuals (not tickets):** Main/Permanent/PMF affiliation bytes; PGE label for AffiliationType `0x03`; further globals CSS carcass; club page polish; First XI median later. Club shortName RE parked (T235).
 
@@ -16,7 +16,7 @@ Last updated: 2026-09-07 (T270 done — ME better-move Best)
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
-| T253 | ME card order by competition / division difficulty | deferred | 4 | claim gate in ticket |
+| T253 | ME card order by competition / division difficulty | deferred | 4 | team→division→reputation; also feeds Best |
 | T190 | Development all-time from Progress Report CA strip | blocked | 2 | **parked** |
 | T210 | Squad — card / list density toggle | deferred | — | not now |
 | T215 | Diagnostics — source-of-truth skeleton + live fill | deferred | — | after product loops |
@@ -29,6 +29,7 @@ Last updated: 2026-09-07 (T270 done — ME better-move Best)
 
 ## Recently done
 
+- **T271** ME better-move: no equal-rung First (Legia stay vs II)
 - **T270** ME Best = no better ladder move (top-2); restore Current/Best pills
 - **T269** ME roster-depth sort (exclude focus); top-2 Current=Best; Current/Best chrome
 - **T268** Dash Ability label; right trail CA/PA digit align (players/talent/ME)
@@ -38,7 +39,6 @@ Last updated: 2026-09-07 (T270 done — ME better-move Best)
 - **T264** Dash true flex fill; mid-tone chip padding fix; ability/ME detail order
 - **T263** Dash denser peeks (4), best position, ME age/CA/PA, personality chip clip fix
 - **T262** Dashboard viewport-fit widgets; ability age; spelled personality chips
-- **T261** Borderless club logos default; ability logo+type; ME Current/Best ribbons
 
 ## Loop
 

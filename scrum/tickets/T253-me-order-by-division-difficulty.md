@@ -19,6 +19,8 @@ Max same-pos CA (T250) is a weak proxy for *match experience level*. A feeder Fi
 ## Scope (when claimed)
 
 - In: Replace (or secondary-sort under) max-CA within TeamType band using a locked **competition / division difficulty** signal from live memory — aligned with FM’s division ranking where possible (Bundesliga → Ekstraklasa → 2. Bundesliga → CFL → U19 leagues, etc.)
+- In: Same signal should inform ME **Best** (equal-rung First hops) once locked — T271 ripped equal-rung CA rank intentionally
+- In: Shortest RE path to try: **team → division → reputation**
 - In: Document the offset/recipe in `research/recipes.md` once locked
 - Out: Blind RE spike without a clear field; parent-logo hacks; inventing reputation from name strings
 
@@ -27,7 +29,7 @@ Max same-pos CA (T250) is a weak proxy for *match experience level*. A feeder Fi
 1. A direct competition/division difficulty value (or a proven better proxy) is identified in RAM / public tooling, **or**
 2. HQ explicitly funds a short RE spike with a falsifiable A/B (named clubs + expected order)
 
-Until then keep T250 max-CA sort.
+Until then keep T250 max-CA sort; Best stays higher-rung-only (T271).
 
 ## Acceptance (when claimed)
 
@@ -37,4 +39,4 @@ Until then keep T250 max-CA sort.
 
 ## Progress
 
-Deferred — CA proxy ships; division RE not funded now.
+Deferred — CA proxy ships; division RE not funded now. Intended path: team → division → reputation (also for Best equal-rung).
