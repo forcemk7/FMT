@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-07 (T264 done — dash flex + mid chip fix)
+Last updated: 2026-09-07 (T265 done — identity under name)
 
 ## Now
 
@@ -29,6 +29,7 @@ Last updated: 2026-09-07 (T264 done — dash flex + mid chip fix)
 
 ## Recently done
 
+- **T265** Dash age·pos under name on all peeks; small-viewport face flex
 - **T264** Dash true flex fill; mid-tone chip padding fix; ability/ME detail order
 - **T263** Dash denser peeks (4), best position, ME age/CA/PA, personality chip clip fix
 - **T262** Dashboard viewport-fit widgets; ability age; spelled personality chips
@@ -36,7 +37,6 @@ Last updated: 2026-09-07 (T264 done — dash flex + mid chip fix)
 - **T260** Dash `{clubName} {teamType}` + ME counts loans on destination First
 - **T259** Dashboard Best players (CA) / Best talent (PA ≤20, loans+FT) + horizontal rows
 - **T258** Dashboard polish — Attribute changes / First-team path rows, tabs, `goBack`
-- **T257** Squad desk — hide empty / ME-only clubTeams (`isSquadDeskClubTeam`)
 
 ## Loop
 

@@ -6,7 +6,6 @@ import {
   type SquadMoverChange,
 } from "@/domain/attribute-history";
 import { attributeDeltaTone } from "@/domain/attribute-tone";
-import { formatPlayerPositions } from "@/domain/live-data";
 import {
   dashPersonalityHighlights,
   formatHasScore,
@@ -34,10 +33,23 @@ function bestPositionLabel(player: LivePlayer): string | null {
   return primary || null;
 }
 
-function ageYearsLabel(player: LivePlayer): string | null {
+function ageShortLabel(player: LivePlayer): string | null {
   return typeof player.age === "number" && Number.isFinite(player.age)
-    ? `${Math.round(player.age)} years old`
+    ? String(Math.round(player.age))
     : null;
+}
+
+/** Subtle `{age} · {pos}` under the name — shared base identity for every peek. */
+function DashPlayerIdentity({ player }: { player: LivePlayer }) {
+  const age = ageShortLabel(player);
+  const position = bestPositionLabel(player);
+  const meta = [age, position].filter(Boolean).join(" · ");
+  return (
+    <span className="dash-has-card-copy">
+      <strong>{player.name}</strong>
+      {meta ? <small className="dash-player-meta">{meta}</small> : null}
+    </span>
+  );
 }
 
 export function DashHasRow({
@@ -62,10 +74,7 @@ export function DashHasRow({
       onClick={() => onOpen(player.id)}
     >
       <PlayerFace playerId={player.id} name={player.name} size="sm" />
-      <span className="dash-has-card-copy">
-        <strong>{player.name}</strong>
-        {!compact ? <small>{formatPlayerPositions(player)}</small> : null}
-      </span>
+      <DashPlayerIdentity player={player} />
       <span className="dash-row-extra">
         <span className="dash-personality-chips">
           {chips.map((chip) => (
@@ -142,10 +151,7 @@ export function DashMoverRow({
       onClick={() => onOpen(player.id)}
     >
       <PlayerFace playerId={player.id} name={player.name} size="sm" />
-      <span className="dash-has-card-copy">
-        <strong>{player.name}</strong>
-        {!compact ? <small>{formatPlayerPositions(player)}</small> : null}
-      </span>
+      <DashPlayerIdentity player={player} />
       <span className="dash-row-extra">
         <MoverChangeChips changes={changes} peek={compact} />
       </span>
@@ -173,8 +179,6 @@ export function DashAbilityRow({
 }) {
   const { player, ca, pa } = row;
   const chrome = dashClubTeamChrome(player, clubTeams ?? [], clubs ?? []);
-  const ageLabel = ageYearsLabel(player);
-  const position = bestPositionLabel(player);
   const secondary =
     mode === "players" ? (
       <>
@@ -203,13 +207,8 @@ export function DashAbilityRow({
       onClick={() => onOpen(player.id)}
     >
       <PlayerFace playerId={player.id} name={player.name} size="sm" />
-      <span className="dash-has-card-copy">
-        <strong>{player.name}</strong>
-        {!compact && ageLabel ? <small>{ageLabel}</small> : null}
-      </span>
+      <DashPlayerIdentity player={player} />
       <span className="dash-row-extra dash-ability-extra">
-        {ageLabel ? <span className="dash-ability-age">{ageLabel}</span> : null}
-        {position ? <span className="dash-ability-pos">{position}</span> : null}
         {chrome ? (
           <span className="dash-ability-team" title={`${chrome.clubName} ${chrome.teamType}`}>
             {chrome.clubId ? (
@@ -248,7 +247,6 @@ export function DashMatchExperienceRow({
     toClubId,
   } = row;
   const moveTitle = `${fromClubName} · ${fromTeamLabel} → ${toClubName} · ${toTeamLabel}`;
-  const ageLabel = ageYearsLabel(player);
   const ca = player.currentAbility;
   const pa = player.potentialAbility;
 
@@ -262,12 +260,8 @@ export function DashMatchExperienceRow({
       title={moveTitle}
     >
       <PlayerFace playerId={player.id} name={player.name} size="sm" />
-      <span className="dash-has-card-copy">
-        <strong>{player.name}</strong>
-        {!compact ? <small>{formatPlayerPositions(player)}</small> : null}
-      </span>
+      <DashPlayerIdentity player={player} />
       <span className="dash-row-extra dash-me-extra">
-        {ageLabel ? <span className="dash-ability-age">{ageLabel}</span> : null}
         <span className="dash-me-move-rail" aria-label={moveTitle}>
           <span className="dash-me-move-side">
             {fromClubId ? <ClubLogo clubId={fromClubId} name={fromClubName} size="sm" /> : null}
