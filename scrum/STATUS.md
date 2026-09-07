@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-07 (T267 done — ability main overlay)
+Last updated: 2026-09-07 (T268 done — Ability label + trail align)
 
 ## Now
 
@@ -29,6 +29,7 @@ Last updated: 2026-09-07 (T267 done — ability main overlay)
 
 ## Recently done
 
+- **T268** Dash Ability label; right trail CA/PA digit align (players/talent/ME)
 - **T267** Fix ability main overlay on face; mover chips Title Case + bold
 - **T266** Dash CA/PA attr tones; `{age} years old`; ability column align
 - **T265** Dash age·pos under name on all peeks; small-viewport face flex
@@ -38,7 +39,6 @@ Last updated: 2026-09-07 (T267 done — ability main overlay)
 - **T261** Borderless club logos default; ability logo+type; ME Current/Best ribbons
 - **T260** Dash `{clubName} {teamType}` + ME counts loans on destination First
 - **T259** Dashboard Best players (CA) / Best talent (PA ≤20, loans+FT) + horizontal rows
-- **T258** Dashboard polish — Attribute changes / First-team path rows, tabs, `goBack`
 
 ## Loop
 

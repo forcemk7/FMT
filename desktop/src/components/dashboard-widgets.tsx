@@ -52,7 +52,7 @@ function DashPlayerIdentity({ player }: { player: LivePlayer }) {
   );
 }
 
-/** CA/PA with core attr-tone colors (1–200 → tenths bands). */
+/** CA/PA with core attr-tone colors; num slot aligns 2- vs 3-digit values. */
 function DashAbilityStat({
   kind,
   value,
@@ -71,7 +71,8 @@ function DashAbilityStat({
     <span
       className={`dash-ability-stat dash-ability-stat-${variant} attr-tone attr-tone-${tone}`}
     >
-      <abbr title={title}>{kind}</abbr> {abilityLabel(value)}
+      <abbr title={title}>{kind}</abbr>
+      <span className="dash-ability-num">{abilityLabel(value)}</span>
     </span>
   );
 }
@@ -128,11 +129,12 @@ export function DashHasRow({
   );
 }
 
-/** Title Case chip labels; CA/PA stay uppercase — match personality peeks. */
+/** Title Case chip labels; CA → Ability; PA stays PA — match personality peeks. */
 function dashAttrChipLabel(field: string): string {
   const t = field.trim();
   if (!t) return t;
-  if (/^(CA|PA)$/i.test(t)) return t.toUpperCase();
+  if (/^CA$/i.test(t)) return "Ability";
+  if (/^PA$/i.test(t)) return "PA";
   return t
     .toLowerCase()
     .replace(/\b([a-z])/g, (ch) => ch.toUpperCase());
@@ -235,7 +237,7 @@ export function DashAbilityRow({
     >
       <PlayerFace playerId={player.id} name={player.name} size="sm" />
       <DashPlayerIdentity player={player} />
-      <span className="dash-row-extra dash-ability-extra">
+      <span className="dash-row-trail dash-ability-trail">
         <span
           className="dash-ability-team"
           title={chrome ? `${chrome.clubName} ${chrome.teamType}` : undefined}
@@ -247,9 +249,9 @@ export function DashAbilityRow({
           )}
           <span className="dash-ability-team-type">{chrome?.teamType ?? "—"}</span>
         </span>
-        <span className="dash-ability-secondary">{secondary}</span>
+        {secondary}
+        {main}
       </span>
-      <span className="dash-row-main dash-ability-main">{main}</span>
     </button>
   );
 }
@@ -289,7 +291,7 @@ export function DashMatchExperienceRow({
     >
       <PlayerFace playerId={player.id} name={player.name} size="sm" />
       <DashPlayerIdentity player={player} />
-      <span className="dash-row-extra dash-me-extra">
+      <span className="dash-row-trail dash-me-trail">
         <span className="dash-me-move-rail" aria-label={moveTitle}>
           <span className="dash-me-move-side">
             {fromClubId ? <ClubLogo clubId={fromClubId} name={fromClubName} size="sm" /> : null}
@@ -305,9 +307,9 @@ export function DashMatchExperienceRow({
         </span>
         <DashAbilityStat kind="CA" value={ca} />
         <DashAbilityStat kind="PA" value={pa} />
-      </span>
-      <span className="dash-row-main dash-me-opportunity-rank">
-        #{focusRank} {position}
+        <span className="dash-me-opportunity-rank">
+          #{focusRank} {position}
+        </span>
       </span>
     </button>
   );

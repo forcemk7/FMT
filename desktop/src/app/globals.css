@@ -2707,13 +2707,13 @@ body.fmt-shell {
     --dash-face:clamp(12px,min(3vh,5.5vw),28px);
   }
   .dash-row-extra{gap:clamp(2px,0.5vw,6px)}
-  .dash-ability-extra{
-    grid-template-columns:minmax(5.25rem,6.25rem) 4.25rem;
+  .dash-ability-trail{
+    grid-template-columns:minmax(5rem,6rem) var(--dash-capa-slot) var(--dash-capa-slot);
+    gap:clamp(4px,0.5vw,8px);
   }
-  .dash-ability-main,
-  .dash-ability-stat-main{
-    width:4.25rem;
-    min-width:4.25rem;
+  .dash-me-trail{
+    grid-template-columns:minmax(0,1fr) var(--dash-capa-slot) var(--dash-capa-slot) auto;
+    gap:clamp(4px,0.5vw,8px);
   }
   .dash-ability-team .club-logo,
   .dash-ability-team .club-logo-sm,
@@ -2765,13 +2765,28 @@ body.fmt-shell {
   min-width:28px;padding:3px 7px;border-radius:6px;background:#eef2f6;color:#334155;
   font-size:10px;font-weight:700;text-align:center;
 }
-.dash-ability-extra{
-  display:grid !important;
-  grid-template-columns:minmax(6.75rem,7.5rem) 4.75rem;
+/* Right-aligned trail groups (ability + ME) — shared CA/PA slot width */
+.dash-peek-row.dash-ability-card,
+.dash-has-card.dash-ability-card,
+.dash-peek-row.dash-me-opportunity-card,
+.dash-has-card.dash-me-opportunity-card{
+  --dash-capa-slot:3.55rem;
+  grid-template-columns:auto minmax(0,1fr) auto;
+}
+.dash-row-trail{
+  display:grid;
   align-items:center;
-  justify-items:stretch;
-  gap:clamp(4px,0.6vw,8px);
-  flex-wrap:nowrap;
+  justify-self:end;
+  min-width:0;
+  max-width:100%;
+}
+.dash-ability-trail{
+  grid-template-columns:minmax(5.5rem,6.75rem) var(--dash-capa-slot) var(--dash-capa-slot);
+  gap:clamp(6px,0.7vw,10px);
+}
+.dash-me-trail{
+  grid-template-columns:minmax(0,max-content) var(--dash-capa-slot) var(--dash-capa-slot) auto;
+  gap:clamp(6px,0.7vw,10px);
 }
 .dash-ability-age,
 .dash-ability-pos{
@@ -2786,22 +2801,31 @@ body.fmt-shell {
 .dash-ability-team-type{
   flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;text-align:left;
 }
-.dash-ability-secondary{
-  display:inline-flex;align-items:center;justify-content:flex-end;width:100%;
-}
 .dash-ability-stat{
-  display:inline-flex;align-items:center;gap:3px;font-weight:700;
-  font-variant-numeric:tabular-nums;white-space:nowrap;
-}
-.dash-ability-stat abbr{font-size:8px;font-weight:700;text-decoration:none;opacity:.75}
-.dash-ability-stat-inline{
-  font-size:9px;justify-content:flex-end;width:100%;
-}
-.dash-ability-stat-main{
-  font-size:10px;justify-content:center;width:4.75rem;min-width:4.75rem;
-  padding:3px 6px;border-radius:6px;
-  background:rgba(148,163,184,.12);
+  display:inline-grid;
+  grid-template-columns:1.35em 3ch;
+  column-gap:3px;
+  align-items:baseline;
+  justify-items:start;
+  width:var(--dash-capa-slot);
   box-sizing:border-box;
+  font-weight:700;
+  font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+}
+.dash-ability-stat abbr{
+  font-size:8px;font-weight:700;text-decoration:none;opacity:.75;justify-self:start;
+}
+.dash-ability-num{
+  justify-self:end;text-align:right;width:3ch;
+  font-variant-numeric:tabular-nums;
+}
+.dash-ability-stat-inline{font-size:9px}
+.dash-ability-stat-main{
+  font-size:10px;
+  padding:2px 5px;
+  border-radius:5px;
+  background:rgba(148,163,184,.12);
 }
 .dash-ability-stat-main.attr-tone-super{
   background:color-mix(in srgb, var(--attr-tone-super,#65e53a) 18%, transparent);
@@ -2818,14 +2842,23 @@ body.fmt-shell {
 .dash-ability-stat-main.attr-tone-low{
   background:color-mix(in srgb, var(--attr-tone-low) 16%, transparent);
 }
-.dash-ability-main{
-  display:flex;align-items:center;justify-content:center;
-  width:4.75rem;min-width:4.75rem;padding:0;
-  background:transparent;color:inherit;font-size:inherit;font-weight:inherit;
+.dash-me-move-rail{
+  display:flex;align-items:center;justify-content:flex-end;gap:6px;min-width:0;max-width:100%;
 }
-.dash-ability-main abbr{font-size:8px;font-weight:700;text-decoration:none;opacity:.7}
-.dash-me-extra{gap:8px}
-.dash-me-extra .dash-ability-stat-inline{min-width:4.5rem;width:auto}
+.dash-me-move-side{display:inline-flex;align-items:center;gap:4px;min-width:0}
+.dash-me-move-side .club-logo,
+.dash-me-move-side .club-logo-sm{width:16px;height:16px}
+.dash-me-move-type{font-size:9px;font-weight:700;color:#334155;white-space:nowrap}
+.dash-me-move-arrow{flex:none;font-size:11px;font-weight:700;color:var(--slate,#64748b)}
+.dash-me-opportunity-rank{
+  flex:none;min-width:2.75rem;padding:2px 6px;border-radius:5px;
+  background:#eef6f3;color:#0b496f;font-size:9px;font-weight:700;
+  font-variant-numeric:tabular-nums;text-align:center;white-space:nowrap;
+  justify-self:end;
+}
+.dash-me-opportunity-move{color:var(--slate,#64748b)}
+.dash-me-opportunity-target{color:var(--slate,#64748b);white-space:normal}
+.dash-me-opportunity-card .dash-has-card-copy{min-width:0}
 .dash-personality-chips{
   display:flex;
   flex-wrap:nowrap;
@@ -2844,18 +2877,6 @@ body.fmt-shell .dash-personality-chip.attr-tone-mid{
   padding:2px 6px;
   background:rgba(255,255,255,0.06);
 }
-.dash-me-move-rail{
-  display:flex;align-items:center;justify-content:flex-end;gap:6px;min-width:0;max-width:100%;
-}
-.dash-me-move-side{display:inline-flex;align-items:center;gap:4px;min-width:0}
-.dash-me-move-side .club-logo,
-.dash-me-move-side .club-logo-sm{width:16px;height:16px}
-.dash-me-move-type{font-size:9px;font-weight:700;color:#334155;white-space:nowrap}
-.dash-me-move-arrow{flex:none;font-size:11px;font-weight:700;color:var(--slate,#64748b)}
-.dash-me-opportunity-rank{flex:none;min-width:48px;padding:3px 7px;border-radius:5px;background:#eef6f3;color:#0b496f;font-size:9px;font-weight:700;font-variant-numeric:tabular-nums;text-align:center;white-space:nowrap}
-.dash-me-opportunity-move{color:var(--slate,#64748b)}
-.dash-me-opportunity-target{color:var(--slate,#64748b);white-space:normal}
-.dash-me-opportunity-card .dash-has-card-copy{min-width:0}
 .dash-has-card{
   display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:10px 12px;
   width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:#fafbfc;
