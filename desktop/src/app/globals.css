@@ -1359,7 +1359,7 @@ button:active,
   box-shadow:none;
 }
 .match-experience-card-best{
-  border-color:color-mix(in srgb,#22c55e 40%, var(--border));
+  border-color:color-mix(in srgb,var(--attr-tone-super,#65e53a) 55%, var(--border));
   box-shadow:none;
 }
 .match-experience-card-ribbon{
@@ -1388,8 +1388,8 @@ button:active,
   border-color:color-mix(in srgb,#2563eb 45%, var(--border));
 }
 .match-experience-card-ribbon-best{
-  color:#15803d;
-  border-color:color-mix(in srgb,#22c55e 40%, var(--border));
+  color:var(--attr-tone-super,#65e53a);
+  border-color:color-mix(in srgb,var(--attr-tone-super,#65e53a) 55%, var(--border));
 }
 .match-experience-card-header{display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:34px;padding:5px 8px;border-bottom:1px solid var(--border);border-radius:8px 8px 0 0;overflow:hidden}
 .match-experience-card-identity{display:flex;align-items:center;gap:6px;min-width:0;flex:1}

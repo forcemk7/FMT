@@ -8,6 +8,7 @@ import {
   matchExperienceTeamBand,
   matchExperienceTeamLabel,
   matchExperienceWindowStart,
+  pickBestMatchExperienceCard,
   sortClubTeamsForMatchExperience,
 } from "./match-experience";
 
@@ -282,7 +283,7 @@ describe("buildMatchExperienceCards", () => {
     expect(feedCard.teamLabel).toBe("First Team");
     expect(feedCard.clubId).toBe("9001");
     expect(feedCard.clubName).toBe("Feeder FC");
-    expect(feedCard.maxSamePosCa).toBe(110);
+    expect(feedCard.maxSamePosCa).toBe(105);
     expect(feedCard.rows.some((row) => row.playerId === "loan")).toBe(true);
     expect(u19Card.rows.map((row) => row.playerId)).toEqual(["youth", "other"]);
     expect(u19Card.rows.some((row) => row.playerId === "loan")).toBe(false);
@@ -437,7 +438,114 @@ describe("buildMatchExperienceCards", () => {
     );
     expect(cards.map((card) => card.teamUid)).toEqual(["t-strong", "t-weak"]);
     expect(cards[0]!.maxSamePosCa).toBe(150);
-    expect(cards[1]!.maxSamePosCa).toBe(110);
+    expect(cards[1]!.maxSamePosCa).toBe(90);
+  });
+
+  it("elite focus CA does not flatten First card order", () => {
+    const weakFirst = team({
+      teamUid: "t-weak",
+      name: "Weak First",
+      clubName: "AAA Weak",
+      squadUnit: "firstTeam",
+      teamType: 0,
+      rosterLen: 10,
+      clubId: "1",
+    });
+    const strongFirst = team({
+      teamUid: "t-strong",
+      name: "Strong First",
+      clubName: "ZZZ Strong",
+      squadUnit: "firstTeam",
+      teamType: 0,
+      rosterLen: 10,
+      clubId: "2",
+    });
+    const weakGk = player({
+      id: "w",
+      name: "Weak GK",
+      positions: ["GK"],
+      currentAbility: 90,
+      squadTeamUid: "t-weak",
+      clubId: "1",
+    });
+    const strongGk = player({
+      id: "s",
+      name: "Strong GK",
+      positions: ["GK"],
+      currentAbility: 150,
+      squadTeamUid: "t-strong",
+      clubId: "2",
+    });
+    const elite = player({
+      id: "elite",
+      name: "Elite GK",
+      positions: ["GK"],
+      currentAbility: 180,
+      squadTeamUid: "t-strong",
+      clubId: "2",
+    });
+    const cards = buildMatchExperienceCards(
+      elite,
+      [elite, weakGk, strongGk],
+      [weakFirst, strongFirst],
+    );
+    expect(cards.map((card) => card.teamUid)).toEqual(["t-strong", "t-weak"]);
+    expect(cards[0]!.maxSamePosCa).toBe(150);
+    expect(cards[1]!.maxSamePosCa).toBe(90);
+  });
+
+  it("pickBest keeps Current when already top-2", () => {
+    const homeFirst = team({
+      teamUid: "t-home",
+      name: "Home First",
+      clubName: "Home",
+      squadUnit: "firstTeam",
+      teamType: 0,
+      rosterLen: 10,
+      clubId: "home",
+    });
+    const otherFirst = team({
+      teamUid: "t-other",
+      name: "Other First",
+      clubName: "Other",
+      squadUnit: "firstTeam",
+      teamType: 0,
+      rosterLen: 10,
+      clubId: "other",
+    });
+    const focus = player({
+      id: "f",
+      name: "Focus",
+      positions: ["ST"],
+      currentAbility: 120,
+      squadTeamUid: "t-home",
+      clubId: "home",
+    });
+    const homeMate = player({
+      id: "hm",
+      name: "Home Mate",
+      positions: ["ST"],
+      currentAbility: 100,
+      squadTeamUid: "t-home",
+      clubId: "home",
+    });
+    const otherMate = player({
+      id: "om",
+      name: "Other Mate",
+      positions: ["ST"],
+      currentAbility: 50,
+      squadTeamUid: "t-other",
+      clubId: "other",
+    });
+    const cards = buildMatchExperienceCards(
+      focus,
+      [focus, homeMate, otherMate],
+      [homeFirst, otherFirst],
+      "home",
+    );
+    const best = pickBestMatchExperienceCard(cards, "home");
+    expect(best?.teamUid).toBe("t-home");
+    expect(best?.focusRank).toBe(1);
   });
 
   it("hides teams with zero resolved players", () => {

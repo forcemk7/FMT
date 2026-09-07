@@ -172,7 +172,7 @@ export function sortClubTeamsForMatchExperience(
   });
 }
 
-/** Within TeamType band: stronger same-pos depth (max CA) first. */
+/** Within TeamType band: stronger same-pos *roster* depth (max CA, focus excluded) first. */
 export function sortMatchExperienceCards(
   cards: MatchExperienceCard[],
 ): MatchExperienceCard[] {
@@ -186,17 +186,28 @@ export function sortMatchExperienceCards(
 }
 
 /**
- * Best First-team ladder step for this player (lowest same-pos rank).
- * Used for profile chrome — includes current First if that is already best.
+ * Best ladder step for this player.
+ * If already top-2 (same-pos) on Current, stay — game time is already there.
+ * Else among First Team cards: lowest focusRank (ties → managed club → depth).
  */
 export function pickBestMatchExperienceCard(
   cards: MatchExperienceCard[],
   managedClubId?: string | null,
 ): MatchExperienceCard | null {
+  const current = cards.find((card) => card.isFocusCurrentTeam);
+  if (
+    current &&
+    typeof current.focusRank === "number" &&
+    current.focusRank >= 1 &&
+    current.focusRank <= 2
+  ) {
+    return current;
+  }
+
   const firsts = cards.filter(
     (card) => card.band === 0 && card.focusRank != null && card.focusRank >= 1,
   );
-  if (!firsts.length) return null;
+  if (!firsts.length) return current ?? null;
   const managed = managedClubId?.trim() || null;
   return [...firsts].sort((left, right) => {
     const rank = (left.focusRank ?? 99) - (right.focusRank ?? 99);
@@ -348,8 +359,10 @@ export function buildMatchExperienceCard(
     team.name.trim() ||
     `Map club (?): uid-${team.teamUid}`;
 
+  // Roster depth only — including focus flattens every card when CA is elite.
   let maxSamePosCa = -Infinity;
   for (const row of allRows) {
+    if (row.isFocus) continue;
     maxSamePosCa = Math.max(maxSamePosCa, caSortKey(row.currentAbility));
   }
 
