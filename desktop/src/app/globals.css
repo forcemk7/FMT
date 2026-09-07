@@ -2663,16 +2663,6 @@ body.fmt-shell {
   font:inherit;
   color:inherit;
 }
-/* Ability peeks: face | identity | team | secondary | main — fixed cols for digit align */
-.dash-peek-row.dash-ability-card,
-.dash-has-card.dash-ability-card{
-  grid-template-columns:
-    auto
-    minmax(0,1fr)
-    minmax(6.75rem,7.5rem)
-    4.75rem
-    4.75rem;
-}
 .dash-peek-row .player-face,
 .dash-peek-row .player-face-sm{
   --dash-face:clamp(14px,min(3.6vh,6vw),36px);
@@ -2717,14 +2707,13 @@ body.fmt-shell {
     --dash-face:clamp(12px,min(3vh,5.5vw),28px);
   }
   .dash-row-extra{gap:clamp(2px,0.5vw,6px)}
-  .dash-peek-row.dash-ability-card,
-  .dash-has-card.dash-ability-card{
-    grid-template-columns:
-      auto
-      minmax(0,1fr)
-      minmax(5.25rem,6.25rem)
-      4.25rem
-      4.25rem;
+  .dash-ability-extra{
+    grid-template-columns:minmax(5.25rem,6.25rem) 4.25rem;
+  }
+  .dash-ability-main,
+  .dash-ability-stat-main{
+    width:4.25rem;
+    min-width:4.25rem;
   }
   .dash-ability-team .club-logo,
   .dash-ability-team .club-logo-sm,
@@ -2771,13 +2760,19 @@ body.fmt-shell {
   display:inline-flex;align-items:baseline;gap:3px;padding:2px 6px;border-radius:6px;
   font-size:9px;font-weight:700;background:#eef2f6;color:#334155;white-space:nowrap;
 }
-.dash-mover-chip small{font-size:8px;font-weight:600;opacity:.75;text-transform:uppercase}
-.dash-mover-chip.is-more{font-weight:600;color:var(--slate,#64748b);background:transparent;padding-inline:2px}
+.dash-mover-chip.is-more{font-weight:700;color:var(--slate,#64748b);background:transparent;padding-inline:2px}
 .dash-mover-count{
   min-width:28px;padding:3px 7px;border-radius:6px;background:#eef2f6;color:#334155;
   font-size:10px;font-weight:700;text-align:center;
 }
-.dash-ability-extra{gap:8px;flex-wrap:nowrap}
+.dash-ability-extra{
+  display:grid !important;
+  grid-template-columns:minmax(6.75rem,7.5rem) 4.75rem;
+  align-items:center;
+  justify-items:stretch;
+  gap:clamp(4px,0.6vw,8px);
+  flex-wrap:nowrap;
+}
 .dash-ability-age,
 .dash-ability-pos{
   font-size:9px;font-weight:600;color:var(--slate,#64748b);white-space:nowrap;
@@ -2785,7 +2780,6 @@ body.fmt-shell {
 .dash-ability-team{
   display:inline-flex;align-items:center;gap:5px;min-width:0;width:100%;
   font-size:9px;font-weight:600;color:var(--slate,#64748b);white-space:nowrap;
-  justify-self:stretch;
 }
 .dash-ability-team .club-logo,
 .dash-ability-team .club-logo-sm{width:18px;height:18px;flex:none}
@@ -2794,7 +2788,6 @@ body.fmt-shell {
 }
 .dash-ability-secondary{
   display:inline-flex;align-items:center;justify-content:flex-end;width:100%;
-  justify-self:stretch;
 }
 .dash-ability-stat{
   display:inline-flex;align-items:center;gap:3px;font-weight:700;
@@ -2805,7 +2798,8 @@ body.fmt-shell {
   font-size:9px;justify-content:flex-end;width:100%;
 }
 .dash-ability-stat-main{
-  font-size:10px;justify-content:center;width:100%;padding:3px 6px;border-radius:6px;
+  font-size:10px;justify-content:center;width:4.75rem;min-width:4.75rem;
+  padding:3px 6px;border-radius:6px;
   background:rgba(148,163,184,.12);
   box-sizing:border-box;
 }
@@ -2825,7 +2819,8 @@ body.fmt-shell {
   background:color-mix(in srgb, var(--attr-tone-low) 16%, transparent);
 }
 .dash-ability-main{
-  display:flex;align-items:center;justify-content:stretch;width:100%;padding:0;min-width:0;
+  display:flex;align-items:center;justify-content:center;
+  width:4.75rem;min-width:4.75rem;padding:0;
   background:transparent;color:inherit;font-size:inherit;font-weight:inherit;
 }
 .dash-ability-main abbr{font-size:8px;font-weight:700;text-decoration:none;opacity:.7}

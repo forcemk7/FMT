@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-07 (T266 done — CA/PA tones + align)
+Last updated: 2026-09-07 (T267 done — ability main overlay)
 
 ## Now
 
@@ -29,6 +29,7 @@ Last updated: 2026-09-07 (T266 done — CA/PA tones + align)
 
 ## Recently done
 
+- **T267** Fix ability main overlay on face; mover chips Title Case + bold
 - **T266** Dash CA/PA attr tones; `{age} years old`; ability column align
 - **T265** Dash age·pos under name on all peeks; small-viewport face flex
 - **T264** Dash true flex fill; mid-tone chip padding fix; ability/ME detail order

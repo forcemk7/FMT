@@ -128,6 +128,16 @@ export function DashHasRow({
   );
 }
 
+/** Title Case chip labels; CA/PA stay uppercase — match personality peeks. */
+function dashAttrChipLabel(field: string): string {
+  const t = field.trim();
+  if (!t) return t;
+  if (/^(CA|PA)$/i.test(t)) return t.toUpperCase();
+  return t
+    .toLowerCase()
+    .replace(/\b([a-z])/g, (ch) => ch.toUpperCase());
+}
+
 function MoverChangeChips({
   changes,
   peek,
@@ -142,13 +152,14 @@ function MoverChangeChips({
     <span className="dash-mover-chips">
       {shown.map((change) => {
         const tone = attributeDeltaTone(change.field, change.delta) ?? "mid";
+        const label = dashAttrChipLabel(change.field);
         return (
           <span
             key={change.field}
             className={`dash-mover-chip attr-tone attr-tone-${tone}`}
-            title={`${change.field} ${formatDelta(change.delta)}`}
+            title={`${label} ${formatDelta(change.delta)}`}
           >
-            <small>{change.field}</small> {formatDelta(change.delta)}
+            {label} {formatDelta(change.delta)}
           </span>
         );
       })}
@@ -224,15 +235,20 @@ export function DashAbilityRow({
     >
       <PlayerFace playerId={player.id} name={player.name} size="sm" />
       <DashPlayerIdentity player={player} />
-      <span className="dash-ability-team" title={chrome ? `${chrome.clubName} ${chrome.teamType}` : undefined}>
-        {chrome?.clubId ? (
-          <ClubLogo clubId={chrome.clubId} name={chrome.clubName} size="sm" />
-        ) : (
-          <span className="club-logo club-logo-sm club-logo-empty" aria-hidden="true" />
-        )}
-        <span className="dash-ability-team-type">{chrome?.teamType ?? "—"}</span>
+      <span className="dash-row-extra dash-ability-extra">
+        <span
+          className="dash-ability-team"
+          title={chrome ? `${chrome.clubName} ${chrome.teamType}` : undefined}
+        >
+          {chrome?.clubId ? (
+            <ClubLogo clubId={chrome.clubId} name={chrome.clubName} size="sm" />
+          ) : (
+            <span className="club-logo club-logo-sm club-logo-empty" aria-hidden="true" />
+          )}
+          <span className="dash-ability-team-type">{chrome?.teamType ?? "—"}</span>
+        </span>
+        <span className="dash-ability-secondary">{secondary}</span>
       </span>
-      <span className="dash-ability-secondary">{secondary}</span>
       <span className="dash-row-main dash-ability-main">{main}</span>
     </button>
   );
