@@ -1,6 +1,6 @@
 [package]
 name = "fmt"
-version = "0.1.25"
+version = "0.1.27"
 description = "Read-only desktop recruitment workspace for Football Manager 2026"
 authors = ["FMT"]
 edition = "2021"
@@ -8,6 +8,10 @@ default-run = "fmt"
 
 [features]
 default = []
+# RE / probe helpers archive. Default build stays quiet (`allow(dead_code)`).
+# Research: `cargo check --features fm-probe` (dead_code warnings on again).
+# New probe-only code: `#[cfg(feature = "fm-probe")]` — see `.cursor/rules/fm-probe-gate.mdc`.
+fm-probe = []
 
 [lib]
 name = "glassscout_fm26_lib"

@@ -1,4 +1,6 @@
 #![recursion_limit = "256"]
+// Product builds: silence RE leftover dead_code. Research: --features fm-probe.
+#![cfg_attr(not(feature = "fm-probe"), allow(dead_code))]
 
 mod commands;
 pub mod connector;

@@ -1,0 +1,27 @@
+---
+description: Gate FM RE/probe helpers behind Cargo feature fm-probe; keep default builds quiet
+globs: desktop/src-tauri/**/*
+alwaysApply: true
+---
+
+# FM probe feature gate
+
+Default `npm run desktop:build` / `cargo check` must stay **quiet**. Do not leave `dead_code` spam in the product build.
+
+## Law
+
+1. **New** RE / probe-only helpers, dumps, scanners, and one-off lock tools → `#[cfg(feature = "fm-probe")]` (module or item). They must **not** compile into the default lib.
+2. Do **not** delete research helpers just to silence warnings — gate or leave under the crate allow (below).
+3. Do **not** add crate-wide `#![allow(dead_code)]` that stays on when `fm-probe` is enabled.
+4. Product / Tauri invoke path stays on the default feature set (no `fm-probe` required to run FMT).
+
+## Cargo
+
+- Feature: `fm-probe` in `desktop/src-tauri/Cargo.toml` (default off).
+- Default build: `#![cfg_attr(not(feature = "fm-probe"), allow(dead_code))]` in `lib.rs` silences **existing** residue.
+- Research session: `cargo check --features fm-probe` — dead_code warnings return; fix by cfg-gating or wiring callers.
+
+## When touching warnings
+
+- Prefer moving the item into a `#[cfg(feature = "fm-probe")]` module over deleting.
+- Update `research/recipes.md` / `research/ecosystem.md` if a probe locks a new offset (existing live-read rule).

@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-07 (T271 done — no equal-rung Best)
+Last updated: 2026-09-07 (T272 done — fm-probe quiet builds)
 
 ## Now
 
@@ -29,6 +29,7 @@ Last updated: 2026-09-07 (T271 done — no equal-rung Best)
 
 ## Recently done
 
+- **T272** fm-probe feature-gate + Cursor rule (quiet default cargo)
 - **T271** ME better-move: no equal-rung First (Legia stay vs II)
 - **T270** ME Best = no better ladder move (top-2); restore Current/Best pills
 - **T269** ME roster-depth sort (exclude focus); top-2 Current=Best; Current/Best chrome
@@ -38,7 +39,6 @@ Last updated: 2026-09-07 (T271 done — no equal-rung Best)
 - **T265** Dash age·pos under name on all peeks; small-viewport face flex
 - **T264** Dash true flex fill; mid-tone chip padding fix; ability/ME detail order
 - **T263** Dash denser peeks (4), best position, ME age/CA/PA, personality chip clip fix
-- **T262** Dashboard viewport-fit widgets; ability age; spelled personality chips
 
 ## Loop
 

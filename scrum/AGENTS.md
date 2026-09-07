@@ -73,6 +73,7 @@ Archiving without a commit is not done.
 - Extract or mmap `.fm` from `Documents/Sports Interactive/…/games/` — copy the selected save into `data/saves` first
 - Stream live SI `graphics/` on `/api/faces` or `/api/logos` when a repo copy exists — copy missing files into `data/faces` / `data/logos` once, then serve those
 - Invent live-memory offsets or heap/idiom world scans without checking `research/ecosystem.md`, `research/recipes.md`, and `.cursor/rules/fm-live-read.mdc` first; when you find a public FM tool, **update research/ecosystem.md**; when you lock a first-party offset/trap, **update research/recipes.md** in the same run
+- Leave new RE/probe-only Rust helpers on the default feature set — gate with `#[cfg(feature = "fm-probe")]` (see `.cursor/rules/fm-probe-gate.mdc`); do not spam `dead_code` on product builds
 - Expand scope from verbal wants
 - Rewrite SCOPE/ROADMAP priorities without Scrum Master chat
 - Leave abandoned `claimed` / `in_progress` tickets
