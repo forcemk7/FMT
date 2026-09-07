@@ -92,13 +92,12 @@ function MatchExperienceCardView({
     : (positionOptions[0] ?? card.position);
 
   const identityTitle = `${card.clubName} · ${card.teamLabel}`;
-  // At best: green border + under-name current (no Best ribbon).
-  // Else: Current = blue border; Best = neon green + Best ribbon.
+  // Stay (Current=Best): green border + Current pill.
+  // Split: Current blue + Current pill; Best neon green + Best pill.
   const isCurrent = card.isFocusCurrentTeam;
-  const atBest = isBestOption && isCurrent;
   const cardClass = [
     "match-experience-card",
-    atBest || isBestOption
+    isBestOption
       ? "match-experience-card-best"
       : isCurrent
         ? "match-experience-card-current"
@@ -106,11 +105,20 @@ function MatchExperienceCardView({
   ]
     .filter(Boolean)
     .join(" ");
-  const ribbon =
-    isBestOption && !isCurrent
+  const ribbon = isBestOption
+    ? isCurrent
       ? {
+          className: "match-experience-card-ribbon match-experience-card-ribbon-current-best",
+          label: "Current",
+        }
+      : {
           className: "match-experience-card-ribbon match-experience-card-ribbon-best",
           label: "Best",
+        }
+    : isCurrent
+      ? {
+          className: "match-experience-card-ribbon match-experience-card-ribbon-current",
+          label: "Current",
         }
       : null;
 

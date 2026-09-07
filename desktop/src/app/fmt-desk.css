@@ -325,6 +325,10 @@ body.fmt-shell .match-experience-card-ribbon-best {
   color: var(--attr-tone-super, #65e53a);
   border-color: color-mix(in srgb, var(--attr-tone-super, #65e53a) 55%, var(--hairline));
 }
+body.fmt-shell .match-experience-card-ribbon-current-best {
+  color: var(--attr-tone-super, #65e53a);
+  border-color: color-mix(in srgb, var(--attr-tone-super, #65e53a) 55%, var(--hairline));
+}
 body.fmt-shell .match-experience-card-header {
   background: rgba(0, 0, 0, 0.22);
   border-color: var(--hairline);

@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-07 (T269 done — ME depth + chrome)
+Last updated: 2026-09-07 (T270 done — ME better-move Best)
 
 ## Now
 
@@ -29,6 +29,7 @@ Last updated: 2026-09-07 (T269 done — ME depth + chrome)
 
 ## Recently done
 
+- **T270** ME Best = no better ladder move (top-2); restore Current/Best pills
 - **T269** ME roster-depth sort (exclude focus); top-2 Current=Best; Current/Best chrome
 - **T268** Dash Ability label; right trail CA/PA digit align (players/talent/ME)
 - **T267** Fix ability main overlay on face; mover chips Title Case + bold
@@ -38,7 +39,6 @@ Last updated: 2026-09-07 (T269 done — ME depth + chrome)
 - **T263** Dash denser peeks (4), best position, ME age/CA/PA, personality chip clip fix
 - **T262** Dashboard viewport-fit widgets; ability age; spelled personality chips
 - **T261** Borderless club logos default; ability logo+type; ME Current/Best ribbons
-- **T260** Dash `{clubName} {teamType}` + ME counts loans on destination First
 
 ## Loop
 

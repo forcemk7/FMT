@@ -1391,6 +1391,10 @@ button:active,
   color:var(--attr-tone-super,#65e53a);
   border-color:color-mix(in srgb,var(--attr-tone-super,#65e53a) 55%, var(--border));
 }
+.match-experience-card-ribbon-current-best{
+  color:var(--attr-tone-super,#65e53a);
+  border-color:color-mix(in srgb,var(--attr-tone-super,#65e53a) 55%, var(--border));
+}
 .match-experience-card-header{display:flex;align-items:center;justify-content:space-between;gap:6px;min-height:34px;padding:5px 8px;border-bottom:1px solid var(--border);border-radius:8px 8px 0 0;overflow:hidden}
 .match-experience-card-identity{display:flex;align-items:center;gap:6px;min-width:0;flex:1}
 .match-experience-card-identity .club-logo,

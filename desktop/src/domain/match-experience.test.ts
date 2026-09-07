@@ -494,7 +494,7 @@ describe("buildMatchExperienceCards", () => {
     expect(cards[1]!.maxSamePosCa).toBe(90);
   });
 
-  it("pickBest keeps Current when already top-2", () => {
+  it("pickBest keeps Current when already top-2 with no better move", () => {
     const homeFirst = team({
       teamUid: "t-home",
       name: "Home First",
@@ -546,6 +546,117 @@ describe("buildMatchExperienceCards", () => {
     const best = pickBestMatchExperienceCard(cards, "home");
     expect(best?.teamUid).toBe("t-home");
     expect(best?.focusRank).toBe(1);
+  });
+
+  it("pickBest moves youth up when First projects top-2", () => {
+    const u19Team = team({
+      teamUid: "t-u19",
+      name: "U19",
+      clubName: "Home",
+      squadUnit: "under19s",
+      teamType: 11,
+      rosterLen: 10,
+      clubId: "home",
+    });
+    const firstTeam = team({
+      teamUid: "t-first",
+      name: "First",
+      clubName: "Home",
+      squadUnit: "firstTeam",
+      teamType: 0,
+      rosterLen: 10,
+      clubId: "home",
+    });
+    const focus = player({
+      id: "y",
+      name: "Youth",
+      positions: ["ST"],
+      currentAbility: 130,
+      squadTeamUid: "t-u19",
+      clubId: "home",
+    });
+    const u19Mate = player({
+      id: "um",
+      name: "U19 Mate",
+      positions: ["ST"],
+      currentAbility: 100,
+      squadTeamUid: "t-u19",
+      clubId: "home",
+    });
+    const firstMate = player({
+      id: "fm",
+      name: "First Mate",
+      positions: ["ST"],
+      currentAbility: 125,
+      squadTeamUid: "t-first",
+      clubId: "home",
+    });
+    const cards = buildMatchExperienceCards(
+      focus,
+      [focus, u19Mate, firstMate],
+      [u19Team, firstTeam],
+      "home",
+    );
+    expect(cards.find((c) => c.teamUid === "t-u19")?.focusRank).toBe(1);
+    expect(cards.find((c) => c.teamUid === "t-first")?.focusRank).toBe(1);
+    const best = pickBestMatchExperienceCard(cards, "home");
+    expect(best?.teamUid).toBe("t-first");
+  });
+
+  it("pickBest stays on youth when First would bury them", () => {
+    const u19Team = team({
+      teamUid: "t-u19",
+      name: "U19",
+      clubName: "Home",
+      squadUnit: "under19s",
+      teamType: 11,
+      rosterLen: 10,
+      clubId: "home",
+    });
+    const firstTeam = team({
+      teamUid: "t-first",
+      name: "First",
+      clubName: "Home",
+      squadUnit: "firstTeam",
+      teamType: 0,
+      rosterLen: 10,
+      clubId: "home",
+    });
+    const focus = player({
+      id: "y",
+      name: "Youth",
+      positions: ["ST"],
+      currentAbility: 110,
+      squadTeamUid: "t-u19",
+      clubId: "home",
+    });
+    const u19Mate = player({
+      id: "um",
+      name: "U19 Mate",
+      positions: ["ST"],
+      currentAbility: 100,
+      squadTeamUid: "t-u19",
+      clubId: "home",
+    });
+    const firstPack = Array.from({ length: 4 }, (_, i) =>
+      player({
+        id: `f${i}`,
+        name: `First ${i}`,
+        positions: ["ST"],
+        currentAbility: 140 - i,
+        squadTeamUid: "t-first",
+        clubId: "home",
+      }),
+    );
+    const cards = buildMatchExperienceCards(
+      focus,
+      [focus, u19Mate, ...firstPack],
+      [u19Team, firstTeam],
+      "home",
+    );
+    expect(cards.find((c) => c.teamUid === "t-first")?.focusRank).toBeGreaterThan(2);
+    const best = pickBestMatchExperienceCard(cards, "home");
+    expect(best?.teamUid).toBe("t-u19");
   });
 
   it("hides teams with zero resolved players", () => {

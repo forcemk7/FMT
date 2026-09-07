@@ -185,40 +185,79 @@ export function sortMatchExperienceCards(
   });
 }
 
+/** Same-pos ranks that count as real game-time (Best / stay). */
+export const MATCH_EXPERIENCE_TOP_N = 2;
+
+function isCompetitiveRank(rank: number | null | undefined): boolean {
+  return typeof rank === "number" && rank >= 1 && rank <= MATCH_EXPERIENCE_TOP_N;
+}
+
+/**
+ * True when `to` is a better place to play than `from`:
+ * - higher ladder rung (lower band) while still top-N, or
+ * - another First with a strictly better competitive rank, or
+ * - current First is not competitive and `to` First is top-N.
+ */
+export function isMatchExperienceBetterMove(
+  from: Pick<MatchExperienceCard, "teamUid" | "band" | "focusRank">,
+  to: Pick<MatchExperienceCard, "teamUid" | "band" | "focusRank">,
+): boolean {
+  if (to.teamUid === from.teamUid) return false;
+  if (!isCompetitiveRank(to.focusRank)) return false;
+  if (to.band < from.band) return true;
+  if (to.band !== 0 || from.band !== 0) return false;
+  if (!isCompetitiveRank(from.focusRank)) return true;
+  return (to.focusRank as number) < (from.focusRank as number);
+}
+
+function sortBestMatchExperienceCandidates(
+  cards: MatchExperienceCard[],
+  managedClubId: string | null,
+): MatchExperienceCard[] {
+  return [...cards].sort((left, right) => {
+    const band = left.band - right.band;
+    if (band !== 0) return band;
+    const rank = (left.focusRank ?? 99) - (right.focusRank ?? 99);
+    if (rank !== 0) return rank;
+    const leftHome = managedClubId && left.clubId === managedClubId ? 0 : 1;
+    const rightHome = managedClubId && right.clubId === managedClubId ? 0 : 1;
+    if (leftHome !== rightHome) return leftHome - rightHome;
+    const strength = right.maxSamePosCa - left.maxSamePosCa;
+    if (strength !== 0) return strength;
+    return left.teamUid.localeCompare(right.teamUid);
+  });
+}
+
 /**
  * Best ladder step for this player.
- * If already top-2 (same-pos) on Current, stay — game time is already there.
- * Else among First Team cards: lowest focusRank (ties → managed club → depth).
+ * Stay on Current when no better move (higher rung / better First still top-N).
+ * Youth top-2 at Under N still move up when a First projects top-N.
  */
 export function pickBestMatchExperienceCard(
   cards: MatchExperienceCard[],
   managedClubId?: string | null,
 ): MatchExperienceCard | null {
-  const current = cards.find((card) => card.isFocusCurrentTeam);
-  if (
-    current &&
-    typeof current.focusRank === "number" &&
-    current.focusRank >= 1 &&
-    current.focusRank <= 2
-  ) {
+  const managed = managedClubId?.trim() || null;
+  const current = cards.find((card) => card.isFocusCurrentTeam) ?? null;
+
+  if (current) {
+    const better = cards.filter((card) => isMatchExperienceBetterMove(current, card));
+    if (better.length) return sortBestMatchExperienceCandidates(better, managed)[0]!;
     return current;
+  }
+
+  const competitiveFirsts = cards.filter(
+    (card) => card.band === 0 && isCompetitiveRank(card.focusRank),
+  );
+  if (competitiveFirsts.length) {
+    return sortBestMatchExperienceCandidates(competitiveFirsts, managed)[0]!;
   }
 
   const firsts = cards.filter(
     (card) => card.band === 0 && card.focusRank != null && card.focusRank >= 1,
   );
-  if (!firsts.length) return current ?? null;
-  const managed = managedClubId?.trim() || null;
-  return [...firsts].sort((left, right) => {
-    const rank = (left.focusRank ?? 99) - (right.focusRank ?? 99);
-    if (rank !== 0) return rank;
-    const leftHome = managed && left.clubId === managed ? 0 : 1;
-    const rightHome = managed && right.clubId === managed ? 0 : 1;
-    if (leftHome !== rightHome) return leftHome - rightHome;
-    const strength = right.maxSamePosCa - left.maxSamePosCa;
-    if (strength !== 0) return strength;
-    return left.teamUid.localeCompare(right.teamUid);
-  })[0]!;
+  if (!firsts.length) return null;
+  return sortBestMatchExperienceCandidates(firsts, managed)[0]!;
 }
 
 export function matchExperienceWindowStart(
