@@ -9,9 +9,10 @@ Desktop app forked from [TobiasTest22/GlassScout](https://github.com/TobiasTest2
 ## Layout
 
 ```
-desktop/        # Next.js + Tauri app (FMT native path)
-scrum/          # board + SCOPE
-Start FMT.cmd   # double-click launcher (calls desktop/Start FMT.cmd)
+desktop/     # Next.js + Tauri app (FMT native path)
+scrum/       # board + SCOPE + agent protocol
+research/    # FM ecosystem, locked recipes, live-read + probe-gate law
+Start FMT.cmd
 ```
 
 ## Run (dev)
@@ -25,7 +26,7 @@ Needs: VS Build Tools 2022 + Windows SDK, Rust (`cargo`).
 
 Prefer `npm run desktop:stable` (via the launcher) over raw `desktop:dev` for daily use.
 
-## Build installer later
+## Build installer
 
 ```bat
 cd desktop
@@ -33,6 +34,10 @@ call vcvars64.bat
 npm run desktop:build
 ```
 
-## Scrum
+Default Rust build stays quiet; RE leftovers are gated — see [`research/fm-probe-gate.md`](./research/fm-probe-gate.md).
 
-[`scrum/SCOPE.md`](./scrum/SCOPE.md) · [`scrum/STATUS.md`](./scrum/STATUS.md)
+## Scrum + research
+
+- Board: [`scrum/SCOPE.md`](./scrum/SCOPE.md) · [`scrum/STATUS.md`](./scrum/STATUS.md) · [`scrum/AGENTS.md`](./scrum/AGENTS.md)
+- Knowledge: [`research/README.md`](./research/README.md)
+- Optional Cursor/Claude local rules: [`research/agent-local-setup.md`](./research/agent-local-setup.md) (`.cursor/` is gitignored)

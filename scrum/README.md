@@ -79,4 +79,4 @@ Knowledge (not the board): [`../research/`](../research/) — public ecosystem +
 
 [`research/ecosystem.md`](../research/ecosystem.md) compounds public FM tooling knowledge.  
 [`research/recipes.md`](../research/recipes.md) is **FMT first-party** locked offsets / traps.  
-Workers: **check both before inventing memory RE.** Update them when you find or verify a source. Operational law: `.cursor/rules/fm-live-read.mdc`.
+Workers: **check both before inventing memory RE.** Update them when you find or verify a source. Operational law: [`research/live-read.md`](../research/live-read.md). Optional local Cursor copies: [`research/agent-local-setup.md`](../research/agent-local-setup.md).

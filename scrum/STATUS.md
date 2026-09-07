@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-07 (T272 done — fm-probe quiet builds)
+Last updated: 2026-09-07 (T273 done — research agent law; pushed)
 
 ## Now
 
@@ -29,7 +29,8 @@ Last updated: 2026-09-07 (T272 done — fm-probe quiet builds)
 
 ## Recently done
 
-- **T272** fm-probe feature-gate + Cursor rule (quiet default cargo)
+- **T273** Research-owned agent law; untrack `.cursor/`; push GitHub
+- **T272** fm-probe feature-gate + quiet default cargo
 - **T271** ME better-move: no equal-rung First (Legia stay vs II)
 - **T270** ME Best = no better ladder move (top-2); restore Current/Best pills
 - **T269** ME roster-depth sort (exclude focus); top-2 Current=Best; Current/Best chrome
@@ -38,7 +39,6 @@ Last updated: 2026-09-07 (T272 done — fm-probe quiet builds)
 - **T266** Dash CA/PA attr tones; `{age} years old`; ability column align
 - **T265** Dash age·pos under name on all peeks; small-viewport face flex
 - **T264** Dash true flex fill; mid-tone chip padding fix; ability/ME detail order
-- **T263** Dash denser peeks (4), best position, ME age/CA/PA, personality chip clip fix
 
 ## Loop
 

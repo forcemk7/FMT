@@ -5,7 +5,9 @@ Compound here instead of rediscovering via brittle heap walks.
 
 **Maintained:** update this file when you find, verify, or discard a source.  
 **Last sweep:** 2026-09-04  
-**Operational RE law:** `.cursor/rules/fm-live-read.mdc` (auto on `fm26/**`)  
+**Operational RE law:** [`live-read.md`](./live-read.md)  
+**Probe / quiet builds:** [`fm-probe-gate.md`](./fm-probe-gate.md)  
+**Local editor copies (optional):** [`agent-local-setup.md`](./agent-local-setup.md)  
 **FMT product fork:** FMLE-class **read** core → Gameplay Support UI. Not live editing. Not BepInEx in product.
 
 ---

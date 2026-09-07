@@ -10,7 +10,7 @@ default-run = "fmt"
 default = []
 # RE / probe helpers archive. Default build stays quiet (`allow(dead_code)`).
 # Research: `cargo check --features fm-probe` (dead_code warnings on again).
-# New probe-only code: `#[cfg(feature = "fm-probe")]` — see `.cursor/rules/fm-probe-gate.mdc`.
+# New probe-only code: `#[cfg(feature = "fm-probe")]` — see `research/fm-probe-gate.md`.
 fm-probe = []
 
 [lib]

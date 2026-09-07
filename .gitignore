@@ -1,7 +1,5 @@
 # FMT
 .cursor/
-!.cursor/rules/
-!.cursor/rules/**
 .DS_Store
 Thumbs.db
 *.log

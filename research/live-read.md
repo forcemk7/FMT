@@ -6,10 +6,12 @@ alwaysApply: false
 
 # FM26 live read — archive + direction
 
-This file is the **operational law** for live-read code (auto-injected on matching paths).  
-**Public FM tools / steal modes:** `research/ecosystem.md`.  
-**FMT first-party locked recipes:** `research/recipes.md` — check and update; do not let knowledge die in deleted probes or chat.  
-**Probe / dead_code gate:** `.cursor/rules/fm-probe-gate.mdc` — new RE helpers behind `fm-probe`; default builds stay quiet.
+This file is the **operational law** for live-read code (canonical in git).  
+Optional Cursor auto-inject: copy to `.cursor/rules/fm-live-read.mdc` — see [`agent-local-setup.md`](./agent-local-setup.md).  
+**Public FM tools / steal modes:** [`ecosystem.md`](./ecosystem.md).  
+**FMT first-party locked recipes:** [`recipes.md`](./recipes.md) — check and update; do not let knowledge die in deleted probes or chat.  
+**Probe / dead_code gate:** [`fm-probe-gate.md`](./fm-probe-gate.md) — new RE helpers behind `fm-probe`; default builds stay quiet.  
+**Local Cursor/Claude copies (optional):** [`agent-local-setup.md`](./agent-local-setup.md).
 
 **Product fork (keep):** FMLE = Live Editing. FMT = Gameplay Support (Squad / Loans / GM / HoYD / Progress).  
 **Shared need (believe):** the same **scouting core** — full in-game world readable in ~&lt;2s from `fm.exe` / `game_plugin.dll`. Editing bytes is out of scope for FMT; reading is not.

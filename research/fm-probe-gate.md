@@ -6,6 +6,8 @@ alwaysApply: true
 
 # FM probe feature gate
 
+Canonical (git). Optional Cursor copy: `.cursor/rules/fm-probe-gate.mdc` — see [`agent-local-setup.md`](./agent-local-setup.md).
+
 Default `npm run desktop:build` / `cargo check` must stay **quiet**. Do not leave `dead_code` spam in the product build.
 
 ## Law
@@ -24,4 +26,4 @@ Default `npm run desktop:build` / `cargo check` must stay **quiet**. Do not leav
 ## When touching warnings
 
 - Prefer moving the item into a `#[cfg(feature = "fm-probe")]` module over deleting.
-- Update `research/recipes.md` / `research/ecosystem.md` if a probe locks a new offset (existing live-read rule).
+- Update [`recipes.md`](./recipes.md) / [`ecosystem.md`](./ecosystem.md) if a probe locks a new offset.
