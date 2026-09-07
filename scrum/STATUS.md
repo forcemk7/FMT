@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-07 (T265 done — identity under name)
+Last updated: 2026-09-07 (T266 done — CA/PA tones + align)
 
 ## Now
 
@@ -29,6 +29,7 @@ Last updated: 2026-09-07 (T265 done — identity under name)
 
 ## Recently done
 
+- **T266** Dash CA/PA attr tones; `{age} years old`; ability column align
 - **T265** Dash age·pos under name on all peeks; small-viewport face flex
 - **T264** Dash true flex fill; mid-tone chip padding fix; ability/ME detail order
 - **T263** Dash denser peeks (4), best position, ME age/CA/PA, personality chip clip fix

@@ -494,12 +494,33 @@ body.fmt-shell .dash-ability-age,
 body.fmt-shell .dash-ability-pos {
   color: var(--text-muted);
 }
-body.fmt-shell .dash-ability-secondary {
+body.fmt-shell .dash-ability-team {
   color: var(--text-muted);
 }
+body.fmt-shell .dash-ability-secondary {
+  color: inherit;
+}
 body.fmt-shell .dash-ability-main {
-  background: rgba(101, 229, 58, 0.12);
-  color: var(--attr-tone-high, #65e53a);
+  background: transparent;
+  color: inherit;
+}
+body.fmt-shell .dash-ability-stat-main {
+  background: rgba(255, 255, 255, 0.06);
+}
+body.fmt-shell .dash-ability-stat-main.attr-tone-super {
+  background: color-mix(in srgb, var(--attr-tone-super) 18%, transparent);
+}
+body.fmt-shell .dash-ability-stat-main.attr-tone-high {
+  background: color-mix(in srgb, var(--attr-tone-high) 16%, transparent);
+}
+body.fmt-shell .dash-ability-stat-main.attr-tone-upper {
+  background: color-mix(in srgb, var(--attr-tone-upper) 16%, transparent);
+}
+body.fmt-shell .dash-ability-stat-main.attr-tone-mid {
+  background: color-mix(in srgb, var(--attr-tone-mid) 12%, transparent);
+}
+body.fmt-shell .dash-ability-stat-main.attr-tone-low {
+  background: color-mix(in srgb, var(--attr-tone-low) 16%, transparent);
 }
 body.fmt-shell .dash-mover-count {
   background: rgba(255, 255, 255, 0.06);

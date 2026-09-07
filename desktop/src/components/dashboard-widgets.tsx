@@ -5,7 +5,7 @@ import {
   formatDelta,
   type SquadMoverChange,
 } from "@/domain/attribute-history";
-import { attributeDeltaTone } from "@/domain/attribute-tone";
+import { abilityToneFromScore, attributeDeltaTone } from "@/domain/attribute-tone";
 import {
   dashPersonalityHighlights,
   formatHasScore,
@@ -33,21 +33,45 @@ function bestPositionLabel(player: LivePlayer): string | null {
   return primary || null;
 }
 
-function ageShortLabel(player: LivePlayer): string | null {
+function ageYearsLabel(player: LivePlayer): string | null {
   return typeof player.age === "number" && Number.isFinite(player.age)
-    ? String(Math.round(player.age))
+    ? `${Math.round(player.age)} years old`
     : null;
 }
 
-/** Subtle `{age} · {pos}` under the name — shared base identity for every peek. */
+/** Subtle `{age} years old · {pos}` under the name — shared base identity. */
 function DashPlayerIdentity({ player }: { player: LivePlayer }) {
-  const age = ageShortLabel(player);
+  const age = ageYearsLabel(player);
   const position = bestPositionLabel(player);
   const meta = [age, position].filter(Boolean).join(" · ");
   return (
     <span className="dash-has-card-copy">
       <strong>{player.name}</strong>
       {meta ? <small className="dash-player-meta">{meta}</small> : null}
+    </span>
+  );
+}
+
+/** CA/PA with core attr-tone colors (1–200 → tenths bands). */
+function DashAbilityStat({
+  kind,
+  value,
+  variant = "inline",
+}: {
+  kind: "CA" | "PA";
+  value: number | null | undefined;
+  variant?: "inline" | "main";
+}) {
+  const tone =
+    typeof value === "number" && Number.isFinite(value)
+      ? abilityToneFromScore(value)
+      : "mid";
+  const title = kind === "CA" ? "Current ability" : "Potential ability";
+  return (
+    <span
+      className={`dash-ability-stat dash-ability-stat-${variant} attr-tone attr-tone-${tone}`}
+    >
+      <abbr title={title}>{kind}</abbr> {abilityLabel(value)}
     </span>
   );
 }
@@ -181,23 +205,15 @@ export function DashAbilityRow({
   const chrome = dashClubTeamChrome(player, clubTeams ?? [], clubs ?? []);
   const secondary =
     mode === "players" ? (
-      <>
-        <abbr title="Potential ability">PA</abbr> {abilityLabel(pa)}
-      </>
+      <DashAbilityStat kind="PA" value={pa} />
     ) : (
-      <>
-        <abbr title="Current ability">CA</abbr> {abilityLabel(ca)}
-      </>
+      <DashAbilityStat kind="CA" value={ca} />
     );
   const main =
     mode === "players" ? (
-      <>
-        <abbr title="Current ability">CA</abbr> {abilityLabel(ca)}
-      </>
+      <DashAbilityStat kind="CA" value={ca} variant="main" />
     ) : (
-      <>
-        <abbr title="Potential ability">PA</abbr> {abilityLabel(pa)}
-      </>
+      <DashAbilityStat kind="PA" value={pa} variant="main" />
     );
 
   return (
@@ -208,19 +224,15 @@ export function DashAbilityRow({
     >
       <PlayerFace playerId={player.id} name={player.name} size="sm" />
       <DashPlayerIdentity player={player} />
-      <span className="dash-row-extra dash-ability-extra">
-        {chrome ? (
-          <span className="dash-ability-team" title={`${chrome.clubName} ${chrome.teamType}`}>
-            {chrome.clubId ? (
-              <ClubLogo clubId={chrome.clubId} name={chrome.clubName} size="sm" />
-            ) : (
-              <span className="club-logo club-logo-sm club-logo-empty" aria-hidden="true" />
-            )}
-            <span className="dash-ability-team-type">{chrome.teamType}</span>
-          </span>
-        ) : null}
-        <span className="dash-ability-secondary">{secondary}</span>
+      <span className="dash-ability-team" title={chrome ? `${chrome.clubName} ${chrome.teamType}` : undefined}>
+        {chrome?.clubId ? (
+          <ClubLogo clubId={chrome.clubId} name={chrome.clubName} size="sm" />
+        ) : (
+          <span className="club-logo club-logo-sm club-logo-empty" aria-hidden="true" />
+        )}
+        <span className="dash-ability-team-type">{chrome?.teamType ?? "—"}</span>
       </span>
+      <span className="dash-ability-secondary">{secondary}</span>
       <span className="dash-row-main dash-ability-main">{main}</span>
     </button>
   );
@@ -275,12 +287,8 @@ export function DashMatchExperienceRow({
             <span className="dash-me-move-type">{toTeamLabel}</span>
           </span>
         </span>
-        <span className="dash-ability-secondary">
-          <abbr title="Current ability">CA</abbr> {abilityLabel(ca)}
-        </span>
-        <span className="dash-ability-secondary">
-          <abbr title="Potential ability">PA</abbr> {abilityLabel(pa)}
-        </span>
+        <DashAbilityStat kind="CA" value={ca} />
+        <DashAbilityStat kind="PA" value={pa} />
       </span>
       <span className="dash-row-main dash-me-opportunity-rank">
         #{focusRank} {position}
