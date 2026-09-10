@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-10 (T282 done — Settings preview cells)
+Last updated: 2026-09-11 (T283 done — Settings preview visible when collapsed)
 
 ## Now
 
@@ -33,6 +33,7 @@ Last updated: 2026-09-10 (T282 done — Settings preview cells)
 
 ## Recently done
 
+- **T283** Settings preview row visible when collapsed (inside summary)
 - **T282** Settings critical peeks = same cell grid visuals (1 row)
 - **T281** Settings dense rows: no titles/subtitles; ≤3 critical peeks
 - **T280** Settings = diagnostics cells only (Teams/Graphics/Scores as cells)
@@ -42,7 +43,6 @@ Last updated: 2026-09-10 (T282 done — Settings preview cells)
 - **T276** Diagnostics title+value cells; kill Status/Data warning soup
 - **T273** Research-owned agent law; untrack `.cursor/`; push GitHub
 - **T272** fm-probe feature-gate + quiet default cargo
-- **T271** ME better-move: no equal-rung First (Legia stay vs II)
 
 ## Loop
 

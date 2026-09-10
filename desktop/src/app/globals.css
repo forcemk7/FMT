@@ -629,18 +629,22 @@ h1, h2, h3, [data-slot="card-title"] { font-family: "Inter Variable", Inter, "Se
 .settings-face-pills li>b[data-kind=Logos]{background:#e8eef8;color:#3d5a80}
 .settings-list .settings-expand{border-top:1px solid var(--border)}
 .settings-list .settings-expand>summary{
-  display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:12px;
-  padding:16px;cursor:pointer;list-style:none;
+  display:flex;flex-direction:column;align-items:stretch;gap:0;
+  padding:0;cursor:pointer;list-style:none;
 }
 .settings-list .settings-expand>summary::-webkit-details-marker{display:none}
-.settings-list .settings-expand>summary>svg:first-child{width:20px;color:var(--mint)}
-.settings-list .settings-expand>summary .settings-section-label{font-size:10px;color:var(--navy);font-weight:700}
+.settings-summary-row{
+  display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:12px;
+  padding:16px;
+}
+.settings-summary-row>svg:first-child{width:20px;color:var(--mint)}
+.settings-summary-row .settings-section-label{font-size:10px;color:var(--navy);font-weight:700}
 .settings-expand-meta{display:inline-flex;align-items:center;gap:8px;justify-self:end}
 .settings-expand-meta b{color:var(--slate);font-size:8px;text-transform:capitalize;font-weight:700}
 .settings-expand-chevron{width:16px;color:var(--slate);transition:transform .15s ease}
 .settings-expand[open]>summary .settings-expand-chevron{transform:rotate(180deg)}
-.settings-section-preview{padding:0 16px 14px}
-.settings-expand[open]>.settings-section-preview{display:none}
+.settings-section-preview{display:block;padding:0 16px 14px}
+.settings-expand[open]>summary .settings-section-preview{display:none}
 .settings-diagnostics-preview{grid-template-columns:repeat(3,minmax(0,1fr))!important}
 .settings-diagnostics-preview .diagnostic-cell{border-bottom:0}
 .settings-expand-body{padding:0 16px 16px;border-top:1px solid var(--border);background:#fbfdfe}

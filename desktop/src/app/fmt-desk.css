@@ -646,12 +646,13 @@ body.fmt-shell .settings-list .settings-expand > summary span,
 body.fmt-shell .settings-expand-meta b {
   color: var(--text-muted);
 }
-body.fmt-shell .settings-expand[open] > .settings-section-preview {
-  display: none;
-}
 body.fmt-shell .settings-list > article svg,
-body.fmt-shell .settings-list .settings-expand > summary > svg:first-child {
+body.fmt-shell .settings-list .settings-expand > summary > svg:first-child,
+body.fmt-shell .settings-summary-row > svg:first-child {
   color: var(--mint);
+}
+body.fmt-shell .settings-expand[open] > summary .settings-section-preview {
+  display: none;
 }
 body.fmt-shell .settings-face-pills li {
   background: var(--panel-2) !important;
