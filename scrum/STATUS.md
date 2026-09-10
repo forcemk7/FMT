@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-10 (T281 done — Settings dense rows)
+Last updated: 2026-09-10 (T282 done — Settings preview cells)
 
 ## Now
 
@@ -33,6 +33,8 @@ Last updated: 2026-09-10 (T281 done — Settings dense rows)
 
 ## Recently done
 
+- **T282** Settings critical peeks = same cell grid visuals (1 row)
+- **T281** Settings dense rows: no titles/subtitles; ≤3 critical peeks
 - **T280** Settings = diagnostics cells only (Teams/Graphics/Scores as cells)
 - **T279** Settings: FM26 / Club / Teams / Players / Affiliations / Graphics / Scores + nested diagnostics
 - **T278** Diagnostics tone on every cell + visible cue
@@ -41,8 +43,6 @@ Last updated: 2026-09-10 (T281 done — Settings dense rows)
 - **T273** Research-owned agent law; untrack `.cursor/`; push GitHub
 - **T272** fm-probe feature-gate + quiet default cargo
 - **T271** ME better-move: no equal-rung First (Legia stay vs II)
-- **T270** ME Best = no better ladder move (top-2); restore Current/Best pills
-- **T269** ME roster-depth sort (exclude focus); top-2 Current=Best; Current/Best chrome
 
 ## Loop
 

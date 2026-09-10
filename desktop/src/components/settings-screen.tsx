@@ -161,27 +161,28 @@ function SettingsGroup({
       <summary>
         {icon}
         <strong className="settings-section-label">{title}</strong>
-        {peeks.length ? (
-          <span className="settings-critical-peeks" aria-hidden="true">
-            {peeks.map((cell) => (
-              <span key={cell.title} className={`settings-critical-peek tone-${cell.tone}`}>
-                <span className="diagnostic-tone" />
-                <span className="settings-critical-peek-text">
-                  <em>{cell.title}</em>
-                  {cell.status.trim() || "none"}
-                </span>
-              </span>
-            ))}
-          </span>
-        ) : (
-          <span className="settings-critical-peeks is-empty" aria-hidden="true" />
-        )}
         <span className="settings-expand-meta">
           <span className={`settings-section-tone tone-${tone}`} aria-label={`${tone} status`} />
           <b>{meta}</b>
           <ChevronDown className="settings-expand-chevron" aria-hidden="true" />
         </span>
       </summary>
+      {peeks.length ? (
+        <div className="settings-section-preview">
+          <dl className="settings-diagnostics-grid settings-diagnostics-preview">
+            {peeks.map((cell, index) => (
+              <DiagnosticCellView
+                key={`peek:${cell.title}:${index}`}
+                title={cell.title}
+                status={cell.status}
+                tone={cell.tone}
+                critical={cell.critical}
+                wide={false}
+              />
+            ))}
+          </dl>
+        </div>
+      ) : null}
       <div className="settings-expand-body">
         {action ? <div className="settings-expand-actions">{action}</div> : null}
         <dl className="settings-diagnostics-grid">

@@ -646,11 +646,8 @@ body.fmt-shell .settings-list .settings-expand > summary span,
 body.fmt-shell .settings-expand-meta b {
   color: var(--text-muted);
 }
-body.fmt-shell .settings-critical-peek-text em {
-  color: var(--text);
-}
-body.fmt-shell .settings-expand[open] > summary .settings-critical-peeks {
-  visibility: hidden;
+body.fmt-shell .settings-expand[open] > .settings-section-preview {
+  display: none;
 }
 body.fmt-shell .settings-list > article svg,
 body.fmt-shell .settings-list .settings-expand > summary > svg:first-child {
