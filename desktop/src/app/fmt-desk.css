@@ -743,14 +743,42 @@ body.fmt-shell .diagnostics .diagnostic-tone {
   border-radius: 50%;
   background: #8b949e;
 }
-body.fmt-shell .diagnostics .tone-green .diagnostic-tone {
+body.fmt-shell .diagnostics .tone-green .diagnostic-tone,
+body.fmt-shell .tone-green .diagnostic-tone,
+body.fmt-shell .settings-section-tone.tone-green {
   background: #3cb87a;
 }
-body.fmt-shell .diagnostics .tone-yellow .diagnostic-tone {
+body.fmt-shell .diagnostics .tone-yellow .diagnostic-tone,
+body.fmt-shell .tone-yellow .diagnostic-tone,
+body.fmt-shell .settings-section-tone.tone-yellow {
   background: #d4b03a;
 }
-body.fmt-shell .diagnostics .tone-red .diagnostic-tone {
+body.fmt-shell .diagnostics .tone-red .diagnostic-tone,
+body.fmt-shell .tone-red .diagnostic-tone,
+body.fmt-shell .settings-section-tone.tone-red {
   background: #e05656;
+}
+body.fmt-shell .settings-diagnostics {
+  border-top-color: var(--hairline);
+}
+body.fmt-shell .settings-diagnostics h3 {
+  color: var(--text-dim);
+}
+body.fmt-shell .settings-diagnostics dl {
+  background: rgba(0, 0, 0, 0.18);
+  border-color: var(--hairline);
+}
+body.fmt-shell .settings-diagnostics dl .diagnostic-cell {
+  border-color: var(--hairline);
+}
+body.fmt-shell .settings-diagnostics dt {
+  color: var(--text-dim);
+}
+body.fmt-shell .settings-diagnostics dd {
+  color: var(--text);
+}
+body.fmt-shell .settings-group-note {
+  color: var(--text-muted);
 }
 body.fmt-shell .mapping-coverage > header {
   background: rgba(0, 0, 0, 0.22) !important;
