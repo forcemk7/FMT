@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-10 (T279 done — Settings core groups)
+Last updated: 2026-09-10 (T280 done — Settings diagnostics cells only)
 
 ## Now
 
@@ -33,6 +33,7 @@ Last updated: 2026-09-10 (T279 done — Settings core groups)
 
 ## Recently done
 
+- **T280** Settings = diagnostics cells only (Teams/Graphics/Scores as cells)
 - **T279** Settings: FM26 / Club / Teams / Players / Affiliations / Graphics / Scores + nested diagnostics
 - **T278** Diagnostics tone on every cell + visible cue
 - **T277** Diagnostics cell tone — green / yellow / red glance cue
@@ -42,7 +43,6 @@ Last updated: 2026-09-10 (T279 done — Settings core groups)
 - **T271** ME better-move: no equal-rung First (Legia stay vs II)
 - **T270** ME Best = no better ladder move (top-2); restore Current/Best pills
 - **T269** ME roster-depth sort (exclude focus); top-2 Current=Best; Current/Best chrome
-- **T268** Dash Ability label; right trail CA/PA digit align (players/talent/ME)
 
 ## Loop
 

@@ -15,10 +15,7 @@ import type { LiveFootballSnapshot } from "@/domain/adapters";
 import { FRONTEND_CALCULATION_CARDS } from "@/domain/has-score";
 import { sortClubTeamsForSquadDesk, squadTeamDisplayName } from "@/domain/live-data";
 import { Button } from "@/components/ui/button";
-import {
-  GraphicsPacksBody,
-  useGraphicsPacksStatus,
-} from "@/components/graphics-packs-panel";
+import { useGraphicsPacksStatus } from "@/components/graphics-packs-panel";
 import { getVersion } from "@tauri-apps/api/app";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -126,8 +123,8 @@ function SettingsGroup({
   subtitle,
   meta,
   tone,
-  children,
-  diagnostics,
+  action,
+  cells,
 }: {
   id: string;
   icon: ReactNode;
@@ -135,8 +132,8 @@ function SettingsGroup({
   subtitle: string;
   meta: string;
   tone: DiagnosticTone;
-  children?: ReactNode;
-  diagnostics: DiagCell[];
+  action?: ReactNode;
+  cells: DiagCell[];
 }) {
   return (
     <details className="settings-expand" id={id}>
@@ -153,15 +150,12 @@ function SettingsGroup({
         </span>
       </summary>
       <div className="settings-expand-body">
-        {children}
-        <div className="settings-diagnostics">
-          <h3>Diagnostics</h3>
-          <dl>
-            {diagnostics.map((cell) => (
-              <DiagnosticCellView key={cell.title} {...cell} />
-            ))}
-          </dl>
-        </div>
+        {action ? <div className="settings-expand-actions">{action}</div> : null}
+        <dl className="settings-diagnostics-grid">
+          {cells.map((cell, index) => (
+            <DiagnosticCellView key={`${cell.title}:${index}`} {...cell} />
+          ))}
+        </dl>
       </div>
     </details>
   );
@@ -193,8 +187,6 @@ export function SettingsScreen({
     if (!clubId) return null;
     return snapshot.clubs.find((club) => club.id === clubId)?.name ?? null;
   }, [snapshot.clubs, snapshot.managedClubId]);
-  const connected =
-    snapshot.status.state === "connected" && Boolean(snapshot.managedClubId);
 
   const backendCells: DiagCell[] = useMemo(
     () =>
@@ -212,7 +204,7 @@ export function SettingsScreen({
     getVersion().then(setAppVersion).catch(() => setAppVersion(null));
   }, []);
 
-  const fm26Diagnostics: DiagCell[] = [
+  const fm26Cells: DiagCell[] = [
     {
       title: "Connection state",
       status: readable(status.state),
@@ -243,9 +235,15 @@ export function SettingsScreen({
       tone: "green",
     },
     {
+      title: "Memory safety",
+      status: memorySafetyLabel(status.memoryAccess),
+      tone: toneIf(status.memoryAccess.includes("read"), "green", "yellow"),
+    },
+    {
       title: "Read-only access flags",
       status: status.handleAccessFlags ?? "Unavailable",
       tone: tonePresent(status.handleAccessFlags),
+      wide: true,
     },
     {
       title: "Windows error",
@@ -387,7 +385,7 @@ export function SettingsScreen({
     },
   ];
 
-  const clubDiagnostics: DiagCell[] = [
+  const clubCells: DiagCell[] = [
     {
       title: "Managed club pointer",
       status: status.managedClubPointer ?? "Unavailable",
@@ -423,7 +421,31 @@ export function SettingsScreen({
     },
   ];
 
-  const teamsDiagnostics: DiagCell[] = [
+  const teamCellsFromRoster: DiagCell[] = clubTeams.length
+    ? clubTeams.map((team) => {
+        const label = squadTeamDisplayName(team, managedClubName);
+        const unit = team.squadUnit ?? "—";
+        const type =
+          typeof team.teamType === "number" ? `type=${team.teamType}` : "type=—";
+        return {
+          title: label,
+          status: `uid ${team.teamUid} · ${unit} · ${team.rosterLen} roster · ${type}`,
+          tone: team.rosterLen > 0 || team.isManagerTeam ? "green" : "yellow",
+          critical: Boolean(team.isManagerTeam) && team.rosterLen === 0,
+          wide: true,
+        };
+      })
+    : [
+        {
+          title: "Club.Teams",
+          status: "none",
+          tone: "yellow" as const,
+          critical: true,
+          wide: true,
+        },
+      ];
+
+  const teamsCells: DiagCell[] = [
     {
       title: "Squad collection",
       status: status.playerCollectionPointer ?? "Unavailable",
@@ -441,13 +463,6 @@ export function SettingsScreen({
       tone: tonePresent(status.clubsLoaded, { zeroOk: false }),
     },
     {
-      title: "Club.Teams discovered",
-      status: cellByTitle(backendCells, "Club.Teams discovered")?.status ?? "none",
-      tone: cellByTitle(backendCells, "Club.Teams discovered")?.tone ?? "yellow",
-      critical: true,
-      wide: true,
-    },
-    {
       title: "Club.Teams + affiliate players loaded",
       status:
         cellByTitle(backendCells, "Club.Teams + affiliate players loaded")?.status ?? "none",
@@ -458,10 +473,12 @@ export function SettingsScreen({
       title: "Squad-tab affiliate clubs",
       status: cellByTitle(backendCells, "Squad-tab affiliate clubs")?.status ?? "none",
       tone: cellByTitle(backendCells, "Squad-tab affiliate clubs")?.tone ?? "yellow",
+      wide: true,
     },
+    ...teamCellsFromRoster,
   ];
 
-  const playersDiagnostics: DiagCell[] = [
+  const playersCells: DiagCell[] = [
     {
       title: "Players loaded",
       status: String(status.playersLoaded),
@@ -546,7 +563,7 @@ export function SettingsScreen({
     "Affiliate clubs loaded",
     "Match experience affiliate teams",
   ];
-  const affiliationsDiagnostics: DiagCell[] = affiliationTitles.map((title) => {
+  const affiliationsCells: DiagCell[] = affiliationTitles.map((title) => {
     const fromBackend = cellByTitle(backendCells, title);
     return {
       title,
@@ -559,7 +576,7 @@ export function SettingsScreen({
     };
   });
 
-  const graphicsDiagnostics: DiagCell[] = [
+  const graphicsCells: DiagCell[] = [
     {
       title: "Graphics folder",
       status: graphics?.graphicsPath?.trim() || "Unavailable",
@@ -567,13 +584,11 @@ export function SettingsScreen({
       wide: true,
     },
     {
-      title: "Packs",
+      title: "Pack count",
       status:
         !graphics || graphics.loading
           ? "…"
-          : graphics.packs.length
-            ? `${graphics.packs.length}`
-            : "none",
+          : String(graphics.packs.length),
       tone:
         !graphics || graphics.loading
           ? "yellow"
@@ -581,11 +596,34 @@ export function SettingsScreen({
             ? "green"
             : "yellow",
     },
+    ...(!graphics || graphics.loading
+      ? []
+      : graphics.packs.length
+        ? graphics.packs.map((pack) => {
+            const path =
+              pack.path?.trim() ||
+              (graphics.graphicsPath
+                ? `${graphics.graphicsPath.replace(/[\\/]+$/, "")}\\${pack.name}`
+                : "Path unavailable");
+            return {
+              title: pack.name,
+              status: `${pack.kind} · ${path}`,
+              tone: path === "Path unavailable" ? ("yellow" as const) : ("green" as const),
+              wide: true,
+            };
+          })
+        : [
+            {
+              title: "Packs",
+              status: "none",
+              tone: "yellow" as const,
+            },
+          ]),
   ];
 
-  const scoresDiagnostics: DiagCell[] = FRONTEND_CALCULATION_CARDS.map((calc) => ({
+  const scoresCells: DiagCell[] = FRONTEND_CALCULATION_CARDS.map((calc) => ({
     title: calc.title,
-    status: calc.detail,
+    status: `${calc.badge} · ${calc.detail}`,
     tone: calc.state === "passed" ? "green" : calc.state === "blocked" ? "red" : "yellow",
     wide: true,
   }));
@@ -598,7 +636,7 @@ export function SettingsScreen({
         <div>
           <h1>Settings</h1>
           <p>
-            FM26 connector and local controls.
+            Diagnostics for the live FM26 read.
             {appVersion ? ` · FMT ${appVersion}` : null}
           </p>
         </div>
@@ -613,10 +651,9 @@ export function SettingsScreen({
             status.processDetected ? "Football Manager 26 detected" : "Waiting for FM26"
           }
           meta={memorySafetyLabel(status.memoryAccess)}
-          tone={sectionTone(fm26Diagnostics)}
-          diagnostics={fm26Diagnostics}
-        >
-          <div className="settings-expand-actions">
+          tone={sectionTone(fm26Cells)}
+          cells={fm26Cells}
+          action={
             <Button variant="outline" onClick={onRefresh} disabled={checking}>
               <RefreshCw
                 data-icon="inline-start"
@@ -624,11 +661,8 @@ export function SettingsScreen({
               />
               Load Active Save
             </Button>
-          </div>
-          <p className="settings-group-note">
-            Query and read access only. FMT cannot write to FM26.
-          </p>
-        </SettingsGroup>
+          }
+        />
 
         <SettingsGroup
           id="settings-club"
@@ -636,69 +670,50 @@ export function SettingsScreen({
           title="Club"
           subtitle={managedClubName ?? "Managed club"}
           meta={snapshot.managedClubId ?? "—"}
-          tone={sectionTone(clubDiagnostics)}
-          diagnostics={clubDiagnostics}
+          tone={sectionTone(clubCells)}
+          cells={clubCells}
         />
 
         <SettingsGroup
           id="settings-teams"
           icon={<Users aria-hidden="true" />}
           title="Teams"
-          subtitle="Club.Teams roster lengths"
-          meta={connected && clubTeams.length ? `${clubTeams.length} teams` : "—"}
-          tone={sectionTone(teamsDiagnostics)}
-          diagnostics={teamsDiagnostics}
-        >
-          {connected && clubTeams.length ? (
-            <dl className="settings-club-roster-lens">
-              {clubTeams.map((team) => (
-                <div key={team.teamUid}>
-                  <dt>{squadTeamDisplayName(team, managedClubName)}</dt>
-                  <dd>{team.rosterLen}</dd>
-                </div>
-              ))}
-            </dl>
-          ) : (
-            <p className="settings-club-roster-empty">
-              Load an active save to see Club.Teams rosterLen values.
-            </p>
-          )}
-        </SettingsGroup>
+          subtitle="Club.Teams"
+          meta={clubTeams.length ? `${clubTeams.length} teams` : "—"}
+          tone={sectionTone(teamsCells)}
+          cells={teamsCells}
+        />
 
         <SettingsGroup
           id="settings-players"
           icon={<UserRound aria-hidden="true" />}
           title="Players"
           subtitle="Rosters and mapped fields"
-          meta={
-            status.playersLoaded
-              ? `${status.playersLoaded} loaded`
-              : "—"
-          }
-          tone={sectionTone(playersDiagnostics)}
-          diagnostics={playersDiagnostics}
+          meta={status.playersLoaded ? `${status.playersLoaded} loaded` : "—"}
+          tone={sectionTone(playersCells)}
+          cells={playersCells}
         />
 
         <SettingsGroup
           id="settings-affiliations"
           icon={<Network aria-hidden="true" />}
           title="Affiliations"
-          subtitle="club+0x118 feeders, II, Match experience"
+          subtitle="club+0x118"
           meta={
             cellByTitle(backendCells, "Affiliate clubs loaded")?.status &&
             cellByTitle(backendCells, "Affiliate clubs loaded")?.status !== "none"
               ? "loaded"
               : "—"
           }
-          tone={sectionTone(affiliationsDiagnostics)}
-          diagnostics={affiliationsDiagnostics}
+          tone={sectionTone(affiliationsCells)}
+          cells={affiliationsCells}
         />
 
         <SettingsGroup
           id="settings-graphics"
           icon={<Images aria-hidden="true" />}
           title="Graphics"
-          subtitle="Faces and logos from the FM26 graphics folder"
+          subtitle="Faces and logos"
           meta={
             !graphics || graphics.loading
               ? "…"
@@ -706,11 +721,9 @@ export function SettingsScreen({
                 ? `${graphics.packs.length} packs`
                 : "None"
           }
-          tone={sectionTone(graphicsDiagnostics)}
-          diagnostics={graphicsDiagnostics}
-        >
-          <GraphicsPacksBody status={graphics} />
-        </SettingsGroup>
+          tone={sectionTone(graphicsCells)}
+          cells={graphicsCells}
+        />
 
         <SettingsGroup
           id="settings-scores"
@@ -718,19 +731,9 @@ export function SettingsScreen({
           title="Scores"
           subtitle="FMT calculations from mapped fields"
           meta={`${scoresLive} live`}
-          tone={sectionTone(scoresDiagnostics)}
-          diagnostics={scoresDiagnostics}
-        >
-          <div className="read-pipeline-grid">
-            {FRONTEND_CALCULATION_CARDS.map((calc) => (
-              <article key={calc.key} data-state={calc.state}>
-                <span>{calc.badge}</span>
-                <strong>{calc.title}</strong>
-                <p>{calc.detail}</p>
-              </article>
-            ))}
-          </div>
-        </SettingsGroup>
+          tone={sectionTone(scoresCells)}
+          cells={scoresCells}
+        />
       </section>
     </main>
   );

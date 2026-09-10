@@ -764,17 +764,21 @@ body.fmt-shell .settings-diagnostics {
 body.fmt-shell .settings-diagnostics h3 {
   color: var(--text-dim);
 }
-body.fmt-shell .settings-diagnostics dl {
+body.fmt-shell .settings-diagnostics dl,
+body.fmt-shell .settings-diagnostics-grid {
   background: rgba(0, 0, 0, 0.18);
   border-color: var(--hairline);
 }
-body.fmt-shell .settings-diagnostics dl .diagnostic-cell {
+body.fmt-shell .settings-diagnostics dl .diagnostic-cell,
+body.fmt-shell .settings-diagnostics-grid .diagnostic-cell {
   border-color: var(--hairline);
 }
-body.fmt-shell .settings-diagnostics dt {
+body.fmt-shell .settings-diagnostics dt,
+body.fmt-shell .settings-diagnostics-grid dt {
   color: var(--text-dim);
 }
-body.fmt-shell .settings-diagnostics dd {
+body.fmt-shell .settings-diagnostics dd,
+body.fmt-shell .settings-diagnostics-grid dd {
   color: var(--text);
 }
 body.fmt-shell .settings-group-note {
