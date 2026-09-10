@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-10 (T277 done — Diagnostics cell tone)
+Last updated: 2026-09-10 (T278 done — Diagnostics tone on every cell)
 
 ## Now
 
@@ -33,6 +33,7 @@ Last updated: 2026-09-10 (T277 done — Diagnostics cell tone)
 
 ## Recently done
 
+- **T278** Diagnostics tone on every cell + visible cue
 - **T277** Diagnostics cell tone — green / yellow / red glance cue
 - **T276** Diagnostics title+value cells; kill Status/Data warning soup
 - **T273** Research-owned agent law; untrack `.cursor/`; push GitHub
@@ -42,7 +43,6 @@ Last updated: 2026-09-10 (T277 done — Diagnostics cell tone)
 - **T269** ME roster-depth sort (exclude focus); top-2 Current=Best; Current/Best chrome
 - **T268** Dash Ability label; right trail CA/PA digit align (players/talent/ME)
 - **T267** Fix ability main overlay on face; mover chips Title Case + bold
-- **T266** Dash CA/PA attr tones; `{age} years old`; ability column align
 
 ## Loop
 

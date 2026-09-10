@@ -734,6 +734,15 @@ body.fmt-shell .diagnostics dd {
 body.fmt-shell .diagnostics > p {
   color: var(--text-muted);
 }
+body.fmt-shell .diagnostics .diagnostic-tone {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  min-width: 8px;
+  min-height: 8px;
+  border-radius: 50%;
+  background: #8b949e;
+}
 body.fmt-shell .diagnostics .tone-green .diagnostic-tone {
   background: #3cb87a;
 }
