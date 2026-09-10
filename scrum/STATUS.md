@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-10 (T280 done — Settings diagnostics cells only)
+Last updated: 2026-09-10 (T281 done — Settings dense rows)
 
 ## Now
 

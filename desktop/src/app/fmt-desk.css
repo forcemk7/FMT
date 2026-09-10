@@ -636,7 +636,8 @@ body.fmt-shell .settings-list > article:first-child {
   border-top: 0 !important;
 }
 body.fmt-shell .settings-list > article strong,
-body.fmt-shell .settings-list .settings-expand > summary strong {
+body.fmt-shell .settings-list .settings-expand > summary strong,
+body.fmt-shell .settings-list .settings-expand > summary .settings-section-label {
   color: var(--text);
 }
 body.fmt-shell .settings-list > article span,
@@ -644,6 +645,12 @@ body.fmt-shell .settings-list > article b,
 body.fmt-shell .settings-list .settings-expand > summary span,
 body.fmt-shell .settings-expand-meta b {
   color: var(--text-muted);
+}
+body.fmt-shell .settings-critical-peek-text em {
+  color: var(--text);
+}
+body.fmt-shell .settings-expand[open] > summary .settings-critical-peeks {
+  visibility: hidden;
 }
 body.fmt-shell .settings-list > article svg,
 body.fmt-shell .settings-list .settings-expand > summary > svg:first-child {

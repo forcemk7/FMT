@@ -116,11 +116,32 @@ function cellByTitle(cells: DiagCell[], title: string): DiagCell | undefined {
   return cells.find((cell) => cell.title === title);
 }
 
+/** Up to 3 peeks: critical red/yellow first, then other red/yellow, then critical green. */
+function criticalPeeks(cells: DiagCell[], limit = 3): DiagCell[] {
+  const buckets: DiagCell[][] = [
+    cells.filter((cell) => cell.critical && cell.tone === "red"),
+    cells.filter((cell) => cell.critical && cell.tone === "yellow"),
+    cells.filter((cell) => !cell.critical && cell.tone === "red"),
+    cells.filter((cell) => !cell.critical && cell.tone === "yellow"),
+    cells.filter((cell) => cell.critical && cell.tone === "green"),
+  ];
+  const picked: DiagCell[] = [];
+  const seen = new Set<string>();
+  for (const bucket of buckets) {
+    for (const cell of bucket) {
+      if (seen.has(cell.title)) continue;
+      seen.add(cell.title);
+      picked.push(cell);
+      if (picked.length >= limit) return picked;
+    }
+  }
+  return picked;
+}
+
 function SettingsGroup({
   id,
   icon,
   title,
-  subtitle,
   meta,
   tone,
   action,
@@ -129,20 +150,32 @@ function SettingsGroup({
   id: string;
   icon: ReactNode;
   title: string;
-  subtitle: string;
   meta: string;
   tone: DiagnosticTone;
   action?: ReactNode;
   cells: DiagCell[];
 }) {
+  const peeks = criticalPeeks(cells, 3);
   return (
     <details className="settings-expand" id={id}>
       <summary>
         {icon}
-        <div>
-          <strong>{title}</strong>
-          <span>{subtitle}</span>
-        </div>
+        <strong className="settings-section-label">{title}</strong>
+        {peeks.length ? (
+          <span className="settings-critical-peeks" aria-hidden="true">
+            {peeks.map((cell) => (
+              <span key={cell.title} className={`settings-critical-peek tone-${cell.tone}`}>
+                <span className="diagnostic-tone" />
+                <span className="settings-critical-peek-text">
+                  <em>{cell.title}</em>
+                  {cell.status.trim() || "none"}
+                </span>
+              </span>
+            ))}
+          </span>
+        ) : (
+          <span className="settings-critical-peeks is-empty" aria-hidden="true" />
+        )}
         <span className="settings-expand-meta">
           <span className={`settings-section-tone tone-${tone}`} aria-label={`${tone} status`} />
           <b>{meta}</b>
@@ -631,25 +664,12 @@ export function SettingsScreen({
   const scoresLive = FRONTEND_CALCULATION_CARDS.filter((c) => c.state === "passed").length;
 
   return (
-    <main className="screen settings-screen">
-      <div className="planner-heading">
-        <div>
-          <h1>Settings</h1>
-          <p>
-            Diagnostics for the live FM26 read.
-            {appVersion ? ` · FMT ${appVersion}` : null}
-          </p>
-        </div>
-      </div>
-
+    <main className="screen settings-screen" aria-label="Settings">
       <section className="settings-list">
         <SettingsGroup
           id="settings-fm26"
           icon={<Gamepad2 aria-hidden="true" />}
           title="FM26"
-          subtitle={
-            status.processDetected ? "Football Manager 26 detected" : "Waiting for FM26"
-          }
           meta={memorySafetyLabel(status.memoryAccess)}
           tone={sectionTone(fm26Cells)}
           cells={fm26Cells}
@@ -668,8 +688,7 @@ export function SettingsScreen({
           id="settings-club"
           icon={<Building2 aria-hidden="true" />}
           title="Club"
-          subtitle={managedClubName ?? "Managed club"}
-          meta={snapshot.managedClubId ?? "—"}
+          meta={managedClubName ?? snapshot.managedClubId ?? "—"}
           tone={sectionTone(clubCells)}
           cells={clubCells}
         />
@@ -678,7 +697,6 @@ export function SettingsScreen({
           id="settings-teams"
           icon={<Users aria-hidden="true" />}
           title="Teams"
-          subtitle="Club.Teams"
           meta={clubTeams.length ? `${clubTeams.length} teams` : "—"}
           tone={sectionTone(teamsCells)}
           cells={teamsCells}
@@ -688,7 +706,6 @@ export function SettingsScreen({
           id="settings-players"
           icon={<UserRound aria-hidden="true" />}
           title="Players"
-          subtitle="Rosters and mapped fields"
           meta={status.playersLoaded ? `${status.playersLoaded} loaded` : "—"}
           tone={sectionTone(playersCells)}
           cells={playersCells}
@@ -698,7 +715,6 @@ export function SettingsScreen({
           id="settings-affiliations"
           icon={<Network aria-hidden="true" />}
           title="Affiliations"
-          subtitle="club+0x118"
           meta={
             cellByTitle(backendCells, "Affiliate clubs loaded")?.status &&
             cellByTitle(backendCells, "Affiliate clubs loaded")?.status !== "none"
@@ -713,7 +729,6 @@ export function SettingsScreen({
           id="settings-graphics"
           icon={<Images aria-hidden="true" />}
           title="Graphics"
-          subtitle="Faces and logos"
           meta={
             !graphics || graphics.loading
               ? "…"
@@ -729,7 +744,6 @@ export function SettingsScreen({
           id="settings-scores"
           icon={<Sigma aria-hidden="true" />}
           title="Scores"
-          subtitle="FMT calculations from mapped fields"
           meta={`${scoresLive} live`}
           tone={sectionTone(scoresCells)}
           cells={scoresCells}
