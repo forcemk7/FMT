@@ -1107,7 +1107,7 @@ pub(crate) fn discover_bteam_affiliate_clubs(
         }));
     }
     if let Some(obj) = affiliation_type_report.as_object_mut() {
-        obj.insert("namedLinks".into(), Value::Array(named_links));
+        obj.insert("namedLinks".into(), Value::Array(named_links.clone()));
         obj.insert(
             "loanFlagLock".into(),
             json!({
@@ -1121,8 +1121,29 @@ pub(crate) fn discover_bteam_affiliate_clubs(
         );
     }
 
+    let mut roster_outcomes = Vec::new();
     for link in &walk.links {
+        let partner_name = named_links
+            .iter()
+            .find(|row| {
+                row.get("partnerUid")
+                    .and_then(Value::as_u64)
+                    .is_some_and(|uid| uid == u64::from(link.partner_uid))
+            })
+            .and_then(|row| row.get("partnerName").and_then(Value::as_str))
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        let type_hex = format!("0x{:02X}", link.type_byte);
+        let type_reminder = affiliation_type_map_reminder(link.type_byte);
         if !is_roster_load_affiliation_type(link.type_byte) {
+            roster_outcomes.push(json!({
+                "partnerUid": link.partner_uid,
+                "partnerName": partner_name,
+                "typeHex": type_hex,
+                "reminder": type_reminder,
+                "outcome": "excluded · non-roster type",
+            }));
             continue;
         }
         if link.partner_uid == managed_club_uid || !seen_uids.insert(link.partner_uid) {
@@ -1139,6 +1160,13 @@ pub(crate) fn discover_bteam_affiliate_clubs(
                     "skip feeder uid {}: nested+0x{PLAYERS_GO_ON_LOAN_NESTED_OFFSET:X}={got:?} (want loan-on {PLAYERS_GO_ON_LOAN_ON})",
                     link.partner_uid
                 ));
+                roster_outcomes.push(json!({
+                    "partnerUid": link.partner_uid,
+                    "partnerName": partner_name,
+                    "typeHex": type_hex,
+                    "reminder": type_reminder,
+                    "outcome": "dropped · loan-off",
+                }));
                 continue;
             }
         }
@@ -1149,6 +1177,13 @@ pub(crate) fn discover_bteam_affiliate_clubs(
                 "affiliation type 0x{:02X}: partner uid {} not resolved in club table",
                 link.type_byte, link.partner_uid
             ));
+            roster_outcomes.push(json!({
+                "partnerUid": link.partner_uid,
+                "partnerName": partner_name,
+                "typeHex": type_hex,
+                "reminder": type_reminder,
+                "outcome": "unresolved · club table",
+            }));
             continue;
         };
         let label = link
@@ -1161,6 +1196,13 @@ pub(crate) fn discover_bteam_affiliate_clubs(
             link.partner_uid,
             club_name.trim()
         ));
+        roster_outcomes.push(json!({
+            "partnerUid": link.partner_uid,
+            "partnerName": club_name.trim(),
+            "typeHex": type_hex,
+            "reminder": label.clone(),
+            "outcome": "loaded",
+        }));
         found.push(AffiliateClubDiscovery {
             club,
             club_uid: link.partner_uid,
@@ -1171,6 +1213,9 @@ pub(crate) fn discover_bteam_affiliate_clubs(
             affiliation_type_label: Some(label),
             match_experience_only: false,
         });
+    }
+    if let Some(obj) = affiliation_type_report.as_object_mut() {
+        obj.insert("rosterOutcomes".into(), Value::Array(roster_outcomes));
     }
 
     // One hop: loan-on feeder → their II Club (e.g. Kaiserslautern II). ME only.
@@ -1195,6 +1240,20 @@ pub(crate) fn discover_bteam_affiliate_clubs(
             let Some((club, club_name)) =
                 resolve_club_ptr_by_uid(reader, module, profile, link.partner_uid)
             else {
+                if let Some(obj) = affiliation_type_report.as_object_mut() {
+                    let outcomes = obj
+                        .entry("rosterOutcomes".to_string())
+                        .or_insert_with(|| Value::Array(Vec::new()));
+                    if let Some(arr) = outcomes.as_array_mut() {
+                        arr.push(json!({
+                            "partnerUid": link.partner_uid,
+                            "partnerName": "",
+                            "typeHex": format!("0x{:02X}", link.type_byte),
+                            "reminder": affiliation_type_map_reminder(link.type_byte),
+                            "outcome": "unresolved · feeder→II club table",
+                        }));
+                    }
+                }
                 continue;
             };
             let label = link
@@ -1209,6 +1268,20 @@ pub(crate) fn discover_bteam_affiliate_clubs(
                 club_name.trim(),
                 link.partner_uid
             ));
+            if let Some(obj) = affiliation_type_report.as_object_mut() {
+                let outcomes = obj
+                    .entry("rosterOutcomes".to_string())
+                    .or_insert_with(|| Value::Array(Vec::new()));
+                if let Some(arr) = outcomes.as_array_mut() {
+                    arr.push(json!({
+                        "partnerUid": link.partner_uid,
+                        "partnerName": club_name.trim(),
+                        "typeHex": format!("0x{:02X}", link.type_byte),
+                        "reminder": label.clone(),
+                        "outcome": "loaded · feeder→II",
+                    }));
+                }
+            }
             second_hop.push(AffiliateClubDiscovery {
                 club,
                 club_uid: link.partner_uid,

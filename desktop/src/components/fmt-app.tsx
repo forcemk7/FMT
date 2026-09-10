@@ -69,6 +69,7 @@ const initialStatus: LiveConnectorStatus = {
   canWriteMemory: false,
   message: "Diagnostics have not run yet.",
   warnings: [],
+  diagnosticCells: [],
 };
 
 const initialSnapshot: LiveFootballSnapshot = {

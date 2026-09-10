@@ -50,11 +50,6 @@ function mappingCoverageLabel(
     .join("; ");
 }
 
-function warningsLabel(warnings: string[] | undefined) {
-  if (!warnings?.length) return "None";
-  return warnings.join(" · ");
-}
-
 export function SettingsScreen({
   snapshot,
   checking,
@@ -367,6 +362,12 @@ export function SettingsScreen({
             <dt>Partial scout reports</dt>
             <dd>{status.partialScoutReports}</dd>
           </div>
+          {(status.diagnosticCells ?? []).map((cell) => (
+            <div key={cell.title} className={cell.status.length > 80 ? "diagnostic-hash" : undefined}>
+              <dt>{cell.title}</dt>
+              <dd>{cell.status.trim() || "none"}</dd>
+            </div>
+          ))}
           {/* 7. In-game calendar (ages) */}
           <div>
             <dt>In-game date</dt>
@@ -413,14 +414,6 @@ export function SettingsScreen({
           <div>
             <dt>Data error</dt>
             <dd>{snapshot.dataError?.trim() || "None"}</dd>
-          </div>
-          <div className="diagnostic-hash">
-            <dt>Status warnings</dt>
-            <dd>{warningsLabel(status.warnings)}</dd>
-          </div>
-          <div className="diagnostic-hash">
-            <dt>Data warnings</dt>
-            <dd>{warningsLabel(snapshot.dataWarnings)}</dd>
           </div>
         </dl>
         <div className="diagnostic-message">

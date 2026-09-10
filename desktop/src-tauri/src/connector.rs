@@ -47,6 +47,13 @@ pub struct ReadPipelineStage {
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct DiagnosticCell {
+    title: String,
+    status: String,
+}
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ConnectorStatus {
     process_detected: bool,
     process_id: Option<u32>,
@@ -92,7 +99,10 @@ pub struct ConnectorStatus {
     windows_error_code: Option<u32>,
     read_pipeline: Vec<ReadPipelineStage>,
     message: String,
+    /// Kept for wire compat; Diagnostics uses `diagnostic_cells` (T276).
     warnings: Vec<String>,
+    /// Load-order index: title + status where status is the value or the miss.
+    diagnostic_cells: Vec<DiagnosticCell>,
 }
 
 #[derive(Serialize)]
@@ -170,6 +180,7 @@ struct LiveData {
     database_scope: &'static str,
     database_index_error: Option<String>,
     warnings: Vec<String>,
+    diagnostic_cells: Vec<DiagnosticCell>,
     tactic_manager_pointer: Option<u64>,
     club_employees: u32,
     /// Managed club+0x118 affiliation type census (Diagnostics).
@@ -306,6 +317,7 @@ fn empty_status() -> ConnectorStatus {
         read_pipeline: Vec::new(),
         message: "FM26 is not running. Open FM26 and load your save to begin.".to_string(),
         warnings: Vec::new(),
+        diagnostic_cells: Vec::new(),
     }
 }
 
@@ -326,6 +338,250 @@ fn empty_snapshot(mut status: ConnectorStatus, error: String) -> ConnectorSnapsh
         data_source: "none",
         data_warnings: Vec::new(),
     }
+}
+
+fn diagnostic_cell(title: impl Into<String>, status: impl Into<String>) -> DiagnosticCell {
+    DiagnosticCell {
+        title: title.into(),
+        status: status.into(),
+    }
+}
+
+fn join_or_none(parts: &[String]) -> String {
+    if parts.is_empty() {
+        "none".to_string()
+    } else {
+        parts.join(", ")
+    }
+}
+
+fn partner_label(row: &Value) -> String {
+    let name = row
+        .get("partnerName")
+        .and_then(Value::as_str)
+        .unwrap_or("")
+        .trim();
+    let uid = row
+        .get("partnerUid")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    if !name.is_empty() {
+        name.to_string()
+    } else if uid != 0 {
+        format!("uid {uid}")
+    } else {
+        "unknown".to_string()
+    }
+}
+
+fn build_load_diagnostic_cells(
+    skipped_squad_warning: &Option<String>,
+    name_fallback_warning: &Option<String>,
+    manager_pick_warning: &Option<String>,
+    bteam_affiliates: &[AffiliateClubDiscovery],
+    bteam_promoted: usize,
+    affiliation_report: Option<&Value>,
+    club_squad_promoted: usize,
+    discovered_team_labels: &[String],
+    club_teams: &[Value],
+) -> Vec<DiagnosticCell> {
+    let mut cells = Vec::new();
+    cells.push(diagnostic_cell(
+        "Squad field coverage",
+        "IDs, names, DoB, ages, nationality, positions, preferred foot, visible attrs, CA/PA/hidden/personality",
+    ));
+    cells.push(diagnostic_cell(
+        "Unvalidated fields",
+        "form, match ratings, contract, wage, valuation, fitness, squad-status → Unknown",
+    ));
+    cells.push(diagnostic_cell(
+        "Skipped squad slots",
+        skipped_squad_warning
+            .as_deref()
+            .unwrap_or("none"),
+    ));
+    cells.push(diagnostic_cell(
+        "Name fallback",
+        name_fallback_warning.as_deref().unwrap_or("none"),
+    ));
+    cells.push(diagnostic_cell(
+        "Manager pick",
+        manager_pick_warning.as_deref().unwrap_or("none"),
+    ));
+    cells.push(diagnostic_cell(
+        "Club.Teams discovered",
+        if discovered_team_labels.is_empty() {
+            "none".to_string()
+        } else {
+            discovered_team_labels.join("; ")
+        },
+    ));
+    cells.push(diagnostic_cell(
+        "Club.Teams + affiliate players loaded",
+        if club_squad_promoted > 0 {
+            format!("{club_squad_promoted}")
+        } else if discovered_team_labels.len() > 1 {
+            "none · teams found but no extra roster loaded".to_string()
+        } else {
+            "none".to_string()
+        },
+    ));
+
+    let links = affiliation_report
+        .and_then(|r| r.get("linkCount"))
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let mapped = affiliation_report
+        .and_then(|r| r.get("mappedLinkCount"))
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    cells.push(diagnostic_cell(
+        "Affiliations club+0x118",
+        if links == 0 {
+            "none".to_string()
+        } else {
+            format!("{links} links · {mapped} labeled")
+        },
+    ));
+
+    let unlabeled = affiliation_report
+        .and_then(|r| r.get("unmappedTypeBytes"))
+        .and_then(Value::as_array)
+        .map(|a| {
+            a.iter()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    cells.push(diagnostic_cell(
+        "Unlabeled affiliation types",
+        join_or_none(&unlabeled),
+    ));
+
+    if let Some(lock) = affiliation_report.and_then(|r| r.get("loanFlagLock")) {
+        let region = lock.get("region").and_then(Value::as_str).unwrap_or("?");
+        let off = lock.get("offsetHex").and_then(Value::as_str).unwrap_or("?");
+        let on = lock.get("loanOnValue").and_then(Value::as_u64).unwrap_or(1);
+        let offv = lock.get("loanOffValue").and_then(Value::as_u64).unwrap_or(0);
+        cells.push(diagnostic_cell(
+            "Players Go On Loan filter",
+            format!("{region}{off} on={on} off={offv}"),
+        ));
+    } else {
+        cells.push(diagnostic_cell("Players Go On Loan filter", "not run"));
+    }
+
+    let outcomes = affiliation_report
+        .and_then(|r| r.get("rosterOutcomes"))
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+
+    let mut excluded = Vec::new();
+    let mut loan_off = Vec::new();
+    let mut unresolved = Vec::new();
+    let mut loaded = Vec::new();
+    for row in &outcomes {
+        let outcome = row.get("outcome").and_then(Value::as_str).unwrap_or("");
+        let label = partner_label(row);
+        if outcome.starts_with("excluded") {
+            let ty = row.get("typeHex").and_then(Value::as_str).unwrap_or("?");
+            excluded.push(format!("{label} ({ty})"));
+        } else if outcome.contains("loan-off") {
+            loan_off.push(label);
+        } else if outcome.contains("unresolved") {
+            unresolved.push(format!("{label} ({outcome})"));
+        } else if outcome.starts_with("loaded") {
+            let note = if outcome.contains("feeder→II") {
+                format!("{label} · feeder→II")
+            } else {
+                label
+            };
+            loaded.push(note);
+        }
+    }
+    cells.push(diagnostic_cell(
+        "Excluded affiliation links",
+        join_or_none(&excluded),
+    ));
+    cells.push(diagnostic_cell(
+        "Dropped loan-off feeders",
+        join_or_none(&loan_off),
+    ));
+    cells.push(diagnostic_cell(
+        "Unresolved affiliate partners",
+        join_or_none(&unresolved),
+    ));
+    cells.push(diagnostic_cell(
+        "Affiliate clubs loaded",
+        join_or_none(&loaded),
+    ));
+
+    let squad_tab = bteam_affiliates
+        .iter()
+        .filter(|a| {
+            a.affiliation_type
+                .is_some_and(is_squad_tab_affiliation_type)
+                || a.affiliation_type.is_none()
+        })
+        .filter(|a| !a.match_experience_only)
+        .map(|a| {
+            let name = a.club_name.trim();
+            if name.is_empty() {
+                format!("uid {}", a.club_uid)
+            } else {
+                name.to_string()
+            }
+        })
+        .collect::<Vec<_>>();
+    cells.push(diagnostic_cell(
+        "Squad-tab affiliate clubs",
+        if squad_tab.is_empty() {
+            "none".to_string()
+        } else {
+            format!("{} · {} players promoted", squad_tab.join(", "), bteam_promoted)
+        },
+    ));
+
+    let me_teams = club_teams
+        .iter()
+        .filter(|team| {
+            team.get("matchExperienceOnly")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+                || team
+                    .get("affiliationType")
+                    .and_then(Value::as_u64)
+                    .is_some_and(|t| t == 0x01 || t == 0x03)
+        })
+        .filter_map(|team| {
+            let name = team
+                .get("name")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .trim();
+            let club = team
+                .get("clubName")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .trim();
+            let roster = team.get("rosterLen").and_then(Value::as_u64).unwrap_or(0);
+            if name.is_empty() && club.is_empty() {
+                None
+            } else if !name.is_empty() {
+                Some(format!("{name} ({roster})"))
+            } else {
+                Some(format!("{club} ({roster})"))
+            }
+        })
+        .collect::<Vec<_>>();
+    cells.push(diagnostic_cell(
+        "Match experience affiliate teams",
+        join_or_none(&me_teams),
+    ));
+
+    cells
 }
 
 fn pipeline_stage(
@@ -716,6 +972,7 @@ fn collect_snapshot(progress: Option<&dyn Fn(&'static str)>) -> ConnectorSnapsho
                 reader.bytes_read
             );
             status.warnings = data.warnings.clone();
+            status.diagnostic_cells = data.diagnostic_cells.clone();
             if let Some(report) = data.affiliation_types.as_ref() {
                 let mapped = report
                     .get("mappedLinkCount")
@@ -732,18 +989,6 @@ fn collect_snapshot(progress: Option<&dyn Fn(&'static str)>) -> ConnectorSnapsho
                     candidate: 0,
                     unmapped,
                 });
-                if let Some(lock) = report.get("loanFlagLock") {
-                    if let (Some(region), Some(off), Some(on), Some(offv)) = (
-                        lock.get("region").and_then(Value::as_str),
-                        lock.get("offsetHex").and_then(Value::as_str),
-                        lock.get("loanOnValue").and_then(Value::as_u64),
-                        lock.get("loanOffValue").and_then(Value::as_u64),
-                    ) {
-                        status.warnings.push(format!(
-                            "Affiliation Players-Go-On-Loan filter: {region}{off} on={on} off={offv} (hardcoded; feeders without loan-on skipped)."
-                        ));
-                    }
-                }
             }
             let data_warnings = status.warnings.clone();
             status.read_pipeline = Vec::new();
@@ -2447,57 +2692,18 @@ fn extract_live_data(
         }
     }
     let tactic: Option<Value> = None;
-    let mut warnings = vec![
-        "Managed-squad IDs, names, dates of birth, ages, nationality, positions, preferred foot, visible attributes, and mapped CA/PA/hidden/personality are validated for this FM26 build.".to_string(),
-        "Form, match ratings, contract, wage, valuation, fitness and squad-status relationships are not yet validated for this build and remain Unknown.".to_string(),
-    ];
-    if let Some(warning) = skipped_squad_warning {
-        warnings.push(warning);
-    }
-    if let Some(warning) = name_fallback_warning {
-        warnings.push(warning);
-    }
-    if let Some(warning) = manager_pick_warning {
-        warnings.push(warning);
-    }
-    if !bteam_affiliates.is_empty() {
-        warnings.push(format!(
-            "{} squad-tab affiliate club(s) resolved (separate-club reserves / NPL); {} player(s) promoted from those rosters.",
-            bteam_affiliates.len(),
-            bteam_promoted
-        ));
-    }
-    if let Some(report) = bteam_discovery.affiliation_type_report.as_ref() {
-        if let Some(reminders) = report.get("unmappedReminders").and_then(Value::as_array) {
-            for reminder in reminders {
-                if let Some(text) = reminder.as_str() {
-                    warnings.push(format!(
-                        "{text} — seen on managed club+0x118; label in PGE when you find the partner."
-                    ));
-                }
-            }
-        }
-        let mapped = report
-            .get("mappedLinkCount")
-            .and_then(Value::as_u64)
-            .unwrap_or(0);
-        let links = report.get("linkCount").and_then(Value::as_u64).unwrap_or(0);
-        if links > 0 {
-            warnings.push(format!(
-                "Affiliation types on club+0x118: {mapped}/{links} links mapped (roster load: II 0x08 + Normal 0x01 + feeder 0x03; Good Relations/Likely Friendly excluded)."
-            ));
-        }
-    }
-    if club_squad_promoted > 0 {
-        warnings.push(format!(
-            "{club_squad_promoted} player(s) loaded from Club.Teams + squad-tab affiliate rosters."
-        ));
-    } else if discovered_team_labels.len() > 1 {
-        warnings.push(format!(
-            "Club.Teams discovered ({}) but no additional same-club roster loaded.",
-            discovered_team_labels.join("; ")
-        ));
-    }
+    let warnings: Vec<String> = Vec::new();
+    let diagnostic_cells = build_load_diagnostic_cells(
+        &skipped_squad_warning,
+        &name_fallback_warning,
+        &manager_pick_warning,
+        bteam_affiliates,
+        bteam_promoted,
+        bteam_discovery.affiliation_type_report.as_ref(),
+        club_squad_promoted,
+        &discovered_team_labels,
+        &club_teams,
+    );
     let club_employees = snapshot_club_employee_count(&players, &club_id);
     let clubs = vec![json!({
         "id": club_id,
@@ -2520,6 +2726,7 @@ fn extract_live_data(
         database_scope,
         database_index_error,
         warnings,
+        diagnostic_cells,
         tactic_manager_pointer: None,
         club_employees,
         affiliation_types: bteam_discovery.affiliation_type_report,

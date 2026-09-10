@@ -58,6 +58,8 @@ export type LiveConnectorStatus = {
   canWriteMemory: false;
   message: string;
   warnings: string[];
+  /** Load-order index: title + status (value or miss). */
+  diagnosticCells?: Array<{ title: string; status: string }>;
 };
 
 export type LivePlayer = {
@@ -365,7 +367,10 @@ const desktopRequiredStatus: LiveConnectorStatus = {
   readPipeline: [],
   canWriteMemory: false,
   message: "FMT requires the installed Windows app to connect to the active FM26 game.",
-  warnings: ["No live data is being simulated."],
+  warnings: [],
+  diagnosticCells: [
+    { title: "Desktop connector", status: "requires Windows app" },
+  ],
 };
 
 export const fm26LiveAdapter: FootballDataAdapter = {

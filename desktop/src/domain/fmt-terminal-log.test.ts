@@ -28,6 +28,7 @@ const baseSnapshot: LiveFootballSnapshot = {
     canWriteMemory: false,
     message: "Connected",
     warnings: [],
+    diagnosticCells: [],
   },
   managedClubId: "club-1",
   managerName: null,

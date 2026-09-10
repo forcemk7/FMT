@@ -1,14 +1,16 @@
 ﻿# Status
 
-Last updated: 2026-09-07 (T273 done — research agent law; pushed)
+Last updated: 2026-09-10 (T276 done — Diagnostics title+value cells)
 
 ## Now
 
-**Board empty of ready product tickets** (T190 parked; T253 deferred). Ask HQ before inventing work.
+**Board empty of ready product tickets** (T190 parked; rest deferred). Ask HQ before inventing work.
+
+**Wait on signal:** SortItOutSI download success unknown — prefer diagnostics paste from failed-load report before funding polish or Loop D.
 
 **T190 parked** — Save ID in RAM before save-copy CA path.
 
-**Deferred:** T253 ME card order / Best by division reputation (team→division→reputation when funded). T215 Diagnostics. T210 Squad density. T139 theme. T162 trophy cabinet. Loop D full-world load parked.
+**Deferred:** T274 live connect honesty. T275 world player lookup (Loop D). T253 ME card order. T215 Diagnostics live-fill (T276 shipped the cell-index slice). T210 Squad density. T139 theme. T162 trophy cabinet.
 
 **Residuals (not tickets):** Main/Permanent/PMF affiliation bytes; PGE label for AffiliationType `0x03`; further globals CSS carcass; club page polish; First XI median later. Club shortName RE parked (T235).
 
@@ -16,10 +18,12 @@ Last updated: 2026-09-07 (T273 done — research agent law; pushed)
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
+| T274 | Live connect honesty — refresh + clear on FM exit | deferred | — | no funding; personal click OK |
+| T275 | World player lookup — squeeze FMLE | deferred | — | Loop D; no funding |
 | T253 | ME card order by competition / division difficulty | deferred | 4 | team→division→reputation; also feeds Best |
 | T190 | Development all-time from Progress Report CA strip | blocked | 2 | **parked** |
 | T210 | Squad — card / list density toggle | deferred | — | not now |
-| T215 | Diagnostics — source-of-truth skeleton + live fill | deferred | — | after product loops |
+| T215 | Diagnostics — source-of-truth skeleton + live fill | deferred | — | after product loops; T276 cell index done |
 | T139 | FMT visual theme | deferred | — | overlapped |
 | T162 | Player trophy cabinet | deferred | — | backlog |
 
@@ -29,6 +33,7 @@ Last updated: 2026-09-07 (T273 done — research agent law; pushed)
 
 ## Recently done
 
+- **T276** Diagnostics title+value cells; kill Status/Data warning soup
 - **T273** Research-owned agent law; untrack `.cursor/`; push GitHub
 - **T272** fm-probe feature-gate + quiet default cargo
 - **T271** ME better-move: no equal-rung First (Legia stay vs II)
@@ -38,7 +43,6 @@ Last updated: 2026-09-07 (T273 done — research agent law; pushed)
 - **T267** Fix ability main overlay on face; mover chips Title Case + bold
 - **T266** Dash CA/PA attr tones; `{age} years old`; ability column align
 - **T265** Dash age·pos under name on all peeks; small-viewport face flex
-- **T264** Dash true flex fill; mid-tone chip padding fix; ability/ME detail order
 
 ## Loop
 
