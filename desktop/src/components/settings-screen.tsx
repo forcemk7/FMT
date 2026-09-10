@@ -363,8 +363,20 @@ export function SettingsScreen({
             <dd>{status.partialScoutReports}</dd>
           </div>
           {(status.diagnosticCells ?? []).map((cell) => (
-            <div key={cell.title} className={cell.status.length > 80 ? "diagnostic-hash" : undefined}>
-              <dt>{cell.title}</dt>
+            <div
+              key={cell.title}
+              className={[
+                cell.status.length > 80 ? "diagnostic-hash" : "",
+                "diagnostic-cell",
+                `tone-${cell.tone ?? "yellow"}`,
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            >
+              <dt>
+                <span className="diagnostic-tone" aria-hidden="true" />
+                {cell.title}
+              </dt>
               <dd>{cell.status.trim() || "none"}</dd>
             </div>
           ))}

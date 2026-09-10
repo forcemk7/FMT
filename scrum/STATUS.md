@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-10 (T276 done — Diagnostics title+value cells)
+Last updated: 2026-09-10 (T277 done — Diagnostics cell tone)
 
 ## Now
 
@@ -10,7 +10,7 @@ Last updated: 2026-09-10 (T276 done — Diagnostics title+value cells)
 
 **T190 parked** — Save ID in RAM before save-copy CA path.
 
-**Deferred:** T274 live connect honesty. T275 world player lookup (Loop D). T253 ME card order. T215 Diagnostics live-fill (T276 shipped the cell-index slice). T210 Squad density. T139 theme. T162 trophy cabinet.
+**Deferred:** T274 live connect honesty. T275 world player lookup (Loop D). T253 ME card order. T215 Diagnostics live-fill. T210 Squad density. T139 theme. T162 trophy cabinet.
 
 **Residuals (not tickets):** Main/Permanent/PMF affiliation bytes; PGE label for AffiliationType `0x03`; further globals CSS carcass; club page polish; First XI median later. Club shortName RE parked (T235).
 
@@ -23,7 +23,7 @@ Last updated: 2026-09-10 (T276 done — Diagnostics title+value cells)
 | T253 | ME card order by competition / division difficulty | deferred | 4 | team→division→reputation; also feeds Best |
 | T190 | Development all-time from Progress Report CA strip | blocked | 2 | **parked** |
 | T210 | Squad — card / list density toggle | deferred | — | not now |
-| T215 | Diagnostics — source-of-truth skeleton + live fill | deferred | — | after product loops; T276 cell index done |
+| T215 | Diagnostics — source-of-truth skeleton + live fill | deferred | — | after product loops |
 | T139 | FMT visual theme | deferred | — | overlapped |
 | T162 | Player trophy cabinet | deferred | — | backlog |
 
@@ -33,6 +33,7 @@ Last updated: 2026-09-10 (T276 done — Diagnostics title+value cells)
 
 ## Recently done
 
+- **T277** Diagnostics cell tone — green / yellow / red glance cue
 - **T276** Diagnostics title+value cells; kill Status/Data warning soup
 - **T273** Research-owned agent law; untrack `.cursor/`; push GitHub
 - **T272** fm-probe feature-gate + quiet default cargo
@@ -42,7 +43,6 @@ Last updated: 2026-09-10 (T276 done — Diagnostics title+value cells)
 - **T268** Dash Ability label; right trail CA/PA digit align (players/talent/ME)
 - **T267** Fix ability main overlay on face; mover chips Title Case + bold
 - **T266** Dash CA/PA attr tones; `{age} years old`; ability column align
-- **T265** Dash age·pos under name on all peeks; small-viewport face flex
 
 ## Loop
 

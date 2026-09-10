@@ -50,6 +50,8 @@ pub struct ReadPipelineStage {
 pub struct DiagnosticCell {
     title: String,
     status: String,
+    /// Glance cue: green = ok value, yellow = partial/expected drop, red = miss/error.
+    tone: &'static str,
 }
 
 #[derive(Clone, Serialize)]
@@ -340,10 +342,39 @@ fn empty_snapshot(mut status: ConnectorStatus, error: String) -> ConnectorSnapsh
     }
 }
 
-fn diagnostic_cell(title: impl Into<String>, status: impl Into<String>) -> DiagnosticCell {
+fn diagnostic_cell(
+    title: impl Into<String>,
+    status: impl Into<String>,
+    tone: &'static str,
+) -> DiagnosticCell {
     DiagnosticCell {
         title: title.into(),
         status: status.into(),
+        tone,
+    }
+}
+
+fn tone_none_ok(status: &str) -> &'static str {
+    if status == "none" {
+        "green"
+    } else {
+        "yellow"
+    }
+}
+
+fn tone_none_bad(status: &str) -> &'static str {
+    if status == "none" {
+        "green"
+    } else {
+        "red"
+    }
+}
+
+fn tone_value_or_none(status: &str) -> &'static str {
+    if status == "none" {
+        "yellow"
+    } else {
+        "green"
     }
 }
 
@@ -389,42 +420,59 @@ fn build_load_diagnostic_cells(
     cells.push(diagnostic_cell(
         "Squad field coverage",
         "IDs, names, DoB, ages, nationality, positions, preferred foot, visible attrs, CA/PA/hidden/personality",
+        "green",
     ));
     cells.push(diagnostic_cell(
         "Unvalidated fields",
         "form, match ratings, contract, wage, valuation, fitness, squad-status → Unknown",
+        "yellow",
     ));
+    let skipped = skipped_squad_warning.as_deref().unwrap_or("none");
     cells.push(diagnostic_cell(
         "Skipped squad slots",
-        skipped_squad_warning
-            .as_deref()
-            .unwrap_or("none"),
+        skipped,
+        tone_none_bad(skipped),
     ));
+    let name_fb = name_fallback_warning.as_deref().unwrap_or("none");
     cells.push(diagnostic_cell(
         "Name fallback",
-        name_fallback_warning.as_deref().unwrap_or("none"),
+        name_fb,
+        tone_none_ok(name_fb),
     ));
+    let manager_pick = manager_pick_warning.as_deref().unwrap_or("none");
     cells.push(diagnostic_cell(
         "Manager pick",
-        manager_pick_warning.as_deref().unwrap_or("none"),
+        manager_pick,
+        tone_none_ok(manager_pick),
     ));
+    let club_teams_status = if discovered_team_labels.is_empty() {
+        "none".to_string()
+    } else {
+        discovered_team_labels.join("; ")
+    };
     cells.push(diagnostic_cell(
         "Club.Teams discovered",
-        if discovered_team_labels.is_empty() {
-            "none".to_string()
-        } else {
-            discovered_team_labels.join("; ")
-        },
+        club_teams_status.clone(),
+        tone_value_or_none(&club_teams_status),
     ));
+    let players_loaded_status = if club_squad_promoted > 0 {
+        format!("{club_squad_promoted}")
+    } else if discovered_team_labels.len() > 1 {
+        "none · teams found but no extra roster loaded".to_string()
+    } else {
+        "none".to_string()
+    };
+    let players_loaded_tone = if club_squad_promoted > 0 {
+        "green"
+    } else if discovered_team_labels.len() > 1 {
+        "yellow"
+    } else {
+        "yellow"
+    };
     cells.push(diagnostic_cell(
         "Club.Teams + affiliate players loaded",
-        if club_squad_promoted > 0 {
-            format!("{club_squad_promoted}")
-        } else if discovered_team_labels.len() > 1 {
-            "none · teams found but no extra roster loaded".to_string()
-        } else {
-            "none".to_string()
-        },
+        players_loaded_status,
+        players_loaded_tone,
     ));
 
     let links = affiliation_report
@@ -435,13 +483,22 @@ fn build_load_diagnostic_cells(
         .and_then(|r| r.get("mappedLinkCount"))
         .and_then(Value::as_u64)
         .unwrap_or(0);
+    let aff_status = if links == 0 {
+        "none".to_string()
+    } else {
+        format!("{links} links · {mapped} labeled")
+    };
+    let aff_tone = if links == 0 {
+        "yellow"
+    } else if mapped < links {
+        "yellow"
+    } else {
+        "green"
+    };
     cells.push(diagnostic_cell(
         "Affiliations club+0x118",
-        if links == 0 {
-            "none".to_string()
-        } else {
-            format!("{links} links · {mapped} labeled")
-        },
+        aff_status,
+        aff_tone,
     ));
 
     let unlabeled = affiliation_report
@@ -454,9 +511,11 @@ fn build_load_diagnostic_cells(
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
+    let unlabeled_status = join_or_none(&unlabeled);
     cells.push(diagnostic_cell(
         "Unlabeled affiliation types",
-        join_or_none(&unlabeled),
+        unlabeled_status.clone(),
+        tone_none_ok(&unlabeled_status),
     ));
 
     if let Some(lock) = affiliation_report.and_then(|r| r.get("loanFlagLock")) {
@@ -467,9 +526,14 @@ fn build_load_diagnostic_cells(
         cells.push(diagnostic_cell(
             "Players Go On Loan filter",
             format!("{region}{off} on={on} off={offv}"),
+            "green",
         ));
     } else {
-        cells.push(diagnostic_cell("Players Go On Loan filter", "not run"));
+        cells.push(diagnostic_cell(
+            "Players Go On Loan filter",
+            "not run",
+            "yellow",
+        ));
     }
 
     let outcomes = affiliation_report
@@ -501,21 +565,36 @@ fn build_load_diagnostic_cells(
             loaded.push(note);
         }
     }
+    let excluded_status = join_or_none(&excluded);
     cells.push(diagnostic_cell(
         "Excluded affiliation links",
-        join_or_none(&excluded),
+        excluded_status.clone(),
+        tone_none_ok(&excluded_status),
     ));
+    let loan_off_status = join_or_none(&loan_off);
     cells.push(diagnostic_cell(
         "Dropped loan-off feeders",
-        join_or_none(&loan_off),
+        loan_off_status.clone(),
+        tone_none_ok(&loan_off_status),
     ));
+    let unresolved_status = join_or_none(&unresolved);
     cells.push(diagnostic_cell(
         "Unresolved affiliate partners",
-        join_or_none(&unresolved),
+        unresolved_status.clone(),
+        tone_none_bad(&unresolved_status),
     ));
+    let loaded_status = join_or_none(&loaded);
+    let loaded_tone = if !unresolved.is_empty() && loaded.is_empty() {
+        "red"
+    } else if loaded.is_empty() {
+        "yellow"
+    } else {
+        "green"
+    };
     cells.push(diagnostic_cell(
         "Affiliate clubs loaded",
-        join_or_none(&loaded),
+        loaded_status,
+        loaded_tone,
     ));
 
     let squad_tab = bteam_affiliates
@@ -535,13 +614,15 @@ fn build_load_diagnostic_cells(
             }
         })
         .collect::<Vec<_>>();
+    let squad_tab_status = if squad_tab.is_empty() {
+        "none".to_string()
+    } else {
+        format!("{} · {} players promoted", squad_tab.join(", "), bteam_promoted)
+    };
     cells.push(diagnostic_cell(
         "Squad-tab affiliate clubs",
-        if squad_tab.is_empty() {
-            "none".to_string()
-        } else {
-            format!("{} · {} players promoted", squad_tab.join(", "), bteam_promoted)
-        },
+        squad_tab_status.clone(),
+        tone_value_or_none(&squad_tab_status),
     ));
 
     let me_teams = club_teams
@@ -576,9 +657,11 @@ fn build_load_diagnostic_cells(
             }
         })
         .collect::<Vec<_>>();
+    let me_status = join_or_none(&me_teams);
     cells.push(diagnostic_cell(
         "Match experience affiliate teams",
-        join_or_none(&me_teams),
+        me_status.clone(),
+        tone_value_or_none(&me_status),
     ));
 
     cells

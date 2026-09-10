@@ -734,6 +734,15 @@ body.fmt-shell .diagnostics dd {
 body.fmt-shell .diagnostics > p {
   color: var(--text-muted);
 }
+body.fmt-shell .diagnostics .tone-green .diagnostic-tone {
+  background: #3cb87a;
+}
+body.fmt-shell .diagnostics .tone-yellow .diagnostic-tone {
+  background: #d4b03a;
+}
+body.fmt-shell .diagnostics .tone-red .diagnostic-tone {
+  background: #e05656;
+}
 body.fmt-shell .mapping-coverage > header {
   background: rgba(0, 0, 0, 0.22) !important;
   border-color: var(--hairline);

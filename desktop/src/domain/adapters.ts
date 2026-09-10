@@ -59,7 +59,7 @@ export type LiveConnectorStatus = {
   message: string;
   warnings: string[];
   /** Load-order index: title + status (value or miss). */
-  diagnosticCells?: Array<{ title: string; status: string }>;
+  diagnosticCells?: Array<{ title: string; status: string; tone?: "green" | "yellow" | "red" }>;
 };
 
 export type LivePlayer = {
@@ -369,7 +369,7 @@ const desktopRequiredStatus: LiveConnectorStatus = {
   message: "FMT requires the installed Windows app to connect to the active FM26 game.",
   warnings: [],
   diagnosticCells: [
-    { title: "Desktop connector", status: "requires Windows app" },
+    { title: "Desktop connector", status: "requires Windows app", tone: "yellow" },
   ],
 };
 
