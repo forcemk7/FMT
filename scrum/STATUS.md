@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-11 (T283 done — Settings preview visible when collapsed)
+Last updated: 2026-09-11 (T284 done — Settings simple collapse)
 
 ## Now
 

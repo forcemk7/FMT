@@ -116,29 +116,6 @@ function cellByTitle(cells: DiagCell[], title: string): DiagCell | undefined {
   return cells.find((cell) => cell.title === title);
 }
 
-/** Up to 3 peeks: prefer critical/red/yellow, then fill so a preview always shows when data exists. */
-function criticalPeeks(cells: DiagCell[], limit = 3): DiagCell[] {
-  const buckets: DiagCell[][] = [
-    cells.filter((cell) => cell.critical && cell.tone === "red"),
-    cells.filter((cell) => cell.critical && cell.tone === "yellow"),
-    cells.filter((cell) => !cell.critical && cell.tone === "red"),
-    cells.filter((cell) => !cell.critical && cell.tone === "yellow"),
-    cells.filter((cell) => cell.critical && cell.tone === "green"),
-    cells,
-  ];
-  const picked: DiagCell[] = [];
-  const seen = new Set<string>();
-  for (const bucket of buckets) {
-    for (const cell of bucket) {
-      if (seen.has(cell.title)) continue;
-      seen.add(cell.title);
-      picked.push(cell);
-      if (picked.length >= limit) return picked;
-    }
-  }
-  return picked;
-}
-
 function SettingsGroup({
   id,
   icon,
@@ -156,35 +133,16 @@ function SettingsGroup({
   action?: ReactNode;
   cells: DiagCell[];
 }) {
-  const peeks = criticalPeeks(cells, 3);
   return (
     <details className="settings-expand" id={id}>
       <summary>
-        <span className="settings-summary-row">
-          {icon}
-          <strong className="settings-section-label">{title}</strong>
-          <span className="settings-expand-meta">
-            <span className={`settings-section-tone tone-${tone}`} aria-label={`${tone} status`} />
-            <b>{meta}</b>
-            <ChevronDown className="settings-expand-chevron" aria-hidden="true" />
-          </span>
+        {icon}
+        <strong className="settings-section-label">{title}</strong>
+        <span className="settings-expand-meta">
+          <span className={`settings-section-tone tone-${tone}`} aria-label={`${tone} status`} />
+          <b>{meta}</b>
+          <ChevronDown className="settings-expand-chevron" aria-hidden="true" />
         </span>
-        {peeks.length ? (
-          <span className="settings-section-preview">
-            <dl className="settings-diagnostics-grid settings-diagnostics-preview">
-              {peeks.map((cell, index) => (
-                <DiagnosticCellView
-                  key={`peek:${cell.title}:${index}`}
-                  title={cell.title}
-                  status={cell.status}
-                  tone={cell.tone}
-                  critical={cell.critical}
-                  wide={false}
-                />
-              ))}
-            </dl>
-          </span>
-        ) : null}
       </summary>
       <div className="settings-expand-body">
         {action ? <div className="settings-expand-actions">{action}</div> : null}
