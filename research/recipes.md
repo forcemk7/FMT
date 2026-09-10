@@ -6,7 +6,7 @@
 
 Update this file when a ticket locks or discards a recipe. Prefer recipes here over resurrecting deleted probe modules.
 
-**Last updated:** 2026-09-07 (T260 — ME counts loans on destination First)
+**Last updated:** 2026-09-11 (T286 — feeder loan-on keep != 0)
 
 ---
 
@@ -36,7 +36,14 @@ Update this file when a ticket locks or discards a recipe. Prefer recipes here o
 | `0x10` | Good Relations | no | no |
 | `0x11` | Likely Friendly | no | no |
 
-**Players Go On Loan (locked T245):** nested agreement byte `@+0x65` — `1` = on, `0` = off. Evidence: Schalke Legia / Sparta Praha / Kaiserslautern vs Daegu / Melbourne (FMLE nested term). Production: `nested_players_go_on_loan`; no name needles.
+**Players Go On Loan (T245 lock + T286 keep):** nested agreement byte `@+0x65`. Loan-off = `0`. Loan-on is **not a single on-value** — production keep = **`!= 0`**.
+
+| When | Evidence | Values |
+|------|----------|--------|
+| T245 2026-09-06 | Schalke Legia / Sparta / KL vs Daegu / Melbourne (FMLE nested term) | on=`1`, off=`0` → kept `==1` |
+| T286 2026-09-11 | Same Schalke save live probe (`probe-loan-flag`) | on=`2`, off=`0` at same `+0x65`; `==1` dropped all feeders |
+
+Constants: `PLAYERS_GO_ON_LOAN_ON_T245=1`, `PLAYERS_GO_ON_LOAN_ON_OBSERVED_2026_09_11=2`. If on-values drift again, re-diff loan-on vs loan-off nested blobs and extend this table — do not re-harden a single `==N` without new evidence.
 
 **Production:** type walk first — roster allow-list `0x08` \| (`0x01`/`0x03` + loan-on); then **one hop** from each loan-on feeder `+0x118` for type `0x08` II (ME-only, e.g. Kaiserslautern II). Squad desk filters out `0x01` / `0x03` / `matchExperienceOnly`. T212-style satellite merge only for NPL / unmapped types; other unmapped `+0x30` → Diagnostics `Map AffiliationType 0xNN`. Feeders: Club.Teams **First + Reserves + Under-N/Youth**; direct managed II: First as Squad 2nd side; feeder→II: First only, ME-only.
 

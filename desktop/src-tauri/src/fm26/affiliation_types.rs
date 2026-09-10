@@ -21,18 +21,24 @@ pub(crate) const AFFILIATION_VECTOR_OFFSET: u64 = 0x118;
 pub(crate) const AFFILIATION_TYPE_OFFSET: usize = 0x30;
 /// Partner club UniqueID on the nested record (duplicated at +0x10).
 pub(crate) const NESTED_PARTNER_UID_OFFSET: usize = 0x0C;
-/// FMLE “Players Go On Loan” on nested agreement (Schalke 2026-09-06 lock).
-/// loan-on = Legia / Sparta Praha / Kaiserslautern (`1`); loan-off = Daegu / Melbourne (`0`).
+/// FMLE “Players Go On Loan” on nested agreement (`nested+0x65`).
+///
+/// History (keep as enum-ish, not a bool):
+/// - T245 (2026-09-06): Schalke Legia/Sparta/KL=`1`, Daegu/Melbourne=`0` → production kept `==1`.
+/// - T286 (2026-09-11): same clubs live, loan-on=`2`, loan-off=`0` → keep any **non-zero**.
 pub(crate) const PLAYERS_GO_ON_LOAN_NESTED_OFFSET: usize = 0x65;
-pub(crate) const PLAYERS_GO_ON_LOAN_ON: u8 = 1;
+/// Historical T245 sample on-value (do not use as sole keep check — see T286).
+pub(crate) const PLAYERS_GO_ON_LOAN_ON_T245: u8 = 1;
+/// Live Schalke 2026-09-11 observed on-value (Legia / Sparta / KL).
+pub(crate) const PLAYERS_GO_ON_LOAN_ON_OBSERVED_2026_09_11: u8 = 2;
 pub(crate) const PLAYERS_GO_ON_LOAN_OFF: u8 = 0;
 
-/// True when nested agreement has Players-Go-On-Loan (hardcoded lock, not name needles).
+/// True when nested agreement has Players-Go-On-Loan (non-zero at `+0x65`).
 pub(crate) fn nested_players_go_on_loan(nested_bytes: &[u8]) -> bool {
     nested_bytes
         .get(PLAYERS_GO_ON_LOAN_NESTED_OFFSET)
         .copied()
-        == Some(PLAYERS_GO_ON_LOAN_ON)
+        .is_some_and(|b| b != PLAYERS_GO_ON_LOAN_OFF)
 }
 
 #[cfg(target_os = "windows")]
@@ -403,7 +409,8 @@ mod tests {
         affiliation_type_label, find_stable_bit_separators, find_stable_u8_separators,
         is_match_experience_feeder_type, is_roster_load_affiliation_type,
         is_squad_tab_affiliation_type, nested_players_go_on_loan, schalke_loan_off_name,
-        schalke_loan_on_name, PLAYERS_GO_ON_LOAN_NESTED_OFFSET, PLAYERS_GO_ON_LOAN_ON,
+        schalke_loan_on_name, PLAYERS_GO_ON_LOAN_NESTED_OFFSET,
+        PLAYERS_GO_ON_LOAN_ON_OBSERVED_2026_09_11, PLAYERS_GO_ON_LOAN_ON_T245,
     };
 
     #[test]
@@ -451,11 +458,14 @@ mod tests {
     }
 
     #[test]
-    fn nested_players_go_on_loan_reads_locked_offset() {
-        let mut on = vec![0u8; PLAYERS_GO_ON_LOAN_NESTED_OFFSET + 1];
-        on[PLAYERS_GO_ON_LOAN_NESTED_OFFSET] = PLAYERS_GO_ON_LOAN_ON;
+    fn nested_players_go_on_loan_keeps_any_nonzero() {
+        let mut t245 = vec![0u8; PLAYERS_GO_ON_LOAN_NESTED_OFFSET + 1];
+        t245[PLAYERS_GO_ON_LOAN_NESTED_OFFSET] = PLAYERS_GO_ON_LOAN_ON_T245;
+        let mut observed = vec![0u8; PLAYERS_GO_ON_LOAN_NESTED_OFFSET + 1];
+        observed[PLAYERS_GO_ON_LOAN_NESTED_OFFSET] = PLAYERS_GO_ON_LOAN_ON_OBSERVED_2026_09_11;
         let off = vec![0u8; PLAYERS_GO_ON_LOAN_NESTED_OFFSET + 1];
-        assert!(nested_players_go_on_loan(&on));
+        assert!(nested_players_go_on_loan(&t245));
+        assert!(nested_players_go_on_loan(&observed));
         assert!(!nested_players_go_on_loan(&off));
         assert!(!nested_players_go_on_loan(&[]));
     }

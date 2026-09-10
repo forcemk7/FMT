@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-11 (T285 done — drop FM26 Load button)
+Last updated: 2026-09-11 (T286 done — feeder loan-on keep != 0)
 
 ## Now
 
@@ -33,6 +33,8 @@ Last updated: 2026-09-11 (T285 done — drop FM26 Load button)
 
 ## Recently done
 
+- **T286** Feeder loan-on keep = nested+0x65 != 0 (T245 on=1 → live on=2)
+- **T285** FM26 section: drop Load Active Save (shell Load remains)
 - **T284** Settings simple collapse: title + status only (no preview row)
 - **T283** Settings preview row visible when collapsed (inside summary)
 - **T282** Settings critical peeks = same cell grid visuals (1 row)
@@ -42,7 +44,6 @@ Last updated: 2026-09-11 (T285 done — drop FM26 Load button)
 - **T278** Diagnostics tone on every cell + visible cue
 - **T277** Diagnostics cell tone — green / yellow / red glance cue
 - **T276** Diagnostics title+value cells; kill Status/Data warning soup
-- **T273** Research-owned agent law; untrack `.cursor/`; push GitHub
 
 ## Loop
 

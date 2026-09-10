@@ -521,11 +521,31 @@ fn build_load_diagnostic_cells(
     if let Some(lock) = affiliation_report.and_then(|r| r.get("loanFlagLock")) {
         let region = lock.get("region").and_then(Value::as_str).unwrap_or("?");
         let off = lock.get("offsetHex").and_then(Value::as_str).unwrap_or("?");
-        let on = lock.get("loanOnValue").and_then(Value::as_u64).unwrap_or(1);
+        let keep = lock
+            .get("keepRule")
+            .and_then(Value::as_str)
+            .unwrap_or("nonzero");
         let offv = lock.get("loanOffValue").and_then(Value::as_u64).unwrap_or(0);
+        let seen = lock
+            .get("observedOnValues")
+            .and_then(Value::as_array)
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(Value::as_u64)
+                    .map(|v| v.to_string())
+                    .collect::<Vec<_>>()
+                    .join("|")
+            })
+            .filter(|s| !s.is_empty())
+            .unwrap_or_else(|| {
+                lock.get("loanOnValue")
+                    .and_then(Value::as_u64)
+                    .map(|v| v.to_string())
+                    .unwrap_or_else(|| "1|2".into())
+            });
         cells.push(diagnostic_cell(
             "Players Go On Loan filter",
-            format!("{region}{off} on={on} off={offv}"),
+            format!("{region}{off} keep!={offv} ({keep}; seen {seen})"),
             "green",
         ));
     } else {
@@ -1350,6 +1370,146 @@ fn resolve_active_human_manager(
         .map(|(index, _)| index)
         .unwrap_or(0);
     Ok((resolved.swap_remove(best_index), manager_pick_warning))
+}
+
+/// Live RE dump: nested Players-Go-On-Loan bytes for managed `club+0x118` links.
+/// Same walk + nested read as production load — use to verify `+0x65` still separates.
+#[cfg(all(feature = "fm-probe", target_os = "windows"))]
+pub fn probe_players_go_on_loan_dump() -> Result<Value, String> {
+    use crate::fm26::affiliation_types::{
+        find_stable_u8_separators, nested_players_go_on_loan, resolve_club_ptr_by_uid,
+        schalke_loan_off_name, schalke_loan_on_name, walk_club_affiliation_links,
+        PLAYERS_GO_ON_LOAN_NESTED_OFFSET, PLAYERS_GO_ON_LOAN_OFF,
+        PLAYERS_GO_ON_LOAN_ON_OBSERVED_2026_09_11, PLAYERS_GO_ON_LOAN_ON_T245,
+    };
+
+    let (process_id, _) =
+        find_fm26_process().ok_or_else(|| "fm.exe not found".to_string())?;
+    let mut reader = ProcessReader::open(process_id).map_err(|code| {
+        format!("OpenProcess denied (win32 {code})")
+    })?;
+    let identity = match reader.process_path() {
+        Some(path) => read_executable_identity(&path),
+        None => ExecutableIdentity {
+            file_version: None,
+            product_version: None,
+            sha256: None,
+            architecture: None,
+        },
+    };
+    let profile = find_entity_map(
+        identity.file_version.as_deref(),
+        identity.product_version.as_deref(),
+        identity.sha256.as_deref(),
+        identity.architecture.as_deref(),
+    )
+    .ok_or_else(|| {
+        format!(
+            "entity map miss build={}",
+            identity.file_version.as_deref().unwrap_or("?")
+        )
+    })?;
+    let module = reader
+        .module(&profile.module)
+        .ok_or_else(|| "game module not found".to_string())?;
+    let mut diagnostics = ExtractionDiagnostics::default();
+    let (manager, pick_warning) =
+        resolve_active_human_manager(&mut reader, module, profile, process_id, &mut diagnostics)
+            .map_err(|e| format!("{}: {}", e.stage, e.message))?;
+
+    let walk = walk_club_affiliation_links(&mut reader, manager.club);
+    let mut rows = Vec::new();
+    let mut loan_on_blobs = Vec::new();
+    let mut loan_off_blobs = Vec::new();
+    for link in &walk.links {
+        let partner_name = resolve_club_ptr_by_uid(&mut reader, module, profile, link.partner_uid)
+            .map(|(_, name)| name)
+            .unwrap_or_default();
+        let name = partner_name.trim().to_string();
+        let loan_byte = link
+            .nested_bytes
+            .get(PLAYERS_GO_ON_LOAN_NESTED_OFFSET)
+            .copied();
+        let production_keeps = nested_players_go_on_loan(&link.nested_bytes);
+        let around_start = PLAYERS_GO_ON_LOAN_NESTED_OFFSET.saturating_sub(8);
+        let around_end = (PLAYERS_GO_ON_LOAN_NESTED_OFFSET + 9).min(link.nested_bytes.len());
+        let around_hex = if around_start < around_end {
+            link.nested_bytes[around_start..around_end]
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect::<String>()
+        } else {
+            String::new()
+        };
+        if schalke_loan_on_name(&name) {
+            loan_on_blobs.push(link.nested_bytes.clone());
+        } else if schalke_loan_off_name(&name) {
+            loan_off_blobs.push(link.nested_bytes.clone());
+        }
+        rows.push(json!({
+            "partnerUid": link.partner_uid,
+            "partnerName": name,
+            "typeHex": format!("0x{:02X}", link.type_byte),
+            "nestedLen": link.nested_bytes.len(),
+            "playersGoOnLoanByteAt0x65": loan_byte,
+            "productionKeepsAsLoanOn": production_keeps,
+            "needleClass": if schalke_loan_on_name(&name) {
+                "expected-loan-on"
+            } else if schalke_loan_off_name(&name) {
+                "expected-loan-off"
+            } else {
+                "other"
+            },
+            "bytesAround0x65": around_hex,
+            "nestedPtr": format!("0x{:X}", link.nested),
+        }));
+    }
+
+    let separators = find_stable_u8_separators(&loan_on_blobs, &loan_off_blobs)
+        .into_iter()
+        .map(|(offset, on_val, off_val)| {
+            json!({
+                "offset": offset,
+                "offsetHex": format!("0x{offset:X}"),
+                "loanOnValue": on_val,
+                "loanOffValue": off_val,
+                "matchesNonzeroKeep": offset == PLAYERS_GO_ON_LOAN_NESTED_OFFSET
+                    && on_val != PLAYERS_GO_ON_LOAN_OFF
+                    && off_val == PLAYERS_GO_ON_LOAN_OFF,
+                "matchesT245Sample": offset == PLAYERS_GO_ON_LOAN_NESTED_OFFSET
+                    && on_val == PLAYERS_GO_ON_LOAN_ON_T245
+                    && off_val == PLAYERS_GO_ON_LOAN_OFF,
+                "matches20260911Sample": offset == PLAYERS_GO_ON_LOAN_NESTED_OFFSET
+                    && on_val == PLAYERS_GO_ON_LOAN_ON_OBSERVED_2026_09_11
+                    && off_val == PLAYERS_GO_ON_LOAN_OFF,
+            })
+        })
+        .collect::<Vec<_>>();
+
+    Ok(json!({
+        "managedClub": manager.club_name.trim(),
+        "managedClubUid": manager.club_uid,
+        "manager": manager.manager_name,
+        "pickWarning": pick_warning,
+        "lockedOffset": PLAYERS_GO_ON_LOAN_NESTED_OFFSET,
+        "lockedOffsetHex": format!("0x{PLAYERS_GO_ON_LOAN_NESTED_OFFSET:X}"),
+        "keepRule": "nonzero",
+        "loanOffValue": PLAYERS_GO_ON_LOAN_OFF,
+        "observedOnValues": [
+            PLAYERS_GO_ON_LOAN_ON_T245,
+            PLAYERS_GO_ON_LOAN_ON_OBSERVED_2026_09_11
+        ],
+        "linkCount": walk.links.len(),
+        "expectedLoanOnBlobCount": loan_on_blobs.len(),
+        "expectedLoanOffBlobCount": loan_off_blobs.len(),
+        "stableU8Separators": separators,
+        "links": rows,
+    }))
+}
+
+#[cfg(all(feature = "fm-probe", not(target_os = "windows")))]
+pub fn probe_players_go_on_loan_dump() -> Result<Value, String> {
+    Err("probe_players_go_on_loan_dump is Windows-only".into())
 }
 
 

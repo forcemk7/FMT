@@ -1079,7 +1079,8 @@ pub(crate) fn discover_bteam_affiliate_clubs(
         affiliation_type_map_reminder, affiliation_walk_to_json, is_match_experience_feeder_type,
         is_roster_load_affiliation_type, is_squad_tab_affiliation_type, nested_players_go_on_loan,
         resolve_club_ptr_by_uid, walk_club_affiliation_links, PLAYERS_GO_ON_LOAN_NESTED_OFFSET,
-        PLAYERS_GO_ON_LOAN_OFF, PLAYERS_GO_ON_LOAN_ON,
+        PLAYERS_GO_ON_LOAN_OFF, PLAYERS_GO_ON_LOAN_ON_OBSERVED_2026_09_11,
+        PLAYERS_GO_ON_LOAN_ON_T245,
     };
 
     let walk = walk_club_affiliation_links(reader, managed_club);
@@ -1103,7 +1104,7 @@ pub(crate) fn discover_bteam_affiliate_clubs(
             "typeHex": format!("0x{:02X}", link.type_byte),
             "reminder": affiliation_type_map_reminder(link.type_byte),
             "playersGoOnLoanByte": loan_byte,
-            "playersGoOnLoan": loan_byte == Some(PLAYERS_GO_ON_LOAN_ON),
+            "playersGoOnLoan": loan_byte.is_some_and(|b| b != PLAYERS_GO_ON_LOAN_OFF),
         }));
     }
     if let Some(obj) = affiliation_type_report.as_object_mut() {
@@ -1114,9 +1115,10 @@ pub(crate) fn discover_bteam_affiliate_clubs(
                 "region": "nested",
                 "offset": PLAYERS_GO_ON_LOAN_NESTED_OFFSET,
                 "offsetHex": format!("0x{PLAYERS_GO_ON_LOAN_NESTED_OFFSET:X}"),
-                "loanOnValue": PLAYERS_GO_ON_LOAN_ON,
+                "keepRule": "nonzero",
                 "loanOffValue": PLAYERS_GO_ON_LOAN_OFF,
-                "evidence": "Schalke live lock 2026-09-06: Legia/Sparta/KL=1 vs Daegu/Melbourne=0 (FMLE nested Players Go On Loan)",
+                "observedOnValues": [PLAYERS_GO_ON_LOAN_ON_T245, PLAYERS_GO_ON_LOAN_ON_OBSERVED_2026_09_11],
+                "evidence": "T245 Schalke 2026-09-06 Legia/Sparta/KL=1 vs Daegu/Melbourne=0; T286 live 2026-09-11 same clubs on=2 — production keep !=0",
             }),
         );
     }
@@ -1157,7 +1159,7 @@ pub(crate) fn discover_bteam_affiliate_clubs(
                     .get(PLAYERS_GO_ON_LOAN_NESTED_OFFSET)
                     .copied();
                 crate::fmt_log::load_detail(format!(
-                    "skip feeder uid {}: nested+0x{PLAYERS_GO_ON_LOAN_NESTED_OFFSET:X}={got:?} (want loan-on {PLAYERS_GO_ON_LOAN_ON})",
+                    "skip feeder uid {}: nested+0x{PLAYERS_GO_ON_LOAN_NESTED_OFFSET:X}={got:?} (want != {PLAYERS_GO_ON_LOAN_OFF})",
                     link.partner_uid
                 ));
                 roster_outcomes.push(json!({
