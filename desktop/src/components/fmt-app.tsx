@@ -394,7 +394,7 @@ export function FMTApp() {
         onOpenPlayer={openPlayer}
       />
     ) : (
-      <SettingsScreen snapshot={snapshot} checking={checking} onRefresh={checkConnection} />
+      <SettingsScreen snapshot={snapshot} />
     );
 
   return (

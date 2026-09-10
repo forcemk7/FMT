@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-11 (T284 done — Settings simple collapse)
+Last updated: 2026-09-11 (T285 done — drop FM26 Load button)
 
 ## Now
 
@@ -33,6 +33,7 @@ Last updated: 2026-09-11 (T284 done — Settings simple collapse)
 
 ## Recently done
 
+- **T284** Settings simple collapse: title + status only (no preview row)
 - **T283** Settings preview row visible when collapsed (inside summary)
 - **T282** Settings critical peeks = same cell grid visuals (1 row)
 - **T281** Settings dense rows: no titles/subtitles; ≤3 critical peeks
@@ -42,7 +43,6 @@ Last updated: 2026-09-11 (T284 done — Settings simple collapse)
 - **T277** Diagnostics cell tone — green / yellow / red glance cue
 - **T276** Diagnostics title+value cells; kill Status/Data warning soup
 - **T273** Research-owned agent law; untrack `.cursor/`; push GitHub
-- **T272** fm-probe feature-gate + quiet default cargo
 
 ## Loop
 

@@ -6,7 +6,6 @@ import {
   Gamepad2,
   Images,
   Network,
-  RefreshCw,
   Sigma,
   UserRound,
   Users,
@@ -14,7 +13,6 @@ import {
 import type { LiveFootballSnapshot } from "@/domain/adapters";
 import { FRONTEND_CALCULATION_CARDS } from "@/domain/has-score";
 import { sortClubTeamsForSquadDesk, squadTeamDisplayName } from "@/domain/live-data";
-import { Button } from "@/components/ui/button";
 import { useGraphicsPacksStatus } from "@/components/graphics-packs-panel";
 import { getVersion } from "@tauri-apps/api/app";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -122,7 +120,6 @@ function SettingsGroup({
   title,
   meta,
   tone,
-  action,
   cells,
 }: {
   id: string;
@@ -130,7 +127,6 @@ function SettingsGroup({
   title: string;
   meta: string;
   tone: DiagnosticTone;
-  action?: ReactNode;
   cells: DiagCell[];
 }) {
   return (
@@ -145,7 +141,6 @@ function SettingsGroup({
         </span>
       </summary>
       <div className="settings-expand-body">
-        {action ? <div className="settings-expand-actions">{action}</div> : null}
         <dl className="settings-diagnostics-grid">
           {cells.map((cell, index) => (
             <DiagnosticCellView key={`${cell.title}:${index}`} {...cell} />
@@ -158,12 +153,8 @@ function SettingsGroup({
 
 export function SettingsScreen({
   snapshot,
-  checking,
-  onRefresh,
 }: {
   snapshot: LiveFootballSnapshot;
-  checking: boolean;
-  onRefresh: () => Promise<unknown>;
 }) {
   const status = snapshot.status;
   const [appVersion, setAppVersion] = useState<string | null>(null);
@@ -635,15 +626,6 @@ export function SettingsScreen({
           meta={memorySafetyLabel(status.memoryAccess)}
           tone={sectionTone(fm26Cells)}
           cells={fm26Cells}
-          action={
-            <Button variant="outline" onClick={onRefresh} disabled={checking}>
-              <RefreshCw
-                data-icon="inline-start"
-                className={checking ? "spin" : undefined}
-              />
-              Load Active Save
-            </Button>
-          }
         />
 
         <SettingsGroup
