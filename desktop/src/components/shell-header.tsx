@@ -77,7 +77,6 @@ function NavButtons({
             onNavigate(label);
             onPicked?.();
           }}
-          title={label}
           aria-label={label}
         >
           {Icon ? <Icon aria-hidden="true" /> : null}
@@ -238,8 +237,8 @@ export function ShellHeader({
           target="_blank"
           rel="noopener noreferrer"
           className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "shell-bmc")}
-          title="Buy me a coffee — optional, not required to use FMT"
-          aria-label="Buy me a coffee"
+          title="Support FMT's development"
+          aria-label="Support FMT's development"
         >
           <Coffee aria-hidden="true" />
         </a>
