@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type RefObject } from "react";
 import {
   ChevronDown,
+  Coffee,
   LayoutDashboard,
   Menu,
   RefreshCw,
@@ -10,7 +11,7 @@ import {
   Settings,
   UsersRound,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import type { LiveFootballSnapshot } from "@/domain/adapters";
@@ -231,6 +232,17 @@ export function ShellHeader({
           <strong>{loadLabel}</strong>
           <RefreshCw aria-hidden="true" className={cn("shell-load-icon", checking && "spin")} />
         </button>
+
+        <a
+          href="https://buymeacoffee.com/mrramirez"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "shell-bmc")}
+          title="Buy me a coffee — optional, not required to use FMT"
+          aria-label="Buy me a coffee"
+        >
+          <Coffee aria-hidden="true" />
+        </a>
 
         <Button
           variant="ghost"

@@ -214,13 +214,15 @@ body.fmt-shell .shell-load.is-loading .live-dot {
     box-shadow: 0 0 0 0 color-mix(in srgb, var(--mint) 0%, transparent);
   }
 }
-body.fmt-shell .shell-tools > button:not(.shell-load) {
+body.fmt-shell .shell-tools > button:not(.shell-load),
+body.fmt-shell .shell-tools > a.shell-bmc {
   color: var(--chrome-fg);
   border-radius: var(--chrome-radius);
   background: var(--chrome-bg);
 }
 body.fmt-shell .shell-tools > button:not(.shell-load):hover,
-body.fmt-shell .shell-tools > button.is-active {
+body.fmt-shell .shell-tools > button.is-active,
+body.fmt-shell .shell-tools > a.shell-bmc:hover {
   color: var(--chrome-fg-active);
   background: var(--chrome-bg-active);
   border-color: var(--chrome-border-active);
