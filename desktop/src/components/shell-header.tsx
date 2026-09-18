@@ -3,7 +3,7 @@
 import { useEffect, useId, useRef, useState, type RefObject } from "react";
 import {
   ChevronDown,
-  Coffee,
+  HandCoins,
   LayoutDashboard,
   Menu,
   RefreshCw,
@@ -240,13 +240,14 @@ export function ShellHeader({
           title="Support FMT's development"
           aria-label="Support FMT's development"
         >
-          <Coffee aria-hidden="true" />
+          <HandCoins aria-hidden="true" />
         </a>
 
         <Button
           variant="ghost"
           size="icon"
-          aria-label="Settings"
+          title="Settings & diagnostics"
+          aria-label="Settings & diagnostics"
           className={cn(screen === "Settings" && "is-active")}
           onClick={() => onNavigate("Settings")}
         >
