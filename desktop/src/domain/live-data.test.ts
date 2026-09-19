@@ -15,6 +15,7 @@ import {
   isLoanedOutSquadPlayer,
   isSquadDeskClubTeam,
   MOVE_ON_HEADROOM_MAX,
+  playerActiveTeamDisplayName,
   playerMatchesSquadRosterFilters,
   playerTeamDisplayName,
   sortClubTeamsForSquadDesk,
@@ -276,6 +277,32 @@ describe("isSquadDeskClubTeam", () => {
       ),
     ).toBe(false);
   });
+
+  it("keeps the managed club's own B team even when affiliation-flagged (Spain)", () => {
+    const bTeamPlayers = [
+      { clubId: "920", loanedOut: false, loanedIn: false, squadTeamUid: "b" },
+    ];
+    expect(
+      isSquadDeskClubTeam(
+        { teamUid: "b", isManagerTeam: false, affiliationType: 0x01, clubId: "920" },
+        bTeamPlayers,
+        "920",
+      ),
+    ).toBe(true);
+  });
+
+  it("still hides a real third-party affiliate even with a loaded roster", () => {
+    const feederPlayers = [
+      { clubId: "77", loanedOut: false, loanedIn: false, squadTeamUid: "f" },
+    ];
+    expect(
+      isSquadDeskClubTeam(
+        { teamUid: "f", isManagerTeam: false, affiliationType: 0x03, clubId: "77" },
+        feederPlayers,
+        "920",
+      ),
+    ).toBe(false);
+  });
 });
 
 describe("squadTeamDisplayName", () => {
@@ -362,6 +389,117 @@ describe("playerTeamDisplayName", () => {
         [{ id: "920", name: "FC Schalke 04" }],
       ),
     ).toBe("FC Schalke 04");
+  });
+});
+
+describe("playerActiveTeamDisplayName", () => {
+  it("at-club First Team — bare club name (core gate, 2026-09-19)", () => {
+    expect(
+      playerActiveTeamDisplayName(
+        {
+          squadTeamUid: "1",
+          clubName: "FC Schalke 04",
+          clubId: "920",
+          loanedOut: false,
+          loanClubId: null,
+          loanClubName: null,
+        },
+        [{ teamUid: "1", shortName: "", name: "", squadUnit: "firstTeam", teamType: 0 }],
+        [{ id: "920", name: "FC Schalke 04" }],
+      ),
+    ).toBe("FC Schalke 04");
+  });
+
+  it("at-club Under 19s — club name + teamType, even when the raw team name is empty (T288 Barcelona bug)", () => {
+    expect(
+      playerActiveTeamDisplayName(
+        {
+          squadTeamUid: "u19",
+          clubName: "Barcelona",
+          clubId: "920",
+          loanedOut: false,
+          loanClubId: null,
+          loanClubName: null,
+        },
+        // raw `.name` deliberately empty — proven unreliable, must not be trusted
+        [{ teamUid: "u19", shortName: "", name: "", squadUnit: "under19s", teamType: 11 }],
+        [{ id: "920", name: "Barcelona" }],
+      ),
+    ).toBe("Barcelona Under 19s");
+  });
+
+  it("at-club affiliate (B/II team) — its own name alone, no teamType suffix", () => {
+    expect(
+      playerActiveTeamDisplayName(
+        {
+          squadTeamUid: "b",
+          clubName: "Barcelona",
+          clubId: "920",
+          loanedOut: false,
+          loanClubId: null,
+          loanClubName: null,
+        },
+        [
+          {
+            teamUid: "b",
+            shortName: "",
+            name: "Barcelona B",
+            squadUnit: "firstTeam",
+            teamType: 0,
+            affiliationType: 0x04,
+            clubName: "Barcelona B",
+          },
+        ],
+        [{ id: "920", name: "Barcelona" }],
+      ),
+    ).toBe("Barcelona B");
+  });
+
+  it("uses the loan club (same lookup as the logo) for a loaned player, ignoring stale squadTeamUid", () => {
+    // squadTeamUid deliberately points at the *parent* club's own II team here —
+    // proven unreliable for loaned players (T288 live test: always resolved to
+    // the parent club's II team regardless of actual loan destination).
+    expect(
+      playerActiveTeamDisplayName(
+        {
+          squadTeamUid: "schalke-ii",
+          clubName: "FC Schalke 04",
+          clubId: "920",
+          loanedOut: true,
+          loanClubId: "77",
+          loanClubName: "Legia Warszawa",
+        },
+        [
+          {
+            teamUid: "schalke-ii",
+            shortName: "",
+            name: "FC Schalke 04 II",
+            squadUnit: "firstTeam",
+          },
+        ],
+        [
+          { id: "920", name: "FC Schalke 04" },
+          { id: "77", name: "Legia Warszawa" },
+        ],
+      ),
+    ).toBe("Legia Warszawa");
+  });
+
+  it("falls back to loanClubName when the loan club isn't in the loaded clubs list", () => {
+    expect(
+      playerActiveTeamDisplayName(
+        {
+          squadTeamUid: null,
+          clubName: "FC Schalke 04",
+          clubId: "920",
+          loanedOut: true,
+          loanClubId: "77",
+          loanClubName: "Legia Warszawa",
+        },
+        [],
+        [{ id: "920", name: "FC Schalke 04" }],
+      ),
+    ).toBe("Legia Warszawa");
   });
 });
 

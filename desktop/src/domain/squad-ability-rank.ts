@@ -4,9 +4,10 @@
  */
 
 import type { LiveClubTeam, LivePlayer } from "./adapters";
+import { clubTeamDisplayName } from "./live-data";
 import {
+  matchExperienceBareTeamTypeLabel,
   matchExperienceTeamBand,
-  matchExperienceTeamLabel,
 } from "./match-experience";
 
 const TALENT_AGE_MAX = 20;
@@ -54,6 +55,9 @@ export type DashClubTeamChrome = {
   clubId: string | null;
   clubName: string;
   teamType: string;
+  /** Core-model display string (2026-09-19, `research/club-team-display.md`)
+   * — what the card's visible text should actually render. */
+  displayLabel: string;
 };
 
 export function dashClubTeamChrome(
@@ -69,10 +73,13 @@ export function dashClubTeamChrome(
       ) ?? clubTeams.find((team) => team.clubId === loanId);
     const clubName = resolveClubName(loanId, clubTeams, clubs, player.loanClubName);
     if (!clubName && !first) return null;
+    const resolvedClubName = clubName ?? first?.clubName?.trim() ?? "Club";
     return {
       clubId: loanId,
-      clubName: clubName ?? first?.clubName?.trim() ?? "Club",
-      teamType: first ? matchExperienceTeamLabel(first) : "First Team",
+      clubName: resolvedClubName,
+      teamType: first ? matchExperienceBareTeamTypeLabel(first) : "First Team",
+      // A loan destination is never "the managed club" — always the club-name branch.
+      displayLabel: resolvedClubName,
     };
   }
 
@@ -88,7 +95,8 @@ export function dashClubTeamChrome(
   return {
     clubId,
     clubName,
-    teamType: matchExperienceTeamLabel(team),
+    teamType: matchExperienceBareTeamTypeLabel(team),
+    displayLabel: clubTeamDisplayName(team, clubName),
   };
 }
 
@@ -99,7 +107,7 @@ export function dashClubTeamSpellout(
   clubs: Array<{ id: string; name: string }> = [],
 ): string | null {
   const chrome = dashClubTeamChrome(player, clubTeams, clubs);
-  return chrome ? `${chrome.clubName} ${chrome.teamType}` : null;
+  return chrome ? chrome.displayLabel : null;
 }
 
 function byName(a: LivePlayer, b: LivePlayer): number {

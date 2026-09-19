@@ -3,7 +3,7 @@
  */
 
 import type { LiveClubTeam, LivePlayer } from "./adapters";
-import { teamTypeDisplayLabel } from "./live-data";
+import { isAffiliateClubTeam, teamTypeDisplayLabel } from "./live-data";
 
 /** Visible rows per card — fixed height, no scrollbar (window around focus). */
 export const MATCH_EXPERIENCE_PAGE_SIZE = 5;
@@ -20,8 +20,15 @@ export type MatchExperienceRow = {
 
 export type MatchExperienceCard = {
   teamUid: string;
-  /** TeamType only — club identity is `clubId` logo in the UI. */
+  /** Primary label per the core gate (2026-09-19): teamType for a managed
+   * team, clubName for any affiliate — see `teamTypeLabel` for the other one. */
   teamLabel: string;
+  /** Bare TeamType/squadUnit label, always — never a club name. Card UI
+   * swaps which of `teamLabel`/`teamTypeLabel` is bold vs subtitle by `isAffiliate`. */
+  teamTypeLabel: string;
+  /** True when this team belongs to a different club than the managed one
+   * (any `affiliationType` byte) — the one gate every display surface reads. */
+  isAffiliate: boolean;
   /** Club UniqueID for badge; null when unread. */
   clubId: string | null;
   /** Full club/team name for tooltip / aria (not the visible title). */
@@ -117,11 +124,8 @@ function isIiClubAffiliate(
   return team.affiliationType === 0x08;
 }
 
-/**
- * Visible TeamType on ME cards. Club identity is the crest, not the string.
- * (Squad desk still uses `squadTeamDisplayName`.)
- */
-export function matchExperienceTeamLabel(
+/** Bare TeamType/squadUnit label — never a club name. */
+export function matchExperienceBareTeamTypeLabel(
   team: Pick<LiveClubTeam, "teamType" | "squadUnit">,
 ): string {
   const fromType = teamTypeDisplayLabel(team.teamType);
@@ -131,6 +135,25 @@ export function matchExperienceTeamLabel(
   if (team.squadUnit === "reserves") return "Reserves";
   if (typeof team.teamType === "number") return `Map TeamType ${team.teamType}`;
   return "Map TeamType (?)";
+}
+
+/**
+ * Visible label on ME cards / Dashboard ME rows: teamType for a managed
+ * team; clubName for any affiliate (2026-09-19 core gate — any
+ * `affiliationType` byte, no hop-depth distinction, no hardcoded byte list).
+ * (Squad desk uses the same gate via `squadTeamDisplayName`.)
+ */
+export function matchExperienceTeamLabel(
+  team: Pick<
+    LiveClubTeam,
+    "teamType" | "squadUnit" | "affiliationType" | "clubName" | "name"
+  >,
+): string {
+  if (isAffiliateClubTeam(team)) {
+    const clubName = team.clubName?.trim() || team.name?.trim();
+    if (clubName) return clubName;
+  }
+  return matchExperienceBareTeamTypeLabel(team);
 }
 
 /**
@@ -406,6 +429,8 @@ export function buildMatchExperienceCard(
   return {
     teamUid: team.teamUid,
     teamLabel: matchExperienceTeamLabel(team),
+    teamTypeLabel: matchExperienceBareTeamTypeLabel(team),
+    isAffiliate: isAffiliateClubTeam(team),
     clubId: teamClubId,
     clubName,
     position: pos,

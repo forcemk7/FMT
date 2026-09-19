@@ -145,6 +145,7 @@ describe("dashClubTeamChrome", () => {
       clubId: "920",
       clubName: "Schalke",
       teamType: "Under 19s",
+      displayLabel: "Schalke Under 19s",
     });
   });
 
@@ -162,6 +163,8 @@ describe("dashClubTeamChrome", () => {
       clubId: "9001",
       clubName: "Legia",
       teamType: "First Team",
+      // A loan destination is never "managed" — displayLabel is always the club name alone.
+      displayLabel: "Legia",
     });
   });
 });

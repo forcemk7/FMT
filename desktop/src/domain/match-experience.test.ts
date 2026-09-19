@@ -154,19 +154,55 @@ describe("sortClubTeamsForMatchExperience", () => {
 });
 
 describe("matchExperienceTeamLabel", () => {
-  it("uses TeamType only (crest carries club identity)", () => {
+  it("uses TeamType only for the managed club's own teams — no affiliationType at all", () => {
     expect(
       matchExperienceTeamLabel({
         squadUnit: "firstTeam",
         teamType: 0,
+        name: "",
       }),
     ).toBe("First Team");
     expect(
       matchExperienceTeamLabel({
         squadUnit: "under19s",
         teamType: 11,
+        name: "",
       }),
     ).toBe("Under 19s");
+  });
+
+  it("names the club for any affiliate — direct feeder, its II hop, or a B/II own-club team alike (2026-09-19 core gate, no byte list)", () => {
+    // Direct feeder (0x01/0x03) — no more bare "First Team" here; the crest
+    // family is shared with its own II hop, so the byte alone must decide.
+    expect(
+      matchExperienceTeamLabel({
+        squadUnit: "firstTeam",
+        teamType: 0,
+        affiliationType: 0x03,
+        clubName: "1. FC Kaiserslautern",
+        name: "1. FC Kaiserslautern",
+      }),
+    ).toBe("1. FC Kaiserslautern");
+    // Feeder's own II hop.
+    expect(
+      matchExperienceTeamLabel({
+        squadUnit: "firstTeam",
+        teamType: 0,
+        affiliationType: 0x08,
+        clubName: "1. FC Kaiserslautern II",
+        name: "1. FC Kaiserslautern II",
+      }),
+    ).toBe("1. FC Kaiserslautern II");
+    // Managed club's own B team (0x04) — confirmed live on the Barcelona save.
+    expect(
+      matchExperienceTeamLabel({
+        squadUnit: "firstTeam",
+        teamType: 0,
+        affiliationType: 0x04,
+        clubName: "Barcelona B",
+        name: "Barcelona B",
+      }),
+    ).toBe("Barcelona B");
   });
 });
 
@@ -280,7 +316,8 @@ describe("buildMatchExperienceCards", () => {
     expect(firstCard.clubName).toBe("Schalke");
     expect(firstCard.maxSamePosCa).toBe(140);
     expect(firstCard.isFocusCurrentTeam).toBe(false);
-    expect(feedCard.teamLabel).toBe("First Team");
+    // 2026-09-19: any affiliate (this feeder is 0x03) names the club, not bare TeamType.
+    expect(feedCard.teamLabel).toBe("Feeder FC");
     expect(feedCard.clubId).toBe("9001");
     expect(feedCard.clubName).toBe("Feeder FC");
     expect(feedCard.maxSamePosCa).toBe(105);

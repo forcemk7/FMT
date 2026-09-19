@@ -32,6 +32,7 @@ Update this file when a ticket locks or discards a recipe. Prefer recipes here o
 |------|---------|------------|--------------|
 | `0x01` | Normal Affiliated Club | no | **yes** if nested+0x65 loan-on |
 | `0x03` | Feeder partners (Schalke: Legia / Kaiserslautern / …) — **PGE label TBD** | no | **yes** if nested+0x65 loan-on |
+| `0x04` | B Club (Barcelona save 2026-09-18: Barcelona B, PGE-confirmed) | **yes** | **yes** |
 | `0x08` | II Club | **yes** | **yes** |
 | `0x10` | Good Relations | no | no |
 | `0x11` | Likely Friendly | no | no |
@@ -61,7 +62,7 @@ Constants: `PLAYERS_GO_ON_LOAN_ON_T245=1`, `PLAYERS_GO_ON_LOAN_ON_OBSERVED_2026_
 
 - PGE display name for `0x03` (still `Map AffiliationType 0x03` in UI).
 - Main / Permanent / Players Move Freely **bytes** still unlocked.
-- Sub / B / C / 2 / 3 / Feeder / etc. other type values; NPL still needs satellite or a locked type.
+- Sub / C / 2 / 3 / Feeder / etc. other type values still unmapped (`0x04` B Club locked 2026-09-18); NPL still needs satellite or a locked type.
 
 ### Do not revive
 

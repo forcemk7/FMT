@@ -240,14 +240,14 @@ export function DashAbilityRow({
       <span className="dash-row-trail dash-ability-trail">
         <span
           className="dash-ability-team"
-          title={chrome ? `${chrome.clubName} ${chrome.teamType}` : undefined}
+          title={chrome ? `${chrome.clubName} · ${chrome.teamType}` : undefined}
         >
           {chrome?.clubId ? (
             <ClubLogo clubId={chrome.clubId} name={chrome.clubName} size="sm" />
           ) : (
             <span className="club-logo club-logo-sm club-logo-empty" aria-hidden="true" />
           )}
-          <span className="dash-ability-team-type">{chrome?.teamType ?? "—"}</span>
+          <span className="dash-ability-team-type">{chrome?.displayLabel ?? "—"}</span>
         </span>
         {secondary}
         {main}

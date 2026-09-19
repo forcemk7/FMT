@@ -4,7 +4,7 @@ import { ArrowLeft, Star } from "lucide-react";
 import type { LiveFootballSnapshot, LivePlayer } from "@/domain/adapters";
 import { abilityToneFromScore, attributeTone } from "@/domain/attribute-tone";
 import { formatHasScore, hasBand, liveHasScore } from "@/domain/has-score";
-import { playerPositionParts, playerTeamDisplayName } from "@/domain/live-data";
+import { playerActiveTeamDisplayName, playerPositionParts } from "@/domain/live-data";
 import { livePersonalityLabels } from "@/domain/personality-labels";
 import { AttributeDesk } from "@/components/attribute-desk";
 import { AttributeHistoryPanel } from "@/components/attribute-history-panel";
@@ -108,14 +108,13 @@ export function PlayerProfileScreen({
   const loanClubName = player.loanClubName?.trim() || null;
   const loanClubId = player.loanClubId?.trim() || null;
   const activeClubId = loanedOut && loanClubId ? loanClubId : player.clubId ?? null;
-  // Club fact = full FM team name via squadTeamUid (T235). shortName is not the display contract.
-  const teamDisplayName = playerTeamDisplayName(
+  // Club fact = full FM team name via squadTeamUid (T235), preferring the
+  // actual placed clubTeam over the contracted loan club when out on loan (T288).
+  const activeClubName = playerActiveTeamDisplayName(
     player,
     snapshot.clubTeams ?? [],
     snapshot.clubs,
   );
-  const activeClubName =
-    loanedOut && loanClubName ? loanClubName : teamDisplayName;
   const club = activeClubId
     ? snapshot.clubs.find((item) => item.id === activeClubId) ?? null
     : null;

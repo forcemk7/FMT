@@ -9,6 +9,7 @@ FMT’s **R&D / knowledge** home — compounded while building the app, kept out
 | [`live-read.md`](./live-read.md) | Operational live-read law (world tables, affiliations, do/don’t) |
 | [`fm-probe-gate.md`](./fm-probe-gate.md) | Cargo `fm-probe` feature — quiet product builds |
 | [`agent-local-setup.md`](./agent-local-setup.md) | Optional: copy law into `.cursor` / Claude locally |
+| [`club-team-display.md`](./club-team-display.md) | Audit: every UI surface showing club/team name, which function powers it, where they diverge |
 
 **Process board** stays in `scrum/` (SCOPE, STATUS, tickets).  
 **Product** stays in `desktop/`.  

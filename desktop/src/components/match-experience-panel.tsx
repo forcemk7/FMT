@@ -91,7 +91,11 @@ function MatchExperienceCardView({
     ? card.position
     : (positionOptions[0] ?? card.position);
 
-  const identityTitle = `${card.clubName} · ${card.teamLabel}`;
+  // Managed team: bold=teamType, subtitle=clubName. Affiliate: swapped —
+  // the specific name (e.g. "Barcelona B") is the primary identity there.
+  const boldText = card.isAffiliate ? card.clubName : card.teamTypeLabel;
+  const subtitleText = card.isAffiliate ? card.teamTypeLabel : card.clubName;
+  const identityTitle = `${boldText} · ${subtitleText}`;
   // Stay (Current=Best): green border + Current pill.
   // Split: Current blue + Current pill; Best neon green + Best pill.
   const isCurrent = card.isFocusCurrentTeam;
@@ -133,8 +137,8 @@ function MatchExperienceCardView({
             <span className="club-logo club-logo-sm club-logo-empty" aria-hidden="true" />
           )}
           <div className="match-experience-card-text">
-            <strong className="match-experience-team-type">{card.teamLabel}</strong>
-            <span className="match-experience-club-name">{card.clubName}</span>
+            <strong className="match-experience-team-type">{boldText}</strong>
+            <span className="match-experience-club-name">{subtitleText}</span>
           </div>
         </div>
         {positionOptions.length > 0 ? (

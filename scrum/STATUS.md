@@ -1,12 +1,14 @@
 ﻿# Status
 
-Last updated: 2026-09-18 (T291 done — BMC link restored)
+Last updated: 2026-09-20 (T288 done — core clubTeam display model)
 
 ## Now
 
 **FMT 1.28 in progress, one ticket at a time.** Owner works strictly sequential — full QA and close-out before the next ticket starts. No parallel ticket work in this phase.
 
-**Next up: T288** (core clubTeam resolution model) or **T287** (ME loan-agreement byte) — both independent, no dependencies. Suggested remaining sequence: T288 → T287 → T215 → T293 → T292 → T290 → T274 → T139 (T292/T290/T293 all depend_on T215; T139 sequenced after T293 so chrome isn't re-skinned before layout changes).
+**Next up: T287** (ME loan-agreement byte still drops Legia) — no dependencies. Suggested remaining sequence: T287 → T215 → T293 → T292 → T290 → T274 → T139 (T292/T290/T293 all depend_on T215; T139 sequenced after T293 so chrome isn't re-skinned before layout changes).
+
+`research/club-team-display.md` is now the standing reference for club/team display logic — check it before touching any UI surface that names a club or team.
 
 **Residuals (not tickets):** Main/Permanent/PMF affiliation bytes; PGE label for AffiliationType `0x03`; further globals CSS carcass; club page polish; First XI median later. Club shortName RE parked (T235).
 
@@ -14,7 +16,6 @@ Last updated: 2026-09-18 (T291 done — BMC link restored)
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
-| T288 | Core clubTeam resolution model → Squad/Loans/Profile/Dashboard | ready | 1 | fixes Spain B-teams, loan display, dashboard ME label |
 | T287 | ME loan-agreement byte still drops Legia | ready | 1 | third attempt after T245, T286 |
 | T215 | Settings restructure — sections, per-cell status, restore missing fields | ready | 1 | prerequisite for T290, T292 |
 | T290 | Minimal functional telemetry — install → launch → load → outcome | ready | 2 | depends_on T215 |
@@ -39,6 +40,7 @@ Last updated: 2026-09-18 (T291 done — BMC link restored)
 
 ## Recently done
 
+- **T288** Core clubTeam display model — one gate (`isAffiliateClubTeam`) + two building blocks (`managedTeamTypeLabel`, `clubTeamDisplayName`) replacing 4 independent resolvers; fixed Squad B-team inclusion (0x04 "B Club" locked), Player Profile loan + at-club display, Dashboard ME row, Dashboard Best/Talent cards, Profile ME tab card bold/subtitle swap. Live-verified across 2 saves. `research/club-team-display.md` is the standing reference.
 - **T291** Restore Buy Me a Coffee link — `<a href="buymeacoffee.com/mrramirez">` back in shell-header.tsx (regressed since T070)
 - **T286** Feeder loan-on keep = nested+0x65 != 0 (T245 on=1 → live on=2)
 - **T285** FM26 section: drop Load Active Save (shell Load remains)

@@ -84,7 +84,7 @@ export function squadTeamLoadedCount(counts: SquadTeamRosterCounts): number {
 export function isSquadDeskClubTeam(
   team: Pick<
     LiveClubTeam,
-    "teamUid" | "affiliationType" | "matchExperienceOnly" | "isManagerTeam"
+    "teamUid" | "affiliationType" | "matchExperienceOnly" | "isManagerTeam" | "clubId"
   >,
   players: Array<
     Pick<LivePlayer, "clubId" | "loanedOut" | "loanedIn" | "squadTeamUid">
@@ -92,7 +92,16 @@ export function isSquadDeskClubTeam(
   managedClubId: string | null | undefined,
 ): boolean {
   if (team.matchExperienceOnly) return false;
-  if (team.affiliationType === 0x01 || team.affiliationType === 0x03) return false;
+  // Some FM structures (e.g. Spanish B teams) flag the managed club's own
+  // reserve team with an affiliation byte even though it's the same club —
+  // only exclude when the team actually belongs to a different club.
+  const ownedByManagedClub =
+    Boolean(managedClubId) && team.clubId === managedClubId;
+  if (
+    (team.affiliationType === 0x01 || team.affiliationType === 0x03) &&
+    !ownedByManagedClub
+  )
+    return false;
   if (team.isManagerTeam) return true;
   const loaded = squadTeamLoadedCount(
     countSquadTeamRoster(players, managedClubId, team.teamUid),
@@ -468,6 +477,28 @@ export function affiliationTypeDisplayLabel(
  * managed club teams → TeamType; affiliated teams → full FM team name.
  * `shortName` (team+0x20) is U19-only in live evidence — not used for UI.
  */
+/**
+ * The one core gate every club/team display surface should read (2026-09-19
+ * audit, `research/club-team-display.md`): any `affiliationType` byte means
+ * this team belongs to a different club than the managed one — no hop-depth
+ * distinction, no hardcoded byte list.
+ */
+export function isAffiliateClubTeam(
+  team: Pick<LiveClubTeam, "affiliationType">,
+): boolean {
+  return typeof team.affiliationType === "number";
+}
+
+/** Bare TeamType/squadUnit label — no club name. Managed-team teams only. */
+function managedTeamTypeLabel(
+  team: Pick<LiveClubTeam, "teamType" | "teamUid">,
+): string {
+  const fromType = teamTypeDisplayLabel(team.teamType);
+  if (fromType) return fromType;
+  if (typeof team.teamType === "number") return `Map TeamType ${team.teamType}`;
+  return `Map TeamType (?): uid-${team.teamUid}`;
+}
+
 export function squadTeamDisplayName(
   team: Pick<
     LiveClubTeam,
@@ -480,22 +511,42 @@ export function squadTeamDisplayName(
   >,
   _managedClubName?: string | null,
 ): string {
-  const isAffiliate = typeof team.affiliationType === "number";
-  if (isAffiliate) {
+  if (isAffiliateClubTeam(team)) {
     const full = team.name.trim();
     if (full) return full;
     return `Map team name (?): uid-${team.teamUid}`;
   }
+  return managedTeamTypeLabel(team);
+}
 
-  const fromType = teamTypeDisplayLabel(team.teamType);
-  if (fromType) return fromType;
-  if (typeof team.teamType === "number") return `Map TeamType ${team.teamType}`;
-  return `Map TeamType (?): uid-${team.teamUid}`;
+/**
+ * Core club/team display string (2026-09-19, `research/club-team-display.md`):
+ * managed First Team -> bare club name; managed non-First (U19/Reserves) ->
+ * "{clubName} {teamType}"; any affiliate (B/II/feeder, any byte) -> its own
+ * name alone — it's already a distinct identity, no suffix needed.
+ * Deliberately does not trust raw `team.name` for managed teams — that
+ * string is sometimes empty on live saves (falls back to bare club name at
+ * the read source) and is unreliable for distinguishing squad type.
+ */
+export function clubTeamDisplayName(
+  team: Pick<
+    LiveClubTeam,
+    "affiliationType" | "teamType" | "squadUnit" | "teamUid" | "clubName" | "name"
+  >,
+  fallbackClubName: string,
+): string {
+  const clubName = team.clubName?.trim() || fallbackClubName;
+  if (isAffiliateClubTeam(team)) {
+    return team.name?.trim() || clubName;
+  }
+  if (team.squadUnit === "firstTeam") return clubName;
+  return `${clubName} ${managedTeamTypeLabel(team)}`;
 }
 
 /**
  * Player profile Club fact — full FM team name via squadTeamUid
  * (load already fills `name` from team+0x18, else linked club name).
+ * Fallback path only — prefer `clubTeamDisplayName` when a team resolves.
  */
 export function playerTeamDisplayName(
   player: Pick<LivePlayer, "squadTeamUid" | "clubName" | "clubId">,
@@ -517,6 +568,50 @@ export function playerTeamDisplayName(
     if (name) return name;
   }
   return null;
+}
+
+/**
+ * Player profile / Loans display name for a player's active club — mirrors
+ * whatever club the logo resolves to (`loanClubId` when out on loan, same
+ * as the profile screen's `activeClubId`), not `squadTeamUid` (T288: proven
+ * unreliable for loaned players — it does not track the specific clubTeam
+ * they're placed in at the loan club, only ever the parent-side roster it
+ * was read from). Showing the *specific* clubTeam at the loan club (e.g.
+ * "Kaiserslautern II" instead of just "Kaiserslautern") needs new data this
+ * function does not have yet — deferred.
+ *
+ * At-club branch uses `clubTeamDisplayName` (the core model) instead of
+ * trusting raw `team.name` — fixes managed non-First teams (e.g. "Barcelona
+ * Under 19s") whose own name string is empty on some saves.
+ */
+export function playerActiveTeamDisplayName(
+  player: Pick<
+    LivePlayer,
+    "squadTeamUid" | "clubName" | "clubId" | "loanedOut" | "loanClubId" | "loanClubName"
+  >,
+  clubTeams: Array<
+    Pick<
+      LiveClubTeam,
+      "teamUid" | "shortName" | "name" | "affiliationType" | "teamType" | "squadUnit" | "clubName"
+    >
+  >,
+  clubs: Array<{ id: string; name: string }>,
+): string | null {
+  if (player.loanedOut === true) {
+    const loanClubId = player.loanClubId?.trim();
+    const loanClub = loanClubId ? clubs.find((club) => club.id === loanClubId) : null;
+    return loanClub?.name?.trim() || player.loanClubName?.trim() || playerTeamDisplayName(player, clubTeams, clubs);
+  }
+  const teamUid = player.squadTeamUid?.trim();
+  const team = teamUid ? clubTeams.find((item) => item.teamUid === teamUid) : undefined;
+  if (team) {
+    const fallbackClubName =
+      player.clubName?.trim() ||
+      clubs.find((club) => club.id === player.clubId)?.name?.trim() ||
+      "";
+    return clubTeamDisplayName(team, fallbackClubName);
+  }
+  return playerTeamDisplayName(player, clubTeams, clubs);
 }
 
 /**
