@@ -23,9 +23,16 @@ pub(crate) const AFFILIATION_TYPE_OFFSET: usize = 0x30;
 pub(crate) const NESTED_PARTNER_UID_OFFSET: usize = 0x0C;
 /// FMLE “Players Go On Loan” on nested agreement (`nested+0x65`).
 ///
-/// History (keep as enum-ish, not a bool):
+/// **Superseded by T287 — see `PLAYERS_GO_ON_LOAN_WRAPPER_OFFSET` below.**
+/// Kept only as the historical record; `nested_players_go_on_loan` is no
+/// longer called from production. Proven wrong 2026-09-20: Legia has a live,
+/// confirmed-active loan agreement (real loaned players there) and reads
+/// `0x00` at `nested+0x65` — identical to the true-off control clubs.
+///
+/// History (kept as enum-ish, not a bool):
 /// - T245 (2026-09-06): Schalke Legia/Sparta/KL=`1`, Daegu/Melbourne=`0` → production kept `==1`.
-/// - T286 (2026-09-11): same clubs live, loan-on=`2`, loan-off=`0` → keep any **non-zero**.
+/// - T286 (2026-09-11): same clubs live, loan-on=`2`, loan-off=`0` → kept any **non-zero**.
+/// - T287 (2026-09-20): field does not live here at all — moved to the wrapper record.
 pub(crate) const PLAYERS_GO_ON_LOAN_NESTED_OFFSET: usize = 0x65;
 /// Historical T245 sample on-value (do not use as sole keep check — see T286).
 pub(crate) const PLAYERS_GO_ON_LOAN_ON_T245: u8 = 1;
@@ -34,11 +41,39 @@ pub(crate) const PLAYERS_GO_ON_LOAN_ON_OBSERVED_2026_09_11: u8 = 2;
 pub(crate) const PLAYERS_GO_ON_LOAN_OFF: u8 = 0;
 
 /// True when nested agreement has Players-Go-On-Loan (non-zero at `+0x65`).
+/// **Historical only — see `wrapper_players_go_on_loan` (T287).**
 pub(crate) fn nested_players_go_on_loan(nested_bytes: &[u8]) -> bool {
     nested_bytes
         .get(PLAYERS_GO_ON_LOAN_NESTED_OFFSET)
         .copied()
         .is_some_and(|b| b != PLAYERS_GO_ON_LOAN_OFF)
+}
+
+/// FMLE "Players Go On Loan" — **locked T287 (2026-09-20)**, on the
+/// **wrapper** record (one hop up from nested), not nested+0x65.
+///
+/// Cross-validated against FMLE's own labeled checkbox for all 6 named
+/// Schalke feeders on the live save: reads `0xFE` for Kaiserslautern, Legia,
+/// Sparta Praha (FMLE: Players Go On Loan = True for exactly these three)
+/// and `0x6C` for Daegu, Melbourne, Schalke II (FMLE: absent/False) — 7/7
+/// links including two (Schalke II 0x08, Sevilla 0x11) that aren't even the
+/// same affiliation type as Legia, ruling out a type-byte confound.
+///
+/// Keep rule mirrors the nested-byte lesson: anchor on the **off** value
+/// (stable across two independent checks so far) rather than the on value
+/// (`0xFE` here is a single sample — could drift the way nested+0x65's
+/// on-value drifted `1→2` between T245 and T286). If a future session
+/// contradicts this, re-diff via `probe-loan-flag`'s `wrapperSeparators`
+/// before re-hardening either value.
+pub(crate) const PLAYERS_GO_ON_LOAN_WRAPPER_OFFSET: usize = 0x2E;
+pub(crate) const PLAYERS_GO_ON_LOAN_WRAPPER_OFF_T287: u8 = 0x6C;
+
+/// True when the wrapper record has Players-Go-On-Loan set (T287 lock).
+pub(crate) fn wrapper_players_go_on_loan(wrapper_bytes: &[u8]) -> bool {
+    wrapper_bytes
+        .get(PLAYERS_GO_ON_LOAN_WRAPPER_OFFSET)
+        .copied()
+        .is_some_and(|b| b != PLAYERS_GO_ON_LOAN_WRAPPER_OFF_T287)
 }
 
 #[cfg(target_os = "windows")]
@@ -179,6 +214,40 @@ pub(crate) fn find_stable_bit_separators(
             } else if on_none && off_all {
                 out.push((offset, bit, false));
             }
+        }
+    }
+    out
+}
+
+/// Offsets where every loan_on blob is non-zero and every loan_off blob is
+/// exactly zero (or the reverse). Different criterion than
+/// `find_stable_u8_separators` — catches a presence/absence field (e.g. a
+/// pointer to a sub-record that only exists when set) whose *value* differs
+/// per club (so no single shared on-value exists) but whose *zero-ness*
+/// doesn't. Returns (byte_offset, on_side_is_nonzero).
+pub(crate) fn find_stable_nonzero_separators(
+    loan_on: &[Vec<u8>],
+    loan_off: &[Vec<u8>],
+) -> Vec<(usize, bool)> {
+    if loan_on.is_empty() || loan_off.is_empty() {
+        return Vec::new();
+    }
+    let min_len = loan_on
+        .iter()
+        .chain(loan_off.iter())
+        .map(|b| b.len())
+        .min()
+        .unwrap_or(0);
+    let mut out = Vec::new();
+    for offset in 0..min_len {
+        let on_all_nonzero = loan_on.iter().all(|b| b[offset] != 0);
+        let on_all_zero = loan_on.iter().all(|b| b[offset] == 0);
+        let off_all_nonzero = loan_off.iter().all(|b| b[offset] != 0);
+        let off_all_zero = loan_off.iter().all(|b| b[offset] == 0);
+        if on_all_nonzero && off_all_zero {
+            out.push((offset, true));
+        } else if on_all_zero && off_all_nonzero {
+            out.push((offset, false));
         }
     }
     out
@@ -407,11 +476,13 @@ pub(crate) fn walk_club_affiliation_links(
 #[cfg(test)]
 mod tests {
     use super::{
-        affiliation_type_label, find_stable_bit_separators, find_stable_u8_separators,
-        is_match_experience_feeder_type, is_roster_load_affiliation_type,
-        is_squad_tab_affiliation_type, nested_players_go_on_loan, schalke_loan_off_name,
-        schalke_loan_on_name, PLAYERS_GO_ON_LOAN_NESTED_OFFSET,
+        affiliation_type_label, find_stable_bit_separators, find_stable_nonzero_separators,
+        find_stable_u8_separators, is_match_experience_feeder_type,
+        is_roster_load_affiliation_type, is_squad_tab_affiliation_type,
+        nested_players_go_on_loan, schalke_loan_off_name, schalke_loan_on_name,
+        wrapper_players_go_on_loan, PLAYERS_GO_ON_LOAN_NESTED_OFFSET,
         PLAYERS_GO_ON_LOAN_ON_OBSERVED_2026_09_11, PLAYERS_GO_ON_LOAN_ON_T245,
+        PLAYERS_GO_ON_LOAN_WRAPPER_OFFSET, PLAYERS_GO_ON_LOAN_WRAPPER_OFF_T287,
     };
 
     #[test]
@@ -467,6 +538,19 @@ mod tests {
     }
 
     #[test]
+    fn stable_nonzero_separator_finds_presence_field_with_differing_on_values() {
+        // T287 Legia case: "on" clubs share no single value at this offset
+        // (0x30 vs 0x90) so find_stable_u8_separators misses it entirely —
+        // but both are non-zero while every "off" club is exactly zero.
+        let on = vec![vec![0u8, 0x30, 0x02], vec![0u8, 0x90, 0x02]];
+        let off = vec![vec![0u8, 0x00, 0x02], vec![0u8, 0x00, 0x02]];
+        let seps = find_stable_nonzero_separators(&on, &off);
+        assert!(seps.contains(&(1, true)));
+        // Offset 2 is non-zero on both sides — not a separator.
+        assert!(!seps.iter().any(|(o, _)| *o == 2));
+    }
+
+    #[test]
     fn nested_players_go_on_loan_keeps_any_nonzero() {
         let mut t245 = vec![0u8; PLAYERS_GO_ON_LOAN_NESTED_OFFSET + 1];
         t245[PLAYERS_GO_ON_LOAN_NESTED_OFFSET] = PLAYERS_GO_ON_LOAN_ON_T245;
@@ -477,5 +561,32 @@ mod tests {
         assert!(nested_players_go_on_loan(&observed));
         assert!(!nested_players_go_on_loan(&off));
         assert!(!nested_players_go_on_loan(&[]));
+    }
+
+    #[test]
+    fn wrapper_players_go_on_loan_matches_fmle_live_schalke_save() {
+        // T287 (2026-09-20): wrapper+0x2E, cross-validated against FMLE's
+        // own "Players Go On Loan" checkbox — True for exactly these three,
+        // False for Daegu/Melbourne/Schalke II on the same save.
+        let mut kaiserslautern = vec![0u8; PLAYERS_GO_ON_LOAN_WRAPPER_OFFSET + 1];
+        kaiserslautern[PLAYERS_GO_ON_LOAN_WRAPPER_OFFSET] = 0xFE;
+        let mut legia = vec![0u8; PLAYERS_GO_ON_LOAN_WRAPPER_OFFSET + 1];
+        legia[PLAYERS_GO_ON_LOAN_WRAPPER_OFFSET] = 0xFE;
+        let mut sparta = vec![0u8; PLAYERS_GO_ON_LOAN_WRAPPER_OFFSET + 1];
+        sparta[PLAYERS_GO_ON_LOAN_WRAPPER_OFFSET] = 0xFE;
+        let mut daegu = vec![0u8; PLAYERS_GO_ON_LOAN_WRAPPER_OFFSET + 1];
+        daegu[PLAYERS_GO_ON_LOAN_WRAPPER_OFFSET] = PLAYERS_GO_ON_LOAN_WRAPPER_OFF_T287;
+        let mut melbourne = vec![0u8; PLAYERS_GO_ON_LOAN_WRAPPER_OFFSET + 1];
+        melbourne[PLAYERS_GO_ON_LOAN_WRAPPER_OFFSET] = PLAYERS_GO_ON_LOAN_WRAPPER_OFF_T287;
+        let mut schalke_ii = vec![0u8; PLAYERS_GO_ON_LOAN_WRAPPER_OFFSET + 1];
+        schalke_ii[PLAYERS_GO_ON_LOAN_WRAPPER_OFFSET] = PLAYERS_GO_ON_LOAN_WRAPPER_OFF_T287;
+
+        assert!(wrapper_players_go_on_loan(&kaiserslautern));
+        assert!(wrapper_players_go_on_loan(&legia));
+        assert!(wrapper_players_go_on_loan(&sparta));
+        assert!(!wrapper_players_go_on_loan(&daegu));
+        assert!(!wrapper_players_go_on_loan(&melbourne));
+        assert!(!wrapper_players_go_on_loan(&schalke_ii));
+        assert!(!wrapper_players_go_on_loan(&[]));
     }
 }

@@ -562,25 +562,40 @@ fn build_load_diagnostic_cells(
         .cloned()
         .unwrap_or_default();
 
+    // T287: wrapper type byte + raw nested+0x65 byte next to the label — lets
+    // a mismatch (e.g. Legia dropped while Kaiserslautern/Sparta load, or a
+    // feeder subtype hiding under the same unmapped 0x03) be read straight
+    // off Settings, without reading fm.exe directly.
+    let feeder_detail_suffix = |row: &Value| -> String {
+        let ty = row.get("typeHex").and_then(Value::as_str).unwrap_or("?");
+        match row.get("loanByte").and_then(Value::as_u64) {
+            Some(b) => format!(" ({ty}) [byte=0x{b:02X}]"),
+            None => format!(" ({ty})"),
+        }
+    };
+
     let mut excluded = Vec::new();
     let mut loan_off = Vec::new();
     let mut unresolved = Vec::new();
     let mut loaded = Vec::new();
+    let mut duplicates = Vec::new();
     for row in &outcomes {
         let outcome = row.get("outcome").and_then(Value::as_str).unwrap_or("");
         let label = partner_label(row);
         if outcome.starts_with("excluded") {
             let ty = row.get("typeHex").and_then(Value::as_str).unwrap_or("?");
             excluded.push(format!("{label} ({ty})"));
+        } else if outcome.contains("duplicate uid") {
+            duplicates.push(format!("{label}{}", feeder_detail_suffix(row)));
         } else if outcome.contains("loan-off") {
-            loan_off.push(label);
+            loan_off.push(format!("{label}{}", feeder_detail_suffix(row)));
         } else if outcome.contains("unresolved") {
             unresolved.push(format!("{label} ({outcome})"));
         } else if outcome.starts_with("loaded") {
             let note = if outcome.contains("feeder→II") {
                 format!("{label} · feeder→II")
             } else {
-                label
+                format!("{label}{}", feeder_detail_suffix(row))
             };
             loaded.push(note);
         }
@@ -590,6 +605,15 @@ fn build_load_diagnostic_cells(
         "Excluded affiliation links",
         excluded_status.clone(),
         tone_none_ok(&excluded_status),
+    ));
+    // T287: a club with 2+ raw links means whichever comes first in the
+    // vector wins today — if FM keeps an old (no agreement) link alongside
+    // a new one, the wrong byte can be kept silently.
+    let duplicates_status = join_or_none(&duplicates);
+    cells.push(diagnostic_cell(
+        "Duplicate affiliation links (uid seen twice)",
+        duplicates_status.clone(),
+        tone_none_ok(&duplicates_status),
     ));
     let loan_off_status = join_or_none(&loan_off);
     cells.push(diagnostic_cell(
@@ -1377,10 +1401,11 @@ fn resolve_active_human_manager(
 #[cfg(all(feature = "fm-probe", target_os = "windows"))]
 pub fn probe_players_go_on_loan_dump() -> Result<Value, String> {
     use crate::fm26::affiliation_types::{
-        find_stable_u8_separators, nested_players_go_on_loan, resolve_club_ptr_by_uid,
-        schalke_loan_off_name, schalke_loan_on_name, walk_club_affiliation_links,
-        PLAYERS_GO_ON_LOAN_NESTED_OFFSET, PLAYERS_GO_ON_LOAN_OFF,
-        PLAYERS_GO_ON_LOAN_ON_OBSERVED_2026_09_11, PLAYERS_GO_ON_LOAN_ON_T245,
+        find_stable_bit_separators, find_stable_nonzero_separators, find_stable_u8_separators,
+        nested_players_go_on_loan, resolve_club_ptr_by_uid, schalke_loan_off_name,
+        schalke_loan_on_name, walk_club_affiliation_links, PLAYERS_GO_ON_LOAN_NESTED_OFFSET,
+        PLAYERS_GO_ON_LOAN_OFF, PLAYERS_GO_ON_LOAN_ON_OBSERVED_2026_09_11,
+        PLAYERS_GO_ON_LOAN_ON_T245,
     };
 
     let (process_id, _) =
@@ -1421,6 +1446,10 @@ pub fn probe_players_go_on_loan_dump() -> Result<Value, String> {
     let mut rows = Vec::new();
     let mut loan_on_blobs = Vec::new();
     let mut loan_off_blobs = Vec::new();
+    // T287: nested blob came back empty on all 3 separator searches — check
+    // one hop up too. `wrapper_bytes` was always captured, never scanned.
+    let mut wrapper_on_blobs = Vec::new();
+    let mut wrapper_off_blobs = Vec::new();
     for link in &walk.links {
         let partner_name = resolve_club_ptr_by_uid(&mut reader, module, profile, link.partner_uid)
             .map(|(_, name)| name)
@@ -1443,9 +1472,21 @@ pub fn probe_players_go_on_loan_dump() -> Result<Value, String> {
         };
         if schalke_loan_on_name(&name) {
             loan_on_blobs.push(link.nested_bytes.clone());
+            wrapper_on_blobs.push(link.wrapper_bytes.clone());
         } else if schalke_loan_off_name(&name) {
             loan_off_blobs.push(link.nested_bytes.clone());
+            wrapper_off_blobs.push(link.wrapper_bytes.clone());
         }
+        let nested_hex = link
+            .nested_bytes
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect::<String>();
+        let wrapper_hex = link
+            .wrapper_bytes
+            .iter()
+            .map(|b| format!("{b:02x}"))
+            .collect::<String>();
         rows.push(json!({
             "partnerUid": link.partner_uid,
             "partnerName": name,
@@ -1461,30 +1502,62 @@ pub fn probe_players_go_on_loan_dump() -> Result<Value, String> {
                 "other"
             },
             "bytesAround0x65": around_hex,
+            // T287: full nested blob — the ±8 window around the old lock
+            // may not contain wherever the real signal actually lives.
+            "nestedHex": nested_hex,
             "nestedPtr": format!("0x{:X}", link.nested),
+            // T287: one hop up from nested — never scanned before.
+            "wrapperHex": wrapper_hex,
+            "wrapperLen": link.wrapper_bytes.len(),
         }));
     }
 
-    let separators = find_stable_u8_separators(&loan_on_blobs, &loan_off_blobs)
-        .into_iter()
-        .map(|(offset, on_val, off_val)| {
-            json!({
-                "offset": offset,
-                "offsetHex": format!("0x{offset:X}"),
-                "loanOnValue": on_val,
-                "loanOffValue": off_val,
-                "matchesNonzeroKeep": offset == PLAYERS_GO_ON_LOAN_NESTED_OFFSET
-                    && on_val != PLAYERS_GO_ON_LOAN_OFF
-                    && off_val == PLAYERS_GO_ON_LOAN_OFF,
-                "matchesT245Sample": offset == PLAYERS_GO_ON_LOAN_NESTED_OFFSET
-                    && on_val == PLAYERS_GO_ON_LOAN_ON_T245
-                    && off_val == PLAYERS_GO_ON_LOAN_OFF,
-                "matches20260911Sample": offset == PLAYERS_GO_ON_LOAN_NESTED_OFFSET
-                    && on_val == PLAYERS_GO_ON_LOAN_ON_OBSERVED_2026_09_11
-                    && off_val == PLAYERS_GO_ON_LOAN_OFF,
+    // T287: Legia's byte differs per-club from Kaiserslautern/Sparta's own
+    // "on" value (0x30 vs 0x90 seen live) — exact-value separators miss
+    // that entirely. Bit-level and presence/absence (nonzero) separators
+    // catch patterns exact-value matching can't. Run against both the
+    // nested record and the wrapper one hop up — nested came back empty.
+    fn all_separators(on_blobs: &[Vec<u8>], off_blobs: &[Vec<u8>]) -> Value {
+        let u8_seps = find_stable_u8_separators(on_blobs, off_blobs)
+            .into_iter()
+            .map(|(offset, on_val, off_val)| {
+                json!({
+                    "offset": offset,
+                    "offsetHex": format!("0x{offset:X}"),
+                    "loanOnValue": on_val,
+                    "loanOffValue": off_val,
+                })
             })
+            .collect::<Vec<_>>();
+        let bit_seps = find_stable_bit_separators(on_blobs, off_blobs)
+            .into_iter()
+            .map(|(offset, bit, on_is_one)| {
+                json!({
+                    "offset": offset,
+                    "offsetHex": format!("0x{offset:X}"),
+                    "bit": bit,
+                    "loanOnBitIsOne": on_is_one,
+                })
+            })
+            .collect::<Vec<_>>();
+        let nonzero_seps = find_stable_nonzero_separators(on_blobs, off_blobs)
+            .into_iter()
+            .map(|(offset, on_is_nonzero)| {
+                json!({
+                    "offset": offset,
+                    "offsetHex": format!("0x{offset:X}"),
+                    "loanOnIsNonzero": on_is_nonzero,
+                })
+            })
+            .collect::<Vec<_>>();
+        json!({
+            "stableU8Separators": u8_seps,
+            "stableBitSeparators": bit_seps,
+            "stableNonzeroSeparators": nonzero_seps,
         })
-        .collect::<Vec<_>>();
+    }
+    let nested_separators = all_separators(&loan_on_blobs, &loan_off_blobs);
+    let wrapper_separators = all_separators(&wrapper_on_blobs, &wrapper_off_blobs);
 
     Ok(json!({
         "managedClub": manager.club_name.trim(),
@@ -1502,7 +1575,10 @@ pub fn probe_players_go_on_loan_dump() -> Result<Value, String> {
         "linkCount": walk.links.len(),
         "expectedLoanOnBlobCount": loan_on_blobs.len(),
         "expectedLoanOffBlobCount": loan_off_blobs.len(),
-        "stableU8Separators": separators,
+        // T287: separator searches run against both byte regions — nested
+        // came back empty on all three kinds; wrapper is the new hop.
+        "nestedSeparators": nested_separators,
+        "wrapperSeparators": wrapper_separators,
         "links": rows,
     }))
 }

@@ -1077,10 +1077,9 @@ pub(crate) fn discover_bteam_affiliate_clubs(
 ) -> BteamAffiliateDiscovery {
     use super::affiliation_types::{
         affiliation_type_map_reminder, affiliation_walk_to_json, is_match_experience_feeder_type,
-        is_roster_load_affiliation_type, is_squad_tab_affiliation_type, nested_players_go_on_loan,
-        resolve_club_ptr_by_uid, walk_club_affiliation_links, PLAYERS_GO_ON_LOAN_NESTED_OFFSET,
-        PLAYERS_GO_ON_LOAN_OFF, PLAYERS_GO_ON_LOAN_ON_OBSERVED_2026_09_11,
-        PLAYERS_GO_ON_LOAN_ON_T245,
+        is_roster_load_affiliation_type, is_squad_tab_affiliation_type, resolve_club_ptr_by_uid,
+        walk_club_affiliation_links, wrapper_players_go_on_loan, PLAYERS_GO_ON_LOAN_WRAPPER_OFFSET,
+        PLAYERS_GO_ON_LOAN_WRAPPER_OFF_T287,
     };
 
     let walk = walk_club_affiliation_links(reader, managed_club);
@@ -1095,8 +1094,8 @@ pub(crate) fn discover_bteam_affiliate_clubs(
             .map(|(_, name)| name)
             .unwrap_or_default();
         let loan_byte = link
-            .nested_bytes
-            .get(PLAYERS_GO_ON_LOAN_NESTED_OFFSET)
+            .wrapper_bytes
+            .get(PLAYERS_GO_ON_LOAN_WRAPPER_OFFSET)
             .copied();
         named_links.push(json!({
             "partnerUid": link.partner_uid,
@@ -1104,7 +1103,7 @@ pub(crate) fn discover_bteam_affiliate_clubs(
             "typeHex": format!("0x{:02X}", link.type_byte),
             "reminder": affiliation_type_map_reminder(link.type_byte),
             "playersGoOnLoanByte": loan_byte,
-            "playersGoOnLoan": loan_byte.is_some_and(|b| b != PLAYERS_GO_ON_LOAN_OFF),
+            "playersGoOnLoan": loan_byte.is_some_and(|b| b != PLAYERS_GO_ON_LOAN_WRAPPER_OFF_T287),
         }));
     }
     if let Some(obj) = affiliation_type_report.as_object_mut() {
@@ -1112,13 +1111,17 @@ pub(crate) fn discover_bteam_affiliate_clubs(
         obj.insert(
             "loanFlagLock".into(),
             json!({
-                "region": "nested",
-                "offset": PLAYERS_GO_ON_LOAN_NESTED_OFFSET,
-                "offsetHex": format!("0x{PLAYERS_GO_ON_LOAN_NESTED_OFFSET:X}"),
-                "keepRule": "nonzero",
-                "loanOffValue": PLAYERS_GO_ON_LOAN_OFF,
-                "observedOnValues": [PLAYERS_GO_ON_LOAN_ON_T245, PLAYERS_GO_ON_LOAN_ON_OBSERVED_2026_09_11],
-                "evidence": "T245 Schalke 2026-09-06 Legia/Sparta/KL=1 vs Daegu/Melbourne=0; T286 live 2026-09-11 same clubs on=2 — production keep !=0",
+                "region": "wrapper",
+                "offset": PLAYERS_GO_ON_LOAN_WRAPPER_OFFSET,
+                "offsetHex": format!("0x{PLAYERS_GO_ON_LOAN_WRAPPER_OFFSET:X}"),
+                "keepRule": "!=off",
+                "loanOffValue": PLAYERS_GO_ON_LOAN_WRAPPER_OFF_T287,
+                "observedOnValues": [],
+                // Single-save sample — off-value is the stable anchor (see
+                // doc comment on PLAYERS_GO_ON_LOAN_WRAPPER_OFFSET); this is
+                // just what was seen, not something to re-harden against.
+                "loanOnValue": 0xFEu8,
+                "evidence": "T287 2026-09-20: nested+0x65 proven wrong (Legia live agreement reads 0x00, same as true-off). wrapper+0x2E cross-validated against FMLE's own Players-Go-On-Loan checkbox for all 6 named Schalke feeders: 0xFE for Kaiserslautern/Legia/Sparta (FMLE true), 0x6C for Daegu/Melbourne/Schalke II (FMLE false/absent).",
             }),
         );
     }
@@ -1148,18 +1151,35 @@ pub(crate) fn discover_bteam_affiliate_clubs(
             }));
             continue;
         }
-        if link.partner_uid == managed_club_uid || !seen_uids.insert(link.partner_uid) {
+        if link.partner_uid == managed_club_uid {
             continue;
         }
         // Feeders without Players-Go-On-Loan stay out of Match experience.
+        // Raw wrapper+0x2E byte (T287: locked here, not nested+0x65 — dump
+        // it so a mismatch is visible without reading fm.exe directly) —
+        // null when unreadable or not a feeder type.
+        let loan_byte = is_match_experience_feeder_type(link.type_byte)
+            .then(|| link.wrapper_bytes.get(PLAYERS_GO_ON_LOAN_WRAPPER_OFFSET).copied())
+            .flatten();
+        if !seen_uids.insert(link.partner_uid) {
+            // T287: a second raw link for a club already kept — surface it
+            // instead of silently discarding. If FM stores an old (no
+            // agreement) and a new (agreement added later) link side by
+            // side, whichever is discarded here matters.
+            roster_outcomes.push(json!({
+                "partnerUid": link.partner_uid,
+                "partnerName": partner_name,
+                "typeHex": type_hex,
+                "reminder": type_reminder,
+                "outcome": "skipped · duplicate uid",
+                "loanByte": loan_byte,
+            }));
+            continue;
+        }
         if is_match_experience_feeder_type(link.type_byte) {
-            if !nested_players_go_on_loan(&link.nested_bytes) {
-                let got = link
-                    .nested_bytes
-                    .get(PLAYERS_GO_ON_LOAN_NESTED_OFFSET)
-                    .copied();
+            if !wrapper_players_go_on_loan(&link.wrapper_bytes) {
                 crate::fmt_log::load_detail(format!(
-                    "skip feeder uid {}: nested+0x{PLAYERS_GO_ON_LOAN_NESTED_OFFSET:X}={got:?} (want != {PLAYERS_GO_ON_LOAN_OFF})",
+                    "skip feeder uid {}: wrapper+0x{PLAYERS_GO_ON_LOAN_WRAPPER_OFFSET:X}={loan_byte:?} (want != {PLAYERS_GO_ON_LOAN_WRAPPER_OFF_T287})",
                     link.partner_uid
                 ));
                 roster_outcomes.push(json!({
@@ -1168,6 +1188,7 @@ pub(crate) fn discover_bteam_affiliate_clubs(
                     "typeHex": type_hex,
                     "reminder": type_reminder,
                     "outcome": "dropped · loan-off",
+                    "loanByte": loan_byte,
                 }));
                 continue;
             }
@@ -1203,6 +1224,7 @@ pub(crate) fn discover_bteam_affiliate_clubs(
             "partnerName": club_name.trim(),
             "typeHex": type_hex,
             "reminder": label.clone(),
+            "loanByte": loan_byte,
             "outcome": "loaded",
         }));
         found.push(AffiliateClubDiscovery {

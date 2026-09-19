@@ -1,12 +1,14 @@
 ﻿# Status
 
-Last updated: 2026-09-20 (T288 done — core clubTeam display model)
+Last updated: 2026-09-20 (T287 done — ME loan-agreement byte relocated to wrapper+0x2E)
 
 ## Now
 
 **FMT 1.28 in progress, one ticket at a time.** Owner works strictly sequential — full QA and close-out before the next ticket starts. No parallel ticket work in this phase.
 
-**Next up: T287** (ME loan-agreement byte still drops Legia) — no dependencies. Suggested remaining sequence: T287 → T215 → T293 → T292 → T290 → T274 → T139 (T292/T290/T293 all depend_on T215; T139 sequenced after T293 so chrome isn't re-skinned before layout changes).
+**Next up: T215** (Settings restructure) — no dependencies, and gates T290/T292/T293. Suggested remaining sequence: T215 → T293 → T292 → T290 → T274 → T139 (T292/T290/T293 all depend_on T215; T139 sequenced after T293 so chrome isn't re-skinned before layout changes).
+
+**T294 blocked, not startable yet** — needs a second affiliationType `0x01` sample (or a native-FM26 `0x03` sample) to isolate a variable T287 couldn't. Flag it when a save surfaces one; don't force it without new data.
 
 `research/club-team-display.md` is now the standing reference for club/team display logic — check it before touching any UI surface that names a club or team.
 
@@ -16,7 +18,6 @@ Last updated: 2026-09-20 (T288 done — core clubTeam display model)
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
-| T287 | ME loan-agreement byte still drops Legia | ready | 1 | third attempt after T245, T286 |
 | T215 | Settings restructure — sections, per-cell status, restore missing fields | ready | 1 | prerequisite for T290, T292 |
 | T290 | Minimal functional telemetry — install → launch → load → outcome | ready | 2 | depends_on T215 |
 | T292 | PA masking toggle | ready | 2 | depends_on T215 |
@@ -33,6 +34,7 @@ Last updated: 2026-09-20 (T288 done — core clubTeam display model)
 | T253 | ME card order by competition / division difficulty | needs RE spike; cosmetic — distinct from T287's correctness bug |
 | T275 | World player lookup (Loop D) | existing clubTeam/affiliate/loan data (via T288) stays searchable; full Loop D world-table RE still parked |
 | T162 | Player trophy cabinet | blocked: no trophy object lock, and trophy graphics package would conflict with the logos megapack |
+| T294 | Loan flag doesn't generalize to affiliationType `0x01` | blocked on a second `0x01` sample (or native-FM26 `0x03` sample) to isolate type-vs-provenance; real bug (Olot), not speculative |
 
 ## Cancelled / superseded
 
@@ -40,6 +42,7 @@ Last updated: 2026-09-20 (T288 done — core clubTeam display model)
 
 ## Recently done
 
+- **T287** ME loan-agreement byte relocated: `wrapper+0x2E` (not nested+0x65) — Legia now resolves correctly alongside Kaiserslautern/Sparta on the Schalke save, cross-validated against FMLE's own checkbox 7/7. Found `wrapper+0x2E` doesn't generalize to affiliationType `0x01` (Olot, Barcelona save) — spun off as T294, blocked on more data.
 - **T288** Core clubTeam display model — one gate (`isAffiliateClubTeam`) + two building blocks (`managedTeamTypeLabel`, `clubTeamDisplayName`) replacing 4 independent resolvers; fixed Squad B-team inclusion (0x04 "B Club" locked), Player Profile loan + at-club display, Dashboard ME row, Dashboard Best/Talent cards, Profile ME tab card bold/subtitle swap. Live-verified across 2 saves. `research/club-team-display.md` is the standing reference.
 - **T291** Restore Buy Me a Coffee link — `<a href="buymeacoffee.com/mrramirez">` back in shell-header.tsx (regressed since T070)
 - **T286** Feeder loan-on keep = nested+0x65 != 0 (T245 on=1 → live on=2)
