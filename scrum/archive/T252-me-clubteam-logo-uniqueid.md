@@ -34,4 +34,4 @@ Match experience cards for second-hop II (e.g. Kaiserslautern II) show empty log
 - Root cause: warm omitted `clubTeams` UniqueIDs; ClubLogo applied permanent null before background logo index finished copying to `logo-cache-trim`
 - Shipped: warm includes `clubTeams[].clubId`; `LogoLookup::{Found,Pending,Missing}` + post-index pending drain; ClubLogo soft-retries while `pending`; longer `fmt-logos-updated` clears
 - Verified: `cargo check` in `desktop/src-tauri`
-- Commit: (this ticket)
+- Commit: `ba3b3f4`

@@ -33,4 +33,4 @@ Match experience still loads feeders without a loan agreement (Daegu, Melbourne)
 
 Locked: **nested+0x65** loanOn=`1` loanOff=`0` (live Diagnostics 2026-09-06). Hardcoded `PLAYERS_GO_ON_LOAN_*` + `nested_players_go_on_loan`; name-needle auto-diff removed from load path. recipes.md updated.
 
-Commit: `_(fill)_`
+Commit: `2367d90`

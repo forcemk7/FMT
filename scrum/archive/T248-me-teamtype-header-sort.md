@@ -32,4 +32,4 @@ Club name as title makes many “First Team” cards hard to scan. Prefer TeamTy
 
 Shipped: flip title/subtitle; sort band First → Res → Under N; within band by clubName. Verified vitest (11).
 
-Commit: `_(fill)_`
+Commit: `ea29aac`

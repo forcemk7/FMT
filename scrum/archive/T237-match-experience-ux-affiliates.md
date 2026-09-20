@@ -38,4 +38,4 @@ Polish Match experience so per-team position compares stay usable, and extend lo
 - Squad desk filters out `affiliationType === 0x01`
 - Verified: vitest match-experience 9/4; cargo lib compiles; affiliation_types unit test
 
-Commit: _(after git)_
+Commit: `288e34e`

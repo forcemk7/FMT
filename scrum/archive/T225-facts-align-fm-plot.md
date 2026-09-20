@@ -38,4 +38,4 @@ Shipped:
 - Facts strip: 14px borderless badges; identity row height = strong line-height so nation/club align with Age/etc.
 - Plot: fixed 0–20 + grid; CA/PA plotted as /10; horizontal-tangent smooth paths; resting dots removed; gold endpoints when ability-only; hover guide + dots + tooltip kept; FM-ish date ticks
 
-Verified: CSS baseline + FM path contract. Commit SHA after commit.
+Verified: CSS baseline + FM path contract. Commit `f51cc4c`.

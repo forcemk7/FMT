@@ -30,4 +30,4 @@ Preview cells lived outside `<summary>` inside `<details>`, so the browser hid t
 
 ## Progress
 
-Shipped. Commit after git.
+Shipped. Commit: `35686a2`. Preview lives inside `<summary>` so collapsed sections show a 1-row cell grid; peeks always fill up to 3 when data exists.

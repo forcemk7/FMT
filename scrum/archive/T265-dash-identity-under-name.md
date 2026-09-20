@@ -35,4 +35,4 @@ Age/position belong under the name on every peek (consistent base identity). Sma
 - Shared `DashPlayerIdentity` — `{age} · {pos}` under name on all peeks
 - Ability/ME extras no longer carry age/pos
 - Face clamp uses `min(vh,vw)`; tighter ≤1100px breakpoint
-- Commit: `8d0480e`
+- Commit: `1505061`

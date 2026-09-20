@@ -30,4 +30,4 @@ Collapsed section peeks were compact text chips. They must match the expanded di
 
 ## Progress
 
-Shipped. Commit after git.
+Shipped. Commit: `43b758b`.

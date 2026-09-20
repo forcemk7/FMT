@@ -43,4 +43,4 @@ No full-name fallbacks, no prefix invent, no clubName substitute. Prior tickets 
 
 Your understanding was complete. We were doing extras (full-name / clubName fallbacks). Display is now TeamType | shortName only. If `team+0x20` is empty in the snapshot, profile shows null / affiliate shows map reminder — that is a memory-read gap, not a display invent.
 
-Commit SHA after commit.
+Commit SHA: `a10728f`.

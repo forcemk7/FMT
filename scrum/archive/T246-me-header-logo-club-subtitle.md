@@ -32,4 +32,4 @@ Logo boxes look framed; TeamType-only titles make two Schalke “First Team” c
 
 Shipped: identity row = flush ClubLogo + club name (from `clubs` by id); TeamType subtitle replaces position·rank. Logo 22px, border/pad/bg cleared like `.player-fact-identity`. Verified vitest (10).
 
-Commit: `_(fill)_`
+Commit: `d1bff0c`

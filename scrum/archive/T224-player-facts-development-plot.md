@@ -44,4 +44,4 @@ Shipped:
 - Load stamp: `deferRecordSnapshotPlayers(..., nextSnapshot.gameDate)` (was season)
 - Honesty: pack/HA all-time Δ still undated point series (T190)
 
-Verified: `vitest` product + attribute-history (22). Commit `53b593c`.
+Verified: `vitest` product + attribute-history (22). Commit `2d8aa42`.

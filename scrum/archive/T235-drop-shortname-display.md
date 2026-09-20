@@ -38,4 +38,4 @@ depends_on: [T234]
 
 Dropped shortName as UI contract. Managed = TeamType; affiliate + profile = full FM team name. Entity-map shortName demoted to candidate/diagnostic. Vitest 41 ok.
 
-Commit SHA after commit.
+Commit SHA: `feb8790`.

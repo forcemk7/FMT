@@ -32,4 +32,4 @@ T276 made Diagnostics an index of title+value cells. Scanning still costs a read
 
 ## Progress
 
-Shipped: `tone` on `DiagnosticCell`; connector assigns green/yellow/red; Settings shows a 7px cue on each cell title. `cargo check` clean.
+Shipped: `tone` on `DiagnosticCell`; connector assigns green/yellow/red; Settings shows a 7px cue on each cell title. `cargo check` clean. Commit: `0e1f397`.

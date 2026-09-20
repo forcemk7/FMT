@@ -1,11 +1,11 @@
 ---
 id: T295
 title: Repo git hygiene cleanup + workflow guardrail against it recurring
-status: ready
+status: in_progress
 priority: 1
-owner: null
-claimed_at: null
-started_at: null
+owner: claude
+claimed_at: 2026-09-20
+started_at: 2026-09-20
 completed_at: null
 depends_on: []
 ---
@@ -45,4 +45,6 @@ This is a real risk, not just clutter: `AGENTS.md`'s per-ticket discipline ("sta
 
 ## Progress
 
-_(worker fills)_
+Re-ran `git status --short` 2026-09-20 — drift is larger than the discovery note above: 53 modified `scrum/archive/*.md`, 2 archive-duplicate deletions in `scrum/tickets/` (T245/T249), ~22 untracked ticket files, 2 untracked local-config dirs (`.claude/`, `desktop/src-tauri/.cargo/`), plus the previously-known Rust/frontend/version-bump files. Reported full categorized findings to owner; working through disposition one group at a time per owner's request (explain TL;DR, then commit, before moving to the next group).
+
+**Group 1 — archive hygiene (done):** Diffed a sample of the 53 modified `scrum/archive/*.md` — all are the same pattern: backfilling `Commit: (pending)` → real SHA, or fixing a stale historical note. Confirmed via `git log` that `scrum/tickets/T245`/`T249` were already properly archived in real past commits (`2367d90`, `5aef510`); the `tickets/` copies were just never `git rm`'d after that archival — no data loss, safe to finish. Also found 3 fully-untracked archive files (T082, T089, T098, all `status: cancelled`) that were never committed at all. Committed all of the above as one commit (see SHA below).

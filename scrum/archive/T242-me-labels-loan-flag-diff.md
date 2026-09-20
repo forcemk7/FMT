@@ -42,4 +42,4 @@ Shipped:
 
 Verified: vitest match-experience (10); cargo `schalke_loan_needles` + `stable_u8_separator_finds_loan_flag`.
 
-Commit: `54798d9`
+Commit: `4377d00`

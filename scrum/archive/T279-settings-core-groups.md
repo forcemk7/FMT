@@ -34,4 +34,4 @@ Standalone Diagnostics is hard to use. Settings should follow the real groups (F
 
 ## Progress
 
-Shipped: seven Settings groups; nested Diagnostics per section; optimistic floor on section dots; standalone Diagnostics removed; Graphics body reused under Graphics.
+Shipped: seven Settings groups; nested Diagnostics per section; optimistic floor on section dots; standalone Diagnostics removed; Graphics body reused under Graphics. Commit: `0c24c01`.

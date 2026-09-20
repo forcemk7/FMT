@@ -30,4 +30,4 @@ T277 shipped tones only on late `diagnosticCells`, and empty tone spans often di
 
 ## Progress
 
-Shipped: `DiagnosticCellView` on all Diagnostics rows; tone CSS `display:inline-block` + shell overrides; backend index cells keep their tones.
+Shipped: `DiagnosticCellView` on all Diagnostics rows; tone CSS `display:inline-block` + shell overrides; backend index cells keep their tones. Commit: `508036e`.

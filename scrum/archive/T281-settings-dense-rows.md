@@ -32,4 +32,4 @@ Settings is a grind surface. Page title/subtitle and per-section subtitles add n
 
 ## Progress
 
-Shipped: no page heading; section rows are label + peeks + meta; ≤3 critical peeks on collapse; full grid on expand.
+Shipped: no page heading; section rows are label + peeks + meta; ≤3 critical peeks on collapse; full grid on expand. Commit: `400f1e6`.

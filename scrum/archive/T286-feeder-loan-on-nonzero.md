@@ -32,4 +32,4 @@ Match experience drops Legia / Kaiserslautern / Sparta as “loan-off” while I
 
 - Keep = `!= 0`; constants `ON_T245=1` + `ON_OBSERVED_2026_09_11=2` for history
 - recipes + Diagnostics `keep!=0 (seen 1|2)`; `cargo test --lib nested_players_go_on_loan` ok
-- Commit: (pending)
+- Commit: `3e8f3a5`

@@ -37,4 +37,4 @@ Cards still overlap faces/names; order wrong vs intended ladder; loaned-out peer
 - Loan compete rules + tests
 - **Normal `0x01` still not verified live** — need user help (see report)
 
-Commit: _(after git)_
+Commit: `9610fd4`

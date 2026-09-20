@@ -46,4 +46,4 @@ Shipped `debug_scan_club_affiliates` + `fm26/club_affiliates.rs`:
 
 Tests: `cargo test club_affiliates --lib` (2/2). Live probe not run in CI.
 
-Commit: (see Progress SHA after commit)
+Commit: bf0af49dbd79d04742429028f39fe86d095cdbb2

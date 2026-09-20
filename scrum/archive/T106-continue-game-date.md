@@ -61,6 +61,6 @@ Locked from König FM24Career + v02–v10 diffs (day steps at trailer; calendar 
 
 Verified: `python -m unittest` t106 + t101 + t099 + t097 + t096 (27 ok). Local smoke: base → 2040-10-24, v10 → 2040-10-15, dynamics-c → 2040-06-19. No committed `.fm` / `tmp/`.
 
-Commit: _(filled after git)_
+Commit: `261d89fd1092f970556ac027ae216bcdac181826`
 
 Restart `npm run dev` and + / Update a continue save — Game Date should be a real day, not —. Native cards stay T099.

@@ -32,4 +32,4 @@ Settings is a grind surface for finding flaws, not user preferences. Mixed displ
 
 ## Progress
 
-Shipped: Settings bodies are cell grids only; one cell per Club.Teams entry and graphics pack; Scores as cells; Load Active Save remains the only non-cell action on FM26. Commit SHA after commit.
+Shipped: Settings bodies are cell grids only; one cell per Club.Teams entry and graphics pack; Scores as cells; Load Active Save remains the only non-cell action on FM26. Commit: `09342a8`.

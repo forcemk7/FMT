@@ -36,4 +36,4 @@ Schalke warnings: `Map AffiliationType 0x03`, `7/12` mapped, only 1 II club reso
 - recipes: Schalke `0x03` evidence
 - vitest match-experience 9/9
 
-Commit: _(after git)_
+Commit: `e1b8712`

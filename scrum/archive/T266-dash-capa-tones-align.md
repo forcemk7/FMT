@@ -35,4 +35,4 @@ CA/PA still ignore attr tones (flat green/grey). Age is cryptic. Digit width shi
 - `DashAbilityStat` — CA/PA via `abilityToneFromScore` + tone-tinted main chip
 - Identity: `{age} years old · {pos}`
 - Ability rows: 5-col grid (team / secondary / main fixed) for digit align
-- Commit: (pending)
+- Commit: `9fb17a7`

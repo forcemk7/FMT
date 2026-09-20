@@ -38,4 +38,4 @@ Settings Diagnostics dumps Status/Data warnings as a joined soup. When affiliate
 
 ## Progress
 
-Shipped: `status.diagnosticCells` from connector (title + value/miss); affiliation walk outcomes (`loaded` / `dropped · loan-off` / `unresolved · club table` / excluded types) as index cells; Settings renders those cells in load-order section; Status/Data warnings soup removed. `cargo check` clean. Commit SHA in archive after commit.
+Shipped: `status.diagnosticCells` from connector (title + value/miss); affiliation walk outcomes (`loaded` / `dropped · loan-off` / `unresolved · club table` / excluded types) as index cells; Settings renders those cells in load-order section; Status/Data warnings soup removed. `cargo check` clean. Commit: `4529dac`.

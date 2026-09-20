@@ -32,4 +32,4 @@ Best players/talent main CA/PA sits on the face (5th grid cell wrap). Mover pill
 
 - Restored face | identity | extras | main (4-col); extras = fixed team + secondary grid
 - Mover chips: Title Case labels, font-weight 700 (no uppercase `<small>`)
-- Commit: (pending)
+- Commit: `0698632`

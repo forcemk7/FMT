@@ -39,4 +39,4 @@ T237 UI missed the brief (scrollbar, uneven rows, missing pos control, wrong hid
 - recipes.md: roster allow-list `0x01|0x08`
 - vitest 11/11
 
-Commit: _(after git)_
+Commit: `8aaf804`

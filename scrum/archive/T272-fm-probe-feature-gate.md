@@ -34,4 +34,4 @@ Default `cargo` / `tauri build` prints ~50 dead_code RE leftovers. Keep them for
 - Feature `fm-probe`; `lib.rs` cfg_attr allow(dead_code) when off
 - Rule `fm-probe-gate.mdc` (alwaysApply); AGENTS + fm-live-read pointers
 - Verified: default `cargo check` → 0 warnings; `--features fm-probe` → 51 warnings
-- Commit: (pending)
+- Commit: `f682871`

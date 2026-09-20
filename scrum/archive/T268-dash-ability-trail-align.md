@@ -35,4 +35,4 @@ Movers still say CA; ability/ME trails feel loose; main pill too wide; 2- vs 3-d
 - Mover: `CA` → `Ability`
 - Ability/ME: single `dash-row-trail` (right-aligned); shared `--dash-capa-slot`; num in `3ch` right-aligned
 - Main pill uses same slot width (tighter padding)
-- Commit: (pending)
+- Commit: `9d444e1`

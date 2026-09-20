@@ -36,4 +36,4 @@ T231 invented shortNames by stripping `FC` / legal-form prefixes. That is not cl
 
 Removed all legal-form strip invent paths. Profile uses memory shortName as-is; unmodified full FM name only if short empty. Vitest 44 ok.
 
-Commit SHA after commit.
+Commit SHA: `3b191e0`.

@@ -34,4 +34,4 @@ Owner wants to evaluate **upstream GlassScout behavior** (full private-memory pl
 - Restored `collect_snapshot(true, …)` in `load_active_save` (desktop connector).
 - STATUS + SCOPE note owner-eval load path.
 - Verified: code path matches T126/native GS; live FM verify is owner (reload save in FMT).
-- Commit: `acd9030`.
+- Commit: `5809858`.

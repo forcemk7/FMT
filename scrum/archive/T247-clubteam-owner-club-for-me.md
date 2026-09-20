@@ -33,4 +33,4 @@ II card shows “FC Schalke 04” because ME resolves name via player `clubId` (
 
 Shipped: `DiscoveredClubTeam.club_id` / `club_name` from managed or `affiliate`; JSON `clubId`/`clubName` on clubTeams; ME prefers team owner over player stamp. Player roster clubId for II unchanged. Verified vitest (11) + `cargo check`.
 
-Commit: `_(fill)_`
+Commit: `be29c32`

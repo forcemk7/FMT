@@ -41,4 +41,4 @@ depends_on: []
 
 Shipped: one `FMT/` commit of the working product (code, scrum, tests, fixtures). `data/saves/`, `data/faces/`, `data/logos/`, `*.fm`, secrets, and `node_modules/` stay gitignored / unstaged. No push (HQ did not ask).
 
-Verified: `git status` clean except ignored paths; `git ls-files` has no `.fm`, no `data/saves/`, no secrets; commit message starts with `T069:`. SHA filled after commit into Recently done / this Progress.
+Verified: `git ls-files` has no `.fm`, no `data/saves/`, no secrets; commit message starts with `T069:`. SHA `f57e928a57dea364715b5e630cc810dd56c28aae` recorded in Recently done after the commit (hash cycle: the SHA cannot live inside the same commit object).

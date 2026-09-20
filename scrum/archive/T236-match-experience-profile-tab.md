@@ -43,4 +43,4 @@ Shipped profile **Match experience** tab:
 - UI cards with optional primary position switcher; click peers to open profile
 - Verified: `vitest run src/domain/match-experience.test.ts` (4/4)
 
-Commit: _(filled after git)_
+Commit: `3dc4e60`

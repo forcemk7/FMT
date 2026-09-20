@@ -32,4 +32,4 @@ Legia / Sparta Praha (and similar) feeders should show Reserve alongside First +
 
 Widened feeder retain to `firstTeam` | `reserves` | `under19s`. recipes note: KL may simply lack Club.Teams Reserves (Schalke II is `0x08`). Verified by code review of retain path; live confirm after rebuild.
 
-Commit: `_(fill)_`
+Commit: `5aef510`

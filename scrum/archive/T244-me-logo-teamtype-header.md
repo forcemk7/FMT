@@ -33,4 +33,4 @@ Long `{clubName} {TeamType}` titles truncate and confuse duplicate affiliates. I
 
 Shipped: `matchExperienceTeamLabel` = TeamType only; card carries `clubId` + `clubName` (tooltip); panel header `ClubLogo` + TeamType. Verified vitest match-experience (10).
 
-Commit: _(after git)_
+Commit: `8c460e5`

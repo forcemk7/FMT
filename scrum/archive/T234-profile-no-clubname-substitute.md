@@ -36,4 +36,4 @@ U19 profiles show real `shortName` (`Schalke 04 U19`). FT/II show `FC Schalke 04
 
 Removed profile `parentClubName` / `club.name` substitute. Documented that team+0x20 shortName is proven for U19 only; FT/II empty short is a map gap (club shortName unmapped), not “shortName isn’t real”.
 
-Commit SHA after commit.
+Commit SHA: `2e389fa`.

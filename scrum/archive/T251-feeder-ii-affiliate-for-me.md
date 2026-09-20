@@ -34,4 +34,4 @@ Kaiserslautern II is a separate II Club under KL (same shape as Schalke → Scha
 
 One-hop walk from loan-on feeders for `0x08`; `matchExperienceOnly` on clubTeams; Squad filters it; roster stamp uses II club uid. `cargo check` ok.
 
-Commit: `_(fill)_`
+Commit: `62d0e4b`

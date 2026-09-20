@@ -36,4 +36,4 @@ depends_on: [T250]
 - `pickBest` stays on Current when rank ≤ 2
 - Panel: no Best ribbon when Current=Best; blue vs neon-green borders
 - Verified: `npx vitest run src/domain/match-experience.test.ts` (15 passed)
-- Commit: (pending)
+- Commit: `8783a9a`

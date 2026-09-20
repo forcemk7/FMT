@@ -34,4 +34,4 @@ Equal-rung First→First “better move” can mark Schalke II Best while Curren
 - Test: Legia First stays Best vs Schalke II #1
 - T253 updated with RE path note
 - Verified: 18 tests passed
-- Commit: (pending)
+- Commit: `a0ad3d7`

@@ -31,4 +31,4 @@ Collapsed preview rows made Settings worse. Revert to simple expand/collapse: se
 
 ## Progress
 
-Shipped. Commit after git.
+Shipped. Commit: `a412060`. Collapsed = title + tone + status meta; expand = full cell grid. No preview row.

@@ -38,4 +38,4 @@ Tactic/TD have no live data or recipes — empty Later stubs. Role desks still s
 
 Shipped: nav order + drop stubs; role desks compact without titles; HoYD/GM club-wide Filter; Loans titleless when connected; LaterRoleScreen deleted; SCOPE updated.
 
-Verified: ReadLints clean on touched components. Commit `7b4f311` (+ follow-up if needed).
+Verified: ReadLints clean on touched components. Commit `cfc2cd6`.

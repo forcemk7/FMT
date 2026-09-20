@@ -37,4 +37,5 @@ depends_on: [T272]
 - research/: live-read, fm-probe-gate, agent-local-setup; README index
 - Untracked `.cursor/rules/*`; gitignore `.cursor/` only
 - Pointers: AGENTS, SCOPE, scrum README, ecosystem, Cargo.toml, root README
-- Commit + push: (pending)
+- Verified: `git ls-files .cursor/` empty; origin/main = `8c2d190`
+- Commit: `8c2d190` + `git push -u origin main`

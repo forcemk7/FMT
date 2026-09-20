@@ -35,4 +35,4 @@ Stock GS requires exactly one registry slot (`vector` size == 8). Continue / New
 - Multi-slot resolve kept; pick max `squad_len` among validated humans.
 - Warning lists all candidates and the chosen club/manager.
 - Unit test documents largest-squad preference.
-- Commit: see git log T134/T135.
+- Commit: `e88cf91`.

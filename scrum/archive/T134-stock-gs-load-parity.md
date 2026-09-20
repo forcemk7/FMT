@@ -37,4 +37,4 @@ Stock GS indexes ~16k on native FM26. FMT often ended at ~34 with a silent world
 - Dossier no longer masks a failed memory index as “ready/full-save”.
 - Warnings describe memory index as the stock path.
 - `cargo check --lib` OK.
-- Commit: see git log T134/T135.
+- Commit: `e88cf91`.

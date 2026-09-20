@@ -62,4 +62,5 @@ Reinstate what **GlassScout already shipped**: `index_full_player_database` on l
 - **Reset:** prior worker pass used invented club scan + youth-age heuristic — **discard**; ticket rewritten to GS index + contract-team unit law (2026-08-29).
 - **Shipped:** Reverted age-share / club-byte scan heuristics. `load_active_save` → `collect_snapshot(true)`. FT roster read unchanged; U19 picked as non-FT contract team with most managed-club employees from `PLAYER_DATABASE_INDEX`; promoted via shared `push_squad_player_from_raw` with `squadUnit: under19s`. Squad subtabs UI already present.
 - **Verified:** `cargo check`; `vitest` live-data 18/18.
+- **Commit:** f3436db
 - **Human test pending:** Schalke FM24Career U19 count vs FM (needs live FM).

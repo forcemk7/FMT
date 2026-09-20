@@ -37,4 +37,4 @@ T269 “top-2 Current = Best” wrongly keeps youth at U19. Best = stay only whe
 - `isMatchExperienceBetterMove` + rewritten `pickBestMatchExperienceCard`
 - Ribbons: stay=`Current` (green), split=blue Current + neon Best
 - Verified: 17 tests passed
-- Commit: (pending)
+- Commit: `c3cc85d`
