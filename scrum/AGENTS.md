@@ -8,8 +8,9 @@ Workers ship tickets that already survived the need-to-have gate. The planning c
 2. Read `scrum/STATUS.md` and pick a ticket:
    - Prefer an explicitly named ticket
    - Else highest priority `ready` ticket (lowest `priority` number, then lowest ID)
-3. Follow **Claim** below before editing product code (or before RE spikes on a claimed RE ticket).
-4. Do not invent extra work mid-flight. No "while I'm here".
+3. Run `git status --short`. Anything modified/untracked/deleted that isn't explained by the ticket you're about to claim → stop before claiming. Don't silently work around it or `git stash` it away. If it's plausibly another live session's in-progress work (check for peer sessions if your tooling supports it), leave it alone and proceed touching only your own ticket's files; otherwise report the drift to the human before continuing.
+4. Follow **Claim** below before editing product code (or before RE spikes on a claimed RE ticket).
+5. Do not invent extra work mid-flight. No "while I'm here".
 
 ## Claim
 
@@ -43,7 +44,7 @@ When acceptance criteria are met and verified, **in this order, before the final
 5. **Git commit on `FMT/`** (see **Git** below). Put the SHA in Progress.
 6. **Then** report to the human: ticket ID, shipped, how tested, commit SHA, residual risk
 
-If you only partially finished: leave `in_progress` or set `blocked` / return to `ready` with reason — never silent-abandon.
+If you only partially finished: leave `in_progress` or set `blocked` / return to `ready` with reason — never silent-abandon. Never end a turn with an uncommitted diff for your own ticket sitting in the working tree: either finish the commit step below, or if blocked/partial, name exactly what's uncommitted and why in `## Progress` — so a future session doesn't mistake your legitimate in-flight work for unrelated drift and touch it. This is how T295 (repo hygiene) had to happen; don't recreate the backlog it just cleaned up.
 
 ## Git (one commit per ticket)
 
@@ -62,6 +63,8 @@ git commit -m "T0XX: short why"
 
 Archiving without a commit is not done.
 
+**Known non-ticket artifact:** `npm run desktop:ship` (`scripts/bump-desktop-version.mjs`) rewrites `desktop/package.json`, `desktop/src-tauri/tauri.conf.json`, `desktop/src-tauri/Cargo.toml`, and `desktop/src/domain/distribution.ts`; a subsequent `cargo build` then updates `Cargo.lock`'s own version line as a side effect. If that's all `git status` shows modified, it's not your ticket's scope creep — commit it as its own small `chore: bump desktop version to X.Y.Z` commit (if you're the one who ran `desktop:ship`), or leave it alone for whoever did. Don't sweep it into an unrelated ticket's commit, and don't revert it.
+
 ## Stop the line
 
 - Empty board or STATUS freeze → end. Shipping a ticket you wrote yourself is a protocol failure.
@@ -74,6 +77,7 @@ Archiving without a commit is not done.
 - Stream live SI `graphics/` on `/api/faces` or `/api/logos` when a repo copy exists — copy missing files into `data/faces` / `data/logos` once, then serve those
 - Invent live-memory offsets or heap/idiom world scans without checking `research/ecosystem.md`, `research/recipes.md`, and `research/live-read.md` first; when you find a public FM tool, **update research/ecosystem.md**; when you lock a first-party offset/trap, **update research/recipes.md** in the same run
 - Leave new RE/probe-only Rust helpers on the default feature set — gate with `#[cfg(feature = "fm-probe")]` (see `research/fm-probe-gate.md`); do not spam `dead_code` on product builds
+- Run `git stash` / `git stash pop` as a casual debugging convenience — check `git status` immediately first, and prefer `git diff`, a throwaway branch, or a worktree when you genuinely need a clean-baseline comparison. A stash on top of unrelated dirty state is exactly how T295 (repo hygiene) had to happen
 - Commit `.cursor/` — it is gitignored; edit `research/` and optionally re-copy per `research/agent-local-setup.md`
 - Expand scope from verbal wants
 - Rewrite SCOPE/ROADMAP priorities without Scrum Master chat
