@@ -67,4 +67,4 @@ Investigation note (unchanged from during-ticket): read through `connector.rs`, 
 - Verified: `npx tsc --noEmit` (no new errors vs. pre-existing baseline — confirmed via `git stash`/`git stash pop` diff, which also surfaced that the repo has substantial unrelated pre-existing uncommitted work outside this ticket's files — worth the owner's attention separately), `npx eslint` clean on both changed files, `vitest run has-score.test.ts` (5/5 passed), browser-verified section order/content/collapse behavior at `localhost:3000` (dev server, no live FM26 process — In-game date/Season correctly show "Unavailable" in that state)
 - Owner verified live on two saves (2026-09-20) — see table above. All acceptance criteria met.
 - Spun off T296 (in-game date unavailable on FM26-native saves — real RE, root cause likely shared with T294) and T295 (repo git hygiene + workflow guardrail, found via this ticket's own `git stash` check) — both included in this commit per the T287→T294 precedent.
-- Commit: (recorded below after commit)
+- Commit: `3de655e`
