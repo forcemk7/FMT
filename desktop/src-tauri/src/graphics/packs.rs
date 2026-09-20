@@ -13,6 +13,7 @@ pub struct GraphicsPackEntry {
     pub name: String,
     /// "Faces" or "Logos"
     pub kind: &'static str,
+    pub path: String,
 }
 
 fn skip_pack(name: &str) -> bool {
@@ -65,16 +66,19 @@ pub fn discover_graphics_packs() -> Vec<GraphicsPackEntry> {
         let path = entry.path();
         let faces = is_face_pack(&path, &name);
         let logos = is_logo_pack(&path, &name);
+        let path_display = path.display().to_string();
         if faces {
             packs.push(GraphicsPackEntry {
                 name: name.clone(),
                 kind: "Faces",
+                path: path_display.clone(),
             });
         }
         if logos {
             packs.push(GraphicsPackEntry {
                 name,
                 kind: "Logos",
+                path: path_display,
             });
         }
     }
