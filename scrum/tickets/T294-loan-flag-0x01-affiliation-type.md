@@ -39,6 +39,8 @@ Real bug (Olot won't get Match Experience loan-destination cards even though the
 - **Need either:** a native-FM26 save with a `0x03` affiliate (to check whether `wrapper+0x2E` still holds there), or an FM24→26-converted save with a second `0x01` affiliate (to check whether it's a type issue, not a provenance issue) — either would help isolate the confounded variable
 - Owner: flag when a save surfaces either of the above; this ticket stays blocked until then
 
+**New, free check surfaced by T296 (2026-09-20):** the Olot read this ticket is built on was taken while Barcelona was sitting at its exact load date with zero days ever simulated. T296 found a different field (`player_current_date_offset`) reading as broken purely because of that save-freshness, not because of native-vs-converted provenance — a third, previously uncontrolled variable in this A/B. The owner has since advanced Barcelona past its load date. Before spending effort isolating type-vs-provenance, re-read Olot's `wrapper+0x2E` on the now-advanced save (no new RE needed) — if it now reads on, this ticket may resolve for free and provenance/type were never the real variable.
+
 ## Notes / pointers
 
 - Full writeup: `research/recipes.md`, "Open: `wrapper+0x2E` does not generalize to affiliationType `0x01`" (T287 section)

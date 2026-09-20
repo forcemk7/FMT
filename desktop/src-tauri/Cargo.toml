@@ -1,6 +1,6 @@
 [package]
 name = "fmt"
-version = "0.1.27"
+version = "0.1.28"
 description = "Read-only desktop recruitment workspace for Football Manager 2026"
 authors = ["FMT"]
 edition = "2021"
@@ -20,6 +20,11 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [[bin]]
 name = "probe-loan-flag"
 path = "src/bin/probe_loan_flag.rs"
+required-features = ["fm-probe"]
+
+[[bin]]
+name = "probe-game-date"
+path = "src/bin/probe_game_date.rs"
 required-features = ["fm-probe"]
 
 [build-dependencies]

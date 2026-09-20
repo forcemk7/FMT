@@ -6,7 +6,7 @@
 
 Update this file when a ticket locks or discards a recipe. Prefer recipes here over resurrecting deleted probe modules.
 
-**Last updated:** 2026-09-11 (T286 — feeder loan-on keep != 0)
+**Last updated:** 2026-09-20 (T296 — Barcelona date failure was save-freshness, not a native-save offset bug)
 
 ---
 
@@ -56,7 +56,17 @@ Constants: `PLAYERS_GO_ON_LOAN_WRAPPER_OFFSET=0x2E`, `PLAYERS_GO_ON_LOAN_WRAPPER
 
 **Open: `wrapper+0x2E` does not generalize to affiliationType `0x01` (T287, 2026-09-20).** Barcelona save, Olot (`0x01`, "A national partnership in which players are loaned"): FMLE confirms `Players Go On Loan: True`, in-game text confirms it explicitly ("Barcelona will be able to send players on loan to Olot") — but FMT reads it off. Checked: `wrapper+0x2E = 0x6C` (off), `wrapper+0x2D = 0x00` (off-pattern too), and `0xFE` does not appear **anywhere** in Olot's full 128-byte nested or wrapper blob — rules out a simple offset shift; whatever encodes this for `0x01` is a different mechanism, not a relocated version of the same byte. **Two tangled, uncontrolled variables, not yet isolated:** affiliation type (`0x01` vs the `0x03` the lock was built from) and save provenance (this Barcelona save is FM26-native; the Schalke save the `0x03` lock came from is FM24→26-converted). Blocked on data, not effort — Barcelona has exactly one `0x01`-type affiliate and nothing to diff it against. Needs either a second `0x01` sample (on or off) or a native-FM26 save with a `0x03` affiliate to isolate which variable actually matters. Tracked as its own ticket, not bundled into T287's (met, narrower) scope.
 
-**Open: same Barcelona save also fails to resolve in-game date at all (T215, 2026-09-20).** Owner-verified: Barcelona (FM26-native) reads `In-game date: Unavailable` / `Season: Unavailable` in Settings, and every squad band's player ages are missing as a direct consequence (`squad_game_date` never resolves — no first-team player has a readable `player_current_date_offset`). The same Schalke save (FM24→26-converted) that anchors the `0x03` loan-flag lock above reads a correct in-game date (`2046-07-11`) and correct ages across FT/U19/B/affiliate. That's a **second independent field** now failing along the exact same native-vs-converted line as the loan-flag confound directly above — raises the odds this isn't per-field coincidence but a broader native-FM26 offset/profile difference. Not yet investigated (`player_current_date_offset` / `person_birth_date_offset` untested against a native save specifically). Tracked as **T296**; check jointly with T294 before assuming either is isolated to its own field.
+**New candidate variable, unchecked (T296, 2026-09-20):** this Olot test ran on the same Barcelona save T296 found sitting at its exact load date with **zero days ever simulated** — and T296 confirmed at least one other field (`player_current_date_offset`) reads as broken purely because of that freshness, not because of native-vs-converted provenance or a real offset bug. The Olot read above was taken before the owner advanced the save; it has since been advanced (`2025-07-14` → `2025-07-15`+). Worth a free re-check (no new RE, just re-read Olot's flag now) before spending effort isolating type-vs-provenance — save-freshness is now a third, previously uncontrolled variable in this A/B.
+
+**Resolved (T296, 2026-09-20): Barcelona's `player_current_date_offset` failure was save-freshness, not a native-save offset/profile bug.** T215 found Barcelona (FM26-native) reading `In-game date: Unavailable` with every squad band's ages missing as a consequence (`squad_game_date` never resolves). Live probe (`probe-game-date`, new — mirrors `probe-loan-flag`) against the attached Barcelona process found:
+
+- `person_birth_date_offset` (136) resolved correctly for 30/31 sampled first-team players — the entity map / profile is fine on native saves, ruling out a broad profile mismatch.
+- `player_current_date_offset` (512) was unreadable for all 31 players. A ±96-byte shift scan found one tempting candidate (`+4`, near-identical `2022-08-13/14` across the whole squad) that turned out to be a false positive once cross-checked against the owner's actual in-game date (`2025-07-14`).
+- Owner confirmed Barcelona is a **control save that had never been advanced past its load date**. Advancing exactly one day (`2025-07-14` → `2025-07-15`) made Squad ages resolve correctly with **no code change** — proving `player_current_date_offset` is a per-player "last processed" cache that FM only writes once its normal day/match/training tick touches that player. On a save sitting at its exact load moment, nobody in the squad has been touched yet, so the field is genuinely unset — not wrong, not shifted.
+
+**Not** the same root cause as the `0x01` loan-flag gap directly below — that stays open on its own. The native-vs-converted framing in both original write-ups was a **save-freshness confound**: Barcelona (0 days simulated) vs Schalke (played to year 2046) differ enormously in how "cooked" their per-entity caches are, independent of native-vs-converted provenance. Any future field that looks broken specifically on a fresh/lightly-played save should be checked against this before assuming an offset or profile problem: **advance a few in-game days first.**
+
+`probe-game-date` (`desktop/src-tauri/src/bin/probe_game_date.rs`, `connector::probe_game_date_dump()`, `fm-probe`-gated) kept in-tree as a reusable tool — dumps raw windows + a brute-force shift scan around any documented date offset across the whole sampled squad, and flags shifts that decode consistently across every player (strong signal) vs. sporadically (noise/sentinel).
 
 **Production:** type walk first — roster allow-list `0x08` \| (`0x01`/`0x03` + loan-on); then **one hop** from each loan-on feeder `+0x118` for type `0x08` II (ME-only, e.g. Kaiserslautern II). Squad desk filters out `0x01` / `0x03` / `matchExperienceOnly`. T212-style satellite merge only for NPL / unmapped types; other unmapped `+0x30` → Diagnostics `Map AffiliationType 0xNN`. Feeders: Club.Teams **First + Reserves + Under-N/Youth**; direct managed II: First as Squad 2nd side; feeder→II: First only, ME-only.
 
@@ -143,5 +153,6 @@ Re-probe when needed: write a **new** minimal probe under a ticket; start from t
 
 | Date | Change |
 |------|--------|
+| 2026-09-20 | T296: Barcelona date-unavailable was save-freshness (never-advanced save), not a native-save offset/profile bug; `probe-game-date` added |
 | 2026-09-05 | T220: home is `research/`; T219 probe fossils stripped |
 | 2026-09-05 | T219: initial first-party recipe book; strip probe fossils |

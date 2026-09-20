@@ -1588,6 +1588,209 @@ pub fn probe_players_go_on_loan_dump() -> Result<Value, String> {
     Err("probe_players_go_on_loan_dump is Windows-only".into())
 }
 
+/// Live RE dump: in-game current-date / birth-date bytes for the managed squad.
+///
+/// T296: FM26-native saves (Barcelona) never resolve a readable current-date at
+/// `player_current_date_offset` even though attributes/CA/positions all read fine on
+/// the same players — so `player_base` itself is landing correctly. Dumps the raw
+/// window around both documented offsets plus a brute-force byte-shift scan so we
+/// can see whether the real field just moved on native saves, and whether
+/// `person_birth_date_offset` is affected too or only the current-date field is.
+#[cfg(all(feature = "fm-probe", target_os = "windows"))]
+pub fn probe_game_date_dump() -> Result<Value, String> {
+    let (process_id, _) = find_fm26_process().ok_or_else(|| "fm.exe not found".to_string())?;
+    let mut reader = ProcessReader::open(process_id)
+        .map_err(|code| format!("OpenProcess denied (win32 {code})"))?;
+    let identity = match reader.process_path() {
+        Some(path) => read_executable_identity(&path),
+        None => ExecutableIdentity {
+            file_version: None,
+            product_version: None,
+            sha256: None,
+            architecture: None,
+        },
+    };
+    let profile = find_entity_map(
+        identity.file_version.as_deref(),
+        identity.product_version.as_deref(),
+        identity.sha256.as_deref(),
+        identity.architecture.as_deref(),
+    )
+    .ok_or_else(|| {
+        format!(
+            "entity map miss build={}",
+            identity.file_version.as_deref().unwrap_or("?")
+        )
+    })?;
+    let module = reader
+        .module(&profile.module)
+        .ok_or_else(|| "game module not found".to_string())?;
+    let mut diagnostics = ExtractionDiagnostics::default();
+    let (manager, pick_warning) =
+        resolve_active_human_manager(&mut reader, module, profile, process_id, &mut diagnostics)
+            .map_err(|e| format!("{}: {}", e.stage, e.message))?;
+
+    let players_start = reader
+        .read_pointer(manager.team + profile.constants.team_players_start_offset)
+        .ok_or_else(|| "player collection start not readable".to_string())?;
+    let players_end = reader
+        .read_pointer(manager.team + profile.constants.team_players_end_offset)
+        .ok_or_else(|| "player collection end not readable".to_string())?;
+    if players_end <= players_start || (players_end - players_start) % 8 != 0 {
+        return Err("player collection failed size/alignment check".into());
+    }
+    let player_count = ((players_end - players_start) / 8) as usize;
+
+    // Bytes searched each side of the documented offset.
+    const WINDOW: i64 = 96;
+
+    // Every position in [anchor-window, anchor+window] whose 4 bytes decode to a
+    // structurally valid FmDate — same rule as production `read_fm_date`, just swept
+    // across a window instead of trusting the single documented offset.
+    fn shift_scan(
+        reader: &mut ProcessReader,
+        base: u64,
+        anchor_offset: u64,
+        window: i64,
+    ) -> Vec<(i64, u16, u16)> {
+        let mut hits = Vec::new();
+        let anchor = anchor_offset as i64;
+        for candidate_offset in (anchor - window)..=(anchor + window) {
+            let address = base as i64 + candidate_offset;
+            if address < 0 {
+                continue;
+            }
+            let Some(bytes) = reader.read_bytes(address as u64, 4) else {
+                continue;
+            };
+            let day_of_year = u16::from_le_bytes([bytes[0], bytes[1]]);
+            let year = u16::from_le_bytes([bytes[2], bytes[3]]);
+            let max_day = if (year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)) || year == 0 {
+                366
+            } else {
+                365
+            };
+            if year >= 1900 && day_of_year > 0 && day_of_year <= max_day {
+                hits.push((candidate_offset - anchor, year, day_of_year));
+            }
+        }
+        hits
+    }
+
+    fn hex_window(reader: &mut ProcessReader, anchor_address: u64, window: i64) -> Option<String> {
+        let start = anchor_address.saturating_sub(window as u64);
+        let bytes = reader.read_bytes(start, (window as usize) * 2 + 4)?;
+        Some(bytes.iter().map(|b| format!("{b:02x}")).collect())
+    }
+
+    let mut players_json = Vec::new();
+    let mut current_date_hit_shifts: Vec<std::collections::BTreeSet<i64>> = Vec::new();
+
+    for index in 0..player_count.min(40) {
+        let Some(raw_player) = reader
+            .read_pointer(players_start + (index as u64 * 8))
+            .filter(|value| *value != 0)
+        else {
+            continue;
+        };
+        let Some(resolved) = resolve_person_and_player_base(&mut reader, raw_player, profile)
+        else {
+            continue;
+        };
+        let name = display_name(
+            read_name_field(
+                &mut reader,
+                resolved.person + profile.constants.person_first_name_offset,
+            ),
+            read_name_field(
+                &mut reader,
+                resolved.person + profile.constants.person_second_name_offset,
+            ),
+            read_name_field(
+                &mut reader,
+                resolved.person + profile.constants.person_common_name_offset,
+            ),
+        )
+        .unwrap_or_else(|| "?".to_string());
+
+        let current_date_addr =
+            resolved.player_base + profile.constants.player_current_date_offset;
+        let birth_date_addr = resolved.person + profile.constants.person_birth_date_offset;
+
+        let locked_current_date = read_fm_date(&mut reader, current_date_addr);
+        let locked_birth_date = read_fm_date(&mut reader, birth_date_addr);
+
+        let current_date_window_hex = hex_window(&mut reader, current_date_addr, WINDOW);
+        let birth_date_window_hex = hex_window(&mut reader, birth_date_addr, WINDOW);
+
+        let current_hits = shift_scan(
+            &mut reader,
+            resolved.player_base,
+            profile.constants.player_current_date_offset,
+            WINDOW,
+        );
+        let birth_hits = shift_scan(
+            &mut reader,
+            resolved.person,
+            profile.constants.person_birth_date_offset,
+            WINDOW,
+        );
+
+        current_date_hit_shifts.push(current_hits.iter().map(|(shift, _, _)| *shift).collect());
+
+        players_json.push(json!({
+            "slot": index,
+            "name": name,
+            "personPtr": format!("0x{:X}", resolved.person),
+            "playerBasePtr": format!("0x{:X}", resolved.player_base),
+            "lockedCurrentDate": locked_current_date.map(|d| format!("year {} day-of-year {}", d.year, d.day_of_year)),
+            "lockedBirthDate": locked_birth_date.map(|d| format!("year {} day-of-year {}", d.year, d.day_of_year)),
+            "currentDateWindowHex": current_date_window_hex,
+            "birthDateWindowHex": birth_date_window_hex,
+            "currentDateShiftHits": current_hits.iter().map(|(shift, year, day)| json!({
+                "byteShiftFromDocumentedOffset": shift,
+                "year": year,
+                "dayOfYear": day,
+            })).collect::<Vec<_>>(),
+            "birthDateShiftHits": birth_hits.iter().map(|(shift, year, day)| json!({
+                "byteShiftFromDocumentedOffset": shift,
+                "year": year,
+                "dayOfYear": day,
+            })).collect::<Vec<_>>(),
+        }));
+    }
+
+    // Shifts that decode to a plausible date for every sampled player are the strongest
+    // signal that a shared "current date" field really lives there.
+    let mut common_shifts: Option<std::collections::BTreeSet<i64>> = None;
+    for shifts in &current_date_hit_shifts {
+        common_shifts = Some(match common_shifts {
+            None => shifts.clone(),
+            Some(existing) => existing.intersection(shifts).copied().collect(),
+        });
+    }
+
+    Ok(json!({
+        "managedClub": manager.club_name.trim(),
+        "managedClubUid": manager.club_uid,
+        "manager": manager.manager_name,
+        "pickWarning": pick_warning,
+        "playerCurrentDateOffset": profile.constants.player_current_date_offset,
+        "playerCurrentDateOffsetHex": format!("0x{:X}", profile.constants.player_current_date_offset),
+        "personBirthDateOffset": profile.constants.person_birth_date_offset,
+        "personBirthDateOffsetHex": format!("0x{:X}", profile.constants.person_birth_date_offset),
+        "sampledPlayers": players_json.len(),
+        "byteShiftsFromDocumentedCurrentDateOffsetThatHitOnEveryPlayer":
+            common_shifts.unwrap_or_default().into_iter().collect::<Vec<_>>(),
+        "players": players_json,
+    }))
+}
+
+#[cfg(all(feature = "fm-probe", not(target_os = "windows")))]
+pub fn probe_game_date_dump() -> Result<Value, String> {
+    Err("probe_game_date_dump is Windows-only".into())
+}
+
 
 
 
