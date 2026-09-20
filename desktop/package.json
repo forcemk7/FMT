@@ -1,6 +1,6 @@
 {
   "name": "fmt",
-  "version": "0.1.25",
+  "version": "0.1.28",
   "private": true,
   "scripts": {
     "dev": "set BROWSER=none&& next dev",
