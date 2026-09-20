@@ -8,7 +8,7 @@ A **lightweight Genie Scout for hidden attributes**: this club’s **HA + CA** f
 
 Tight **mentoring loop**, also usable to plan **youth development** (who is growing, who is out on loan, who can sit in a group).
 
-Must run **in the cloud** (upload save → extract → four tabs). Local `npm run dev` is the same extract contract.
+Must run **in the cloud** (upload save → extract → four tabs). That means **any** Career Save, not one fitted continue. Local `npm run dev` is the same extract contract.
 
 ```
 Upload / copy Career Save
@@ -66,13 +66,12 @@ The save is a **read-only input**. Speed comes from doing less, not a faster ful
 
 | Step | Why |
 |------|-----|
-| Take **one** Career `.fm` (upload, or copy from SI `games/` into `data/saves`) | Working copy only |
-| Read-only open / mmap that copy | Never lock FM autosave |
-| Find **this club’s** FT / II / U19 lists | Squad + Loans |
-| Pull per player: uid, name, unit, age, pack HA, Det/Lea, CA, in-game today, loan flag | Tabs 1–4 |
-| Put **loaned-out** on Loans only; Squad is at-club | Honesty + mentoring pool |
-| Stream or partial decompress only as far as those lists need | Expedient |
-| When JSON is written: **delete** temp `.fm` / decompress blobs (cloud: always; local: keep the `data/saves` copy the user chose) | Cloud must not store saves |
+| 0. Take **one** Career `.fm` (upload, or copy into `data/saves`) | Working copy only; never live `games/*.fm` |
+| 1. Find the **managed club** of this save | Whoever uploaded |
+| 2. **Employed players** — that club’s FT, II, U19 job lists → people | Who belongs to the club |
+| 3. Those players: **pack** + **CA card**, once each | HA + CA |
+| 4. **Contracts** — loan object on those jobs → outgoing | At-club (Squad / Mentoring) vs loaned out (Loans) |
+| When JSON is written: **delete** temp `.fm` / decompress blobs (cloud: always; local: keep the chosen `data/saves` copy) | Cloud must not store saves |
 
 **Do not**
 
@@ -82,24 +81,31 @@ The save is a **read-only input**. Speed comes from doing less, not a faster ful
 | Write, patch, or round-trip the `.fm` | Not an editor |
 | Keep the uploaded `.fm` in cloud storage | Privacy + cost |
 | Walk staff, stadiums, world players, tactics, media, graphics | GS’s 15-minute load |
+| Hunt Det/Lea as a third extract, or walk the CA card twice | Same blob; UI splits |
+| Hard-wire one Career Save (names, UIDs, byte windows, club 920) | Cloud is any upload; König is a check, not the model |
 | Full-file decompress “to be safe” after this club is already in hand | Waste |
 | Run several full decompresses of the same save at once | T072: one Python, no 5×2GB |
 | Require SI `graphics/` for the cloud path | No download, no local FM install |
 
 ### 7. Ship shape
 
+**Launch waits.** No public URL until the owner can upload **any** Career Save locally and see an honest at-club vs loaned split (T086). Sharing on FM Scout comes after that.
+
 - GitHub `forcemk7/FMT`
-- Local: clone + `npm run dev` (same extract rules)
-- Cloud: upload → extract → discard `.fm`
-- Buy Me a Coffee (tip, not Stripe)
+- **T077:** blocked on T088. No www until local loop: any save + Active not stolen by a finishing extract
+- BMC already on the header (`buymeacoffee.com/mrramirez`)
+- Local `npm run dev` stays the same extract rules
 - One git commit per ticket (AGENTS.md)
 
 ## Not funded
 
-Suggest, HAS ranker/checker/compare as app chrome, editor / write-to-save, FMT→in-game sync, Talent tab, CA/PA columns on Squad, exe, FM27 extract, storing career saves in the cloud.
+Suggest, HAS ranker/checker/compare as app chrome, editor / write-to-save, FMT→in-game sync, Talent tab, favoured-club / scout extract, CA/PA columns on Squad, exe, FM27 extract, storing career saves in the cloud.
 
 ## Later (notes, not a promise)
 
 - Extract entirely in the browser (no server Python)
 - Read mentoring groups back from the save
 - CA/PA as Squad columns if Progress is not enough
+- Progress GK vs outfield CA layout (T087) after native roster honesty
+- Identity must be honest on any save (T096) before more squad-join recipes
+- Player trophy cabinet on profile (T162) — marketable; RE + desk only after Loop A habit and a locked wins object
