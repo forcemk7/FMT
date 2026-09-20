@@ -12,6 +12,14 @@ Workers ship tickets that already survived the need-to-have gate. The planning c
 4. Follow **Claim** below before editing product code (or before RE spikes on a claimed RE ticket).
 5. Do not invent extra work mid-flight. No "while I'm here".
 
+## Parallel sessions (only when the owner has explicitly allowed more than one ticket in flight)
+
+The default is one ticket at a time (see **Stop the line**). When the owner has explicitly broken that rule, dirty files in `git status` can belong to a session that's still running, not to stale drift — and guessing by re-reading diffs or watching for a file to "appear mid-session" is slow and unreliable (this is literally how T295 first tried to sort this out on 2026-09-20 — don't repeat it). Instead, use the board, which is the actual source of truth for what's live:
+
+1. `grep -l "status: claimed\|status: in_progress" scrum/tickets/*.md` — this is the authoritative signal for "is there live work right now," not file content or timestamps.
+2. If that returns anything, treat **every** dirty file in the working tree as potentially in-flight, even ones that look unrelated to your own ticket. Do not commit, revert, or gitignore any of it — wait for those tickets to reach `done` or `blocked`, then re-check.
+3. Only once that grep is empty is it safe to treat pre-existing dirty files as historical drift rather than live parallel work. At that point, whether a file was already shipped-but-undocumented or genuinely never committed is a `git log -- <file>` question, not a guess.
+
 ## Claim
 
 1. Open `scrum/tickets/TXXX-*.md`
