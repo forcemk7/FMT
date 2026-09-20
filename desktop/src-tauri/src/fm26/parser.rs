@@ -61,12 +61,27 @@ pub(crate) fn personality_attribute_map(raw: &[u8]) -> HashMap<String, u8> {
         .collect()
 }
 
-/// Prefer foot label from **display** left/right strengths (1–20).
-/// Equal → Either; otherwise the stronger side.
+/// FM foot competency band for display left/right strengths (1–20).
+/// Validated against in-game labels on Schalke squad (2026-08-27).
+fn foot_competency_band(value: u8) -> u8 {
+    match value {
+        18..=20 => 5, // Very Strong
+        15..=17 => 4, // Strong
+        12..=14 => 3, // Fairly Strong
+        9..=11 => 2,  // Reasonable
+        6..=8 => 1,   // Weak
+        _ => 0,       // Very Weak (1–5)
+    }
+}
+
+/// Prefer foot label from display left/right strengths (1–20).
+/// Same competency band → Either; otherwise the side in the higher band.
 pub(crate) fn preferred_foot_label(left: u8, right: u8) -> &'static str {
-    if left == right {
+    let left_band = foot_competency_band(left);
+    let right_band = foot_competency_band(right);
+    if left_band == right_band {
         "Either"
-    } else if left > right {
+    } else if left_band > right_band {
         "Left"
     } else {
         "Right"
@@ -123,11 +138,18 @@ mod tests {
     }
 
     #[test]
-    fn preferred_foot_label_uses_equality_not_threshold() {
+    fn preferred_foot_label_uses_competency_bands() {
+        // Schalke squad validation set (in-game labels 2026-08-27).
+        assert_eq!(preferred_foot_label(20, 18), "Either"); // Heilbrom
+        assert_eq!(preferred_foot_label(17, 20), "Right"); // Kizza / Hoßmang
+        assert_eq!(preferred_foot_label(18, 20), "Either"); // Koné
+        assert_eq!(preferred_foot_label(20, 17), "Left"); // Éder / Kramarić
+        assert_eq!(preferred_foot_label(20, 9), "Left"); // Bandeira
+        assert_eq!(preferred_foot_label(11, 20), "Right"); // Brăescu
+        assert_eq!(preferred_foot_label(13, 20), "Right"); // Heynke
         assert_eq!(preferred_foot_label(15, 15), "Either");
         assert_eq!(preferred_foot_label(18, 12), "Left");
         assert_eq!(preferred_foot_label(10, 14), "Right");
-        assert_eq!(preferred_foot_label(20, 19), "Left");
     }
 
     #[test]
