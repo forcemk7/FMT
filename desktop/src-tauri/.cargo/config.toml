@@ -1,0 +1,6 @@
+# Faster local iteration: optimize the app crate in dev without slowing deps.
+[profile.dev.package.fmt]
+opt-level = 1
+
+[profile.dev.package.glassscout_fm26_lib]
+opt-level = 1
