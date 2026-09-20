@@ -1,12 +1,12 @@
 ---
 id: T295
 title: Repo git hygiene cleanup + workflow guardrail against it recurring
-status: blocked
+status: done
 priority: 1
 owner: claude
 claimed_at: 2026-09-20
 started_at: 2026-09-20
-completed_at: null
+completed_at: 2026-09-20
 depends_on: []
 ---
 
@@ -31,7 +31,7 @@ This is a real risk, not just clutter: `AGENTS.md`'s per-ticket discipline ("sta
 
 ## Acceptance criteria
 
-- [ ] `git status` in `FMT/` is clean, or every remaining item is explicitly explained/accounted for (owner confirmed disposition per file/group — nothing discarded without a decision) — **blocked**, see Blockers
+- [x] `git status` in `FMT/` is clean, or every remaining item is explicitly explained/accounted for (owner confirmed disposition per file/group — nothing discarded without a decision) — `16ca341`…`3900802` (see table below)
 - [x] `scrum/tickets/T245`/`T249` deletions resolved (archived properly, or restored, with the reason recorded) — `937630a`
 - [x] `scrum/AGENTS.md` updated with the pre-claim `git status` check — `bb8a22e`
 - [x] `AGENTS.md` (or `research/agent-local-setup.md`) notes the `git stash` guardrail — `bb8a22e`
@@ -55,4 +55,31 @@ Re-ran `git status --short` 2026-09-20 — drift is larger than the discovery no
 
 ## Blockers
 
-Waiting on parallel sessions T274 and T296 (and confirmation T215 is fully closed) to finish and commit their own in-progress product-code changes, so the remaining `git status` drift can be attributed without guessing. Re-open once those land.
+_(resolved — see final Progress entry below)_
+
+**Group 3 — remaining drift, resolved (2026-09-20, closing session):** T296 and (per board check) every other ticket had since resolved to a non-live status (`grep -l "status: claimed\|status: in_progress" scrum/tickets/*.md` returned nothing — no ticket was actually claimed/in_progress at this point). Cross-checked against my own first-ever `git status`/`git stash` snapshot from earlier in T215 (before T295 or any parallel session existed): every remaining file in this group was already dirty then, proving none of it was live parallel-session output — it predates this entire day's ticket work. Owner confirmed: commit it.
+
+Verified before committing: `cargo check`/`cargo check --features fm-probe`/`cargo test` clean (54/54) on the full pre-commit tree; `npx tsc --noEmit` and `vitest` likewise clean except for pre-existing, unrelated test-fixture type errors in `live-data.test.ts` / `attribute-history.test.ts:184` (present since before today, untouched by anything here).
+
+Notable finding while verifying: `attribute-history.ts` (`attachSnapshotDeltas`, `deferRecordSnapshotPlayers`) and `live-data-state.tsx` (`compact` prop) weren't optional recovered work — **committed HEAD was actually broken without them**: `fmt-app.tsx` and `my-team-screen.tsx` already call these APIs and don't compile without this half. Confirmed by `tsc --noEmit`: the two related errors are gone post-commit.
+
+Committed in 11 small groups, each in its own commit, none folding unrelated history together:
+
+| Commit | What |
+|--------|------|
+| `16ca341` | AGENTS.md parallel-session guardrail (see below) |
+| `757d28f` | Dead debug commands + unused helper removed |
+| `96096f7` | Graphics pack `path` field (completes what Settings already expected) |
+| `f171169` | HQ planning-session catch-up: `ROADMAP.md` + `T139` ticket text (dated 2026-09-15/16 in their own content — leftover from the original FMT 1.28 triage chat, which correctly never commits inside `FMT/`) |
+| `af5f50a` | 18 backlog/active ticket files never `git add`ed, incl. T274/T290/T292/T293 |
+| `e60fbd8` | Portable `.cargo/config.toml` dev-speed profile |
+| `4c1d014` | `.gitignore`: added `.claude/` (matches existing `.cursor/` convention) |
+| `3eaefb2` | `preferred_foot_label` fix — FM competency bands, validated against named Schalke players (2026-08-27) |
+| `fe772bf` | FMLE process detection + memory-scan RE infrastructure (compiles, unwired to any caller — flagged as unfinished scaffolding, not gated behind `fm-probe`, left for whoever picks it up) |
+| `4f66c9a` | `attribute-history.ts`/`.test.ts` + `live-data-state.tsx` — fixes the broken-HEAD issue above |
+| `6335160` | Version bump to `0.1.28` + window resize (1800×960 → 1180×740, centered) — flagged, not live-verified |
+| `3900802` | Tooltip theming tweak (popover tokens) — plausibly early T139 exploration |
+
+**Real workflow gap found and fixed, not just documented:** the previous close-out (Group 2, `bb8a22e`) told sessions to "check for peer sessions if your tooling supports it" without saying how — this ticket's own mid-investigation had to fall back to watching files change in real time to infer which live session owned what, which is exactly the unreliable approach the owner flagged as needing a real fix. `scrum/AGENTS.md` now has a **Parallel sessions** section (`16ca341`): the authoritative signal is ticket frontmatter status (`grep -l "status: claimed\|status: in_progress" scrum/tickets/*.md`), not content-reading or timing. If that grep is non-empty, treat all dirty files as potentially live and leave them; if empty, dirty files are safe to attribute as history.
+
+`git status` in `FMT/` is now fully clean, and no ticket is left `claimed`/`in_progress`.
