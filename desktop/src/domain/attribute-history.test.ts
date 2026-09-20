@@ -153,11 +153,8 @@ describe("attachAttrDeltas", () => {
       Crossing: -1,
       Determination: 2,
     });
-    expect(player!.allTimeAttrDeltas).toEqual({
-      CA: 6,
-      Crossing: -1,
-      Determination: 2,
-    });
+    // All-time comes from Progress Report pack, not Load history.
+    expect(player!.allTimeAttrDeltas).toEqual({});
   });
 
   it("returns empty delta maps when only one observation exists", () => {
@@ -169,7 +166,32 @@ describe("attachAttrDeltas", () => {
     };
     const [player] = attachAttrDeltas([{ id: "p1", name: "Test" } as LivePlayer], store);
     expect(player!.recentAttrDeltas).toEqual({ CA: null, Crossing: null });
-    expect(player!.allTimeAttrDeltas).toEqual({ CA: null, Crossing: null });
+    expect(player!.allTimeAttrDeltas).toEqual({});
+  });
+
+  it("preserves connector Progress Report all-time when pack points exist", () => {
+    const store: AttrHistoryStore = {
+      version: 2,
+      players: {
+        p1: [
+          { at: "2026-01-01", values: { Crossing: 8 } },
+          { at: "2026-01-08", values: { Crossing: 10 } },
+        ],
+      },
+    };
+    const [player] = attachAttrDeltas(
+      [
+        {
+          id: "p1",
+          name: "Test",
+          caPackPointCount: 5,
+          allTimeAttrDeltas: { Crossing: 4, Determination: 2 },
+        } as LivePlayer,
+      ],
+      store,
+    );
+    expect(player!.recentAttrDeltas).toEqual({ Crossing: 2 });
+    expect(player!.allTimeAttrDeltas).toEqual({ Crossing: 4, Determination: 2 });
   });
 });
 

@@ -3,18 +3,21 @@
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { LiveFootballSnapshot } from "@/domain/adapters";
+import { cn } from "@/lib/utils";
 
-/** Empty / not-ready desk — show only real signals; prefer blank over filler. */
+/** Empty / not-ready desk — structure stays; this fills the data hole only. */
 export function LiveDataState({
   snapshot,
   title,
   checking,
   onRefresh,
+  compact = false,
 }: {
   snapshot: LiveFootballSnapshot;
   title: string;
   checking: boolean;
   onRefresh: () => Promise<unknown>;
+  compact?: boolean;
 }) {
   const status = snapshot.status;
   const fmRunning = status.processDetected;
@@ -29,21 +32,32 @@ export function LiveDataState({
       ? status.message
       : null;
 
-  const hasSignal = checking || fmRunning || Boolean(failure) || Boolean(usefulMessage);
+  if (checking) {
+    return (
+      <section
+        className={cn("live-data-state", compact ? "is-compact" : "is-empty")}
+        aria-busy="true"
+        aria-label={`Loading ${title}`}
+      >
+        {compact ? <p>Loading live data…</p> : null}
+      </section>
+    );
+  }
 
-  if (!hasSignal) {
+  const hasSignal = fmRunning || Boolean(failure) || Boolean(usefulMessage);
+
+  if (!hasSignal && !compact) {
     return <section className="live-data-state is-empty" aria-label={`${title} empty`} />;
   }
 
   return (
-    <section className="live-data-state" role="status" aria-live="polite">
+    <section
+      className={cn("live-data-state", compact && "is-compact")}
+      role="status"
+      aria-live="polite"
+    >
       <div>
-        {checking ? (
-          <>
-            <h1>Loading…</h1>
-            <p>Reading the active FM26 save.</p>
-          </>
-        ) : fmRunning && !failure ? (
+        {fmRunning && !failure ? (
           <>
             <h1>FM26 is running</h1>
             <p>{usefulMessage ?? "Save is open — load when you want the squad desk."}</p>
@@ -55,15 +69,15 @@ export function LiveDataState({
           </>
         ) : (
           <>
-            <h1>{title}</h1>
-            {usefulMessage ? <p>{usefulMessage}</p> : null}
+            <h1>{compact ? "No live squad yet" : title}</h1>
+            <p>{usefulMessage ?? "Use Load Data in the header when Football Manager 26 has a career save open."}</p>
           </>
         )}
       </div>
       <div className="live-data-state-actions">
-        <Button onClick={onRefresh} disabled={checking}>
-          <RefreshCw data-icon="inline-start" className={checking ? "spin" : undefined} />
-          {checking ? "Loading…" : "Load Data"}
+        <Button onClick={onRefresh}>
+          <RefreshCw data-icon="inline-start" />
+          Load Data
         </Button>
       </div>
     </section>

@@ -135,7 +135,11 @@ export function recordPlayersFromSnapshot(
   return store;
 }
 
-/** Attach recent + all-time delta maps from a history store onto each player. */
+/**
+ * Attach recent Δ from Load history. Preserve connector `allTimeAttrDeltas` when
+ * Progress Report CA pack points were found (Development). Never invent all-time
+ * from the Load clock.
+ */
 export function attachAttrDeltas(
   players: LivePlayer[],
   store: AttrHistoryStore = loadAttrHistoryStore(),
@@ -149,17 +153,21 @@ export function attachAttrDeltas(
       };
     }
     const points = store.players[player.id] ?? [];
+    const packAllTime =
+      (player.caPackPointCount ?? 0) >= 1 && player.allTimeAttrDeltas
+        ? player.allTimeAttrDeltas
+        : {};
     return {
       ...player,
       recentAttrDeltas: recentDeltasFromPoints(points),
-      allTimeAttrDeltas: allTimeDeltasFromPoints(points),
+      allTimeAttrDeltas: packAllTime,
     };
   });
 }
 
 /**
  * Load pipeline: append change-points, then stamp recent/all-time Δ on players
- * for Attributes / Development desks.
+ * for Attributes / Development desks (stable Attributes path).
  */
 export function ingestSnapshotPlayers(
   players: LivePlayer[],
@@ -167,6 +175,23 @@ export function ingestSnapshotPlayers(
 ): LivePlayer[] {
   const store = recordPlayersFromSnapshot(players, gameDate);
   return attachAttrDeltas(players, store);
+}
+
+/** Stamp recent Δ from existing store without blocking Load on a localStorage write. */
+export function attachSnapshotDeltas(players: LivePlayer[]): LivePlayer[] {
+  return attachAttrDeltas(players);
+}
+
+/** Append change-points after the UI has painted. */
+export function deferRecordSnapshotPlayers(
+  players: LivePlayer[],
+  gameDate?: string | null,
+): void {
+  if (typeof window === "undefined") return;
+  const run = () => {
+    recordPlayersFromSnapshot(players, gameDate);
+  };
+  globalThis.setTimeout(run, 0);
 }
 
 export function getPlayerAttrHistory(playerId: string): AttrHistoryPoint[] {
