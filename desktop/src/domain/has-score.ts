@@ -194,43 +194,6 @@ export const HAS_EXCLUDED_ATTRIBUTES = [
   "Versatility",
 ] as const;
 
-export type FrontendCalculationCard = {
-  key: string;
-  badge: string;
-  state: "passed" | "pending" | "warning";
-  title: string;
-  detail: string;
-};
-
-function hasCalculationDetail() {
-  const weights = HAS_CALCULATION_SPECS.map((spec) => {
-    if (spec.mode === "diminishing") return `${spec.abbr}×${spec.weight} dim>10`;
-    if (spec.mode === "inverted") return `${spec.abbr}×${spec.weight} 21−x`;
-    return `${spec.abbr}×${spec.weight}`;
-  }).join(", ");
-  const excluded = HAS_EXCLUDED_ATTRIBUTES.join(", ");
-  return `Σ(w×eff)/Σ(w): ${weights}. Excluded: ${excluded}.`;
-}
-
-/** Settings → Frontend calculations cards (one row per FMT model). */
-export const FRONTEND_CALCULATION_CARDS: FrontendCalculationCard[] = [
-  {
-    key: "has",
-    badge: "Live",
-    state: "passed",
-    title: "Hidden attribute score (HAS)",
-    detail: hasCalculationDetail(),
-  },
-  {
-    key: "personality-media",
-    badge: "Live",
-    state: "passed",
-    title: "Personality × Media Handling labels",
-    detail:
-      "Catalog band match on HA pack + Det/Lea (FM HA Calculator). Shown in the profile facts strip. Incomplete pack → —.",
-  },
-];
-
 /** HAS display tones — same palette as attrs (`attr-colors`). */
 export type HasTone = AppTone;
 

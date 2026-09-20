@@ -2,16 +2,17 @@
 
 import {
   Building2,
+  CalendarDays,
   ChevronDown,
   Gamepad2,
   Images,
   Network,
-  Sigma,
+  SlidersHorizontal,
+  UserCog,
   UserRound,
   Users,
 } from "lucide-react";
 import type { LiveFootballSnapshot } from "@/domain/adapters";
-import { FRONTEND_CALCULATION_CARDS } from "@/domain/has-score";
 import { sortClubTeamsForSquadDesk, squadTeamDisplayName } from "@/domain/live-data";
 import { useGraphicsPacksStatus } from "@/components/graphics-packs-panel";
 import { getVersion } from "@tauri-apps/api/app";
@@ -390,10 +391,14 @@ export function SettingsScreen({
       tone: tonePresent(managedClubName),
       critical: true,
     },
+  ];
+
+  const managerCells: DiagCell[] = [
     {
       title: "Manager name",
       status: snapshot.managerName ?? "Unavailable",
       tone: tonePresent(snapshot.managerName),
+      critical: true,
     },
     {
       title: "Manager pick",
@@ -404,6 +409,20 @@ export function SettingsScreen({
       title: "Name fallback",
       status: cellByTitle(backendCells, "Name fallback")?.status ?? "none",
       tone: cellByTitle(backendCells, "Name fallback")?.tone ?? "green",
+    },
+  ];
+
+  const saveCells: DiagCell[] = [
+    {
+      title: "In-game date",
+      status: snapshot.gameDate?.trim() || "Unavailable",
+      tone: tonePresent(snapshot.gameDate),
+      critical: true,
+    },
+    {
+      title: "Season",
+      status: snapshot.season?.trim() || "Unavailable",
+      tone: tonePresent(snapshot.season),
     },
   ];
 
@@ -519,17 +538,6 @@ export function SettingsScreen({
       wide: true,
     },
     {
-      title: "In-game date",
-      status: snapshot.gameDate?.trim() || "Unavailable",
-      tone: tonePresent(snapshot.gameDate),
-      critical: true,
-    },
-    {
-      title: "Season",
-      status: snapshot.season?.trim() || "Unavailable",
-      tone: tonePresent(snapshot.season),
-    },
-    {
       title: "Mapping coverage",
       status: mappingCoverageLabel(status.mappingCoverage),
       tone: (status.mappingCoverage ?? []).some((row) => row.unmapped > 0)
@@ -544,6 +552,7 @@ export function SettingsScreen({
     "Unlabeled affiliation types",
     "Players Go On Loan filter",
     "Excluded affiliation links",
+    "Duplicate affiliation links (uid seen twice)",
     "Dropped loan-off feeders",
     "Unresolved affiliate partners",
     "Affiliate clubs loaded",
@@ -607,18 +616,32 @@ export function SettingsScreen({
           ]),
   ];
 
-  const scoresCells: DiagCell[] = FRONTEND_CALCULATION_CARDS.map((calc) => ({
-    title: calc.title,
-    status: `${calc.badge} · ${calc.detail}`,
-    tone: calc.state === "passed" ? "green" : calc.state === "blocked" ? "red" : "yellow",
-    wide: true,
-  }));
-
-  const scoresLive = FRONTEND_CALCULATION_CARDS.filter((c) => c.state === "passed").length;
+  const preferencesCells: DiagCell[] = [
+    {
+      title: "Preferences",
+      status: "None yet — PA masking (T292) lands here",
+      tone: "yellow",
+    },
+  ];
 
   return (
     <main className="screen settings-screen" aria-label="Settings">
       <section className="settings-list">
+        <SettingsGroup
+          id="settings-graphics"
+          icon={<Images aria-hidden="true" />}
+          title="Graphics"
+          meta={
+            !graphics || graphics.loading
+              ? "…"
+              : graphics.packs.length
+                ? `${graphics.packs.length} packs`
+                : "None"
+          }
+          tone={sectionTone(graphicsCells)}
+          cells={graphicsCells}
+        />
+
         <SettingsGroup
           id="settings-fm26"
           icon={<Gamepad2 aria-hidden="true" />}
@@ -626,6 +649,24 @@ export function SettingsScreen({
           meta={memorySafetyLabel(status.memoryAccess)}
           tone={sectionTone(fm26Cells)}
           cells={fm26Cells}
+        />
+
+        <SettingsGroup
+          id="settings-save"
+          icon={<CalendarDays aria-hidden="true" />}
+          title="Save"
+          meta={snapshot.gameDate?.trim() || "—"}
+          tone={sectionTone(saveCells)}
+          cells={saveCells}
+        />
+
+        <SettingsGroup
+          id="settings-manager"
+          icon={<UserCog aria-hidden="true" />}
+          title="Manager"
+          meta={snapshot.managerName ?? "—"}
+          tone={sectionTone(managerCells)}
+          cells={managerCells}
         />
 
         <SettingsGroup
@@ -647,15 +688,6 @@ export function SettingsScreen({
         />
 
         <SettingsGroup
-          id="settings-players"
-          icon={<UserRound aria-hidden="true" />}
-          title="Players"
-          meta={status.playersLoaded ? `${status.playersLoaded} loaded` : "—"}
-          tone={sectionTone(playersCells)}
-          cells={playersCells}
-        />
-
-        <SettingsGroup
           id="settings-affiliations"
           icon={<Network aria-hidden="true" />}
           title="Affiliations"
@@ -670,27 +702,21 @@ export function SettingsScreen({
         />
 
         <SettingsGroup
-          id="settings-graphics"
-          icon={<Images aria-hidden="true" />}
-          title="Graphics"
-          meta={
-            !graphics || graphics.loading
-              ? "…"
-              : graphics.packs.length
-                ? `${graphics.packs.length} packs`
-                : "None"
-          }
-          tone={sectionTone(graphicsCells)}
-          cells={graphicsCells}
+          id="settings-players"
+          icon={<UserRound aria-hidden="true" />}
+          title="Players"
+          meta={status.playersLoaded ? `${status.playersLoaded} loaded` : "—"}
+          tone={sectionTone(playersCells)}
+          cells={playersCells}
         />
 
         <SettingsGroup
-          id="settings-scores"
-          icon={<Sigma aria-hidden="true" />}
-          title="Scores"
-          meta={`${scoresLive} live`}
-          tone={sectionTone(scoresCells)}
-          cells={scoresCells}
+          id="settings-preferences"
+          icon={<SlidersHorizontal aria-hidden="true" />}
+          title="User Preferences"
+          meta="—"
+          tone={sectionTone(preferencesCells)}
+          cells={preferencesCells}
         />
       </section>
     </main>
