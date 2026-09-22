@@ -1,9 +1,29 @@
 use std::cell::Cell;
+use std::sync::OnceLock;
 use std::time::Instant;
 
 thread_local! {
     static LOAD_START: Cell<Option<Instant>> = const { Cell::new(None) };
     static COMPACT_PAYLOAD: Cell<bool> = const { Cell::new(false) };
+}
+
+static BOOT_START: OnceLock<Instant> = OnceLock::new();
+
+/// Called once, as early as possible in `run()` — every boot-diagnostic line below
+/// reports elapsed time relative to this, so the whole boot→first-load timeline
+/// (window creation, page compile/serve, React mount, first poll, first heartbeat,
+/// first load) is on one comparable clock instead of scattered, un-anchored numbers.
+pub fn mark_boot_start() {
+    BOOT_START.get_or_init(Instant::now);
+}
+
+/// Milliseconds since `mark_boot_start()`. 0 if it was never called (e.g. non-Windows
+/// stub builds, or a call made before `run()` — shouldn't happen in practice).
+pub fn boot_elapsed_ms() -> u128 {
+    BOOT_START
+        .get()
+        .map(|start| start.elapsed().as_millis())
+        .unwrap_or(0)
 }
 
 fn elapsed_ms() -> u128 {
@@ -33,7 +53,10 @@ fn stage_label(stage: &str) -> &str {
 pub fn load_begin(label: &str, compact: bool) {
     LOAD_START.with(|start| start.set(Some(Instant::now())));
     set_compact(compact);
-    eprintln!("[fmt] {label} — start (compact={compact})");
+    eprintln!(
+        "[fmt] {label} — start (compact={compact}) [boot +{}ms]",
+        boot_elapsed_ms()
+    );
 }
 
 pub fn load_stage(stage: &str) {
@@ -65,9 +88,10 @@ pub fn load_done(summary: impl AsRef<str>) {
     LOAD_START.with(|start| start.set(None));
 }
 
-/// Mirror UI-only status lines from the frontend into the dev terminal.
+/// Mirror UI-only status lines from the frontend into the dev terminal, boot-relative
+/// so they splice directly into the same timeline as the Rust-side load stages below.
 pub fn app_line(message: impl AsRef<str>) {
-    eprintln!("[fmt] {}", message.as_ref());
+    eprintln!("[fmt] +{}ms  {}", boot_elapsed_ms(), message.as_ref());
 }
 
 #[tauri::command]

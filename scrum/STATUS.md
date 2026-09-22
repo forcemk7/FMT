@@ -1,10 +1,12 @@
 ﻿# Status
 
-Last updated: 2026-09-20 (T295 done — repo fully clean, all pre-existing drift resolved)
+Last updated: 2026-09-22 (T274 done — live-connect auto-detect/auto-load/auto-refresh shipped)
 
 ## Now
 
-**FMT 1.28 in progress, one ticket at a time.** Owner works strictly sequential — full QA and close-out before the next ticket starts. Parallel ticket work happened briefly this session (owner-authorized, to cut idle time) and has now fully wound down — no ticket is currently `claimed`/`in_progress`. Back to strictly sequential.
+**FMT 1.28 in progress, one ticket at a time.** Owner works strictly sequential — full QA and close-out before the next ticket starts. Parallel ticket work happened briefly this session (owner-authorized, to cut idle time) and has now fully wound down — no ticket is currently `claimed`/`in_progress`.
+
+**T274 done.** Nine rounds, full write-up in the archived ticket. Shipped: a unified detect/load/refresh mechanism (one heartbeat-driven mechanism now covers auto-load-on-launch, auto-switch, auto-refresh, and disconnect-dismount, instead of separate paths); a fixed-layout load button (dot/text/icon pinned via CSS grid, no more reflow); a live pill with a structured status-grid tooltip and a persistent "Switching…" state during a club change; and boot-sequence timestamp instrumentation the owner can use going forward to tell dev-build cost apart from real regressions. Two real bugs found and fixed along the way that are worth remembering: (1) a non-`async` Tauri command executing inline on the same thread that pumps the native window's message loop — froze drag/paint/hover; the fix (`async` + `spawn_blocking`) is now the pattern to match for any future polled command. (2) a busy-flag implemented as a `useRef` silently surviving React Strict Mode's dev-only double-effect-invoke, letting a stale instance block the real one — the fix (a plain local variable scoped inside the effect) is the pattern to match for any future per-effect-instance guard. Owner is deferring final release-build timing verification to their own `desktop:build` check later, not blocking on it now.
 
 **T215 done.** Owner-verified live on two saves: Schalke (FM24→26-converted) shows correct in-game date/season and correct ages across FT/U19/B/affiliate; Barcelona (FM26-native) shows in-game date/season `Unavailable` and all squad ages missing as a direct consequence. Confirms the age/date architecture itself is sound — Barcelona's native-save date read is a separate, real bug, spun off as **T296**. A repo git-hygiene issue found while closing T215 (large pre-existing uncommitted work unrelated to any ticket) spun off as **T295**, marked priority per owner request.
 
@@ -24,7 +26,6 @@ Last updated: 2026-09-20 (T295 done — repo fully clean, all pre-existing drift
 |----|-------|--------|----------|-------|
 | T290 | Minimal functional telemetry — install → launch → load → outcome | ready | 2 | depends_on T215 (done) |
 | T292 | PA masking toggle | ready | 2 | depends_on T215 (done) |
-| T274 | Live connect — auto-refresh + honest load button/status UI | ready | 2 | reframed: current "live" is manual snapshot only |
 | T293 | Responsive desk layout + UI density preference + min viewport | ready | 2 | depends_on T215 (done); split out of T139 |
 | T139 | FMT shell theme (MW90 CTRL 26-inspired) | ready | 3 | visual identity only now — layout/density moved to T293; sequence after it |
 
@@ -45,6 +46,7 @@ Last updated: 2026-09-20 (T295 done — repo fully clean, all pre-existing drift
 
 ## Recently done
 
+- **T274** Live connect — auto-detect/auto-load/auto-refresh, replacing the manual-only Load button. One heartbeat-driven mechanism (not separate paths) now covers first-launch auto-load, save-switch detection, routine refresh, and disconnect-dismount. Fixed-column button layout (no more reflow), live pill with a structured tooltip, persistent "Switching…" state, and boot-sequence timing instrumentation. Nine rounds of owner-verified live testing surfaced and fixed two real bugs: a Tauri command blocking the native window's main thread (froze drag/paint/hover), and a `useRef`-based guard that silently broke under React Strict Mode's dev-only double-effect-invoke. Full write-up in the archived ticket.
 - **T295** Repo git hygiene: `git status` in `FMT/` fully clean. 11 small commits, each attributable, none folding unrelated history together — see archived ticket for the full table. Added a real fix (not just a note) for the workflow gap that made this hard: `scrum/AGENTS.md`'s new **Parallel sessions** section makes ticket frontmatter status (via `grep`) the authoritative signal for live work, replacing the old "check for peer sessions if your tooling supports it" hand-wave.
 - **T296** In-game date/Season "Unavailable" on Barcelona (FM26-native) was save-freshness, not a native-save offset/profile bug — a never-advanced control save left `player_current_date_offset`'s per-player "last processed" cache unwritten for the whole squad. Confirmed by advancing the save one day: ages resolved, zero code changes. New `probe-game-date` RE tool added; `research/recipes.md` updated; surfaced a free re-check opportunity for T294.
 - **T215** Settings restructured into Graphics → FM26 → Save → Manager → Club → Teams → Affiliations → Players → User Preferences; new Save/Manager sections split out, Scores section dropped (owner's own call — "not that useful"), empty User Preferences shell added for T292. Owner-verified live on two saves: age/date architecture confirmed correct (Schalke: FT/U19/B/affiliate ages all correct); Barcelona's native-save date-unavailable failure spun off as T296, not a T215 defect.

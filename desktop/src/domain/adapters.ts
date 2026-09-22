@@ -310,10 +310,40 @@ export type LiveFootballSnapshot = {
   dataWarnings?: string[];
 };
 
+/**
+ * Cheap poll target for T274 auto-detect/auto-load/auto-refresh — not a full snapshot,
+ * just enough to diff against. `"unresolved"` means fm.exe is running but nothing
+ * downstream resolved yet (mid save-switch, a menu screen, etc.) — treat as "try again
+ * next poll," never as a reason to dismount. `"not_found"` (fm.exe isn't running at all)
+ * is the only state that should ever dismount FMT's mounted data.
+ */
+export type LiveHeartbeat = {
+  state: "connected" | "unresolved" | "not_found";
+  clubUid: number | null;
+  clubName: string | null;
+  /** In-game calendar date (YYYY-MM-DD); null on a save with no player tick processed yet (T296). */
+  gameDate: string | null;
+};
+
+const notFoundHeartbeat: LiveHeartbeat = {
+  state: "not_found",
+  clubUid: null,
+  clubName: null,
+  gameDate: null,
+};
+
+const unresolvedHeartbeat: LiveHeartbeat = {
+  state: "unresolved",
+  clubUid: null,
+  clubName: null,
+  gameDate: null,
+};
+
 export interface FootballDataAdapter {
   readonly kind: "fm26-live";
   getStatus(): Promise<LiveConnectorStatus>;
   getSnapshot(): Promise<LiveFootballSnapshot>;
+  getHeartbeat(): Promise<LiveHeartbeat>;
 }
 
 export interface FutureRealLifeAdapter {
@@ -431,6 +461,19 @@ export const fm26LiveAdapter: FootballDataAdapter = {
         dataSource: "none",
         dataWarnings: [message],
       });
+    }
+  },
+  async getHeartbeat() {
+    if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) {
+      return notFoundHeartbeat;
+    }
+
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      return await invoke<LiveHeartbeat>("connector_heartbeat");
+    } catch {
+      // A flaky IPC round-trip isn't proof fm.exe quit — treat it as "try again next poll."
+      return unresolvedHeartbeat;
     }
   },
 };

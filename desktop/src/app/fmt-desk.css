@@ -194,14 +194,37 @@ body.fmt-shell .shell-load.is-needs-load strong,
 body.fmt-shell .shell-load.is-needs-load .shell-load-icon {
   color: var(--action-text);
 }
-body.fmt-shell .shell-load .live-dot {
+body.fmt-shell .shell-load .live-dot,
+body.fmt-shell .shell-live-pill .live-dot {
   background: var(--mint);
   box-shadow: 0 0 0 0 color-mix(in srgb, var(--mint) 55%, transparent);
   animation: fmt-live-dot-pulse 1.8s ease-out infinite;
 }
-body.fmt-shell .shell-load.is-loading .live-dot {
+body.fmt-shell .shell-load.is-loading .live-dot,
+body.fmt-shell .shell-live-pill.is-loading .live-dot {
   background: var(--mint);
   animation: fmt-live-dot-pulse 0.9s ease-out infinite;
+}
+body.fmt-shell .shell-live-pill {
+  background: var(--control-bg);
+  border: 1px solid var(--control-border);
+  color: var(--control-fg-muted);
+  border-radius: var(--control-radius);
+}
+body.fmt-shell .shell-live-pill strong {
+  color: var(--control-fg);
+}
+body.fmt-shell .shell-live-refresh:hover {
+  background: color-mix(in srgb, var(--control-fg) 10%, transparent);
+}
+body.fmt-shell .offline-dot {
+  background: #e05656;
+}
+body.fmt-shell .shell-status-grid dt {
+  color: var(--text-dim);
+}
+body.fmt-shell .shell-load-log li {
+  color: var(--text-dim);
 }
 @keyframes fmt-live-dot-pulse {
   0% {

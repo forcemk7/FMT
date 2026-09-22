@@ -13,6 +13,12 @@ use tauri_plugin_sql::{Migration, MigrationKind};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // First line, on purpose: every boot-diagnostic timestamp downstream (window
+    // creation, page compile/serve, React mount, first poll, first heartbeat, first
+    // load) is relative to this, so the whole boot sequence lands on one comparable
+    // clock instead of scattered, un-anchored numbers.
+    fmt_log::mark_boot_start();
+    eprintln!("[fmt] +0ms  run() start");
     let _registered_commands = commands::registered_commands();
     let migrations = vec![Migration {
         version: 1,
@@ -31,6 +37,7 @@ pub fn run() {
             fmt_log::fmt_terminal_log,
             connector::connector_status,
             connector::connector_snapshot,
+            connector::connector_heartbeat,
             connector::load_active_save,
             player_face::club_logo_data,
             player_face::faces_status,

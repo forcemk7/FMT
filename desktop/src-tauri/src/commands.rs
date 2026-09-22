@@ -2,6 +2,7 @@ pub(crate) const REGISTERED_COMMANDS: &[&str] = &[
     "fmt_terminal_log",
     "connector_status",
     "connector_snapshot",
+    "connector_heartbeat",
     "load_active_save",
     "club_logo_data",
     "nation_flag_data",

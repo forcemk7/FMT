@@ -115,7 +115,36 @@ export function FMTApp() {
     }
   });
   const [checking, setChecking] = useState(false);
-  const [loadStage, setLoadStage] = useState<string | null>(null);
+  /** Compact log shown in the load button's tooltip while checking (T274). */
+  const [loadStageHistory, setLoadStageHistory] = useState<string[]>([]);
+  const [switchFlash, setSwitchFlash] = useState<string | null>(null);
+
+  // T274: auto-detect/auto-load/auto-refresh. heartbeatBaselineRef doubles as "is
+  // anything currently mounted" — it's set (by checkConnection) and cleared (by the
+  // poll, on a genuine not_found) in lockstep with `snapshot`, so no separate ref is
+  // needed to mirror connection state. loadInFlightRef is the authoritative guard on
+  // checkConnection itself — a manual Load click and a poll-triggered reload are
+  // meant to be an OR (whichever gets there first wins), never an AND;
+  // `checking`/`checkingRef` alone aren't enough to guarantee that, since there's a
+  // real gap between the poll deciding to reload and `checking` actually flipping
+  // true (the poll awaits a heartbeat first) during which the button isn't yet
+  // disabled. loadInFlightRef closes that gap synchronously. (The poll's own
+  // poll-vs-poll overlap guard is a plain local variable inside its effect, not a
+  // ref — see the comment there for why.)
+  const checkingRef = useRef(checking);
+  const loadInFlightRef = useRef(false);
+  const heartbeatBaselineRef = useRef<{ clubUid: number | null; gameDate: string | null } | null>(null);
+
+  useEffect(() => {
+    checkingRef.current = checking;
+  }, [checking]);
+
+  // Boot-sequence diagnostic marker — fires once, as early as React lets it, so the
+  // terminal log shows exactly when the page actually finished mounting/hydrating
+  // relative to the Rust-side boot clock (see fmt_log::mark_boot_start).
+  useEffect(() => {
+    void mirrorToTerminal("app: FMTApp mounted");
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return;
@@ -123,7 +152,9 @@ export function FMTApp() {
     void import("@tauri-apps/api/event")
       .then(({ listen }) =>
         listen<string>("fmt-load-progress", (event) => {
-          setLoadStage(event.payload);
+          setLoadStageHistory((history) =>
+            history[history.length - 1] === event.payload ? history : [...history, event.payload],
+          );
         }),
       )
       .then((unlisten) => {
@@ -176,11 +207,28 @@ export function FMTApp() {
   }, [historyIndex, screenHistory]);
 
   const checkConnection = useCallback(async () => {
+    // Synchronous check-and-set, no `await` in between — the manual Load button and
+    // the poll are meant to be an OR (whichever gets here first wins), never an AND.
+    // A caller that loses this race (e.g. a click landing in the poll's brief
+    // heartbeat-to-decision window, before `checking` has flipped true and disabled
+    // the button) is a silent no-op rather than a second concurrent read.
+    if (loadInFlightRef.current) return undefined;
+    loadInFlightRef.current = true;
+
     resetTerminalMirror();
-    setLoadStage("detecting_fm26");
+    setLoadStageHistory(["detecting_fm26"]);
     setChecking(true);
     try {
       const nextSnapshot = normalizeLiveSnapshot(await fm26LiveAdapter.getSnapshot());
+      // Baseline follows the mounted snapshot in lockstep, whether this load was a
+      // manual click, a poll-triggered switch, or an on-launch auto-load.
+      heartbeatBaselineRef.current =
+        nextSnapshot.status.state === "connected"
+          ? {
+              clubUid: nextSnapshot.managedClubId !== null ? Number(nextSnapshot.managedClubId) : null,
+              gameDate: nextSnapshot.gameDate,
+            }
+          : null;
       if (nextSnapshot.status.state === "connected" && nextSnapshot.players.length) {
         const players = attachSnapshotDeltas(nextSnapshot.players);
         setSnapshot({ ...nextSnapshot, players });
@@ -194,10 +242,81 @@ export function FMTApp() {
       setSnapshot(nextSnapshot);
       return nextSnapshot.status;
     } finally {
-      setLoadStage(null);
       setChecking(false);
+      loadInFlightRef.current = false;
     }
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return;
+    const POLL_MS = 8000;
+    let cancelled = false;
+    // Deliberately a local variable, not a useRef: it must reset cleanly on every
+    // fresh effect instance, including React Strict Mode's dev-only mount → cleanup
+    // → mount cycle. A useRef persists across that whole cycle, so the *stale* first
+    // instance's still-in-flight tick (started, then cancelled before its heartbeat
+    // resolved) would hold a shared ref "busy" and silently eat the *real* second
+    // instance's immediate on-mount check — which is exactly why auto-load was still
+    // waiting a full POLL_MS in dev even after adding the immediate `tick()` call.
+    let pollBusy = false;
+    // Boot-diagnostic marker, once per effect instance (so a Strict Mode stale
+    // instance and the real one are both visible and distinguishable in the log).
+    let firstTickLogged = false;
+
+    const tick = async () => {
+      if (!firstTickLogged) {
+        firstTickLogged = true;
+        void mirrorToTerminal("poll: first tick");
+      }
+      // Claimed synchronously, before any `await`, so a second tick firing while this
+      // one is still mid-flight (e.g. a slow cold heartbeat in a debug build widening
+      // the window past the 8s poll period) can never slip through the same gap and
+      // fire a second concurrent load — the bug that produced 4 overlapping loads.
+      if (cancelled || pollBusy || checkingRef.current) return;
+      pollBusy = true;
+
+      try {
+        const heartbeat = await fm26LiveAdapter.getHeartbeat();
+        if (cancelled || heartbeat.state === "unresolved") return;
+
+        if (heartbeat.state === "not_found") {
+          // Only a confirmed "fm.exe isn't running" dismounts — never a transient
+          // unresolved read, so a save-switch blip can't strand the poll dormant.
+          if (heartbeatBaselineRef.current !== null) {
+            heartbeatBaselineRef.current = null;
+            setSnapshot(initialSnapshot);
+          }
+          return;
+        }
+
+        // heartbeat.state === "connected"
+        const baseline = heartbeatBaselineRef.current;
+        const clubChanged = baseline !== null && heartbeat.clubUid !== null && heartbeat.clubUid !== baseline.clubUid;
+        const dateChanged = baseline !== null && heartbeat.gameDate !== null && heartbeat.gameDate !== baseline.gameDate;
+        // No baseline at all covers both "FMT just launched into an already-running
+        // save" (auto-load) and "was disconnected, FM/save is back" (auto-reconnect).
+        if (baseline !== null && !clubChanged && !dateChanged) return;
+
+        if (baseline !== null && clubChanged && heartbeat.clubName) {
+          setSwitchFlash(heartbeat.clubName);
+        }
+
+        await checkConnection();
+      } finally {
+        setSwitchFlash(null);
+        pollBusy = false;
+      }
+    };
+
+    // `setInterval` only fires after the first full period — without this, auto-load
+    // on launch would wait a full POLL_MS for no reason before even checking once.
+    void tick();
+    const interval = window.setInterval(() => void tick(), POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [checkConnection]);
 
   const togglePlayerFavorite = (playerId: string) =>
     setFavorites((current) => toggleFavorite(current, playerId));
@@ -408,8 +527,9 @@ export function FMTApp() {
           searchInputRef={searchInputRef}
           snapshot={snapshot}
           checking={checking}
-          loadStage={loadStage}
+          loadStageHistory={loadStageHistory}
           onRefresh={checkConnection}
+          switchFlash={switchFlash}
         />
         {search ? (
           <motion.div

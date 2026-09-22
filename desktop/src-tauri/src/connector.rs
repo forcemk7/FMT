@@ -7,7 +7,7 @@ use std::{
     io::Read,
     path::Path,
     sync::{Mutex, OnceLock},
-    time::SystemTime,
+    time::{Instant, SystemTime},
 };
 use tauri::Emitter;
 
@@ -126,6 +126,22 @@ pub struct ConnectorSnapshot {
     data_warnings: Vec<String>,
 }
 
+/// Slim poll target for T274 auto-detect/auto-load/auto-refresh: cheap enough to call
+/// every few seconds. Reuses the same cached manager-signature resolution as the full
+/// snapshot but stops at the first readable player date instead of walking the whole squad.
+///
+/// `state` is one of `"connected"`, `"unresolved"` (fm.exe is running but nothing
+/// downstream resolved yet — try again next poll, never dismount on this), or
+/// `"not_found"` (fm.exe isn't running — the only state that should dismount FMT).
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectorHeartbeat {
+    state: &'static str,
+    club_uid: Option<u32>,
+    club_name: Option<String>,
+    game_date: Option<String>,
+}
+
 #[derive(Clone, Default)]
 struct ExecutableIdentity {
     file_version: Option<String>,
@@ -213,6 +229,36 @@ pub fn connector_status() -> ConnectorStatus {
 #[tauri::command]
 pub fn connector_snapshot() -> ConnectorSnapshot {
     collect_snapshot(None)
+}
+
+// Must be `async` + `spawn_blocking`, not a plain sync command: a non-async
+// #[tauri::command] runs inline on whatever thread dispatches the IPC call, which on
+// Windows/WRY is the same thread that pumps the native window's message loop. This is
+// polled every few seconds, so a plain sync fn here would periodically freeze window
+// drag/paint/hover (and did — this is what T274's round-4 regression report traced to).
+// `load_active_save` already gets this right; mirror it exactly.
+#[tauri::command]
+pub async fn connector_heartbeat() -> ConnectorHeartbeat {
+    // Boot-relative and unconditional (not just when slow) while T274's boot-sequence
+    // timing is under active investigation — one short line even every 8s isn't the
+    // kind of spam a full concurrent squad-read was; it's the actual data needed to
+    // tell a dev-only cost apart from a real bug.
+    eprintln!(
+        "[fmt] +{}ms  heartbeat — start",
+        crate::fmt_log::boot_elapsed_ms()
+    );
+    let start = Instant::now();
+    let result = tauri::async_runtime::spawn_blocking(collect_heartbeat).await;
+    let elapsed = start.elapsed();
+    eprintln!(
+        "[fmt] +{}ms  heartbeat — done ({}ms)",
+        crate::fmt_log::boot_elapsed_ms(),
+        elapsed.as_millis()
+    );
+    match result {
+        Ok(heartbeat) => heartbeat,
+        Err(_) => unresolved_heartbeat(),
+    }
 }
 
 #[tauri::command]
@@ -1170,6 +1216,109 @@ fn collect_snapshot(_progress: Option<&dyn Fn(&'static str)>) -> ConnectorSnapsh
     let mut status = empty_status();
     status.message = "The live FM26 connector requires the installed Windows app.".to_string();
     empty_snapshot(status.clone(), status.message)
+}
+
+/// fm.exe isn't in the process list at all — the one signal that should ever
+/// dismount FMT's mounted data. A confident, instant OS-level fact (process
+/// list scan), never a transient false negative the way registry resolution can be.
+fn not_found_heartbeat() -> ConnectorHeartbeat {
+    ConnectorHeartbeat {
+        state: "not_found",
+        club_uid: None,
+        club_name: None,
+        game_date: None,
+    }
+}
+
+/// fm.exe is running but nothing downstream resolved yet — mid save-switch, a
+/// menu screen, still loading, etc. Deliberately distinct from `not_found`: the
+/// frontend treats this as "try again next tick," never as a reason to dismount.
+fn unresolved_heartbeat() -> ConnectorHeartbeat {
+    ConnectorHeartbeat {
+        state: "unresolved",
+        club_uid: None,
+        club_name: None,
+        game_date: None,
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn collect_heartbeat() -> ConnectorHeartbeat {
+    let Some((process_id, _)) = find_fm26_process() else {
+        return not_found_heartbeat();
+    };
+    let Ok(mut reader) = ProcessReader::open(process_id) else {
+        return unresolved_heartbeat();
+    };
+    let Some(path) = reader.process_path() else {
+        return unresolved_heartbeat();
+    };
+    let identity = read_executable_identity(&path);
+    let Some(profile) = find_entity_map(
+        identity.file_version.as_deref(),
+        identity.product_version.as_deref(),
+        identity.sha256.as_deref(),
+        identity.architecture.as_deref(),
+    ) else {
+        return unresolved_heartbeat();
+    };
+    let Some(module) = reader.module(&profile.module) else {
+        return unresolved_heartbeat();
+    };
+    let mut diagnostics = ExtractionDiagnostics::default();
+    let Ok((manager, _)) =
+        resolve_active_human_manager(&mut reader, module, profile, process_id, &mut diagnostics)
+    else {
+        return unresolved_heartbeat();
+    };
+
+    // Same "first readable player date wins" fallback as the full snapshot's
+    // squad_game_date (connector.rs, extract_live_data) — this field is a lazily
+    // written per-player cache (T296), not a standalone clock, so a virgin save
+    // legitimately reports no date yet.
+    let mut game_date = None;
+    if let Some(players_start) = reader
+        .read_pointer(manager.team + profile.constants.team_players_start_offset)
+        .filter(|value| *value != 0)
+    {
+        if let Some(players_end) = reader
+            .read_pointer(manager.team + profile.constants.team_players_end_offset)
+            .filter(|value| *value != 0)
+        {
+            let player_count = ((players_end.saturating_sub(players_start)) / 8) as usize;
+            for index in 0..player_count {
+                let Some(raw_player) = reader
+                    .read_pointer(players_start + (index as u64 * 8))
+                    .filter(|value| *value != 0)
+                else {
+                    continue;
+                };
+                if let Some(resolved) =
+                    resolve_person_and_player_base(&mut reader, raw_player, profile)
+                {
+                    if let Some(date) = read_fm_date(
+                        &mut reader,
+                        resolved.player_base + profile.constants.player_current_date_offset,
+                    ) {
+                        game_date = format_fm_date(date);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    ConnectorHeartbeat {
+        state: "connected",
+        club_uid: Some(manager.club_uid),
+        club_name: Some(manager.club_name.trim().to_string()),
+        game_date,
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn collect_heartbeat() -> ConnectorHeartbeat {
+    not_found_heartbeat()
 }
 
 #[cfg(target_os = "windows")]

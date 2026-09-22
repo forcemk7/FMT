@@ -34,6 +34,20 @@ export function shellLoadLabel(
   return `${club?.name ?? "Synced"} · ${totalPlayers} players`;
 }
 
+/** Club/count/date shown in the shell header's live pill once connected (T274). */
+export function shellLiveSummary(snapshot: LiveFootballSnapshot) {
+  const club = snapshot.clubs.find((item) => item.id === snapshot.managedClubId);
+  const totalPlayers =
+    snapshot.status.clubEmployees > 0
+      ? snapshot.status.clubEmployees
+      : snapshot.status.managedSquadPlayers;
+  return {
+    clubName: club?.name ?? "Synced",
+    playerCount: totalPlayers,
+    gameDate: snapshot.gameDate,
+  };
+}
+
 /** Single line matching the shell header load button. */
 export function shellStatusLine(
   snapshot: LiveFootballSnapshot,

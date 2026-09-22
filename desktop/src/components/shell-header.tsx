@@ -11,12 +11,14 @@ import {
   Settings,
   UsersRound,
 } from "lucide-react";
+import type { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { LiveFootballSnapshot } from "@/domain/adapters";
 import { isDashViewId } from "@/domain/dashboard-views";
-import { shellLoadLabel } from "@/domain/fmt-terminal-log";
+import { loadStageLabel, shellLiveSummary } from "@/domain/fmt-terminal-log";
 
 export type Screen =
   | "Dashboard"
@@ -96,8 +98,9 @@ export function ShellHeader({
   searchInputRef,
   snapshot,
   checking,
-  loadStage,
+  loadStageHistory,
   onRefresh,
+  switchFlash,
 }: {
   screen: Screen;
   onNavigate: (screen: Screen) => void;
@@ -106,8 +109,11 @@ export function ShellHeader({
   searchInputRef?: RefObject<HTMLInputElement | null>;
   snapshot: LiveFootballSnapshot;
   checking: boolean;
-  loadStage?: string | null;
+  /** Ordered stage keys seen so far this load, for the loading tooltip's compact log (T274). */
+  loadStageHistory?: string[];
   onRefresh: () => Promise<unknown>;
+  /** Brief "Switched to {club}" text after the auto-poll detects a different save (T274). */
+  switchFlash?: string | null;
 }) {
   const connected = snapshot.status.state === "connected";
   const activeNav =
@@ -116,14 +122,23 @@ export function ShellHeader({
       : isDashViewId(screen)
         ? "Dashboard"
         : screen;
-  const needsLoad = !connected;
-  const loadLabel = shellLoadLabel(snapshot, checking, loadStage);
+  const liveSummary = shellLiveSummary(snapshot);
 
   const headerRef = useRef<HTMLElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [compact, setCompact] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuId = useId();
+  // Only one of the two load-control Tooltips is ever mounted at a time (connected
+  // pill vs. not-connected button), so one shared actionsRef is enough for both.
+  const loadTooltipActionsRef = useRef<TooltipPrimitive.Root.Actions>(null);
+
+  // A tooltip left open from hovering through a load (nice — shows the log/detail
+  // live) shouldn't require the user to move the mouse away and back just to dismiss
+  // it once the load is done; close it the moment `checking` finishes.
+  useEffect(() => {
+    if (!checking) loadTooltipActionsRef.current?.close();
+  }, [checking]);
 
   const activeItem =
     navigation.find((item) => item.label === activeNav) ?? navigation[0];
@@ -219,18 +234,84 @@ export function ShellHeader({
           />
         </div>
 
-        <button
-          type="button"
-          className={cn("shell-load", needsLoad && "is-needs-load", checking && "is-loading")}
-          onClick={() => void onRefresh()}
-          disabled={checking}
-          title={needsLoad ? "Load active FM26 save" : "Reload live squad data"}
-          aria-label={needsLoad ? "Load Data" : "Reload live data"}
-        >
-          <span className={connected ? "live-dot" : "neutral-dot"} aria-hidden="true" />
-          <strong>{loadLabel}</strong>
-          <RefreshCw aria-hidden="true" className={cn("shell-load-icon", checking && "spin")} />
-        </button>
+        {connected ? (
+          <Tooltip actionsRef={loadTooltipActionsRef}>
+            <TooltipTrigger
+              render={<div />}
+              className={cn("shell-live-pill", checking && "is-loading")}
+              aria-label={`Live: ${liveSummary.clubName}`}
+            >
+              <span className="live-dot" aria-hidden="true" />
+              <strong>{checking && switchFlash ? "Switching…" : liveSummary.clubName}</strong>
+              <button
+                type="button"
+                className="shell-live-refresh"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void onRefresh();
+                }}
+                disabled={checking}
+                title="Force refresh"
+                aria-label="Force refresh live data"
+              >
+                <RefreshCw aria-hidden="true" className={cn("shell-load-icon", checking && "spin")} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              {checking && switchFlash ? (
+                <div>
+                  <dl className="shell-status-grid">
+                    <dt>Switching to</dt>
+                    <dd>{switchFlash}</dd>
+                  </dl>
+                  {loadStageHistory && loadStageHistory.length > 0 ? (
+                    <ol className="shell-load-log">
+                      {loadStageHistory.map((stage, index) => (
+                        <li key={`${stage}-${index}`} aria-current={index === loadStageHistory.length - 1}>
+                          {loadStageLabel(stage)}
+                        </li>
+                      ))}
+                    </ol>
+                  ) : null}
+                </div>
+              ) : (
+                <dl className="shell-status-grid">
+                  <dt>Club</dt>
+                  <dd>{liveSummary.clubName}</dd>
+                  <dt>Players</dt>
+                  <dd>{liveSummary.playerCount}</dd>
+                  <dt>As of</dt>
+                  <dd>{liveSummary.gameDate ?? "unavailable"}</dd>
+                </dl>
+              )}
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <Tooltip actionsRef={loadTooltipActionsRef}>
+            <TooltipTrigger
+              type="button"
+              className={cn("shell-load", checking ? "is-loading" : "is-needs-load")}
+              onClick={() => void onRefresh()}
+              disabled={checking}
+              aria-label={checking ? "Loading" : "Load Data"}
+            >
+              <span className="offline-dot" aria-hidden="true" />
+              <strong>{checking ? "Loading…" : "Load"}</strong>
+              <RefreshCw aria-hidden="true" className={cn("shell-load-icon", checking && "spin")} />
+            </TooltipTrigger>
+            {checking && loadStageHistory && loadStageHistory.length > 0 ? (
+              <TooltipContent>
+                <ol className="shell-load-log">
+                  {loadStageHistory.map((stage, index) => (
+                    <li key={`${stage}-${index}`} aria-current={index === loadStageHistory.length - 1}>
+                      {loadStageLabel(stage)}
+                    </li>
+                  ))}
+                </ol>
+              </TooltipContent>
+            ) : null}
+          </Tooltip>
+        )}
 
         <a
           href="https://buymeacoffee.com/mrramirez"

@@ -535,7 +535,7 @@ h1, h2, h3, [data-slot="card-title"] { font-family: "Inter Variable", Inter, "Se
 .firewall-stats strong { font-size: 18px; }.firewall-stats span, .firewall-stats small { color: var(--slate); font-size: 8px; }
 .firewall-stats [data-slot="progress"], .firewall-stats > small { grid-column: 1 / -1; }
 
-.neutral-dot { width: 7px; height: 7px; border-radius: 50%; background: #94a2b2; }
+.offline-dot { width: 7px; height: 7px; border-radius: 50%; background: #c44b4b; }
 
 .full-profile-screen { padding-top: 18px; }
 .player-identity { display: grid; grid-template-columns: minmax(260px, 1fr) auto; gap: 14px 22px; padding: 14px 0 12px; }
@@ -2419,13 +2419,12 @@ body.fmt-shell {
 .shell-search input{width:100%;height:34px;font-size:12px;padding-right:14px}
 .shell-search .keyboard-hint{display:none}
 .shell-load{
-  display:inline-flex;
+  display:grid;
+  grid-template-columns:7px 1fr 14px;
   align-items:center;
-  gap:7px;
+  column-gap:7px;
   flex:0 0 auto;
-  width:auto;
-  min-width:7.5rem;
-  max-width:min(260px,32vw);
+  width:136px;
   height:34px;
   padding:0 12px;
   border:1px solid var(--border);
@@ -2445,8 +2444,8 @@ body.fmt-shell {
   white-space:nowrap;
   overflow:hidden;
   text-overflow:ellipsis;
+  text-align:left;
 }
-.shell-load>span:not(.live-dot):not(.neutral-dot){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .shell-load-icon{width:14px;height:14px;flex:0 0 auto;opacity:.7}
 .shell-load.is-needs-load{
   border-color:#9bd0c8;
@@ -2456,7 +2455,57 @@ body.fmt-shell {
 .shell-load.is-needs-load strong{color:#076b62}
 .shell-load.is-needs-load .shell-load-icon{opacity:1;color:#076b62}
 .shell-load:disabled{opacity:.75;cursor:wait}
-.shell-tools>.shell-load{width:auto;height:34px}
+.shell-live-pill{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  flex:0 0 auto;
+  width:auto;
+  min-width:7.5rem;
+  max-width:min(220px,28vw);
+  height:34px;
+  padding:0 8px 0 12px;
+  border:1px solid var(--border);
+  border-radius:8px;
+  background:#fff;
+  font:inherit;
+  font-size:12px;
+  color:var(--slate);
+  overflow:hidden;
+  white-space:nowrap;
+  cursor:default;
+}
+.shell-live-pill strong{
+  color:var(--navy);
+  font-size:12px;
+  font-weight:700;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.shell-live-refresh{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  flex:0 0 auto;
+  width:22px;
+  height:22px;
+  border:none;
+  border-radius:6px;
+  background:transparent;
+  cursor:pointer;
+  color:inherit;
+}
+.shell-live-refresh:hover{background:rgba(0,0,0,.06)}
+.shell-live-refresh:disabled{opacity:.5;cursor:wait}
+.shell-tools>.shell-load{width:136px;height:34px}
+.shell-tools>.shell-live-pill{width:auto;height:34px}
+.shell-status-grid{display:grid;grid-template-columns:auto auto;gap:2px 10px;font-size:12px}
+.shell-status-grid dt{color:var(--slate);font-weight:400}
+.shell-status-grid dd{margin:0;font-weight:600;text-align:right}
+.shell-load-log{display:flex;flex-direction:column;gap:3px;margin:0;padding:0;list-style:none;font-size:12px;min-width:9rem}
+.shell-load-log li{color:var(--slate);opacity:.55}
+.shell-load-log li[aria-current="true"]{color:inherit;opacity:1;font-weight:700}
 .shell-tools>button:not(.shell-load){flex:0 0 auto;width:34px;height:34px;border-radius:8px}
 .shell-tools>button.is-active{background:var(--accent);color:var(--accent-foreground)}
 .app-canvas.shell-single-header .global-search-results{
