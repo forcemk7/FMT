@@ -128,8 +128,8 @@ function SettingsGroup({
   id: string;
   icon: ReactNode;
   title: string;
-  meta: string;
-  tone: DiagnosticTone;
+  meta?: string;
+  tone?: DiagnosticTone;
   cells?: DiagCell[];
   children?: ReactNode;
 }) {
@@ -139,8 +139,10 @@ function SettingsGroup({
         {icon}
         <strong className="settings-section-label">{title}</strong>
         <span className="settings-expand-meta">
-          <span className={`settings-section-tone tone-${tone}`} aria-label={`${tone} status`} />
-          <b>{meta}</b>
+          {tone ? (
+            <span className={`settings-section-tone tone-${tone}`} aria-label={`${tone} status`} />
+          ) : null}
+          {meta ? <b>{meta}</b> : null}
           <ChevronDown className="settings-expand-chevron" aria-hidden="true" />
         </span>
       </summary>
@@ -223,6 +225,15 @@ export function SettingsScreen({
       })),
     [status.diagnosticCells],
   );
+
+  const affiliateClubsCount = useMemo(() => {
+    const loaded = cellByTitle(backendCells, "Affiliate clubs loaded")?.status;
+    if (!loaded || loaded === "none") return 0;
+    return loaded
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean).length;
+  }, [backendCells]);
 
   useEffect(() => {
     if (typeof window === "undefined" || !("__TAURI_INTERNALS__" in window)) return;
@@ -657,6 +668,29 @@ export function SettingsScreen({
 
   return (
     <main className="screen settings-screen" aria-label="Settings">
+      <section className="settings-list settings-list-preferences">
+        <SettingsGroup
+          id="settings-preferences"
+          icon={<SlidersHorizontal aria-hidden="true" />}
+          title="User Preferences"
+        >
+          <dl className="settings-diagnostics-grid">
+            <PreferenceToggleCell
+              title="Auto-load on startup"
+              description="Automatically loads the live save when FMT opens. Turn off to require clicking Load."
+              checked={preferences.autoLoadOnStartup}
+              onChange={(checked) => setPreference("autoLoadOnStartup", checked)}
+            />
+            <PreferenceToggleCell
+              title="Hide potential ability (PA)"
+              description="Masks PA as “?” everywhere it's shown, including the Dashboard biggest-talent card."
+              checked={preferences.hidePA}
+              onChange={(checked) => setPreference("hidePA", checked)}
+            />
+          </dl>
+        </SettingsGroup>
+      </section>
+
       <section className="settings-list">
         <SettingsGroup
           id="settings-graphics"
@@ -710,26 +744,21 @@ export function SettingsScreen({
         />
 
         <SettingsGroup
+          id="settings-affiliations"
+          icon={<Network aria-hidden="true" />}
+          title="Affiliations"
+          meta={affiliateClubsCount ? `${affiliateClubsCount} affiliates` : "—"}
+          tone={sectionTone(affiliationsCells)}
+          cells={affiliationsCells}
+        />
+
+        <SettingsGroup
           id="settings-teams"
           icon={<Users aria-hidden="true" />}
           title="Teams"
           meta={clubTeams.length ? `${clubTeams.length} teams` : "—"}
           tone={sectionTone(teamsCells)}
           cells={teamsCells}
-        />
-
-        <SettingsGroup
-          id="settings-affiliations"
-          icon={<Network aria-hidden="true" />}
-          title="Affiliations"
-          meta={
-            cellByTitle(backendCells, "Affiliate clubs loaded")?.status &&
-            cellByTitle(backendCells, "Affiliate clubs loaded")?.status !== "none"
-              ? "loaded"
-              : "—"
-          }
-          tone={sectionTone(affiliationsCells)}
-          cells={affiliationsCells}
         />
 
         <SettingsGroup
@@ -740,23 +769,6 @@ export function SettingsScreen({
           tone={sectionTone(playersCells)}
           cells={playersCells}
         />
-
-        <SettingsGroup
-          id="settings-preferences"
-          icon={<SlidersHorizontal aria-hidden="true" />}
-          title="User Preferences"
-          meta={preferences.hidePA ? "1 active" : "—"}
-          tone="green"
-        >
-          <dl className="settings-diagnostics-grid">
-            <PreferenceToggleCell
-              title="Hide potential ability (PA)"
-              description="Masks PA as “?” everywhere it's shown, including the Dashboard biggest-talent card."
-              checked={preferences.hidePA}
-              onChange={(checked) => setPreference("hidePA", checked)}
-            />
-          </dl>
-        </SettingsGroup>
       </section>
     </main>
   );

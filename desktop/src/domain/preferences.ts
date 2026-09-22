@@ -8,12 +8,14 @@ import { useSyncExternalStore } from "react";
  */
 export type FmtPreferences = {
   hidePA: boolean;
+  autoLoadOnStartup: boolean;
 };
 
 const STORAGE_KEY = "fmt-preferences-v1";
 
 const DEFAULT_PREFERENCES: FmtPreferences = {
-  hidePA: false,
+  hidePA: true,
+  autoLoadOnStartup: true,
 };
 
 function parsePreferences(raw: string | null): FmtPreferences {

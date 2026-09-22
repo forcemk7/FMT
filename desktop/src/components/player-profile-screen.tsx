@@ -33,7 +33,7 @@ function footToneClass(value: number | null | undefined) {
 
 function formatHeight(heightCm: number | null | undefined) {
   if (typeof heightCm !== "number" || !Number.isFinite(heightCm)) return "—";
-  return `${(heightCm / 100).toFixed(2)} m`;
+  return `${heightCm} cm`;
 }
 
 function formatGeneralText(value: string | null | undefined) {

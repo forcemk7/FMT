@@ -24,6 +24,7 @@ import {
 } from "@/domain/fmt-terminal-log";
 import { writeAppMainScrollTop } from "@/domain/squad-desk-session";
 import { playerMatchesSquadSearch } from "@/domain/squad-search";
+import { usePreferences } from "@/domain/preferences";
 
 const initialStatus: LiveConnectorStatus = {
   processDetected: false,
@@ -134,6 +135,12 @@ export function FMTApp() {
   const checkingRef = useRef(checking);
   const loadInFlightRef = useRef(false);
   const heartbeatBaselineRef = useRef<{ clubUid: number | null; gameDate: string | null } | null>(null);
+  // Gates only the very first auto-load of a session (Settings > User Preferences >
+  // Auto-load on startup). Once any load — manual or automatic — succeeds, this
+  // flips permanently true, so disconnect/reconnect and save-switch auto-refresh
+  // (T274) are never affected by this preference, only the moment FMT opens.
+  const hasConnectedOnceRef = useRef(false);
+  const { autoLoadOnStartup } = usePreferences();
 
   useEffect(() => {
     checkingRef.current = checking;
@@ -230,6 +237,7 @@ export function FMTApp() {
             }
           : null;
       if (nextSnapshot.status.state === "connected" && nextSnapshot.players.length) {
+        hasConnectedOnceRef.current = true;
         const players = attachSnapshotDeltas(nextSnapshot.players);
         setSnapshot({ ...nextSnapshot, players });
         deferRecordSnapshotPlayers(nextSnapshot.players, nextSnapshot.gameDate);
@@ -297,6 +305,14 @@ export function FMTApp() {
         // save" (auto-load) and "was disconnected, FM/save is back" (auto-reconnect).
         if (baseline !== null && !clubChanged && !dateChanged) return;
 
+        // Auto-load on startup (Settings > User Preferences) only gates the very
+        // first load of a session — once hasConnectedOnceRef flips (any load,
+        // manual or automatic), disconnect/reconnect and save-switch auto-refresh
+        // proceed exactly as T274 shipped, regardless of this preference.
+        if (baseline === null && !hasConnectedOnceRef.current && !autoLoadOnStartup) {
+          return;
+        }
+
         if (baseline !== null && clubChanged && heartbeat.clubName) {
           setSwitchFlash(heartbeat.clubName);
         }
@@ -316,7 +332,7 @@ export function FMTApp() {
       cancelled = true;
       window.clearInterval(interval);
     };
-  }, [checkConnection]);
+  }, [checkConnection, autoLoadOnStartup]);
 
   const togglePlayerFavorite = (playerId: string) =>
     setFavorites((current) => toggleFavorite(current, playerId));
