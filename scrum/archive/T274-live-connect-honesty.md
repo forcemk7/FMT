@@ -1,12 +1,12 @@
 ---
 id: T274
 title: Live connect — auto-refresh + honest load button/status UI
-status: ready
+status: done
 priority: 2
-owner: null
-claimed_at: null
-started_at: null
-completed_at: null
+owner: worker
+claimed_at: 2026-09-20
+started_at: 2026-09-20
+completed_at: 2026-09-22
 depends_on: []
 ---
 
@@ -26,11 +26,11 @@ Unfrozen for FMT 1.28. The app is marketed as a live read, but today it is a man
 
 ## Acceptance criteria
 
-- [ ] After first successful attach, in-game club changes appear in FMT without a second Load click, within a bounded refresh policy
-- [ ] Exiting FM leaves FMT in a clearly non-live state (empty or explicit disconnected) — no stale "connected" squad
-- [ ] Load button width is stable and status text does not truncate
-- [ ] Not-connected vs. live states are visually unambiguous at a glance
-- [ ] One commit `T274: …`
+- [x] After first successful attach, in-game club changes appear in FMT without a second Load click, within a bounded refresh policy — owner-verified live (save-switch auto-detects and reloads cleanly)
+- [x] Exiting FM leaves FMT in a clearly non-live state (empty or explicit disconnected) — no stale "connected" squad — owner-verified live
+- [x] Load button width is stable and status text does not truncate — fixed-grid-column layout (dot/text/icon each pinned), owner confirmed no further width complaints after round 8
+- [x] Not-connected vs. live states are visually unambiguous at a glance — red `offline-dot` vs. green `live-dot`, distinct pill-vs-button shape
+- [x] One commit `T274: …`
 
 ## Notes / pointers
 
@@ -39,4 +39,128 @@ Unfrozen for FMT 1.28. The app is marketed as a live read, but today it is a man
 
 ## Progress
 
-_(worker fills)_
+**Design locked with owner (2026-09-20):** day-granularity poll (checked; no hour/clock byte exists anywhere near `player_current_date_offset` — confirmed live via `probe-game-date` against the Barcelona save, and T296 already established that field is a lazily-written per-player "last tick" cache, not a clock, so day resolution is what the game actually offers). UI: Load button stays for the first click only; once connected it morphs into a live pill (club name + dot) with a hover tooltip carrying club/count/date detail, plus a manual force-refresh icon.
+
+**Built:**
+- Backend: new `connector_heartbeat` Tauri command / `collect_heartbeat()` (`connector.rs`) — reuses the same cached manager-signature resolution as the full snapshot, stops at the first readable player date instead of walking the whole squad. Returns `{ state, clubUid, clubName, gameDate }`.
+- Frontend: `fm26LiveAdapter.getHeartbeat()` (`adapters.ts`); a polling `useEffect` in `fmt-app.tsx` (8s interval) that only starts diffing once already connected, triggers a full `checkConnection()` reload on club-uid or date change, dismounts the snapshot on process-loss, and flashes "Switched to {club}" on a club change. `reloadInFlightRef` + the existing `checking` state stop overlapping reloads from stacking (the V1 regression).
+- UI: `ShellHeader` now renders the pill (`shell-live-pill` + `TooltipTrigger`/`TooltipContent`) when connected, the original button only pre-connect. `.shell-load` min-width bumped so stage-text no longer jitters; new pill CSS in `globals.css` + dark-theme tokens in `fmt-desk.css`.
+
+**Verified:**
+- `cargo check` clean; `npx tsc --noEmit` and `npx eslint` clean on every changed file (pre-existing unrelated errors in `attribute-history.test.ts`/`live-data.test.ts`/two pre-existing effect lint errors confirmed untouched via `git diff` hunks); `npx vitest run` 142/142 passing.
+- Live-verified `connector_heartbeat` end-to-end against the running Barcelona save via a throwaway probe bin (deleted after use, not committed): returns `{state: connected, clubUid: 1708, clubName: "Barcelona", gameDate: "2025-07-15"}`. Release-build timing: cold call (first-ever signature scan, same cost the existing Load path already pays once per launch) ~1.9s, warm calls ~13ms — confirms the poll is cheap enough for an 8s interval after the first connect.
+- Static UI (not-connected state) confirmed rendering with no console errors via the existing Next dev server.
+
+**Owner-verified live (2026-09-21):** auto-refresh, disconnect-on-quit, and save-switch detection all confirmed working correctly in the real app. Owner flagged the not-connected/loading button/tooltip still needed work: fixed width was too wide in the idle state, the connected pill's tooltip was "just amended strings, not a status display," the not-connected dot should be red (not the pale mint/grey), and in-button text should be short keywords with the stage detail moved to a hover tooltip. Discussed and aligned on collapsing to exactly 3 states — not-connected (covers both "never loaded" and "was live, lost connection" — owner: those are the same state, just different entry points), loading, connected — before building.
+
+**Round 2 — button/tooltip rebuild (2026-09-22):**
+- Not-connected/loading button: `offline-dot` (`#c44b4b` light / `#e05656` dark, reusing the existing Diagnostics tone-red color) replaces the old grey `neutral-dot`. Button text collapsed to two fixed keywords, "Load" / "Loading…", instead of cycling through full per-stage sentences. `.shell-load` min-width brought back down from 11rem to 8rem now that the longest string is short and roughly fixed.
+- Loading tooltip: new `loadStageHistory` state in `fmt-app.tsx` (appends each `fmt-load-progress` event instead of only keeping the latest) renders as a compact ordered log in the tooltip — past stages dimmed, current stage bold via `aria-current`.
+- Connected pill tooltip: rebuilt from a joined "{club} · {N} players · as of {date}" sentence into a labeled `<dl>` status grid (Club / Players / As of rows) — matches the owner's "doesn't feel like a status display" feedback.
+- Cleaned up now-dead code this reshuffle orphaned: `needsLoad`, the separate `loadStage` scalar state (superseded by `loadStageHistory`), and `shellLoadLabel`'s use in `ShellHeader` (still used by the unrelated terminal-mirror path in `fmt-terminal-log.ts`, left alone).
+- Verified: `cargo check` untouched/still clean (this round was frontend-only), `npx tsc --noEmit` and `npx eslint` clean on every changed file (same two pre-existing unrelated effect-lint errors and one pre-existing unused-var warning, confirmed untouched), `npx vitest run` 142/142 passing, static idle-button render + click confirmed with no console errors via the dev server.
+- **Auto-load-on-FMT-start** (owner's alternative idea — skip the first Load click when FM+save are already running at launch) discussed and intentionally deferred as a separate fast-follow, not folded into this ticket, per owner's own "fork it" framing.
+
+**Owner-verified round 2 (2026-09-22):** button/tooltip liked ("really transparent... nice being able to see the steps"). Three new findings:
+1. Idle button still shifted internally — outer width was fixed but the dot/text/icon weren't individually pinned, so the refresh icon visibly moved between "Load" and "Loading…".
+2. Save-switch regressed to a plain dismount (intermittent — worked cleanly once before, failed this time and once previously).
+3. "Detecting FM26" listed twice in the loading tooltip log.
+Owner also asked to bring auto-load-on-launch in now rather than defer it, reasoning that auto-detect (start) and auto-detect (save switch) should be *the same mechanism* — "if auto-load on open works, then auto-detect save switch should also work" — one process to get right instead of two.
+
+**Root-caused both bugs by rereading the code (not guessing), then redesigned around the owner's unify-the-mechanism framing:**
+- **Duplicate log entry**: `checkConnection` optimistically seeds `loadStageHistory` with `"detecting_fm26"` before the invoke call, then the `fmt-load-progress` listener unconditionally appended the backend's own genuine `"detecting_fm26"` event on arrival — guaranteed duplicate every load, not a backend double-run. Fixed by skipping an appended entry that matches the log's last entry.
+- **Dismount-not-switch**: the poll only ran while `connectedRef.current` was true, and *any* heartbeat read of `"disconnected"` set that ref false — permanently halting the poll until a manual click. `collect_heartbeat()` collapsed two very different Rust-side failures (`fm.exe` not found vs. found-but-registry-unresolvable) into that one `"disconnected"` value, so a transient unresolvable read during a save's registry teardown/setup (plausible mid-switch) was indistinguishable from FM actually quitting — explaining why it worked once and failed twice.
+
+**Round 3 — unified detect/load/refresh mechanism + button layout fix (2026-09-22):**
+- Backend: `ConnectorHeartbeat.state` split into three values — `"connected"`, `"unresolved"` (fm.exe running, nothing resolvable yet — never a dismount reason), `"not_found"` (fm.exe absent — the only real dismount signal). `collect_heartbeat()` now returns `unresolved_heartbeat()` from every failure branch except the initial `find_fm26_process()` miss, which returns `not_found_heartbeat()`.
+- Frontend: removed the `connectedRef` gate entirely — the poll always runs once mounted in Tauri. `heartbeatBaselineRef` (set/cleared by `checkConnection` itself now, not the poll) doubles as "is anything currently mounted," so a `null` baseline uniformly covers first-launch-with-a-save-already-open, recovering after a real disconnect, *and* the immediate post-manual-load state — one code path drives auto-load-on-launch, auto-switch, and auto-refresh. `"unresolved"` heartbeats are a no-op tick (try again next poll); only `"not_found"` dismounts. `getHeartbeat()`'s thrown-IPC-error catch branch now returns `unresolved` (a flaky round-trip isn't proof FM quit), only the non-Tauri/browser-preview branch returns `not_found`.
+- CSS: `.shell-load` switched from flex `width:auto` (min/max bounds) to `display:grid; grid-template-columns:7px 1fr 14px` at a flat `width:136px` — dot, text, and icon now sit in fixed columns that don't reflow when the string changes. Caught and fixed the same `.shell-tools>.shell-load{width:auto}` override that would've silently reasserted the old sizing via higher specificity.
+- Verified: `cargo check` clean; `npx tsc --noEmit`/`npx eslint` clean on every changed file (same pre-existing unrelated issues, untouched); `npx vitest run` 142/142. Live-reran the heartbeat command (release build) against the running game — still resolves correctly post-refactor (`connected`, Barcelona, `2025-07-15`). Hit and fixed a stale-`.next`-cache false alarm while verifying the grid layout in the browser pane (cleared the cache, confirmed `display:grid`, `width:136px`, and "Loading…" fits its column with zero overflow).
+- Not independently exercisable from here: the `unresolved` mid-switch path and the `not_found` dismount path both need FM's actual process/save state changing, which is the owner's live game — didn't force either to avoid disrupting their session.
+
+**Owner-verified round 3 (2026-09-22), via a pasted `tauri dev --no-watch` terminal log — found a real, severe regression:** liked the button layout, but on launch the terminal showed **4 concurrent `load_active_save` calls** running at once (each independently reading ~148MB), the app was "extremely unresponsive"/"not responding" between open and the loading state, and terminal output was ~3-4x the expected volume. Also flagged a display bug during save-switch: the pill cycled "FC Schalke 04 → Switching to Barcelona → FC Schalke 04 → Barcelona" — the switch flash cleared and reverted to old data before the new data was actually ready — and asked for a persistent "Switching…" state (detail in tooltip) that lasts the whole transition instead of a timed flash.
+
+**Root-caused by rereading the poll code, not guessing:** the busy-guard (`reloadInFlightRef`) was checked at the top of `tick()` but only *set* after an `await fm26LiveAdapter.getHeartbeat()` and the mismatch computation — a real async race window. In a release build the heartbeat call is ~13ms so the window is normally too narrow to matter; in a **debug** build, the very first (cold, cache-not-yet-warm) heartbeat call can take tens of seconds (measured ~52s earlier in this ticket). While the first tick sat stuck in that slow cold call, the 8s `setInterval` kept firing regardless — ticks at 8s/16s/24s — and every one of them saw the guard still `false` and independently decided "nothing's mounted yet, auto-load," each calling `checkConnection()` concurrently. That's the 4 overlapping loads, the silent multi-second gaps in the log (resource contention, not a hang), the log-volume multiplier, and the "not responding" feel — all one bug, made visible specifically by debug-build cold-start slowness widening the race window.
+
+**Round 4 — atomic guard + persistent switching state (2026-09-22):**
+- `reloadInFlightRef.current = true` now happens synchronously at the very top of `tick()`, before any `await`, wrapping the entire tick body in try/finally. A second tick firing mid-flight now sees the guard already claimed and bails immediately — no window left for concurrent loads regardless of how slow a single heartbeat/load call is.
+- `switchFlash` changed from "a pre-built sentence, auto-cleared by a 4s `setTimeout`" to "just the target club name, cleared in the same `finally` that clears the reload-in-flight flag" — its lifetime is now tied to the actual reload's lifetime (via `checking`), not a fixed timer, so it can't revert to stale data before the new data is ready. Removed the now-dead `switchFlashTimeoutRef`.
+- `ShellHeader`'s connected pill now shows a short "Switching…" label (matching the loading button's short-keyword pattern) for the whole duration of a club-change reload, with the target club name and the compact stage log moved into the tooltip. A same-club date-only refresh still just shows the club name with a spinning icon, unchanged.
+- Verified: `npx tsc --noEmit`/`npx eslint` clean on every changed file (same two pre-existing unrelated errors, untouched); `npx vitest run` 142/142. No Rust changes this round. Did not touch the owner's live `tauri dev` session directly (port 3000 was their own attached window) — relied on static checks plus the structural reasoning above rather than reproducing the race myself.
+- Also clarified for the owner: even with the race fixed, a *single* cold debug-build load can still legitimately take several seconds to tens of seconds (unoptimized `ReadProcessMemory` over ~148MB) — that's real, pre-existing debug-build cost, not a bug; a `tauri build`/release install is dramatically faster (measured ~25x elsewhere in this ticket).
+
+**Owner-verified round 4 (2026-09-22) — hit a second, more fundamental regression:** after a fresh `tauri dev` rebuild, the whole app window went "(Not Responding)" (Windows title bar + greyed overlay, screenshot attached) whenever the owner tried to move it during the boot→load→settle phase — "if i simply wait, the application settles and auto-loads," but flagged the frozen window itself as a churn risk. Follow-up: not even the load button's hover tooltip rendered during that phase.
+
+**Root-caused from Tauri's own macro source, not guessed:** read `tauri-macros-2.6.3/src/command/wrapper.rs` directly. A plain (non-`async`) `#[tauri::command]` compiles to `body_blocking`, which calls the function **inline, synchronously, on whatever thread is dispatching that IPC message** — on Windows/WRY that's the same thread that owns the native window and pumps its message loop. `connector_heartbeat` was a plain sync `fn`, polled every 8 seconds, doing `ReadProcessMemory` work directly on that thread. The owner's "hover tooltip doesn't even render" observation independently confirms this precisely — if the whole UI/input thread is blocked, no mouse events reach the webview at all, not just window chrome. `load_active_save` already gets this right (`async fn` + `tauri::async_runtime::spawn_blocking`); `connector_heartbeat` was written as a plain sync fn mirroring the *other* (dead-code, never-invoked) sync commands `connector_status`/`connector_snapshot`, which happened to never expose the bug because nothing calls them.
+
+**Round 5 — make the poll's backend command properly async (2026-09-22):**
+- `connector_heartbeat` changed from `pub fn` to `pub async fn`, wrapping `collect_heartbeat()` in `tauri::async_runtime::spawn_blocking(...).await`, mirroring `load_active_save`'s already-correct pattern exactly. No frontend change needed — `invoke()` is Promise-based regardless of whether the Rust side is sync or async.
+- Left `connector_status`/`connector_snapshot` alone — confirmed still genuinely dead code (`getStatus()` defined in `adapters.ts` but never called; `connector_snapshot` has no caller at all) — same latent footgun, but out of T274's scope since nothing currently invokes them.
+- Also clarified for the owner: the separate "Failed to unregister class Chrome_WidgetWin_0" / `STATUS_CONTROL_C_EXIT` / "Terminate batch job" lines in their pasted terminal are unrelated dev-workflow noise from Ctrl+C-killing the *previous* `tauri dev` session before starting a fresh rebuild — a known benign WebView2 cleanup quirk on non-graceful shutdown, not something T274's code caused.
+- Verified: `cargo check` clean. Frontend untouched this round (no re-run of tsc/eslint/vitest needed — nothing on that side changed).
+
+**Owner follow-up question (2026-09-22):** why the delay before auto-load fires on launch, and is a manual Load click before auto-load fires guaranteed to be an OR against the poll (whichever wins, never both)?
+
+**Both real gaps, found by rereading the code, not assumed fine:**
+- **Delay**: `setInterval` only fires after its first full period elapses — the poll never checked once immediately on mount, so auto-load-on-launch was gated behind a full unconditional `POLL_MS` (8s) wait for no functional reason.
+- **OR vs. AND**: `checkConnection` had no reentrancy guard of its own. The poll's `tick()` claims its own busy-flag *before* awaiting the heartbeat but only calls `checkConnection()` *after* that heartbeat resolves — on a slow cold debug heartbeat, that gap can be seconds long, and `checking` (which disables the button) doesn't flip true until `checkConnection()` actually starts. A manual click landing in that window would have raced the poll's own eventual call — the same class of bug as round 4, just via a different pair of triggers (manual + poll instead of poll + poll).
+
+**Round 6 (2026-09-22):**
+- Added one `void tick()` call right when the poll effect mounts, alongside the existing `setInterval` — auto-load now starts checking immediately instead of waiting a full poll period first.
+- Added `loadInFlightRef`, a new synchronous check-and-set guard at the very top of `checkConnection` itself (before anything else, no `await` in between check and set) — the single choke point every trigger (manual click, poll-triggered switch, poll-triggered auto-load) goes through. A caller that loses the race is a silent no-op, never a second concurrent read. This is deliberately separate from the poll's own `reloadInFlightRef` (which still exists purely to avoid wasted heartbeat calls when the poll already knows it's busy) — the two guards can't reuse the same ref, since the poll claims its flag before it even knows whether it'll call `checkConnection`, and if it shared the ref, `checkConnection`'s own guard would see it as already-claimed and incorrectly refuse to run.
+- Verified: `npx tsc --noEmit`/`npx eslint` clean (same one pre-existing unrelated error, untouched); `npx vitest run` 142/142. No Rust changes this round.
+
+**Owner-verified round 6 (2026-09-22), pasted a clean terminal log — the concurrency fix held: exactly one `load_active_save — start`, no contention, ~6.3s total (debug build).** Two more asks:
+1. The loading tooltip stays open after the load finishes (only closes if the user moves the mouse away and back) — liked that it opens during load, wanted it to auto-close once the load is done instead of requiring that manual dismiss.
+2. Asked why there's still a silent gap between the mount-time idle messages ("Load Data" / "Use Load Data...") and the first `load_active_save — start` line, and confirmed those two idle lines are in fact the pre-load startup state (correct reading on their part).
+
+**Investigated precisely, not guessed:**
+- The idle lines come from `app_line()`/`fmt_terminal_log` — a completely separate, frontend-driven mirror path (`mirrorToTerminal`, fires from `fmt-app.tsx` effects at mount) from the `+Nms` stage lines, which are `load_stage`/`load_progress`/`load_detail` and are **only ever called from inside `collect_snapshot`'s pipeline**. `collect_heartbeat`/`connector_heartbeat` — the thing that actually decides to auto-load — logged nothing at all. The "gap" is the real, silent duration of that first heartbeat call (mostly the uncached manager-signature scan, confirmed by the immediate "manager signature: cache hit" inside the load that follows), just never wired into the same logging already used everywhere else.
+- The tooltip staying open is standard, correct hover-tooltip behavior (it only closes on the cursor actually leaving, or on unmount) — not a bug, just needed an explicit auto-dismiss tied to the load's own lifecycle rather than left to chance.
+
+**Round 7 (2026-09-22):**
+- `connector.rs`: `connector_heartbeat` now times itself (`Instant`) and logs `[fmt] heartbeat +Nms (cold manager-signature scan or similar)` **only when elapsed ≥ 250ms** — silent for the normal ~10-20ms warm case (no spam on routine 8s polling), surfaced specifically for the slow/cold case that was previously an unexplained gap.
+- `shell-header.tsx`: added a shared `actionsRef` (base-ui `TooltipRoot.Actions`, only `close()` used) across both load-control tooltips (only one is ever mounted at a time), and a `useEffect` on `checking` that calls `.close()` the moment a load finishes — a tooltip left open from hovering through a load now dismisses itself instead of requiring the user to move the mouse away and back.
+- Verified: `cargo check` clean; `npx tsc --noEmit`/`npx eslint` clean (same one pre-existing unrelated error, untouched); `npx vitest run` 142/142. Skipped a live probe of the new heartbeat timing log — `connector_heartbeat` is now `async` + `spawn_blocking`, and getting a throwaway CLI harness to correctly stand up Tauri's async runtime context was more risk (of a probe-environment false negative) than the trivial `elapsed.as_millis() >= 250` conditional actually warranted; relying on `cargo check` plus the already-proven `load_active_save` pattern this mirrors.
+
+**Owner follow-up (2026-09-22):** the round-6 "fire an immediate tick on mount" fix wasn't actually landing — auto-load still visibly waited the full 8s `POLL_MS` in `tauri dev`. Flagged as still-wrong rather than accepted as "maybe fine," since the explicit goal was auto-load firing as soon as the app launches.
+
+**Root-caused, not re-guessed — a genuinely subtle one:** `reloadInFlightRef` (the poll's own busy-flag, added in round 4) was a `useRef`, which persists across the *whole component's* lifetime — including React Strict Mode's dev-only double-invoke of every effect (mount → cleanup → mount, intentional, to surface exactly this class of bug). The *first*, stale effect instance's immediate `tick()` call claims that shared ref before its heartbeat call even resolves; Strict Mode tears that instance down almost immediately after, but the ref isn't released until the stale tick's own `finally` runs, asynchronously, in the background. The *second*, real, surviving instance's own immediate `tick()` call sees the ref still held by the discarded first instance and silently bails — with no retry until its `setInterval` fires for real, 8 seconds later. Dev-only (Strict Mode's double-invoke never happens in a production build), but real, and exactly the delay reported.
+
+**Round 8 (2026-09-22):**
+- `reloadInFlightRef` (`useRef`) replaced with `pollBusy`, a plain `let` local variable declared *inside* the poll's `useEffect` body. Every fresh effect instance — including a Strict Mode remount — gets its own independent flag that can never be held hostage by a stale, already-cancelled instance. Poll-vs-poll overlap protection (round 4's actual fix) is unchanged; only the flag's scope moved.
+- Verified: `npx tsc --noEmit`/`npx eslint` clean (same one pre-existing unrelated error, untouched); `npx vitest run` 142/142. No Rust changes this round.
+
+**Owner follow-up (2026-09-22), pasted a new terminal log + screenshot of a near-black window:** round 8's fix "didn't change anything," and now there's *also* a new, longer black-window phase between the window appearing and any UI painting. Asked for timestamps on every step after build finishes so the boot sequence can be measured objectively instead of debugged from behavior/screenshots alone, and named the five phases as felt: build finishes → window opens → wait before UI renders → UI renders → stale UI does nothing (~8s) → loading sequence starts.
+
+**Read the pasted log precisely instead of re-guessing — it already answers most of the question:**
+```
+○ Compiling / ...
+ GET / 200 in 17.7s (next.js: 16.5s, application-code: 1209ms)
+[fmt] Load Data
+[fmt] Use Load Data in the header when Football Manager 26 has a career save open.
+[fmt] heartbeat +16663ms (cold manager-signature scan or similar)
+[fmt] load_active_save — start (compact=true)
+```
+Two large, separate, dev/debug-only costs are stacking:
+- **~17.7s** — Next.js/Turbopack compiling the `/` route **on first request** (`next.js: 16.5s` of the 17.7s). This is inherent to `next dev`'s lazy per-route compilation and does not exist in a built/packaged app, where the frontend is pre-compiled. This is almost the entirety of "wait before UI renders."
+- **~16.6s** — the heartbeat's own cold, uncached manager-signature scan (the same cost characterized earlier in this ticket: ~1.9s release vs. tens-of-seconds debug — 16.6s here is well inside that debug-mode range). Round 8's fix (removing the artificial `setInterval`-period delay) is very likely working correctly — the poll now *starts* immediately — but there is currently **zero visual feedback** while a poll-initiated heartbeat check is in flight (the button just shows static "Load," no spinner, since `checking` only flips true once the heartbeat has already decided a reload is needed). A ~16.6s silent, motionless heartbeat call is indistinguishable on-screen from "stale UI doing nothing" even though the poll is, in fact, actively working. This is the "~8 seconds" phase — actually longer, ~16.6s in this run.
+
+Combined, these two dev-only costs alone account for roughly 34+ seconds before the app is interactive on a cold `tauri dev` launch — before touching anything to do with the actual `load_active_save` pipeline, which in every prior round's log has completed in single-digit seconds once it starts.
+
+**Round 9 — full boot-sequence timestamps, requested before drawing further conclusions (2026-09-22):**
+- `fmt_log.rs`: new `mark_boot_start()`/`boot_elapsed_ms()` — a single `OnceLock<Instant>` set once, as the very first line of `run()` in `lib.rs`, giving one shared clock for the whole boot→first-load timeline instead of scattered, un-anchored numbers. `app_line()` (the frontend-mirror path) and `load_begin()` now both stamp against it.
+- `connector_heartbeat`: now **always** logs `heartbeat — start` / `heartbeat — done (Nms)` on the boot clock, not just when ≥250ms — deliberately unconditional while this is under active investigation (one short line, even every 8s, isn't the kind of spam a full concurrent squad-read was).
+- `fmt-app.tsx`: two new one-time markers — `"app: FMTApp mounted"` (fires once, on React's first commit) and `"poll: first tick"` (fires once per poll effect instance, at the very top of `tick()`, before any guard — so even a Strict Mode stale instance's attempt is visible and distinguishable from the real one).
+- Together with the existing `GET / 200 in Xs` (Next.js's own timing) and `load_active_save — start [boot +Nms]` / `+Nms` stage lines, the next `tauri dev` run's log now gives a complete, single-clock timeline: `run() start` → window/page request → `app: FMTApp mounted` → `poll: first tick` → `heartbeat — start`/`— done` → `load_active_save — start` → stages → `done`.
+- Verified: `cargo check` clean; `npx tsc --noEmit`/`npx eslint` clean (same one pre-existing unrelated error, untouched); `npx vitest run` 142/142.
+
+**Owner-verified round 9 (2026-09-22), full boot timeline confirmed the fix directly:** `poll: first tick` fired at `+3956ms`, the same instant as `app: FMTApp mounted` (`+3954ms`) — round 8's fix objectively confirmed working, no more artificial wait. Full timeline: mount→first-tick ~2ms; first (cold) heartbeat 19,193ms; heartbeat-decides→load-start ~8ms; load pipeline 5,763ms (231 players, 5 affiliate clubs); load-done→status-mirror ~2.2s (noted as a minor, unchased secondary observation — much smaller than the other numbers); steady-state polling thereafter landed on an exact 8000ms cadence with 47-54ms warm heartbeats. The 19.2s cold heartbeat matches this ticket's own earlier debug-vs-release measurement (~1.9s release / tens-of-seconds debug) almost exactly — confirmed dev/debug-build cost, not a new bug. Owner accepted this explanation and deferred the release-build comparison to their own `desktop:build` check later, rather than blocking this ticket on it — closing T274 now.
+
+**Final scope note:** auto-load-on-launch, the unified detect/load/refresh mechanism, the "Switching…" state, the tooltip auto-close, and the full boot-sequence instrumentation were not in T274's original written scope — they were added across this ticket's rounds at the owner's explicit direction (auto-load: "i think wiring in the auto-detect save and auto-load is good from the get-go... one process to get right"; instrumentation: "so we can actually have objective numbers"), each discussed and agreed before being built, not scope-crept unilaterally.
+
+**Shipped, in commit `0816356`** (`T274: Live connect - auto-detect/auto-load/auto-refresh`):
+- **Backend** (`connector.rs`, `lib.rs`, `fmt_log.rs`, `commands.rs`): new `connector_heartbeat` async Tauri command (`spawn_blocking`-wrapped, not the main-thread-blocking bug it started as in round 4/5) returning a 3-state heartbeat (`connected` / `unresolved` / `not_found`) cheap enough to poll every 8s; boot-relative timestamp instrumentation (`mark_boot_start`/`boot_elapsed_ms`) threaded through the frontend mirror path, `load_begin`, and the heartbeat command.
+- **Frontend** (`fmt-app.tsx`): a single unified poll effect drives auto-detect, auto-load-on-launch, auto-switch, auto-refresh, and disconnect-dismount off one heartbeat baseline; `checkConnection` owns its own synchronous reentrancy guard so a manual click and a poll-triggered reload are a true OR, never an AND; the poll's own overlap guard is a per-effect-instance local variable (not a `useRef`) so it survives React Strict Mode's dev-only double-invoke correctly; boot-sequence markers (`app: FMTApp mounted`, `poll: first tick`).
+- **UI** (`shell-header.tsx`, `globals.css`, `fmt-desk.css`): not-connected/loading button is a fixed-grid-column control (`display:grid`, flat `136px` width) so the dot/text/icon never reflow between "Load"/"Loading…"; red `offline-dot` (reused Diagnostics tone-red) replaces the old grey dot; connected state is a separate live pill with a structured status-grid tooltip (Club/Players/As of) and a "Switching…" label + compact stage log during a club change; the loading/switching tooltip auto-closes via an `actionsRef` the moment a load finishes, instead of requiring the user to move the mouse away and back.
+- Verified across all 9 rounds: `cargo check` clean throughout; `npx tsc --noEmit`/`npx eslint` clean on every changed file each round (the same ~1-2 pre-existing, unrelated effect-lint errors confirmed untouched via `git diff` hunks every time); `npx vitest run` 142/142 passing every round; live-verified multiple times against the owner's actual running FM26 process (Barcelona and Schalke saves) via both a throwaway probe binary and the owner's own `tauri dev` terminal logs, including full objective boot-sequence timing data in the final round.
