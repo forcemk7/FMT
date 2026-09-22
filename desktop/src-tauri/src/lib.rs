@@ -35,6 +35,7 @@ pub fn run() {
         )
         .invoke_handler(tauri::generate_handler![
             fmt_log::fmt_terminal_log,
+            commands::open_external,
             connector::connector_status,
             connector::connector_snapshot,
             connector::connector_heartbeat,

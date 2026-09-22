@@ -12,6 +12,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import type { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip";
+import { invoke } from "@tauri-apps/api/core";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -313,16 +314,18 @@ export function ShellHeader({
           </Tooltip>
         )}
 
-        <a
-          href="https://buymeacoffee.com/mrramirez"
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          type="button"
+          onClick={() => {
+            if (!("__TAURI_INTERNALS__" in window)) return;
+            void invoke("open_external", { url: "https://buymeacoffee.com/mrramirez" }).catch(() => {});
+          }}
           className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "shell-bmc")}
           title="Support FMT's development"
           aria-label="Support FMT's development"
         >
           <HandCoins aria-hidden="true" />
-        </a>
+        </button>
 
         <Button
           variant="ghost"
