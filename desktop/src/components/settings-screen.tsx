@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import type { LiveFootballSnapshot } from "@/domain/adapters";
 import { sortClubTeamsForSquadDesk, squadTeamDisplayName } from "@/domain/live-data";
+import { setPreference, usePreferences } from "@/domain/preferences";
 import { useGraphicsPacksStatus } from "@/components/graphics-packs-panel";
 import { getVersion } from "@tauri-apps/api/app";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -122,13 +123,15 @@ function SettingsGroup({
   meta,
   tone,
   cells,
+  children,
 }: {
   id: string;
   icon: ReactNode;
   title: string;
   meta: string;
   tone: DiagnosticTone;
-  cells: DiagCell[];
+  cells?: DiagCell[];
+  children?: ReactNode;
 }) {
   return (
     <details className="settings-expand" id={id}>
@@ -142,13 +145,47 @@ function SettingsGroup({
         </span>
       </summary>
       <div className="settings-expand-body">
-        <dl className="settings-diagnostics-grid">
-          {cells.map((cell, index) => (
-            <DiagnosticCellView key={`${cell.title}:${index}`} {...cell} />
-          ))}
-        </dl>
+        {children ?? (
+          <dl className="settings-diagnostics-grid">
+            {(cells ?? []).map((cell, index) => (
+              <DiagnosticCellView key={`${cell.title}:${index}`} {...cell} />
+            ))}
+          </dl>
+        )}
       </div>
     </details>
+  );
+}
+
+/** A settings-diagnostics-grid cell with a real control instead of a read-only status. */
+function PreferenceToggleCell({
+  title,
+  description,
+  checked,
+  onChange,
+}: {
+  title: string;
+  description?: string;
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className="diagnostic-cell settings-pref-cell">
+      <dt>{title}</dt>
+      <dd>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={checked}
+          aria-label={title}
+          className={`settings-pref-toggle${checked ? " is-on" : ""}`}
+          onClick={() => onChange(!checked)}
+        >
+          <i aria-hidden="true" />
+        </button>
+        {description ? <span className="settings-pref-desc">{description}</span> : null}
+      </dd>
+    </div>
   );
 }
 
@@ -158,6 +195,7 @@ export function SettingsScreen({
   snapshot: LiveFootballSnapshot;
 }) {
   const status = snapshot.status;
+  const preferences = usePreferences();
   const [appVersion, setAppVersion] = useState<string | null>(null);
   const graphics = useGraphicsPacksStatus();
   const clubTeams = useMemo(
@@ -616,13 +654,6 @@ export function SettingsScreen({
           ]),
   ];
 
-  const preferencesCells: DiagCell[] = [
-    {
-      title: "Preferences",
-      status: "None yet — PA masking (T292) lands here",
-      tone: "yellow",
-    },
-  ];
 
   return (
     <main className="screen settings-screen" aria-label="Settings">
@@ -714,10 +745,18 @@ export function SettingsScreen({
           id="settings-preferences"
           icon={<SlidersHorizontal aria-hidden="true" />}
           title="User Preferences"
-          meta="—"
-          tone={sectionTone(preferencesCells)}
-          cells={preferencesCells}
-        />
+          meta={preferences.hidePA ? "1 active" : "—"}
+          tone="green"
+        >
+          <dl className="settings-diagnostics-grid">
+            <PreferenceToggleCell
+              title="Hide potential ability (PA)"
+              description="Masks PA as “?” everywhere it's shown, including the Dashboard biggest-talent card."
+              checked={preferences.hidePA}
+              onChange={(checked) => setPreference("hidePA", checked)}
+            />
+          </dl>
+        </SettingsGroup>
       </section>
     </main>
   );

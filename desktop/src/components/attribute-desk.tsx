@@ -18,6 +18,7 @@ import {
   sortedAttributeEntries,
 } from "@/domain/attribute-desk";
 import { abilityToneFromScore, attributeTone } from "@/domain/attribute-tone";
+import { usePreferences } from "@/domain/preferences";
 import {
   colorForPlotField,
   getPlayerAttrHistory,
@@ -290,6 +291,7 @@ function GeneralColumn({
   selectedOrder?: readonly string[];
   onToggleField?: (field: string) => void;
 }) {
+  const { hidePA } = usePreferences();
   const rows = [
     {
       label: "Ability",
@@ -300,8 +302,8 @@ function GeneralColumn({
     {
       label: "Potential",
       field: "PA",
-      value: abilityLabel(player.potentialAbility),
-      toneClass: abilityToneClass(player.potentialAbility),
+      value: hidePA ? "?" : abilityLabel(player.potentialAbility),
+      toneClass: hidePA ? "attr-tone-mid" : abilityToneClass(player.potentialAbility),
     },
   ];
 
@@ -321,7 +323,7 @@ function GeneralColumn({
               value={row.value}
               toneClass={row.toneClass}
               title={row.value === "—" ? undefined : row.value}
-              delta={deltas?.[row.field]}
+              delta={hidePA && row.field === "PA" ? null : deltas?.[row.field]}
               deltaAttribute={row.field}
               showDeltaColumn={showDeltaColumn}
               selected={selected}

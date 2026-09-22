@@ -6,6 +6,7 @@ import { abilityToneFromScore, attributeTone } from "@/domain/attribute-tone";
 import { formatHasScore, hasBand, liveHasScore } from "@/domain/has-score";
 import { playerActiveTeamDisplayName, playerPositionParts } from "@/domain/live-data";
 import { livePersonalityLabels } from "@/domain/personality-labels";
+import { usePreferences } from "@/domain/preferences";
 import { AttributeDesk } from "@/components/attribute-desk";
 import { AttributeHistoryPanel } from "@/components/attribute-history-panel";
 import { MatchExperiencePanel } from "@/components/match-experience-panel";
@@ -87,6 +88,7 @@ export function PlayerProfileScreen({
   onOpenPlayer: (playerId: string) => void;
   initialTab?: PlayerProfileTab;
 }) {
+  const { hidePA } = usePreferences();
   if (!player) {
     return (
       <main className="screen">
@@ -130,7 +132,7 @@ export function PlayerProfileScreen({
   const leftFoot = player.leftFoot != null ? String(player.leftFoot) : "—";
   const rightFoot = player.rightFoot != null ? String(player.rightFoot) : "—";
   const ca = abilityLabel(player.currentAbility);
-  const pa = abilityLabel(player.potentialAbility);
+  const pa = hidePA ? "?" : abilityLabel(player.potentialAbility);
   const hasScore = liveHasScore(player);
   const hasLabel = formatHasScore(hasScore);
   const hasTone = hasScore == null ? "attr-tone-mid" : `attr-tone-${hasBand(hasScore)}`;
@@ -268,7 +270,9 @@ export function PlayerProfileScreen({
           <span>
             <b>Potential</b>
             <span className="player-fact-value">
-              <strong className={abilityToneClass(player.potentialAbility)}>{pa}</strong>
+              <strong className={hidePA ? "attr-tone-mid" : abilityToneClass(player.potentialAbility)}>
+                {pa}
+              </strong>
             </span>
           </span>
           <span>

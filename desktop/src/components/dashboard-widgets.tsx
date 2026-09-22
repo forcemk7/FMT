@@ -6,6 +6,7 @@ import {
   type SquadMoverChange,
 } from "@/domain/attribute-history";
 import { abilityToneFromScore, attributeDeltaTone } from "@/domain/attribute-tone";
+import { usePreferences } from "@/domain/preferences";
 import {
   dashPersonalityHighlights,
   formatHasScore,
@@ -62,8 +63,10 @@ function DashAbilityStat({
   value: number | null | undefined;
   variant?: "inline" | "main";
 }) {
+  const { hidePA } = usePreferences();
+  const masked = kind === "PA" && hidePA;
   const tone =
-    typeof value === "number" && Number.isFinite(value)
+    !masked && typeof value === "number" && Number.isFinite(value)
       ? abilityToneFromScore(value)
       : "mid";
   const title = kind === "CA" ? "Current ability" : "Potential ability";
@@ -72,7 +75,7 @@ function DashAbilityStat({
       className={`dash-ability-stat dash-ability-stat-${variant} attr-tone attr-tone-${tone}`}
     >
       <abbr title={title}>{kind}</abbr>
-      <span className="dash-ability-num">{abilityLabel(value)}</span>
+      <span className="dash-ability-num">{masked ? "?" : abilityLabel(value)}</span>
     </span>
   );
 }

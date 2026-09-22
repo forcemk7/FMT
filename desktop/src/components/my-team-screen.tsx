@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { LiveFootballSnapshot, LivePlayer } from "@/domain/adapters";
 import { abilityProgress, abilityToneFromScore } from "@/domain/attribute-tone";
+import { usePreferences } from "@/domain/preferences";
 import { formatHasScore, hasBand, hasProgress, liveHasScore } from "@/domain/has-score";
 import {
   formatPlayerPositions,
@@ -167,12 +168,20 @@ function SquadMetricRing({
   );
 }
 
-function AbilityRing({ value }: { value: number | null | undefined }) {
-  const tone = value == null || !Number.isFinite(value) ? "unknown" : abilityToneFromScore(value);
+function AbilityRing({
+  value,
+  masked = false,
+}: {
+  value: number | null | undefined;
+  masked?: boolean;
+}) {
+  const tone = masked || value == null || !Number.isFinite(value)
+    ? "unknown"
+    : abilityToneFromScore(value);
   return (
     <SquadMetricRing
-      display={value ?? "—"}
-      progress={value == null ? 0 : abilityProgress(value)}
+      display={masked ? "?" : value ?? "—"}
+      progress={masked || value == null ? 0 : abilityProgress(value)}
       tone={tone}
     />
   );
@@ -240,6 +249,7 @@ function SquadPlayerCard({
   showLoanClub?: boolean;
   rosterStatus?: "atClub" | "loanedIn" | "loanedOut" | null;
 }) {
+  const { hidePA } = usePreferences();
   const has = liveHasScore(player);
   const foot = preferredFootDisplay(player);
   const ageLine =
@@ -308,7 +318,7 @@ function SquadPlayerCard({
           <AbilityRing value={player.currentAbility} />
         </MetricTip>
         <MetricTip label="Potential" detail="Potential ability (PA)">
-          <AbilityRing value={player.potentialAbility} />
+          <AbilityRing value={player.potentialAbility} masked={hidePA} />
         </MetricTip>
         <Tooltip>
           <TooltipTrigger

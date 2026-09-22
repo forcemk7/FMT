@@ -1,10 +1,14 @@
 ﻿# Status
 
-Last updated: 2026-09-22 (T274 done — live-connect auto-detect/auto-load/auto-refresh shipped)
+Last updated: 2026-09-22 (T292 done — PA masking toggle + generic user-preferences store shipped)
 
 ## Now
 
 **FMT 1.28 in progress, one ticket at a time.** Owner works strictly sequential — full QA and close-out before the next ticket starts. Parallel ticket work happened briefly this session (owner-authorized, to cut idle time) and has now fully wound down — no ticket is currently `claimed`/`in_progress`.
+
+**Sequencing note (2026-09-22):** owner re-ordered the remaining board to group by kind rather than strict priority-number order: **feature (T292, done) → telemetry (T290) → UI structure (T293) → UI visual (T139)** — functional work before aesthetics. T290 is next up.
+
+**T292 done.** First entry in the Settings > User Preferences section T215 shelled — and the first interactive control anywhere in Settings (previously 100% read-only diagnostics). Built generically, not PA-only, since the owner has more preferences planned (UI density/theme via T293/T139, possibly non-club-player attribute masking later): a small `localStorage`-backed external store (`domain/preferences.ts`, `useSyncExternalStore`, no new deps, merge-onto-defaults schema so future keys don't need a version bump) plus a new `PreferenceToggleCell` UI (real toggle button, `SettingsGroup` now accepts `children` as an escape hatch from the read-only diagnostic-cell shape). PA masked at all 4 display sites app-wide (Dashboard biggest-talent card, Player Profile, Squad ability ring, attribute-desk General column incl. its recent-delta badge) — CA/HAS untouched, sort-by-real-PA untouched, both by ticket scope. `tsc`/`eslint`/`vitest` (142/142) clean on touched files; live-clicked in dev preview (toggle flips, persists across reload, no hydration warnings) but **not** checked against a real loaded save (dev preview had no FM26 process attached) — owner should eyeball Dashboard/Squad/Profile with a save loaded and the toggle on.
 
 **T274 done.** Nine rounds, full write-up in the archived ticket. Shipped: a unified detect/load/refresh mechanism (one heartbeat-driven mechanism now covers auto-load-on-launch, auto-switch, auto-refresh, and disconnect-dismount, instead of separate paths); a fixed-layout load button (dot/text/icon pinned via CSS grid, no more reflow); a live pill with a structured status-grid tooltip and a persistent "Switching…" state during a club change; and boot-sequence timestamp instrumentation the owner can use going forward to tell dev-build cost apart from real regressions. Two real bugs found and fixed along the way that are worth remembering: (1) a non-`async` Tauri command executing inline on the same thread that pumps the native window's message loop — froze drag/paint/hover; the fix (`async` + `spawn_blocking`) is now the pattern to match for any future polled command. (2) a busy-flag implemented as a `useRef` silently surviving React Strict Mode's dev-only double-effect-invoke, letting a stale instance block the real one — the fix (a plain local variable scoped inside the effect) is the pattern to match for any future per-effect-instance guard. Owner is deferring final release-build timing verification to their own `desktop:build` check later, not blocking on it now.
 
@@ -24,10 +28,9 @@ Last updated: 2026-09-22 (T274 done — live-connect auto-detect/auto-load/auto-
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
-| T290 | Minimal functional telemetry — install → launch → load → outcome | ready | 2 | depends_on T215 (done) |
-| T292 | PA masking toggle | ready | 2 | depends_on T215 (done) |
-| T293 | Responsive desk layout + UI density preference + min viewport | ready | 2 | depends_on T215 (done); split out of T139 |
-| T139 | FMT shell theme (MW90 CTRL 26-inspired) | ready | 3 | visual identity only now — layout/density moved to T293; sequence after it |
+| T290 | Minimal functional telemetry — install → launch → load → outcome | ready | 2 | depends_on T215 (done); next up — owner sequencing: feature → telemetry → UI structure → UI visual |
+| T293 | Responsive desk layout + UI density preference + min viewport | ready | 2 | depends_on T215 (done); split out of T139; owner sequencing: after T290 |
+| T139 | FMT shell theme (MW90 CTRL 26-inspired) | ready | 3 | visual identity only now — layout/density moved to T293; last in owner's sequencing |
 
 ## Deferred / not in FMT 1.28
 
@@ -46,6 +49,7 @@ Last updated: 2026-09-22 (T274 done — live-connect auto-detect/auto-load/auto-
 
 ## Recently done
 
+- **T292** PA masking toggle — first entry (and first interactive control) in the Settings > User Preferences section. Built on a new generic `localStorage`-backed preferences store (`useSyncExternalStore`, merge-onto-defaults) rather than a PA-only one-off, since the owner has more preferences planned. Masks PA at all 4 app-wide display sites (Dashboard, Player Profile, Squad, attribute-desk incl. its delta badge); CA/HAS and sort-by-real-PA untouched. Not yet checked against a real loaded save — dev-preview verification only.
 - **T274** Live connect — auto-detect/auto-load/auto-refresh, replacing the manual-only Load button. One heartbeat-driven mechanism (not separate paths) now covers first-launch auto-load, save-switch detection, routine refresh, and disconnect-dismount. Fixed-column button layout (no more reflow), live pill with a structured tooltip, persistent "Switching…" state, and boot-sequence timing instrumentation. Nine rounds of owner-verified live testing surfaced and fixed two real bugs: a Tauri command blocking the native window's main thread (froze drag/paint/hover), and a `useRef`-based guard that silently broke under React Strict Mode's dev-only double-effect-invoke. Full write-up in the archived ticket.
 - **T295** Repo git hygiene: `git status` in `FMT/` fully clean. 11 small commits, each attributable, none folding unrelated history together — see archived ticket for the full table. Added a real fix (not just a note) for the workflow gap that made this hard: `scrum/AGENTS.md`'s new **Parallel sessions** section makes ticket frontmatter status (via `grep`) the authoritative signal for live work, replacing the old "check for peer sessions if your tooling supports it" hand-wave.
 - **T296** In-game date/Season "Unavailable" on Barcelona (FM26-native) was save-freshness, not a native-save offset/profile bug — a never-advanced control save left `player_current_date_offset`'s per-player "last processed" cache unwritten for the whole squad. Confirmed by advancing the save one day: ages resolved, zero code changes. New `probe-game-date` RE tool added; `research/recipes.md` updated; surfaced a free re-check opportunity for T294.
