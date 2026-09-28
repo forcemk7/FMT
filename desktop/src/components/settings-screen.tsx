@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  Activity,
   Building2,
   CalendarDays,
   ChevronDown,
@@ -666,6 +667,33 @@ export function SettingsScreen({
   ];
 
 
+  const telemetryCells: DiagCell[] = [
+    {
+      title: "What's sent",
+      status: "App launches, save-load attempts, and load outcomes (success/failure + reason)",
+      tone: "green",
+      wide: true,
+    },
+    {
+      title: "Not collected",
+      status: "No save data, player/club data, or anything that identifies you",
+      tone: "green",
+      wide: true,
+    },
+    {
+      title: "Why",
+      status: "Anonymous usage signal only, used to decide how much time to invest in FMT — never sold",
+      tone: "green",
+      wide: true,
+    },
+    {
+      title: "Anonymous id",
+      status: preferences.telemetryId || "Not generated yet",
+      tone: tonePresent(preferences.telemetryId),
+      wide: true,
+    },
+  ];
+
   return (
     <main className="screen settings-screen" aria-label="Settings">
       <section className="settings-list settings-list-preferences">
@@ -689,6 +717,14 @@ export function SettingsScreen({
             />
           </dl>
         </SettingsGroup>
+
+        <SettingsGroup
+          id="settings-telemetry"
+          icon={<Activity aria-hidden="true" />}
+          title="Telemetry"
+          meta="Always on"
+          cells={telemetryCells}
+        />
       </section>
 
       <section className="settings-list">

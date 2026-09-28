@@ -25,6 +25,7 @@ import {
 import { writeAppMainScrollTop } from "@/domain/squad-desk-session";
 import { playerMatchesSquadSearch } from "@/domain/squad-search";
 import { usePreferences } from "@/domain/preferences";
+import { reportLaunch, reportLoadResult } from "@/domain/telemetry";
 
 const initialStatus: LiveConnectorStatus = {
   processDetected: false,
@@ -151,6 +152,7 @@ export function FMTApp() {
   // relative to the Rust-side boot clock (see fmt_log::mark_boot_start).
   useEffect(() => {
     void mirrorToTerminal("app: FMTApp mounted");
+    reportLaunch();
   }, []);
 
   useEffect(() => {
@@ -245,9 +247,11 @@ export function FMTApp() {
           markFmtCosmeticsReady();
           warmSquadGraphics({ ...nextSnapshot, players });
         });
+        reportLoadResult("success", null);
         return nextSnapshot.status;
       }
       setSnapshot(nextSnapshot);
+      reportLoadResult("failure", nextSnapshot.status.failureStage ?? null);
       return nextSnapshot.status;
     } finally {
       setChecking(false);

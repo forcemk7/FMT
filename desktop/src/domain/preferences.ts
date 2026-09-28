@@ -9,6 +9,14 @@ import { useSyncExternalStore } from "react";
 export type FmtPreferences = {
   hidePA: boolean;
   autoLoadOnStartup: boolean;
+  /**
+   * Anonymous, per-install telemetry id (T290). Not user-facing/toggleable —
+   * lives here only because this is the existing persisted store, not because
+   * it's a preference. Generated once on first load if missing (see
+   * loadPreferences) rather than given a static default, since it must be
+   * unique per install.
+   */
+  telemetryId: string;
 };
 
 const STORAGE_KEY = "fmt-preferences-v1";
@@ -16,6 +24,7 @@ const STORAGE_KEY = "fmt-preferences-v1";
 const DEFAULT_PREFERENCES: FmtPreferences = {
   hidePA: true,
   autoLoadOnStartup: true,
+  telemetryId: "",
 };
 
 function parsePreferences(raw: string | null): FmtPreferences {
@@ -32,7 +41,12 @@ function parsePreferences(raw: string | null): FmtPreferences {
 function loadPreferences(): FmtPreferences {
   if (typeof window === "undefined") return { ...DEFAULT_PREFERENCES };
   try {
-    return parsePreferences(window.localStorage.getItem(STORAGE_KEY));
+    const prefs = parsePreferences(window.localStorage.getItem(STORAGE_KEY));
+    if (!prefs.telemetryId) {
+      prefs.telemetryId = crypto.randomUUID();
+      savePreferences(prefs);
+    }
+    return prefs;
   } catch {
     return { ...DEFAULT_PREFERENCES };
   }
@@ -74,4 +88,9 @@ export function setPreference<K extends keyof FmtPreferences>(
 
 export function usePreferences(): FmtPreferences {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+}
+
+/** Non-React read for callers outside a component (e.g. the telemetry client). */
+export function getPreferences(): FmtPreferences {
+  return current;
 }

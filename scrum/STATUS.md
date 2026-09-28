@@ -1,10 +1,10 @@
 ﻿# Status
 
-Last updated: 2026-09-22 (T292 + same-day follow-up done — user-preferences store, auto-load-on-startup, settings polish)
+Last updated: 2026-09-28 (T290 closed pre-QA by owner decision — moving to T293/T139, live verification batched for the end of 1.28)
 
 ## Now
 
-**FMT 1.28 in progress, one ticket at a time.** Owner works strictly sequential — full QA and close-out before the next ticket starts. Parallel ticket work happened briefly this session (owner-authorized, to cut idle time) and has now fully wound down — no ticket is currently `claimed`/`in_progress`.
+**FMT 1.28 in progress.** Owner made a deliberate, one-time exception to the usual full-QA-before-close rule (2026-09-28): **T290 was closed with its repo-side code done and locally checked, but not live-verified against a real Supabase project.** Owner is moving straight to T293 and T139, then doing one consolidated build-and-test pass across all three. If that pass finds anything wrong in T290 — Supabase setup, fire points, throttle, disclosure copy — **reopen T290** rather than filing a new ticket; see its archived Progress note. Once T293/T139 land, go back to the normal one-ticket-at-a-time full-QA rule.
 
 **Sequencing note (2026-09-22):** owner re-ordered the remaining board to group by kind rather than strict priority-number order: **feature (T292, done) → telemetry (T290) → UI structure (T293) → UI visual (T139)** — functional work before aesthetics. T290 is next up.
 
@@ -30,7 +30,6 @@ Last updated: 2026-09-22 (T292 + same-day follow-up done — user-preferences st
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
-| T290 | Minimal functional telemetry — install → launch → load → outcome | ready | 2 | depends_on T215 (done); next up — owner sequencing: feature → telemetry → UI structure → UI visual |
 | T293 | Responsive desk layout + UI density preference + min viewport | ready | 2 | depends_on T215 (done); split out of T139; owner sequencing: after T290 |
 | T139 | FMT shell theme (MW90 CTRL 26-inspired) | ready | 3 | visual identity only now — layout/density moved to T293; last in owner's sequencing |
 
@@ -51,6 +50,7 @@ Last updated: 2026-09-22 (T292 + same-day follow-up done — user-preferences st
 
 ## Recently done
 
+- **T290** Minimal functional telemetry (install→launch→load→outcome), Supabase-backed. `anon`-role-INSERT-only RLS + a per-`anon_id` daily rate-limit trigger (bounds T274's heartbeat-retry failure mode; deliberately not defending against deliberate payload forgery, a threat tier out of scope here). Client posts directly to Supabase's REST API — no custom backend function. Reuses T215's `status.failureStage` verbatim as `failure_reason`; throttled to only send `load_outcome` on change. Disclosure lives in its own always-on Settings > Telemetry section, no opt-out (owner's explicit call — needs the unbiased signal for the 1.28 investment decision). Anon id in the existing T292 preferences store. Supabase URL/key read from `.env.local` (gitignored, `.env.example` documents the shape) — never committed. **Closed 2026-09-28 ahead of live QA, by explicit owner decision**: repo code is done and locally verified (`tsc`/`eslint`/`vitest` clean, dev-preview render confirmed) but never checked against a real Supabase project. Owner is batching live verification with T293/T139 at the end of 1.28 — reopen this ticket, not a new one, if that pass finds anything wrong.
 - **T292** PA masking toggle — first entry (and first interactive control) in the Settings > User Preferences section. Built on a new generic `localStorage`-backed preferences store (`useSyncExternalStore`, merge-onto-defaults) rather than a PA-only one-off, since the owner has more preferences planned. Masks PA at all 4 app-wide display sites (Dashboard, Player Profile, Squad, attribute-desk incl. its delta badge); CA/HAS and sort-by-real-PA untouched. **Same-day follow-up** (logged in the archived ticket, not a new one): Settings reordered (User Preferences its own panel up top with a gap; Affiliations above Teams; Affiliations shows a real count); User Preferences header dropped its diagnostic-style tone/meta indicators; Player Profile height display dropped its cm→m reformatting (raw read is already cm); new **`autoLoadOnStartup`** preference (gates only the first auto-load of a session, T274's ongoing auto-refresh untouched); both `hidePA` and `autoLoadOnStartup` now **default on**.
 - **T274** Live connect — auto-detect/auto-load/auto-refresh, replacing the manual-only Load button. One heartbeat-driven mechanism (not separate paths) now covers first-launch auto-load, save-switch detection, routine refresh, and disconnect-dismount. Fixed-column button layout (no more reflow), live pill with a structured tooltip, persistent "Switching…" state, and boot-sequence timing instrumentation. Nine rounds of owner-verified live testing surfaced and fixed two real bugs: a Tauri command blocking the native window's main thread (froze drag/paint/hover), and a `useRef`-based guard that silently broke under React Strict Mode's dev-only double-effect-invoke. Full write-up in the archived ticket.
 - **T295** Repo git hygiene: `git status` in `FMT/` fully clean. 11 small commits, each attributable, none folding unrelated history together — see archived ticket for the full table. Added a real fix (not just a note) for the workflow gap that made this hard: `scrum/AGENTS.md`'s new **Parallel sessions** section makes ticket frontmatter status (via `grep`) the authoritative signal for live work, replacing the old "check for peer sessions if your tooling supports it" hand-wave.
