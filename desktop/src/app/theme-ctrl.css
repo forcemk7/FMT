@@ -1,0 +1,129 @@
+/**
+ * T139 — CTRL theme, first pass (visual direction probe).
+ *
+ * Control-room chrome: neutral graphite instead of navy glass, flat surfaces,
+ * tight corners, one electric accent (a sharper take on the existing mint)
+ * for active/primary states. Gold is left to mean "warning" only.
+ *
+ * Loaded after fmt-desk.css and only overrides its tokens + a few chrome
+ * rules. To revert: delete this file and its import in layout.tsx.
+ */
+
+body.fmt-shell {
+  /* Canvas — neutral graphite, no blue cast */
+  --shell-0: #08090b;
+  --shell-1: #0c0d10;
+  --shell-2: #111316;
+  --shell-bottom: #0c0d10;
+  --atmosphere-blue: transparent;
+  --atmosphere-green: transparent;
+
+  --panel: #131519;
+  --panel-2: #181b20;
+  --panel-3: #1f2329;
+  --hairline: rgba(255, 255, 255, 0.07);
+  --hairline-strong: rgba(255, 255, 255, 0.13);
+
+  --text: #eceef0;
+  --text-muted: #8d939b;
+  --text-dim: #666c74;
+
+  /* One accent */
+  --ctrl-accent: #22e0a8;
+  --ctrl-accent-soft: rgba(34, 224, 168, 0.1);
+  --ctrl-accent-line: rgba(34, 224, 168, 0.45);
+
+  --chrome-fg-active: var(--text);
+  --chrome-bg-hover: rgba(255, 255, 255, 0.04);
+  --chrome-bg-active: transparent;
+  --chrome-border-active: transparent;
+  --chrome-radius: 4px;
+
+  --control-radius: 5px;
+  --control-bg-strong: var(--ctrl-accent);
+  --action-border: var(--ctrl-accent);
+  --action-text: #04140e;
+
+  --mint: var(--ctrl-accent);
+  --ring: var(--ctrl-accent);
+  --sidebar-primary: var(--ctrl-accent);
+  --sidebar-ring: var(--ctrl-accent);
+  --panel-shadow: none;
+
+  background: var(--shell-1);
+}
+
+/* —— Header: flat bar, no glass —— */
+body.fmt-shell .shell-header {
+  background: var(--shell-0);
+  backdrop-filter: none;
+  box-shadow: none;
+  border-bottom-color: var(--hairline-strong);
+}
+
+/* Nav: tracked uppercase labels, accent underline marks the active desk
+   (drawn inside the button — .shell-nav clips overflow) */
+body.fmt-shell .shell-nav-item,
+body.fmt-shell .shell-nav-menu-item {
+  position: relative;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 11px;
+  font-weight: 650;
+}
+body.fmt-shell .shell-nav-item.is-active::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 0;
+  height: 2px;
+  background: var(--ctrl-accent);
+}
+body.fmt-shell .shell-nav-item.is-active svg,
+body.fmt-shell .shell-nav-menu-item.is-active svg {
+  color: var(--ctrl-accent);
+  opacity: 1;
+}
+
+body.fmt-shell .shell-tools > button:not(.shell-load):hover,
+body.fmt-shell .shell-tools > button.is-active {
+  color: var(--ctrl-accent);
+  background: var(--ctrl-accent-soft);
+}
+
+body.fmt-shell .shell-load.is-needs-load strong {
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* —— Panels: flat, tight corners —— */
+body.fmt-shell .squad-live-table,
+body.fmt-shell .squad-matrix,
+body.fmt-shell .dossier-panel,
+body.fmt-shell .player-dossier,
+body.fmt-shell .settings-list,
+body.fmt-shell .screen-panel,
+body.fmt-shell .dash-widget,
+body.fmt-shell .diagnostics,
+body.fmt-shell .read-pipeline-grid article {
+  border-radius: 6px;
+}
+
+body.fmt-shell .settings-list .settings-expand > summary .settings-section-label,
+body.fmt-shell .settings-list .settings-expand > summary strong {
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  font-size: 11px;
+}
+
+body.fmt-shell .settings-pref-toggle {
+  border-radius: 4px;
+  background: var(--panel-3);
+}
+body.fmt-shell .settings-pref-toggle.is-on {
+  background: var(--ctrl-accent);
+}
+body.fmt-shell .settings-pref-toggle i {
+  border-radius: 2px;
+}

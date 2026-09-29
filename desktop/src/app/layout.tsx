@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "@fontsource-variable/inter";
 import "./globals.css";
 import "./fmt-desk.css";
+import "./theme-ctrl.css";
 
 export const metadata: Metadata = {
   title: "FMT",
