@@ -3048,3 +3048,9 @@ ul.attr-history-timeline-moves em[data-delta="down"]{color:var(--attr-tone-low,#
   background:#f3faf8;border:1px solid #d7ebe6;color:#1d4f48;
   font-size:12px;line-height:1.45;
 }
+
+/* T293 — responsive desks + UI density.
+ * Density: root zoom behaves like browser zoom in Chromium/WebView2 — percentages
+ * resolve against the real window, px lengths scale, so desks reflow instead of
+ * overflowing. Standard = no zoom (today's compact size). */
+html[data-density="large"]{zoom:1.125}

@@ -25,6 +25,7 @@ import {
 import { writeAppMainScrollTop } from "@/domain/squad-desk-session";
 import { playerMatchesSquadSearch } from "@/domain/squad-search";
 import { usePreferences } from "@/domain/preferences";
+import { applyMinWindowSize, LARGE_UI_ZOOM } from "@/domain/window-size";
 import { reportLaunch, reportLoadResult } from "@/domain/telemetry";
 
 const initialStatus: LiveConnectorStatus = {
@@ -141,7 +142,7 @@ export function FMTApp() {
   // flips permanently true, so disconnect/reconnect and save-switch auto-refresh
   // (T274) are never affected by this preference, only the moment FMT opens.
   const hasConnectedOnceRef = useRef(false);
-  const { autoLoadOnStartup } = usePreferences();
+  const { autoLoadOnStartup, largeUi } = usePreferences();
 
   useEffect(() => {
     checkingRef.current = checking;
@@ -189,6 +190,13 @@ export function FMTApp() {
   useEffect(() => {
     applyAttrColorPalette(loadAttrColorPalette());
   }, []);
+
+  // T293 UI density: root `zoom` scales the whole UI like browser zoom, so every
+  // desk reflows into the smaller effective viewport instead of overflowing.
+  useEffect(() => {
+    document.documentElement.dataset.density = largeUi ? "large" : "standard";
+    void applyMinWindowSize(largeUi ? LARGE_UI_ZOOM : 1);
+  }, [largeUi]);
 
   // Shared `.app-main` scroll must not leak into other screens.
   // Zero after Squad has unmounted (effect, not layout) so we don't flash Squad-to-top mid-swap.

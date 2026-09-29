@@ -715,6 +715,12 @@ export function SettingsScreen({
               checked={preferences.hidePA}
               onChange={(checked) => setPreference("hidePA", checked)}
             />
+            <PreferenceToggleCell
+              title="Larger interface"
+              description="Scales text and controls up for readability. Off keeps FMT's compact default size."
+              checked={preferences.largeUi}
+              onChange={(checked) => setPreference("largeUi", checked)}
+            />
           </dl>
         </SettingsGroup>
 

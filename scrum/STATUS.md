@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-28 (T290 closed pre-QA by owner decision — moving to T293/T139, live verification batched for the end of 1.28)
+Last updated: 2026-09-29 (T293 closed — T139 is the last 1.28 ticket, then the consolidated live test pass)
 
 ## Now
 
@@ -30,7 +30,6 @@ Last updated: 2026-09-28 (T290 closed pre-QA by owner decision — moving to T29
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
-| T293 | Responsive desk layout + UI density preference + min viewport | ready | 2 | depends_on T215 (done); split out of T139; owner sequencing: after T290 |
 | T139 | FMT shell theme (MW90 CTRL 26-inspired) | ready | 3 | visual identity only now — layout/density moved to T293; last in owner's sequencing |
 
 ## Deferred / not in FMT 1.28
@@ -50,6 +49,7 @@ Last updated: 2026-09-28 (T290 closed pre-QA by owner decision — moving to T29
 
 ## Recently done
 
+- **T293** Responsive desk + UI density: minimum/default window locked at **1180x1100** client (Player Profile, the tallest desk, fits every tab with no scrolling; Development was the binding tab). Owner rejected both stretched row spacing and a compressed profile layout: the profile stays exactly as before, the window is just larger, and tall displays show empty space below. New **Larger interface** preference (default off, 1.125x root zoom), and the minimum window scales with it (1328x1238) via a runtime `setMinSize`. Other desks and the Tauri window-growth path go into the end-of-1.28 consolidated test pass.
 - **T290** Minimal functional telemetry (install→launch→load→outcome), Supabase-backed. `anon`-role-INSERT-only RLS + a per-`anon_id` daily rate-limit trigger (bounds T274's heartbeat-retry failure mode; deliberately not defending against deliberate payload forgery, a threat tier out of scope here). Client posts directly to Supabase's REST API — no custom backend function. Reuses T215's `status.failureStage` verbatim as `failure_reason`; throttled to only send `load_outcome` on change. Disclosure lives in its own always-on Settings > Telemetry section, no opt-out (owner's explicit call — needs the unbiased signal for the 1.28 investment decision). Anon id in the existing T292 preferences store. Supabase URL/key read from `.env.local` (gitignored, `.env.example` documents the shape) — never committed. **Closed 2026-09-28 ahead of live QA, by explicit owner decision**: repo code is done and locally verified (`tsc`/`eslint`/`vitest` clean, dev-preview render confirmed) but never checked against a real Supabase project. Owner is batching live verification with T293/T139 at the end of 1.28 — reopen this ticket, not a new one, if that pass finds anything wrong.
 - **T292** PA masking toggle — first entry (and first interactive control) in the Settings > User Preferences section. Built on a new generic `localStorage`-backed preferences store (`useSyncExternalStore`, merge-onto-defaults) rather than a PA-only one-off, since the owner has more preferences planned. Masks PA at all 4 app-wide display sites (Dashboard, Player Profile, Squad, attribute-desk incl. its delta badge); CA/HAS and sort-by-real-PA untouched. **Same-day follow-up** (logged in the archived ticket, not a new one): Settings reordered (User Preferences its own panel up top with a gap; Affiliations above Teams; Affiliations shows a real count); User Preferences header dropped its diagnostic-style tone/meta indicators; Player Profile height display dropped its cm→m reformatting (raw read is already cm); new **`autoLoadOnStartup`** preference (gates only the first auto-load of a session, T274's ongoing auto-refresh untouched); both `hidePA` and `autoLoadOnStartup` now **default on**.
 - **T274** Live connect — auto-detect/auto-load/auto-refresh, replacing the manual-only Load button. One heartbeat-driven mechanism (not separate paths) now covers first-launch auto-load, save-switch detection, routine refresh, and disconnect-dismount. Fixed-column button layout (no more reflow), live pill with a structured tooltip, persistent "Switching…" state, and boot-sequence timing instrumentation. Nine rounds of owner-verified live testing surfaced and fixed two real bugs: a Tauri command blocking the native window's main thread (froze drag/paint/hover), and a `useRef`-based guard that silently broke under React Strict Mode's dev-only double-effect-invoke. Full write-up in the archived ticket.

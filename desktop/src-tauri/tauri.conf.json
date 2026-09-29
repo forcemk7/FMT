@@ -14,9 +14,9 @@
       {
         "title": "​",
         "width": 1180,
-        "height": 740,
-        "minWidth": 880,
-        "minHeight": 720,
+        "height": 1100,
+        "minWidth": 1180,
+        "minHeight": 1100,
         "center": true,
         "resizable": true,
         "fullscreen": false

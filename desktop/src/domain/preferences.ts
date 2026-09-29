@@ -10,6 +10,11 @@ export type FmtPreferences = {
   hidePA: boolean;
   autoLoadOnStartup: boolean;
   /**
+   * UI density (T293). false = today's compact size; true = the whole UI is
+   * scaled up via root `zoom` (see `html[data-density="large"]` in globals.css).
+   */
+  largeUi: boolean;
+  /**
    * Anonymous, per-install telemetry id (T290). Not user-facing/toggleable —
    * lives here only because this is the existing persisted store, not because
    * it's a preference. Generated once on first load if missing (see
@@ -24,6 +29,7 @@ const STORAGE_KEY = "fmt-preferences-v1";
 const DEFAULT_PREFERENCES: FmtPreferences = {
   hidePA: true,
   autoLoadOnStartup: true,
+  largeUi: false,
   telemetryId: "",
 };
 
