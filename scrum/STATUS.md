@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-29 (T139 closed — 1.28 board empty; next is the consolidated live test pass across T290/T293/T139)
+Last updated: 2026-09-29 (T297 added — Settings coherence pass, final 1.28 ticket; consolidated live test pass after or alongside)
 
 ## Now
 
@@ -30,7 +30,8 @@ Last updated: 2026-09-29 (T139 closed — 1.28 board empty; next is the consolid
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
-| — | Board empty — consolidated 1.28 live test pass next | — | — | reopen T290/T293/T139 if the pass finds issues |
+| T297 | Settings coherence pass — section-by-section truth audit | ready | 1 | final 1.28 ticket; owner-led, one section at a time; commit + push |
+| — | Consolidated 1.28 live test pass | — | — | reopen T290/T293/T139 if the pass finds issues |
 
 ## Deferred / not in FMT 1.28
 
