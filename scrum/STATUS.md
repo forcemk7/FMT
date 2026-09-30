@@ -1,12 +1,12 @@
 ﻿# Status
 
-Last updated: 2026-09-30 (T290 follow-up: publishable key + Diagnostics Last event; next is the consolidated 1.28 live test pass)
+Last updated: 2026-09-30 (T298 done: publishable key + Diagnostics Last event; next is the consolidated 1.28 live test pass)
 
 ## Now
 
 **FMT 1.28 board is empty — next is the consolidated live test pass.** All 1.28 tickets are closed. Owner made a deliberate, one-time exception to the usual full-QA-before-close rule: **T290, T293 and T139 were closed with repo-side work done and locally checked, but not fully live-verified.** Owner now does one consolidated build-and-test pass across all three on a real save. If that pass finds anything wrong, **reopen the matching ticket** (T290: Supabase setup, fire points, throttle, disclosure copy; T293: other desks at 1180x1100, Larger-interface window growth in Tauri; T139: stray rounded/blue-tinted legacy styling on Squad/Profile/Loans/HoYD/GM) rather than filing a new one; see each ticket's archived Progress note. After that pass, go back to the normal one-ticket-at-a-time full-QA rule.
 
-**T290 follow-up (2026-09-30, HQ chat, owner go).** Switched to Supabase's **publishable key** (legacy anon key is deprecated end of 2026): env var is now `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, sent on the `apikey` header only — `Authorization: Bearer` removed, since publishable keys aren't JWTs and get rejected there (`f1bf5c0`). Owner must rename the key line in `.env.local`. Settings > Diagnostics "Last data sent" JSON replaced by a plain-English **Last event** cell (`App launched` / `Loaded successfully` / `Load failed: <reason>` / `(not delivered, HTTP n)`); raw codes still go to the DB (`e13d755`). Owner considered one-row-per-session and deferred it — run the experiment first; a `sessions` view over `events` is the cheap option if the table gets noisy.
+**T298 done (2026-09-30, HQ chat, owner go; T290 follow-up).** Switched to Supabase's **publishable key** (legacy anon key is deprecated end of 2026): env var is now `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, sent on the `apikey` header only — `Authorization: Bearer` removed, since publishable keys aren't JWTs and get rejected there (`f1bf5c0`). Owner must rename the key line in `.env.local`. Settings > Diagnostics "Last data sent" JSON replaced by a plain-English **Last event** cell (`App launched` / `Loaded successfully` / `Load failed: <reason>` / `(not delivered, HTTP n)`); raw codes still go to the DB (`e13d755`). Reopen T298 if the live pass finds issues here. Owner considered one-row-per-session and deferred it — run the experiment first; a `sessions` view over `events` is the cheap option if the table gets noisy.
 
 **Sequencing note (2026-09-22):** owner re-ordered the remaining board to group by kind rather than strict priority-number order: **feature (T292, done) → telemetry (T290) → UI structure (T293) → UI visual (T139)** — functional work before aesthetics. T290 is next up.
 
