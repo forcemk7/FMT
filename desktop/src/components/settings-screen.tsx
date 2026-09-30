@@ -21,7 +21,7 @@ import {
   teamTypeDisplayLabel,
 } from "@/domain/live-data";
 import { setPreference, usePreferences } from "@/domain/preferences";
-import { isTelemetryConfigured, useLastSent } from "@/domain/telemetry";
+import { describeLastSent, isTelemetryConfigured, useLastSent } from "@/domain/telemetry";
 import { useGraphicsPacksStatus } from "@/components/graphics-packs-panel";
 import { getVersion } from "@tauri-apps/api/app";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
@@ -515,8 +515,8 @@ export function SettingsScreen({
       wide: true,
     },
     {
-      title: "Last data sent",
-      status: lastSent?.data ?? "None",
+      title: "Last event",
+      status: lastSent ? describeLastSent(lastSent) : "None",
       tone: lastSent ? toneIf(lastSent.ok) : "yellow",
       wide: true,
     },

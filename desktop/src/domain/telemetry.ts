@@ -25,10 +25,42 @@ function isTauri(): boolean {
 /** Last event actually posted this session, for Settings > Diagnostics. */
 export type LastSent = {
   at: Date;
-  data: string;
+  eventType: EventType;
+  outcome: Outcome | null;
+  failureReason: string | null;
   ok: boolean;
   httpStatus: number | null;
 };
+
+const FAILURE_REASON_LABELS: Record<string, string> = {
+  exact_build_match: "FM26 build not supported yet",
+  open_read_only_process: "Windows denied read access to FM26",
+  locate_game_module: "could not find FM26's game module",
+  validate_game_module: "FM26's game module failed validation",
+  entity_map: "could not read the game's data map",
+  manager_signature: "could not identify the manager/save",
+};
+
+/** Plain-English line for Settings > Diagnostics; the raw codes stay in the DB row. */
+export function describeLastSent(entry: LastSent): string {
+  let text: string;
+  if (entry.eventType === "launch") {
+    text = "App launched";
+  } else if (entry.eventType === "load_attempt") {
+    text = "Load attempted";
+  } else if (entry.outcome === "success") {
+    text = "Loaded successfully";
+  } else if (entry.failureReason) {
+    const reason =
+      FAILURE_REASON_LABELS[entry.failureReason] ?? entry.failureReason.replaceAll("_", " ");
+    text = `Load failed: ${reason}`;
+  } else {
+    text = "Load failed";
+  }
+  if (entry.ok) return text;
+  const why = entry.httpStatus === null ? "no connection" : `HTTP ${entry.httpStatus}`;
+  return `${text} (not delivered, ${why})`;
+}
 
 let lastSent: LastSent | null = null;
 const listeners = new Set<() => void>();
@@ -73,15 +105,18 @@ async function postEvent(payload: {
   const anonId = getPreferences().telemetryId;
   if (!anonId) return;
   const appVersion = await resolveAppVersion();
-  // anon_id has its own Settings cell; show everything else exactly as sent.
-  const shown = {
+  const body = {
+    anon_id: anonId,
     event_type: payload.event_type,
     outcome: payload.outcome ?? null,
     failure_reason: payload.failure_reason ?? null,
     app_version: appVersion ?? "unknown",
   };
-  const body = { anon_id: anonId, ...shown };
-  const data = JSON.stringify(shown);
+  const sent = {
+    eventType: body.event_type,
+    outcome: body.outcome,
+    failureReason: body.failure_reason,
+  };
   try {
     const response = await fetch(`${SUPABASE_URL}/rest/v1/events`, {
       method: "POST",
@@ -93,10 +128,10 @@ async function postEvent(payload: {
       },
       body: JSON.stringify(body),
     });
-    recordSent({ at: new Date(), data, ok: response.ok, httpStatus: response.status });
+    recordSent({ at: new Date(), ...sent, ok: response.ok, httpStatus: response.status });
   } catch {
     // Telemetry must never surface an error to the user or block whatever it's reporting on.
-    recordSent({ at: new Date(), data, ok: false, httpStatus: null });
+    recordSent({ at: new Date(), ...sent, ok: false, httpStatus: null });
   }
 }
 
