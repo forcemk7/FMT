@@ -400,30 +400,6 @@ fn diagnostic_cell(
     }
 }
 
-fn tone_none_ok(status: &str) -> &'static str {
-    if status == "none" {
-        "green"
-    } else {
-        "yellow"
-    }
-}
-
-fn tone_none_bad(status: &str) -> &'static str {
-    if status == "none" {
-        "green"
-    } else {
-        "red"
-    }
-}
-
-fn tone_value_or_none(status: &str) -> &'static str {
-    if status == "none" {
-        "yellow"
-    } else {
-        "green"
-    }
-}
-
 fn join_or_none(parts: &[String]) -> String {
     if parts.is_empty() {
         "none".to_string()
@@ -451,175 +427,77 @@ fn partner_label(row: &Value) -> String {
     }
 }
 
+/// Warnings are built as "{count} …" — Settings shows the count only.
+fn warning_count(warning: &Option<String>) -> u64 {
+    warning
+        .as_deref()
+        .and_then(|text| text.split_whitespace().next())
+        .and_then(|first| first.parse().ok())
+        .unwrap_or(0)
+}
+
+/// T297: Settings cells hold one value each; tone is the state
+/// (green = working, yellow = partial, red = error). A normal, working load
+/// must come out all green.
 fn build_load_diagnostic_cells(
     skipped_squad_warning: &Option<String>,
     name_fallback_warning: &Option<String>,
     manager_pick_warning: &Option<String>,
-    bteam_affiliates: &[AffiliateClubDiscovery],
-    bteam_promoted: usize,
     affiliation_report: Option<&Value>,
-    club_squad_promoted: usize,
-    discovered_team_labels: &[String],
-    club_teams: &[Value],
 ) -> Vec<DiagnosticCell> {
     let mut cells = Vec::new();
-    cells.push(diagnostic_cell(
-        "Squad field coverage",
-        "IDs, names, DoB, ages, nationality, positions, preferred foot, visible attrs, CA/PA/hidden/personality",
-        "green",
-    ));
-    cells.push(diagnostic_cell(
-        "Unvalidated fields",
-        "form, match ratings, contract, wage, valuation, fitness, squad-status → Unknown",
-        "yellow",
-    ));
-    let skipped = skipped_squad_warning.as_deref().unwrap_or("none");
+
+    let skipped = warning_count(skipped_squad_warning);
     cells.push(diagnostic_cell(
         "Skipped squad slots",
-        skipped,
-        tone_none_bad(skipped),
+        skipped.to_string(),
+        if skipped == 0 { "green" } else { "yellow" },
     ));
-    let name_fb = name_fallback_warning.as_deref().unwrap_or("none");
+    let name_fallbacks = warning_count(name_fallback_warning);
     cells.push(diagnostic_cell(
         "Name fallback",
-        name_fb,
-        tone_none_ok(name_fb),
+        name_fallbacks.to_string(),
+        if name_fallbacks == 0 { "green" } else { "yellow" },
     ));
-    let manager_pick = manager_pick_warning.as_deref().unwrap_or("none");
+    // "Multiple human managers validated [a; b; c]. Selected …"
+    let human_managers = manager_pick_warning
+        .as_deref()
+        .and_then(|text| text.split_once('[').and_then(|(_, rest)| rest.split_once(']')))
+        .map(|(inside, _)| inside.split("; ").count())
+        .unwrap_or(1);
     cells.push(diagnostic_cell(
-        "Manager pick",
-        manager_pick,
-        tone_none_ok(manager_pick),
-    ));
-    let club_teams_status = if discovered_team_labels.is_empty() {
-        "none".to_string()
-    } else {
-        discovered_team_labels.join("; ")
-    };
-    cells.push(diagnostic_cell(
-        "Club.Teams discovered",
-        club_teams_status.clone(),
-        tone_value_or_none(&club_teams_status),
-    ));
-    let players_loaded_status = if club_squad_promoted > 0 {
-        format!("{club_squad_promoted}")
-    } else if discovered_team_labels.len() > 1 {
-        "none · teams found but no extra roster loaded".to_string()
-    } else {
-        "none".to_string()
-    };
-    let players_loaded_tone = if club_squad_promoted > 0 {
-        "green"
-    } else if discovered_team_labels.len() > 1 {
-        "yellow"
-    } else {
-        "yellow"
-    };
-    cells.push(diagnostic_cell(
-        "Club.Teams + affiliate players loaded",
-        players_loaded_status,
-        players_loaded_tone,
+        "Human managers",
+        human_managers.to_string(),
+        "green",
     ));
 
-    let links = affiliation_report
-        .and_then(|r| r.get("linkCount"))
-        .and_then(Value::as_u64)
-        .unwrap_or(0);
-    let mapped = affiliation_report
-        .and_then(|r| r.get("mappedLinkCount"))
-        .and_then(Value::as_u64)
-        .unwrap_or(0);
-    let aff_status = if links == 0 {
-        "none".to_string()
-    } else {
-        format!("{links} links · {mapped} labeled")
+    let Some(report) = affiliation_report else {
+        cells.push(diagnostic_cell("Affiliation links", "not run", "yellow"));
+        return cells;
     };
-    let aff_tone = if links == 0 {
-        "yellow"
-    } else if mapped < links {
-        "yellow"
-    } else {
-        "green"
+    let links = report.get("linkCount").and_then(Value::as_u64).unwrap_or(0);
+    cells.push(diagnostic_cell("Affiliation links", links.to_string(), "green"));
+
+    let loan_filter = match report.get("loanFlagLock") {
+        Some(lock) => {
+            let region = lock.get("region").and_then(Value::as_str).unwrap_or("?");
+            let off = lock.get("offsetHex").and_then(Value::as_str).unwrap_or("?");
+            (format!("{region}+{off}"), "green")
+        }
+        None if links == 0 => ("not needed".to_string(), "green"),
+        None => ("not run".to_string(), "yellow"),
     };
     cells.push(diagnostic_cell(
-        "Affiliations club+0x118",
-        aff_status,
-        aff_tone,
+        "Players Go On Loan filter",
+        loan_filter.0,
+        loan_filter.1,
     ));
 
-    let unlabeled = affiliation_report
-        .and_then(|r| r.get("unmappedTypeBytes"))
-        .and_then(Value::as_array)
-        .map(|a| {
-            a.iter()
-                .filter_map(Value::as_str)
-                .map(str::to_string)
-                .collect::<Vec<_>>()
-        })
-        .unwrap_or_default();
-    let unlabeled_status = join_or_none(&unlabeled);
-    cells.push(diagnostic_cell(
-        "Unlabeled affiliation types",
-        unlabeled_status.clone(),
-        tone_none_ok(&unlabeled_status),
-    ));
-
-    if let Some(lock) = affiliation_report.and_then(|r| r.get("loanFlagLock")) {
-        let region = lock.get("region").and_then(Value::as_str).unwrap_or("?");
-        let off = lock.get("offsetHex").and_then(Value::as_str).unwrap_or("?");
-        let keep = lock
-            .get("keepRule")
-            .and_then(Value::as_str)
-            .unwrap_or("nonzero");
-        let offv = lock.get("loanOffValue").and_then(Value::as_u64).unwrap_or(0);
-        let seen = lock
-            .get("observedOnValues")
-            .and_then(Value::as_array)
-            .map(|arr| {
-                arr.iter()
-                    .filter_map(Value::as_u64)
-                    .map(|v| v.to_string())
-                    .collect::<Vec<_>>()
-                    .join("|")
-            })
-            .filter(|s| !s.is_empty())
-            .unwrap_or_else(|| {
-                lock.get("loanOnValue")
-                    .and_then(Value::as_u64)
-                    .map(|v| v.to_string())
-                    .unwrap_or_else(|| "1|2".into())
-            });
-        cells.push(diagnostic_cell(
-            "Players Go On Loan filter",
-            format!("{region}{off} keep!={offv} ({keep}; seen {seen})"),
-            "green",
-        ));
-    } else {
-        cells.push(diagnostic_cell(
-            "Players Go On Loan filter",
-            "not run",
-            "yellow",
-        ));
-    }
-
-    let outcomes = affiliation_report
-        .and_then(|r| r.get("rosterOutcomes"))
+    let outcomes = report
+        .get("rosterOutcomes")
         .and_then(Value::as_array)
         .cloned()
         .unwrap_or_default();
-
-    // T287: wrapper type byte + raw nested+0x65 byte next to the label — lets
-    // a mismatch (e.g. Legia dropped while Kaiserslautern/Sparta load, or a
-    // feeder subtype hiding under the same unmapped 0x03) be read straight
-    // off Settings, without reading fm.exe directly.
-    let feeder_detail_suffix = |row: &Value| -> String {
-        let ty = row.get("typeHex").and_then(Value::as_str).unwrap_or("?");
-        match row.get("loanByte").and_then(Value::as_u64) {
-            Some(b) => format!(" ({ty}) [byte=0x{b:02X}]"),
-            None => format!(" ({ty})"),
-        }
-    };
-
     let mut excluded = Vec::new();
     let mut loan_off = Vec::new();
     let mut unresolved = Vec::new();
@@ -629,129 +507,44 @@ fn build_load_diagnostic_cells(
         let outcome = row.get("outcome").and_then(Value::as_str).unwrap_or("");
         let label = partner_label(row);
         if outcome.starts_with("excluded") {
-            let ty = row.get("typeHex").and_then(Value::as_str).unwrap_or("?");
-            excluded.push(format!("{label} ({ty})"));
+            excluded.push(label);
         } else if outcome.contains("duplicate uid") {
-            duplicates.push(format!("{label}{}", feeder_detail_suffix(row)));
+            duplicates.push(label);
         } else if outcome.contains("loan-off") {
-            loan_off.push(format!("{label}{}", feeder_detail_suffix(row)));
+            loan_off.push(label);
         } else if outcome.contains("unresolved") {
-            unresolved.push(format!("{label} ({outcome})"));
+            unresolved.push(label);
         } else if outcome.starts_with("loaded") {
-            let note = if outcome.contains("feeder→II") {
-                format!("{label} · feeder→II")
-            } else {
-                format!("{label}{}", feeder_detail_suffix(row))
-            };
-            loaded.push(note);
+            loaded.push(label);
         }
     }
-    let excluded_status = join_or_none(&excluded);
+    // Excluded / dropped links are the filter working as intended.
     cells.push(diagnostic_cell(
         "Excluded affiliation links",
-        excluded_status.clone(),
-        tone_none_ok(&excluded_status),
+        join_or_none(&excluded),
+        "green",
     ));
-    // T287: a club with 2+ raw links means whichever comes first in the
-    // vector wins today — if FM keeps an old (no agreement) link alongside
-    // a new one, the wrong byte can be kept silently.
-    let duplicates_status = join_or_none(&duplicates);
-    cells.push(diagnostic_cell(
-        "Duplicate affiliation links (uid seen twice)",
-        duplicates_status.clone(),
-        tone_none_ok(&duplicates_status),
-    ));
-    let loan_off_status = join_or_none(&loan_off);
     cells.push(diagnostic_cell(
         "Dropped loan-off feeders",
-        loan_off_status.clone(),
-        tone_none_ok(&loan_off_status),
+        join_or_none(&loan_off),
+        "green",
     ));
-    let unresolved_status = join_or_none(&unresolved);
+    // T287: with 2+ raw links for one club the first in the vector wins, so a
+    // stale no-agreement link could hide a real one — partial, not an error.
+    cells.push(diagnostic_cell(
+        "Duplicate affiliation links",
+        join_or_none(&duplicates),
+        if duplicates.is_empty() { "green" } else { "yellow" },
+    ));
     cells.push(diagnostic_cell(
         "Unresolved affiliate partners",
-        unresolved_status.clone(),
-        tone_none_bad(&unresolved_status),
+        join_or_none(&unresolved),
+        if unresolved.is_empty() { "green" } else { "red" },
     ));
-    let loaded_status = join_or_none(&loaded);
-    let loaded_tone = if !unresolved.is_empty() && loaded.is_empty() {
-        "red"
-    } else if loaded.is_empty() {
-        "yellow"
-    } else {
-        "green"
-    };
     cells.push(diagnostic_cell(
         "Affiliate clubs loaded",
-        loaded_status,
-        loaded_tone,
-    ));
-
-    let squad_tab = bteam_affiliates
-        .iter()
-        .filter(|a| {
-            a.affiliation_type
-                .is_some_and(is_squad_tab_affiliation_type)
-                || a.affiliation_type.is_none()
-        })
-        .filter(|a| !a.match_experience_only)
-        .map(|a| {
-            let name = a.club_name.trim();
-            if name.is_empty() {
-                format!("uid {}", a.club_uid)
-            } else {
-                name.to_string()
-            }
-        })
-        .collect::<Vec<_>>();
-    let squad_tab_status = if squad_tab.is_empty() {
-        "none".to_string()
-    } else {
-        format!("{} · {} players promoted", squad_tab.join(", "), bteam_promoted)
-    };
-    cells.push(diagnostic_cell(
-        "Squad-tab affiliate clubs",
-        squad_tab_status.clone(),
-        tone_value_or_none(&squad_tab_status),
-    ));
-
-    let me_teams = club_teams
-        .iter()
-        .filter(|team| {
-            team.get("matchExperienceOnly")
-                .and_then(Value::as_bool)
-                .unwrap_or(false)
-                || team
-                    .get("affiliationType")
-                    .and_then(Value::as_u64)
-                    .is_some_and(|t| t == 0x01 || t == 0x03)
-        })
-        .filter_map(|team| {
-            let name = team
-                .get("name")
-                .and_then(Value::as_str)
-                .unwrap_or("")
-                .trim();
-            let club = team
-                .get("clubName")
-                .and_then(Value::as_str)
-                .unwrap_or("")
-                .trim();
-            let roster = team.get("rosterLen").and_then(Value::as_u64).unwrap_or(0);
-            if name.is_empty() && club.is_empty() {
-                None
-            } else if !name.is_empty() {
-                Some(format!("{name} ({roster})"))
-            } else {
-                Some(format!("{club} ({roster})"))
-            }
-        })
-        .collect::<Vec<_>>();
-    let me_status = join_or_none(&me_teams);
-    cells.push(diagnostic_cell(
-        "Match experience affiliate teams",
-        me_status.clone(),
-        tone_value_or_none(&me_status),
+        join_or_none(&loaded),
+        "green",
     ));
 
     cells
@@ -3279,7 +3072,6 @@ fn extract_live_data(
         )
     });
 
-    let mut club_squad_promoted = 0usize;
     if let Some(progress) = progress {
         progress("loading_youth_squads");
     }
@@ -3288,7 +3080,7 @@ fn extract_live_data(
             continue;
         }
         let label = entry.name.clone();
-        club_squad_promoted += load_team_roster(
+        load_team_roster(
             reader,
             module,
             profile,
@@ -3312,7 +3104,7 @@ fn extract_live_data(
     if let Some(progress) = progress {
         progress("loading_affiliate_squads");
     }
-    let (bteam_promoted, bteam_labels, bteam_teams) = load_bteam_affiliate_rosters(
+    let (_, bteam_labels, bteam_teams) = load_bteam_affiliate_rosters(
         reader,
         module,
         profile,
@@ -3331,7 +3123,6 @@ fn extract_live_data(
         &mut name_fallback_details,
         &mut player_vtable,
     );
-    club_squad_promoted += bteam_promoted;
     for label in bteam_labels {
         discovered_team_labels.push(label);
     }
@@ -3368,12 +3159,7 @@ fn extract_live_data(
         &skipped_squad_warning,
         &name_fallback_warning,
         &manager_pick_warning,
-        bteam_affiliates,
-        bteam_promoted,
         bteam_discovery.affiliation_type_report.as_ref(),
-        club_squad_promoted,
-        &discovered_team_labels,
-        &club_teams,
     );
     let club_employees = snapshot_club_employee_count(&players, &club_id);
     let clubs = vec![json!({

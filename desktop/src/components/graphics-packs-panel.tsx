@@ -13,11 +13,13 @@ type GraphicsPackEntry = {
 type GraphicsStatusPayload = {
   packs: GraphicsPackEntry[];
   graphicsPath?: string;
+  graphicsExists?: boolean;
 };
 
 export type GraphicsPacksStatus = {
   packs: GraphicsPackEntry[];
   graphicsPath?: string;
+  graphicsExists?: boolean;
   loading: boolean;
 };
 
@@ -77,6 +79,7 @@ export function useGraphicsPacksStatus(): GraphicsPacksStatus | null {
           setStatus({
             packs: next.packs ?? [],
             graphicsPath: next.graphicsPath,
+            graphicsExists: next.graphicsExists,
             loading: false,
           });
         }

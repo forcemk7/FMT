@@ -1,4 +1,5 @@
 import { getVersion } from "@tauri-apps/api/app";
+import { useSyncExternalStore } from "react";
 import { getPreferences } from "@/domain/preferences";
 
 /**
@@ -21,6 +22,35 @@ function isTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
+/** Last event actually posted this session, for Settings > Diagnostics. */
+export type LastSent = {
+  at: Date;
+  data: string;
+  ok: boolean;
+  httpStatus: number | null;
+};
+
+let lastSent: LastSent | null = null;
+const listeners = new Set<() => void>();
+
+function recordSent(entry: LastSent): void {
+  lastSent = entry;
+  for (const listener of listeners) listener();
+}
+
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+export function useLastSent(): LastSent | null {
+  return useSyncExternalStore(subscribe, () => lastSent, () => null);
+}
+
+export function isTelemetryConfigured(): boolean {
+  return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY) && isTauri();
+}
+
 let cachedAppVersion: string | null = null;
 
 async function resolveAppVersion(): Promise<string | null> {
@@ -39,12 +69,21 @@ async function postEvent(payload: {
   outcome?: Outcome;
   failure_reason?: string | null;
 }): Promise<void> {
-  if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !isTauri()) return;
+  if (!isTelemetryConfigured()) return;
   const anonId = getPreferences().telemetryId;
   if (!anonId) return;
   const appVersion = await resolveAppVersion();
+  // anon_id has its own Settings cell; show everything else exactly as sent.
+  const shown = {
+    event_type: payload.event_type,
+    outcome: payload.outcome ?? null,
+    failure_reason: payload.failure_reason ?? null,
+    app_version: appVersion ?? "unknown",
+  };
+  const body = { anon_id: anonId, ...shown };
+  const data = JSON.stringify(shown);
   try {
-    await fetch(`${SUPABASE_URL}/rest/v1/events`, {
+    const response = await fetch(`${SUPABASE_URL}/rest/v1/events`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -52,16 +91,12 @@ async function postEvent(payload: {
         Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
         Prefer: "return=minimal",
       },
-      body: JSON.stringify({
-        anon_id: anonId,
-        event_type: payload.event_type,
-        outcome: payload.outcome ?? null,
-        failure_reason: payload.failure_reason ?? null,
-        app_version: appVersion ?? "unknown",
-      }),
+      body: JSON.stringify(body),
     });
+    recordSent({ at: new Date(), data, ok: response.ok, httpStatus: response.status });
   } catch {
     // Telemetry must never surface an error to the user or block whatever it's reporting on.
+    recordSent({ at: new Date(), data, ok: false, httpStatus: null });
   }
 }
 
@@ -91,6 +126,9 @@ export function reportLoadResult(outcome: Outcome, failureReason: string | null)
     return;
   }
   lastLoadResult = { outcome, failureReason };
-  void postEvent({ event_type: "load_attempt" });
-  void postEvent({ event_type: "load_outcome", outcome, failure_reason: failureReason });
+  // Sequential so "last sent" is deterministically the outcome row.
+  void (async () => {
+    await postEvent({ event_type: "load_attempt" });
+    await postEvent({ event_type: "load_outcome", outcome, failure_reason: failureReason });
+  })();
 }

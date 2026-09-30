@@ -1,6 +1,6 @@
 ﻿# Status
 
-Last updated: 2026-09-29 (T297 added — Settings coherence pass, final 1.28 ticket; consolidated live test pass after or alongside)
+Last updated: 2026-09-30 (T297 closed — Settings coherence pass; next is the consolidated 1.28 live test pass)
 
 ## Now
 
@@ -30,7 +30,6 @@ Last updated: 2026-09-29 (T297 added — Settings coherence pass, final 1.28 tic
 
 | ID | Title | Status | Priority | Notes |
 |----|-------|--------|----------|-------|
-| T297 | Settings coherence pass — section-by-section truth audit | ready | 1 | final 1.28 ticket; owner-led, one section at a time; commit + push |
 | — | Consolidated 1.28 live test pass | — | — | reopen T290/T293/T139 if the pass finds issues |
 
 ## Deferred / not in FMT 1.28
@@ -50,6 +49,7 @@ Last updated: 2026-09-29 (T297 added — Settings coherence pass, final 1.28 tic
 
 ## Recently done
 
+- **T297** Settings coherence pass: every cell is an action (User Preferences) or a status cell = one real value + green/yellow/red tone; a working load is all green. Removed explainer/hardcoded/duplicate cells across all sections (FM26 28→13), rehomed misplaced cells (manager pointers → Manager, FMT version → Diagnostics, Name fallback + squad pointer → Players), Telemetry renamed **Diagnostics** with real last-send state, grid holes fixed, Larger-interface tooltip offset fixed. Rebuild needed (backend changed). Reopen T297 if the consolidated pass finds non-green cells on a working load.
 - **T139** CTRL theme (visual identity only): neutral graphite canvas instead of navy glass, flat header, uppercase tracked nav with an accent underline for the active desk, one accent (`#22e0a8`, a sharper mint) for active/primary states with gold left for warnings only, and tighter corners (panels 6px, chrome 4px). All of it lives in one override file, `desktop/src/app/theme-ctrl.css`, imported last in `layout.tsx`; revert = delete it and the import. Checked in the dev preview (Dashboard header/nav, Settings) with no save loaded; the save-loaded desks go into the consolidated pass. **Closed ahead of live QA by owner decision** ("I like it, perhaps it is sufficient") — reopen T139 if the pass finds leftovers.
 - **T293** Responsive desk + UI density: minimum/default window locked at **1180x1100** client (Player Profile, the tallest desk, fits every tab with no scrolling; Development was the binding tab). Owner rejected both stretched row spacing and a compressed profile layout: the profile stays exactly as before, the window is just larger, and tall displays show empty space below. New **Larger interface** preference (default off, 1.125x root zoom), and the minimum window scales with it (1328x1238) via a runtime `setMinSize`. Other desks and the Tauri window-growth path go into the end-of-1.28 consolidated test pass.
 - **T290** Minimal functional telemetry (install→launch→load→outcome), Supabase-backed. `anon`-role-INSERT-only RLS + a per-`anon_id` daily rate-limit trigger (bounds T274's heartbeat-retry failure mode; deliberately not defending against deliberate payload forgery, a threat tier out of scope here). Client posts directly to Supabase's REST API — no custom backend function. Reuses T215's `status.failureStage` verbatim as `failure_reason`; throttled to only send `load_outcome` on change. Disclosure lives in its own always-on Settings > Telemetry section, no opt-out (owner's explicit call — needs the unbiased signal for the 1.28 investment decision). Anon id in the existing T292 preferences store. Supabase URL/key read from `.env.local` (gitignored, `.env.example` documents the shape) — never committed. **Closed 2026-09-28 ahead of live QA, by explicit owner decision**: repo code is done and locally verified (`tsc`/`eslint`/`vitest` clean, dev-preview render confirmed) but never checked against a real Supabase project. Owner is batching live verification with T293/T139 at the end of 1.28 — reopen this ticket, not a new one, if that pass finds anything wrong.

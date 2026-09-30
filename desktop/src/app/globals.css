@@ -3054,3 +3054,8 @@ ul.attr-history-timeline-moves em[data-delta="down"]{color:var(--attr-tone-low,#
  * resolve against the real window, px lengths scale, so desks reflow instead of
  * overflowing. Standard = no zoom (today's compact size). */
 html[data-density="large"]{zoom:1.125}
+/* Floating UI positions in unzoomed px, but the positioner's own offsets get
+ * scaled by the root zoom again — undo it there and re-apply it to the popup,
+ * so the tooltip sits on its trigger at full size. */
+html[data-density="large"] [data-slot="tooltip-positioner"]{zoom:calc(1/1.125)}
+html[data-density="large"] [data-slot="tooltip-content"]{zoom:1.125}
