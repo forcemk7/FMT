@@ -4,16 +4,16 @@ import { getPreferences } from "@/domain/preferences";
 
 /**
  * T290 — minimal functional telemetry (install/launch → load → outcome).
- * Posts directly to Supabase's REST API with a public anon key (write-only
- * via RLS — see FMT/scrum/tickets/T290-minimal-functional-telemetry.md for
- * the table/policy). Read from NEXT_PUBLIC_SUPABASE_URL/ANON_KEY in
+ * Posts directly to Supabase's REST API with a publishable key (runs as the
+ * anon role; write-only via RLS — see FMT/scrum/tickets/T290-minimal-functional-telemetry.md
+ * for the table/policy). Read from NEXT_PUBLIC_SUPABASE_URL/PUBLISHABLE_KEY in
  * .env.local (see .env.example) rather than hardcoded here, so the real
  * values never need to go through source review. Missing/empty env is a
  * deliberate no-op, not a bug: every send silently skips instead of
  * throwing, so this file is safe to build against with no .env.local at all.
  */
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+const SUPABASE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "";
 
 type EventType = "launch" | "load_attempt" | "load_outcome";
 type Outcome = "success" | "failure";
@@ -48,7 +48,7 @@ export function useLastSent(): LastSent | null {
 }
 
 export function isTelemetryConfigured(): boolean {
-  return Boolean(SUPABASE_URL && SUPABASE_ANON_KEY) && isTauri();
+  return Boolean(SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY) && isTauri();
 }
 
 let cachedAppVersion: string | null = null;
@@ -87,8 +87,8 @@ async function postEvent(payload: {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+        // Publishable keys aren't JWTs — apikey header only; Authorization: Bearer is rejected.
+        apikey: SUPABASE_PUBLISHABLE_KEY,
         Prefer: "return=minimal",
       },
       body: JSON.stringify(body),
